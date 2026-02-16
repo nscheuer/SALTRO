@@ -9,5 +9,5 @@ doxygen
 # Sphinx Instructions
 ```bash
 python3 generate_rst.py
-make html
+sphinx-build -W -b html source build
 ```

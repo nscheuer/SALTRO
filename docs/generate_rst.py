@@ -4,8 +4,17 @@ from pathlib import Path
 SRC = Path("../include/saltro")
 DST = Path("source/api")
 
+
+def has_headers_recursive(folder: Path) -> bool:
+    return any(p.suffix == ".h" for p in folder.rglob("*.h"))
+
+
 for path in SRC.rglob("*"):
     if path.is_dir():
+        # Skip directories with no headers anywhere inside
+        if not has_headers_recursive(path):
+            continue
+
         rel = path.relative_to(SRC)
         out_dir = DST / rel
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -13,7 +22,10 @@ for path in SRC.rglob("*"):
         index = out_dir / "index.rst"
 
         subheaders = sorted(p.stem for p in path.glob("*.h"))
-        subdirs = sorted(p.name for p in path.iterdir() if p.is_dir())
+        subdirs = sorted(
+            p.name for p in path.iterdir()
+            if p.is_dir() and has_headers_recursive(p)
+        )
 
         with open(index, "w") as f:
             title = rel.name if rel != Path(".") else "API"
