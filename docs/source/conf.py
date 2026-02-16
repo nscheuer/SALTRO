@@ -14,18 +14,28 @@ release = '0.0.0'
 extensions = [
     "breathe",
     "sphinx.ext.mathjax",
-    "sphinx_rtd_dark_mode"
 ]
-default_dark_mode = True
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "pydata_sphinx_theme"
 html_static_path = ['_static']
 html_theme_options = {
-    "style_external_links": True,
+    "logo": {
+        "text": "SALTRO",
+    },
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    
+    # Empty this list to remove all icons (including GitHub)
+    "icon_links": [], 
+
+    "show_nav_level": 2,
 }
+html_logo = "_static/rexlab.png"
+html_css_files = [
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+]
 
 breathe_projects = {
     "saltro": "./xml"

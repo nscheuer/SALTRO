@@ -1,6 +1,6 @@
 # 🛰️ SALTRO
 <a href="https://roboticexplorationlab.org/">
-  <img src="docs/images/rexlab.png" alt="REXLab Logo" height="100">
+  <img src="docs/source/_static/rexlab.png" alt="REXLab Logo" height="100">
 </a>
 
 **Satellite Augmented Lagrangian Trajectory Optimizer** is a lightweight, flight-ready attitude trajectory optimizer for satellite pointing. It is built on the [ALTRO](https://bjack205.github.io/assets/ALTRO.pdf) trajectory optimizer. 
