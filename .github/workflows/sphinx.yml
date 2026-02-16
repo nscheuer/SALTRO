@@ -21,7 +21,7 @@ jobs:
     - name: Install project with documentation extras
       run: |
         pip install --upgrade pip
-        pip install -e ".[docs]"
+        pip install -r docs/requirements.txt
         
     - name: List installed packages (debug help)
       run: pip list
