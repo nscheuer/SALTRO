@@ -26,3 +26,8 @@ html_static_path = ['_static']
 html_theme_options = {
     "style_external_links": True,
 }
+
+breathe_projects = {
+    "saltro": "./xml"
+}
+breathe_default_project = "saltro"

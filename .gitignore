@@ -51,7 +51,8 @@ env.bak/
 venv.bak/
 
 # Ignore Doxygen output
-docs/latex/
-docs/xml/
-docs/html/
-docs/_build
+docs/source/latex/
+docs/source/xml/
+docs/source/html/
+docs/source/api/
+docs/build

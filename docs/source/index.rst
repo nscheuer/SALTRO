@@ -13,5 +13,8 @@ documentation for details.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+
+   api/math/index
+   api/optimizer/index
+   api/pybind/index
 

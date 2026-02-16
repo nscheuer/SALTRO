@@ -1,5 +1,6 @@
 #pragma once
 
+namespace saltro::math {
 /**
  * @brief Add two real numbers.
  *
@@ -18,3 +19,4 @@
  * @return Sum \f$a+b\f$
  */
 double add(double a, double b);
+}
