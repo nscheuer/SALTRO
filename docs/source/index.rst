@@ -10,4 +10,5 @@ documentation for details.
    :maxdepth: 1
 
    api/math/index
+   api/pybind/index
 

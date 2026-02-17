@@ -1,0 +1,26 @@
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/external/eigen",
+        "${workspaceFolder}/external/pybind11/include",
+        "/usr/include/python3.12"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}/include",
+          "${workspaceFolder}/external/eigen",
+          "${workspaceFolder}/external/pybind11/include",
+          "/usr/include/python3.12"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "compilerPath": "/usr/bin/g++",
+      "cppStandard": "c++20",
+      "intelliSenseMode": "linux-gcc-x64"
+    }
+  ],
+  "version": 4
+}
