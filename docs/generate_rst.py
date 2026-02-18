@@ -50,5 +50,6 @@ for path in SRC.rglob("*"):
             title = path.stem
             f.write(title + "\n")
             f.write("=" * len(title) + "\n\n")
-            f.write(f".. doxygenfile:: saltro/{rel}\n")
+            f.write(f".. doxygenfile:: {rel}\n")
             f.write("   :project: saltro\n")
+            f.write("   :path: ../include/saltro\n")

@@ -1,38 +1,70 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
+
+#include <Eigen/Dense>
+#include <saltro/limits.h>
 #include <saltro/orbit_generation/magnetics/compute_magnetic_igrf8.h>
 
 namespace py = pybind11;
 
-bool compute_magnetic_igrf8_py(
-    const Eigen::Ref<
-        const Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ>
-    >& R_ref,
-    const Eigen::Ref<
-        const Eigen::Matrix<double,1,saltro::limits::MAX_LENGTH_TRAJ>
-    >& jtime_ref,
-    int jtime_length,
-    Eigen::Ref<
-        Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ>
-    > B_ref)
+py::tuple compute_magnetic_igrf8_py(
+    const Eigen::Ref<const Eigen::MatrixXd>& R_in,
+    const Eigen::Ref<const Eigen::RowVectorXd>& jtime_in
+)
 {
-    Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> R = R_ref;
-    Eigen::Matrix<double,1,saltro::limits::MAX_LENGTH_TRAJ> jtime = jtime_ref;
+    const int N = jtime_in.size();
 
+    if (R_in.rows() != 3)
+        throw std::runtime_error("R must be shape (3, N)");
+
+    if (R_in.cols() != N)
+        throw std::runtime_error("R and jtime length mismatch");
+
+    if (N > saltro::limits::MAX_LENGTH_TRAJ)
+        throw std::runtime_error("Trajectory exceeds MAX_LENGTH_TRAJ");
+
+    // --- fixed flight buffers ---
+    Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> R;
+    Eigen::Matrix<double,1,saltro::limits::MAX_LENGTH_TRAJ> jtime;
     Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> B;
 
-    bool ok = saltro::orbit::compute_magnetic_igrf8(R,jtime,jtime_length,B);
+    // copy into fixed buffers
+    R.leftCols(N) = R_in;
+    jtime.leftCols(N) = jtime_in;
 
-    B_ref = B;
-    return ok;
+    const bool ok = saltro::orbit::compute_magnetic_igrf8(
+        R,
+        jtime,
+        N,
+        B
+    );
+
+    Eigen::MatrixXd Bout = B.leftCols(N);
+
+    return py::make_tuple(ok, Bout);
 }
 
 void bind_compute_magnetic_igrf8(py::module_& m)
 {
-    m.def("compute_magnetic_igrf8",
-          &compute_magnetic_igrf8_py,
-          py::arg("R"),
-          py::arg("jtime"),
-          py::arg("jtime_length"),
-          py::arg("B"));
+    m.def(
+        "compute_magnetic_igrf8",
+        &compute_magnetic_igrf8_py,
+        py::arg("R"),
+        py::arg("jtime"),
+        R"doc(
+Compute magnetic field using IGRF8 model.
+
+Parameters
+----------
+R : ndarray (3,N)
+    Position vectors
+jtime : ndarray (N,)
+    Julian times
+
+Returns
+-------
+ok : bool
+B : ndarray (3,N)
+)doc"
+    );
 }

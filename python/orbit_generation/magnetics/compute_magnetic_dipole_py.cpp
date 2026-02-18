@@ -7,32 +7,39 @@
 
 namespace py = pybind11;
 
-bool compute_magnetic_dipole_py(
-    const Eigen::Ref<
-        const Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ>
-    >& R_ref,
-    const Eigen::Ref<
-        const Eigen::Matrix<double,1,saltro::limits::MAX_LENGTH_TRAJ>
-    >& jtime_ref,
-    int jtime_length,
-    Eigen::Ref<
-        Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ>
-    > B_ref
+py::tuple compute_magnetic_dipole_py(
+    const Eigen::Ref<const Eigen::MatrixXd>& R_in,
+    const Eigen::Ref<const Eigen::RowVectorXd>& jtime_in
 ) {
-    Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> R = R_ref;
-    Eigen::Matrix<double,1,saltro::limits::MAX_LENGTH_TRAJ> jtime = jtime_ref;
+    const int N = jtime_in.size();
 
+    if (R_in.rows() != 3)
+        throw std::runtime_error("R must be shape (3, N)");
+
+    if (R_in.cols() != N)
+        throw std::runtime_error("R and jtime length mismatch");
+
+    if (N > saltro::limits::MAX_LENGTH_TRAJ)
+        throw std::runtime_error("Trajectory exceeds MAX_LENGTH_TRAJ");
+
+    Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> R;
+    Eigen::Matrix<double,1,saltro::limits::MAX_LENGTH_TRAJ> jtime;
     Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> B;
+
+    R.leftCols(N) = R_in;
+    jtime.leftCols(N) = jtime_in;
 
     const bool ok = saltro::orbit::compute_magnetic_dipole(
         R,
         jtime,
-        jtime_length,
+        N,
         B
     );
 
-    B_ref = B;
-    return ok;
+    // output numpy matrix
+    Eigen::MatrixXd Bout = B.leftCols(N);
+
+    return py::make_tuple(ok, Bout);
 }
 
 void bind_compute_magnetic_dipole(py::module_& m) {
@@ -41,7 +48,20 @@ void bind_compute_magnetic_dipole(py::module_& m) {
         &compute_magnetic_dipole_py,
         py::arg("R"),
         py::arg("jtime"),
-        py::arg("jtime_length"),
-        py::arg("B")
+        R"doc(
+Compute magnetic field using tilted dipole model.
+
+Parameters
+----------
+R : ndarray (3,N)
+    Position vectors
+jtime : ndarray (N,)
+    Julian times
+
+Returns
+-------
+ok : bool
+B : ndarray (3,N)
+)doc"
     );
 }
