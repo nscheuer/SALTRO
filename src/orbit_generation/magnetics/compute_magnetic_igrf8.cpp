@@ -43,8 +43,8 @@ bool compute_magnetic_igrf8(
 
     Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& B
 ) {
-    constexpr int NMAX = saltro::constants::IGRF8_NMAX;
-    const double a = saltro::constants::IGRF_EARTH_REFERENCE_RADIUS;
+    constexpr int NMAX = saltro::constants::IGRF8::NMAX;
+    const double a = saltro::constants::IGRF8::EARTH_REFERENCE_RADIUS;
 
     for(int k=0; k<jtime_length; k++)
     {
@@ -85,8 +85,8 @@ bool compute_magnetic_igrf8(
 
             for(int m=0; m<=n; m++)
             {
-                const double g = saltro::constants::IGRF8_G[n][m];
-                const double h = saltro::constants::IGRF8_H[n][m];
+                const double g = saltro::constants::IGRF8::G[n][m];
+                const double h = saltro::constants::IGRF8::H[n][m];
 
                 const double cos_m = std::cos(m*phi);
                 const double sin_m = std::sin(m*phi);

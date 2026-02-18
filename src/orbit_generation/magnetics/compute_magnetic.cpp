@@ -1,3 +1,4 @@
+#include <saltro/orbit_generation/magnetics/compute_magnetic.h>
 #include <saltro/orbit_generation/magnetics/compute_magnetic_dipole.h>
 #include <saltro/orbit_generation/magnetics/compute_magnetic_igrf8.h>
 #include <saltro/orbit_generation/magnetics/compute_magnetic_igrf13.h>

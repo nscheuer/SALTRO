@@ -1,13 +1,13 @@
 #pragma once
 #include <array>
 
-namespace saltro::constants {
+namespace saltro::constants::IGRF8 {
 
-constexpr int IGRF8_NMAX = 8;
+constexpr int NMAX = 8;
 
-extern const double IGRF8_G[IGRF8_NMAX+1][IGRF8_NMAX+1];
-extern const double IGRF8_H[IGRF8_NMAX+1][IGRF8_NMAX+1];
+extern const double G[NMAX+1][NMAX+1];
+extern const double H[NMAX+1][NMAX+1];
 
-constexpr double IGRF_EARTH_REFERENCE_RADIUS = 6371200.0;
+constexpr double EARTH_REFERENCE_RADIUS = 6371200.0;
 
 }

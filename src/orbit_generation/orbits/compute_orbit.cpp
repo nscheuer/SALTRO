@@ -1,3 +1,4 @@
+#include <saltro/orbit_generation/orbits/compute_orbit.h>
 #include <saltro/orbit_generation/orbits/compute_orbit_keplerian.h>
 
 namespace saltro::orbit {

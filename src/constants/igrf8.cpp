@@ -1,8 +1,8 @@
 #include <saltro/constants/igrf8.h>
 
-namespace saltro::constants {
+namespace saltro::constants::IGRF8 {
 
-const double IGRF8_G[IGRF8_NMAX+1][IGRF8_NMAX+1] = {
+const double G[NMAX+1][NMAX+1] = {
 {0},
 {-29350.0, -1410.3},
 {-2556.2, 2950.9, 1648.7},
@@ -14,7 +14,7 @@ const double IGRF8_G[IGRF8_NMAX+1][IGRF8_NMAX+1] = {
 {23.1, 10.9, -17.5, 2.0, -21.8, 16.9, 14.9, -16.8, 1.0}
 };
 
-const double IGRF8_H[IGRF8_NMAX+1][IGRF8_NMAX+1] = {
+const double H[NMAX+1][NMAX+1] = {
 {0},
 {0, 4545.5},
 {0, -3133.6, -814.2},
