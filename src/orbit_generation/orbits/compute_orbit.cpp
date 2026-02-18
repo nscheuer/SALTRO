@@ -1,7 +1,7 @@
 #include <saltro/orbit_generation/orbits/compute_orbit.h>
 #include <saltro/orbit_generation/orbits/compute_orbit_keplerian.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 bool compute_orbit(
     const Eigen::Vector3d& r0,

@@ -2,7 +2,7 @@
 #include <saltro/math/frames.h>
 #include <saltro/constants/constants.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 bool compute_magnetic_dipole(
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& R,

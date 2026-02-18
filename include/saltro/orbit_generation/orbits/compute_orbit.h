@@ -3,7 +3,7 @@
 #include <Eigen/Dense>
 #include <saltro/limits.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 bool compute_orbit(
     const Eigen::Vector3d& r0,

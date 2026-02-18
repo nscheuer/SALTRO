@@ -28,7 +28,7 @@ py::tuple compute_orbit_keplerian_py(
 
     jtime.leftCols(N) = jtime_in;
 
-    const bool ok = saltro::orbit::compute_orbit_keplerian(
+    const bool ok = saltro::orbits::compute_orbit_keplerian(
         r0,
         v0,
         jtime,

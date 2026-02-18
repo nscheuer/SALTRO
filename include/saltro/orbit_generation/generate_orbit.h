@@ -4,7 +4,7 @@
 
 #include <saltro/limits.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 bool generate_orbit(
     const Eigen::Vector3d& r0,

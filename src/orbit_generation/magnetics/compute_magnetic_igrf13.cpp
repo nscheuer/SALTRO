@@ -4,7 +4,7 @@
 #include <saltro/math/frames.h>
 #include <cmath>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
     
 static inline void legendre(
     int nmax,

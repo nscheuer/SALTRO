@@ -3,7 +3,7 @@
 #include <saltro/orbit_generation/magnetics/compute_magnetic.h>
 #include <saltro/orbit_generation/sun/compute_sun.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 bool generate_orbit(
     const Eigen::Vector3d& r0,

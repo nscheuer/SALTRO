@@ -32,7 +32,7 @@ py::tuple compute_magnetic_igrf13_py(
     R.leftCols(N) = R_in;
     jtime.leftCols(N) = jtime_in;
 
-    const bool ok = saltro::orbit::compute_magnetic_igrf13(
+    const bool ok = saltro::orbits::compute_magnetic_igrf13(
         R,
         jtime,
         N,

@@ -29,7 +29,7 @@ py::tuple compute_magnetic_dipole_py(
     R.leftCols(N) = R_in;
     jtime.leftCols(N) = jtime_in;
 
-    const bool ok = saltro::orbit::compute_magnetic_dipole(
+    const bool ok = saltro::orbits::compute_magnetic_dipole(
         R,
         jtime,
         N,

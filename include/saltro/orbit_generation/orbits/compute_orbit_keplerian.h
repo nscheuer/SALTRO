@@ -3,7 +3,7 @@
 #include <Eigen/Dense>
 #include <saltro/limits.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 /**
  * @brief Propagate an orbit using Keplerian two-body dynamics.

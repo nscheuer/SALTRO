@@ -14,7 +14,7 @@ int main() {
     Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> R;
     Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> V;
 
-    bool ok = saltro::orbit::compute_orbit_keplerian(r0,v0,t,100,R,V);
+    bool ok = saltro::orbits::compute_orbit_keplerian(r0,v0,t,100,R,V);
 
      if(!ok){
         std::cout<<"FAIL\n";

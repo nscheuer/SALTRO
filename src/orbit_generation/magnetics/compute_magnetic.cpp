@@ -3,7 +3,7 @@
 #include <saltro/orbit_generation/magnetics/compute_magnetic_igrf8.h>
 #include <saltro/orbit_generation/magnetics/compute_magnetic_igrf13.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 bool compute_magnetic(
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& R,

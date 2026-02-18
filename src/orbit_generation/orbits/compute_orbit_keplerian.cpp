@@ -2,7 +2,7 @@
 #include <saltro/constants/constants.h>
 #include <cmath>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 static inline void stumpff(double z, double&C, double& S){
     if (std::abs(z) < 1e-8) {

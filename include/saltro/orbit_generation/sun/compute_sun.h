@@ -3,7 +3,7 @@
 #include <Eigen/Dense>
 #include <saltro/limits.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 bool compute_sun(
     Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& R,

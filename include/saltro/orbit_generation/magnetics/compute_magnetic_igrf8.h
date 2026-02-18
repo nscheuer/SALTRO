@@ -2,7 +2,7 @@
 #include <Eigen/Dense>
 #include <saltro/limits.h>
 
-namespace saltro::orbit {
+namespace saltro::orbits {
 
 /**
  * @brief Compute geomagnetic field using the IGRF-8 model.
