@@ -1,7 +1,7 @@
 #pragma once
 
 namespace saltro::limits {
-    inline constexpr int MAX_LENGTH_TRAJ = 1000;
+    inline constexpr int MAX_LENGTH_TRAJ = 10000;
 
     inline constexpr int KEPLER_MAX_ITERS = 8;
     inline constexpr double KEPLER_TOLERANCE = 1e-10;

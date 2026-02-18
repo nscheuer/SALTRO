@@ -1,6 +1,7 @@
 #include <iostream>
 #include <Eigen/Dense>
 #include <saltro/orbit_generation/orbits/compute_orbit_keplerian.h>
+#include <saltro/orbit_generation/magnetics/compute_magnetic_dipole.h>
 #include <saltro/constants/constants.h>
 #include <saltro/limits.h>
 
@@ -22,8 +23,16 @@ int main() {
         return 1;
     }
 
-    std::cout<<"R0: "<<R.col(0).transpose()<<"\n";
-    std::cout<<"R10: "<<R.col(10).transpose()<<"\n";
+    Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ> B;
+    ok = saltro::orbit::compute_magnetic_dipole(R,t,100,B);
+
+     if(!ok){
+        std::cout<<"FAIL\n";
+        return 1;
+    }
+
+    std::cout<<"B at R0: "<<B.col(0).transpose()<<"\n";
+    std::cout<<"B at R10: "<<B.col(10).transpose()<<"\n";
 
     return 0;
 }

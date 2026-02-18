@@ -42,7 +42,7 @@ bool compute_orbit_keplerian_py(
     return ok;
 }
 
-PYBIND11_MODULE(saltro_py, m)
+void bind_compute_orbit(py::module_& m)
 {
     m.def(
         "compute_orbit_keplerian",
