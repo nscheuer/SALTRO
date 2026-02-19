@@ -1,0 +1,41 @@
+name: saltro-ci
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y cmake ninja-build ccache python3-pip catch2
+
+      - name: Install Python packages
+        run: |
+          pip install pytest numpy
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -DSALTRO_BUILD_PYTHON=ON
+
+      - name: Build
+        run: |
+          cmake --build build -- -j4
+
+      - name: Run C++ tests
+        run: |
+          cd build
+          ctest --output-on-failure
+
+      - name: Run Python tests
+        run: |
+          cd tests
+          pytest -q
