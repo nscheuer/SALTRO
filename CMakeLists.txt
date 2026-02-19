@@ -45,20 +45,69 @@ target_include_directories(saltro PUBLIC
 target_link_libraries(saltro PUBLIC Eigen3::Eigen)
 
 if(SALTRO_BUILD_PYTHON)
+
     file(GLOB_RECURSE PYTHON_BINDING_SOURCES
-        ${CMAKE_SOURCE_DIR}/python/**/*_py.cpp
+        ${CMAKE_SOURCE_DIR}/python/*_py.cpp
     )
 
     if(NOT PYTHON_BINDING_SOURCES)
         message(WARNING "No Python binding sources found in python/")
     else()
 
+        # -----------------------------
+        # Generate module.cpp automatically
+        # -----------------------------
+
+        set(GENERATED_MODULE_CPP ${CMAKE_BINARY_DIR}/saltro_generated_module.cpp)
+
+        file(WRITE ${GENERATED_MODULE_CPP}
+            "#include <pybind11/pybind11.h>\n"
+            "namespace py = pybind11;\n\n"
+        )
+
+        # Forward declarations
+        foreach(binding ${PYTHON_BINDING_SOURCES})
+
+            get_filename_component(fname ${binding} NAME_WE)
+            string(REPLACE "_py" "" base ${fname})
+
+            file(APPEND ${GENERATED_MODULE_CPP}
+                "void bind_${base}(py::module_&);\n"
+            )
+
+        endforeach()
+
+        file(APPEND ${GENERATED_MODULE_CPP}
+            "\nPYBIND11_MODULE(saltro_py, m)\n{\n"
+            "    m.doc() = \"saltro python bindings\";\n"
+        )
+
+        # Call all binders
+        foreach(binding ${PYTHON_BINDING_SOURCES})
+
+            get_filename_component(fname ${binding} NAME_WE)
+            string(REPLACE "_py" "" base ${fname})
+
+            file(APPEND ${GENERATED_MODULE_CPP}
+                "    bind_${base}(m);\n"
+            )
+
+        endforeach()
+
+        file(APPEND ${GENERATED_MODULE_CPP}
+            "}\n"
+        )
+
+        # Build module
         pybind11_add_module(saltro_py
             ${PYTHON_BINDING_SOURCES}
+            ${GENERATED_MODULE_CPP}
         )
 
         target_link_libraries(saltro_py PRIVATE saltro)
+
     endif()
+
 endif()
 
 if(SALTRO_BUILD_MANUAL_DEBUG)
