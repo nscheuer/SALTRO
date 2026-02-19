@@ -7,16 +7,22 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(SALTRO_BUILD_PYTHON "Build python bindings" ON)
 option(SALTRO_BUILD_MANUAL_DEBUG "Build manual debug executables" ON)
+option(SALTRO_BUILD_TESTS "Build unit tests" ON)
 
 include(FetchContent)
 
+set(EIGEN_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     eigen
     GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
     GIT_TAG 3.4.0
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/eigen
 )
-FetchContent_MakeAvailable(eigen)
+FetchContent_Populate(eigen)
+add_library(Eigen3::Eigen INTERFACE IMPORTED)
+target_include_directories(Eigen3::Eigen INTERFACE
+    ${CMAKE_SOURCE_DIR}/external/eigen
+)
 
 if(SALTRO_BUILD_PYTHON)
     FetchContent_Declare(
@@ -150,6 +156,66 @@ if(SALTRO_BUILD_MANUAL_DEBUG)
         set_target_properties(${target_name} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY
             ${CMAKE_BINARY_DIR}/debug_tests/${rel_dir}
+        )
+
+    endforeach()
+
+endif()
+
+if(SALTRO_BUILD_TESTS)
+
+    include(CTest)
+    enable_testing()
+
+    FetchContent_Declare(
+        catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.5.0
+    )
+    FetchContent_MakeAvailable(catch2)
+
+    file(GLOB_RECURSE UNIT_TEST_SOURCES
+        CONFIGURE_DEPENDS
+        ${CMAKE_SOURCE_DIR}/tests/unit/test_*.cpp
+    )
+
+    foreach(test_src ${UNIT_TEST_SOURCES})
+
+        # Get path relative to tests/unit
+        file(RELATIVE_PATH rel_path
+            ${CMAKE_SOURCE_DIR}/tests/unit
+            ${test_src}
+        )
+
+        # Remove extension
+        get_filename_component(rel_no_ext ${rel_path} NAME_WE)
+
+        # Get subdirectory
+        get_filename_component(rel_dir ${rel_path} DIRECTORY)
+
+        # Replace "/" with "_" for safe target names
+        string(REPLACE "/" "_" target_name ${rel_path})
+        string(REPLACE ".cpp" "" target_name ${target_name})
+
+        add_executable(${target_name} ${test_src})
+
+        target_link_libraries(${target_name}
+            PRIVATE
+            saltro
+            Catch2::Catch2WithMain
+        )
+
+        target_include_directories(${target_name}
+            PRIVATE
+            ${CMAKE_SOURCE_DIR}/include
+        )
+
+        add_test(NAME ${target_name} COMMAND ${target_name})
+
+        # Optional: preserve folder structure in build directory
+        set_target_properties(${target_name} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY
+            ${CMAKE_BINARY_DIR}/unit_tests/${rel_dir}
         )
 
     endforeach()

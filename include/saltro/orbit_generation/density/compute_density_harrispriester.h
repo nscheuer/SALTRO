@@ -5,7 +5,7 @@
 
 namespace saltro::orbits {
 
-bool compute_denisty_harrispriester(
+bool compute_density_harrispriester(
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& R,
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& S,
     const int jtime_length,

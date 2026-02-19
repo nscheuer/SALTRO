@@ -87,7 +87,7 @@ static inline double density_harris_priester_single(const Eigen::Vector3d& r_eci
     return rho_min + (rho_max - rho_min) * cos_pow;
 }
 
-bool compute_denisty_harrispriester(
+bool compute_density_harrispriester(
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& R,
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& S,
     const int jtime_length,

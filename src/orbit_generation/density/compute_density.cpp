@@ -12,7 +12,7 @@ bool compute_density(
 ) {
     switch (density_model) {
         case 0:
-            return compute_denisty_harrispriester(R, S, jtime_length, rho);
+            return compute_density_harrispriester(R, S, jtime_length, rho);
         default:
             return false;
     }

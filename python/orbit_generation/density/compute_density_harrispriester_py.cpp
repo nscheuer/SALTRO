@@ -30,7 +30,7 @@ py::tuple compute_density_harrispriester_py(
     R.leftCols(N) = R_in;
     S.leftCols(N) = S_in;
 
-    const bool ok = saltro::orbits::compute_denisty_harrispriester(
+    const bool ok = saltro::orbits::compute_density_harrispriester(
         R,
         S,
         N,

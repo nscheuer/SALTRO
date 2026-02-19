@@ -10,3 +10,9 @@ sudo apt install ccache
 cmake -S . -B build -DSALTRO_BUILD_PYTHON=ON
 cmake --build build -j
 ```
+
+# Python Tests
+```bash
+pip install git+https://github.com/poliastro/poliastro
+pip install astropy
+```

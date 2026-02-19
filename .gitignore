@@ -62,3 +62,6 @@ build/
 
 # External libraries
 external/
+
+# Test Log
+Testing/
