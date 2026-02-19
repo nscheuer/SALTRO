@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(SALTRO_BUILD_PYTHON "Build python bindings" ON)
-option(SALTRO_BUILD_MANUAL_TESTS "Build manual test executables" ON)
+option(SALTRO_BUILD_MANUAL_DEBUG "Build manual debug executables" ON)
 
 include(FetchContent)
 
@@ -46,7 +46,7 @@ target_link_libraries(saltro PUBLIC Eigen3::Eigen)
 
 if(SALTRO_BUILD_PYTHON)
     file(GLOB_RECURSE PYTHON_BINDING_SOURCES
-        ${CMAKE_SOURCE_DIR}/python/*.cpp
+        ${CMAKE_SOURCE_DIR}/python/**/*_py.cpp
     )
 
     if(NOT PYTHON_BINDING_SOURCES)
@@ -61,31 +61,46 @@ if(SALTRO_BUILD_PYTHON)
     endif()
 endif()
 
-if(SALTRO_BUILD_MANUAL_TESTS)
+if(SALTRO_BUILD_MANUAL_DEBUG)
 
-    file(GLOB_RECURSE MANUAL_TEST_SOURCES
-        ${CMAKE_SOURCE_DIR}/tests/manual/*.cpp
+    file(GLOB_RECURSE DEBUG_TEST_SOURCES
+        ${CMAKE_SOURCE_DIR}/tests/debug/debug_*.cpp
     )
 
-    foreach(test_src ${MANUAL_TEST_SOURCES})
+    foreach(test_src ${DEBUG_TEST_SOURCES})
 
-        get_filename_component(test_name ${test_src} NAME_WE)
+        # Get path relative to tests/debug
+        file(RELATIVE_PATH rel_path
+            ${CMAKE_SOURCE_DIR}/tests/debug
+            ${test_src}
+        )
 
-        add_executable(${test_name} ${test_src})
+        # Remove .cpp extension
+        get_filename_component(rel_path_no_ext ${rel_path} NAME_WE)
 
-        target_link_libraries(${test_name}
+        # Get directory relative to tests/debug
+        get_filename_component(rel_dir ${rel_path} DIRECTORY)
+
+        # Create executable name (replace / with _ to avoid target name issues)
+        string(REPLACE "/" "_" target_name ${rel_path_no_ext})
+
+        add_executable(${target_name} ${test_src})
+
+        target_link_libraries(${target_name}
             PRIVATE
             saltro
             Eigen3::Eigen
         )
 
-        target_include_directories(${test_name}
+        target_include_directories(${target_name}
             PRIVATE
             ${CMAKE_SOURCE_DIR}/include
         )
 
-        set_target_properties(${test_name} PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/manual_tests
+        # Preserve folder structure in build directory
+        set_target_properties(${target_name} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY
+            ${CMAKE_BINARY_DIR}/debug_tests/${rel_dir}
         )
 
     endforeach()

@@ -43,7 +43,7 @@ py::tuple compute_orbit_keplerian_py(
     return py::make_tuple(ok, Rout, Vout);
 }
 
-void bind_compute_orbit(py::module_& m)
+void bind_compute_orbit_keplerian(py::module_& m)
 {
     m.def(
         "compute_orbit_keplerian",
