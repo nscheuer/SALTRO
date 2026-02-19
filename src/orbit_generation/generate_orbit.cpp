@@ -2,6 +2,7 @@
 #include <saltro/orbit_generation/orbits/compute_orbit.h>
 #include <saltro/orbit_generation/magnetics/compute_magnetic.h>
 #include <saltro/orbit_generation/sun/compute_sun.h>
+#include <saltro/orbit_generation/density/compute_density.h>
 
 namespace saltro::orbits {
 
@@ -24,7 +25,7 @@ bool generate_orbit(
     if (!compute_orbit(r0, v0, jtime, jtime_length, orbit_model, R, V)) return false;
     if (!compute_magnetic(R, jtime, jtime_length, magnetic_model, B)) return false;
     if (!compute_sun(R, jtime, jtime_length, sun_model, S)) return false;
-    // if (!compute_density(R, jtime_length, density_model, rho)) return false;
+    if (!compute_density(R, S, jtime_length, density_model, rho)) return false;
     return true;
 }
 

@@ -56,4 +56,29 @@ Eigen::Matrix3d ecef_to_eci_dcm(double jcentury) {
     return eci_to_ecef_dcm(jcentury).transpose();
 }
 
+Eigen::Vector3d rotate_about_z(const Eigen::Vector3d& v, const double angle_rad) {
+    const double c = std::cos(angle_rad);
+    const double s = std::sin(angle_rad);
+    return Eigen::Vector3d(
+        c * v.x() - s * v.y(),
+        s * v.x() + c * v.y(),
+        v.z()
+    );
+}
+
+bool unit_vector(const Eigen::Vector3d& v, Eigen::Vector3d& out_unit) {
+    const double n = v.norm();
+    if (!(n > 0.0)) {
+        return false;
+    }
+    out_unit = v / n;
+    return true;
+}
+
+double clamp(const double x, const double lo, const double hi) {
+    if (x < lo) return lo;
+    if (x > hi) return hi;
+    return x;
+}
+
 }
