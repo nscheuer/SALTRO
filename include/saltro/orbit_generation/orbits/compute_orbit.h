@@ -28,6 +28,7 @@ namespace saltro::orbits {
  *
  * Supported models:
  * - \f$0\f$ → Two-body Keplerian propagation
+ * - \f$1\f$ → J2 perturbation with RK4 integration
  *
  * The output state matrices are written column-wise:
  * \f[

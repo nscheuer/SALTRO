@@ -74,6 +74,7 @@ namespace saltro::orbits {
  * Supported model identifiers:
  * - Orbit model:
  *   - 0 → Keplerian two-body propagation
+ *   - 1 → J2 perturbation with RK4 integration
  * - Magnetic model:
  *   - 0 → Tilted dipole
  *   - 1 → IGRF-8
