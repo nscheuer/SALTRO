@@ -1,0 +1,7 @@
+pybind
+======
+
+.. toctree::
+   :maxdepth: 1
+
+   plannersettings

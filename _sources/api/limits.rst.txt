@@ -1,0 +1,6 @@
+limits
+======
+
+.. doxygenfile:: limits.h
+   :project: saltro
+   :path: ../include/saltro

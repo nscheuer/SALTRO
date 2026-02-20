@@ -1,0 +1,6 @@
+compute_orbit
+=============
+
+.. doxygenfile:: orbit_generation/orbits/compute_orbit.h
+   :project: saltro
+   :path: ../include/saltro

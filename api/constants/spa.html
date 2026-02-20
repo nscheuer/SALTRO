@@ -1,0 +1,685 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>spa &#8212; SALTRO 0.0.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=7026087e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/constants/spa';</script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="math" href="../math/index.html" />
+    <link rel="prev" title="igrf8" href="igrf8.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../_static/rexlab.png" class="logo__image only-light" alt=""/>
+    <img src="../../_static/rexlab.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">SALTRO</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../pybind/index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../pybind/index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="constants.html">constants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="harrispriester.html">harrispriester</a></li>
+<li class="toctree-l1"><a class="reference internal" href="igrf13.html">igrf13</a></li>
+<li class="toctree-l1"><a class="reference internal" href="igrf8.html">igrf8</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">spa</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">constants</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">spa</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="spa">
+<h1>spa<a class="headerlink" href="#spa" title="Link to this heading">#</a></h1>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv46saltro">
+<span id="_CPPv36saltro"></span><span id="_CPPv26saltro"></span><span id="saltro"></span><span class="target" id="namespacesaltro"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">saltro</span></span></span><br /></dt>
+<dd><dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constantsE">
+<span id="_CPPv3N6saltro9constantsE"></span><span id="_CPPv2N6saltro9constantsE"></span><span id="saltro::constants"></span><span class="target" id="namespacesaltro_1_1constants"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">constants</span></span></span><br /></dt>
+<dd><dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPAE">
+<span id="_CPPv3N6saltro9constants7NRELSPAE"></span><span id="_CPPv2N6saltro9constants7NRELSPAE"></span><span id="saltro::constants::NRELSPA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NRELSPA</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPAE" title="Link to this definition">#</a><br /></dt>
+<dd><div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-variables">Variables</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L0_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L0_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L0_TABLEE"></span><span id="saltro::constants::NRELSPA::L0_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a3d58b830f81cc65f6fca494776ec8aaf"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L0_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L0_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L0_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L0_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L0_COUNTE"></span><span id="saltro::constants::NRELSPA::L0_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1ad704b660efb1d44f060a1eeef436cd68"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L0_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L0_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L1_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L1_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L1_TABLEE"></span><span id="saltro::constants::NRELSPA::L1_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a7c016827ec6f898e0ebd2c19d625c525"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L1_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L1_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L1_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L1_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L1_COUNTE"></span><span id="saltro::constants::NRELSPA::L1_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a86ebefff162679cec7a9b46fbf9f26ae"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L1_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L1_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L2_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L2_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L2_TABLEE"></span><span id="saltro::constants::NRELSPA::L2_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a390caa2e07ed3e7559145484e891c5ab"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L2_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L2_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L2_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L2_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L2_COUNTE"></span><span id="saltro::constants::NRELSPA::L2_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a2c92b901ceb71693fcbd853127eab995"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L2_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L2_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L3_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L3_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L3_TABLEE"></span><span id="saltro::constants::NRELSPA::L3_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1afd16ce79a8d943664cf777454cc05429"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L3_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L3_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L3_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L3_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L3_COUNTE"></span><span id="saltro::constants::NRELSPA::L3_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a3b7524b0867b4e920b9c6c9df775e4ee"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L3_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L3_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L4_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L4_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L4_TABLEE"></span><span id="saltro::constants::NRELSPA::L4_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a5c077332229c88d58d788319f27cfd99"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L4_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L4_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L4_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L4_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L4_COUNTE"></span><span id="saltro::constants::NRELSPA::L4_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1adeeb4859fca255c8d1a6fdc30f5acede"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L4_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L4_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L5_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L5_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L5_TABLEE"></span><span id="saltro::constants::NRELSPA::L5_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a0fd9375e692eb9b93c60f3cb00a34a51"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L5_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L5_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8L5_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8L5_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8L5_COUNTE"></span><span id="saltro::constants::NRELSPA::L5_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a2c90dc6ccf42971a12a762a56c736469"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">L5_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8L5_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8B0_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8B0_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8B0_TABLEE"></span><span id="saltro::constants::NRELSPA::B0_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1aca6cc92e4d22a6f21c616d939f179384"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">B0_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8B0_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8B0_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8B0_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8B0_COUNTE"></span><span id="saltro::constants::NRELSPA::B0_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1af4987296b452c088f2c66c7b40013f03"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">B0_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8B0_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8B1_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8B1_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8B1_TABLEE"></span><span id="saltro::constants::NRELSPA::B1_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a1db7507d60d3c2f96728de603cb7b94d"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">B1_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8B1_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8B1_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8B1_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8B1_COUNTE"></span><span id="saltro::constants::NRELSPA::B1_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1aa41f9b693b9cbf6eeceb45d9bace10b8"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">B1_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8B1_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R0_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R0_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R0_TABLEE"></span><span id="saltro::constants::NRELSPA::R0_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a63ad57726770ad3d772f8d775db90dcd"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R0_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R0_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R0_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R0_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R0_COUNTE"></span><span id="saltro::constants::NRELSPA::R0_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a0f0e629281ab78c04ef966da7f02df08"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R0_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R0_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R1_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R1_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R1_TABLEE"></span><span id="saltro::constants::NRELSPA::R1_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1aa1051a964f1837940d08893132845606"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R1_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R1_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R1_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R1_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R1_COUNTE"></span><span id="saltro::constants::NRELSPA::R1_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a6786682c65f4c9e2ba0141452bd98dea"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R1_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R1_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R2_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R2_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R2_TABLEE"></span><span id="saltro::constants::NRELSPA::R2_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a42b0a0916122772da83d830736f1914f"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R2_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R2_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R2_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R2_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R2_COUNTE"></span><span id="saltro::constants::NRELSPA::R2_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a9bcced6d4e81884aa6eb1cb819247021"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R2_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R2_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R3_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R3_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R3_TABLEE"></span><span id="saltro::constants::NRELSPA::R3_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a93d2d390a0d1134d27e1d6f68bb8a9c7"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R3_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R3_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R3_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R3_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R3_COUNTE"></span><span id="saltro::constants::NRELSPA::R3_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a637b97f7623dc25fb4686e78ebaa6505"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R3_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R3_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R4_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R4_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R4_TABLEE"></span><span id="saltro::constants::NRELSPA::R4_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a3b340e984c60ff5a3d7e6bc026ca9e58"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R4_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R4_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA8R4_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA8R4_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA8R4_COUNTE"></span><span id="saltro::constants::NRELSPA::R4_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a7abc1f1bb267a347258d90a0d2b2c129"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R4_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA8R4_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA7Y_TABLEE">
+<span id="_CPPv3N6saltro9constants7NRELSPA7Y_TABLEE"></span><span id="_CPPv2N6saltro9constants7NRELSPA7Y_TABLEE"></span><span id="saltro::constants::NRELSPA::Y_TABLE__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a0daa03684440f6c2aaa030fc9def4aae"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Y_TABLE</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><span class="m"><span class="pre">9</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA7Y_TABLEE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7NRELSPA7Y_COUNTE">
+<span id="_CPPv3N6saltro9constants7NRELSPA7Y_COUNTE"></span><span id="_CPPv2N6saltro9constants7NRELSPA7Y_COUNTE"></span><span id="saltro::constants::NRELSPA::Y_COUNT__iC"></span><span class="target" id="namespacesaltro_1_1constants_1_1NRELSPA_1a370f218ed035bc260272b75338bb8427"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Y_COUNT</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7NRELSPA7Y_COUNTE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="igrf8.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">igrf8</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../math/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">math</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv46saltro"><code class="docutils literal notranslate"><span class="pre">saltro</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constantsE"><code class="docutils literal notranslate"><span class="pre">saltro::constants</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPAE"><code class="docutils literal notranslate"><span class="pre">saltro::constants::NRELSPA</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L0_TABLEE"><code class="docutils literal notranslate"><span class="pre">L0_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L0_COUNTE"><code class="docutils literal notranslate"><span class="pre">L0_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L1_TABLEE"><code class="docutils literal notranslate"><span class="pre">L1_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L1_COUNTE"><code class="docutils literal notranslate"><span class="pre">L1_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L2_TABLEE"><code class="docutils literal notranslate"><span class="pre">L2_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L2_COUNTE"><code class="docutils literal notranslate"><span class="pre">L2_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L3_TABLEE"><code class="docutils literal notranslate"><span class="pre">L3_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L3_COUNTE"><code class="docutils literal notranslate"><span class="pre">L3_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L4_TABLEE"><code class="docutils literal notranslate"><span class="pre">L4_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L4_COUNTE"><code class="docutils literal notranslate"><span class="pre">L4_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L5_TABLEE"><code class="docutils literal notranslate"><span class="pre">L5_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8L5_COUNTE"><code class="docutils literal notranslate"><span class="pre">L5_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8B0_TABLEE"><code class="docutils literal notranslate"><span class="pre">B0_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8B0_COUNTE"><code class="docutils literal notranslate"><span class="pre">B0_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8B1_TABLEE"><code class="docutils literal notranslate"><span class="pre">B1_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8B1_COUNTE"><code class="docutils literal notranslate"><span class="pre">B1_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R0_TABLEE"><code class="docutils literal notranslate"><span class="pre">R0_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R0_COUNTE"><code class="docutils literal notranslate"><span class="pre">R0_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R1_TABLEE"><code class="docutils literal notranslate"><span class="pre">R1_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R1_COUNTE"><code class="docutils literal notranslate"><span class="pre">R1_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R2_TABLEE"><code class="docutils literal notranslate"><span class="pre">R2_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R2_COUNTE"><code class="docutils literal notranslate"><span class="pre">R2_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R3_TABLEE"><code class="docutils literal notranslate"><span class="pre">R3_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R3_COUNTE"><code class="docutils literal notranslate"><span class="pre">R3_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R4_TABLEE"><code class="docutils literal notranslate"><span class="pre">R4_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA8R4_COUNTE"><code class="docutils literal notranslate"><span class="pre">R4_COUNT</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA7Y_TABLEE"><code class="docutils literal notranslate"><span class="pre">Y_TABLE</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7NRELSPA7Y_COUNTE"><code class="docutils literal notranslate"><span class="pre">Y_COUNT</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/api/constants/spa.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Niclas Scheuer, Patrick McKeen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

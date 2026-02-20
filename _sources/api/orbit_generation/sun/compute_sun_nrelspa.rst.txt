@@ -1,0 +1,6 @@
+compute_sun_nrelspa
+===================
+
+.. doxygenfile:: orbit_generation/sun/compute_sun_nrelspa.h
+   :project: saltro
+   :path: ../include/saltro

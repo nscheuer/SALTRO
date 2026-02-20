@@ -1,0 +1,6 @@
+rk4
+===
+
+.. doxygenfile:: math/integrators/rk4.h
+   :project: saltro
+   :path: ../include/saltro

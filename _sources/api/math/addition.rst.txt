@@ -1,5 +1,0 @@
-addition
-========
-
-.. doxygenfile:: saltro/math/addition.h
-   :project: saltro

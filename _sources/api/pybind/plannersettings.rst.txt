@@ -1,0 +1,6 @@
+plannersettings
+===============
+
+.. doxygenfile:: pybind/plannersettings.h
+   :project: saltro
+   :path: ../include/saltro

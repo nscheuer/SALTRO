@@ -1,0 +1,10 @@
+magnetics
+=========
+
+.. toctree::
+   :maxdepth: 1
+
+   compute_magnetic
+   compute_magnetic_dipole
+   compute_magnetic_igrf13
+   compute_magnetic_igrf8

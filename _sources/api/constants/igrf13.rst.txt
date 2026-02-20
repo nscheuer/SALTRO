@@ -1,0 +1,6 @@
+igrf13
+======
+
+.. doxygenfile:: constants/igrf13.h
+   :project: saltro
+   :path: ../include/saltro

@@ -1,0 +1,6 @@
+compute_magnetic_igrf8
+======================
+
+.. doxygenfile:: orbit_generation/magnetics/compute_magnetic_igrf8.h
+   :project: saltro
+   :path: ../include/saltro

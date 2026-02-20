@@ -1,0 +1,6 @@
+constants
+=========
+
+.. doxygenfile:: constants/constants.h
+   :project: saltro
+   :path: ../include/saltro

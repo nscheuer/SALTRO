@@ -1,0 +1,9 @@
+sun
+===
+
+.. toctree::
+   :maxdepth: 1
+
+   compute_sun
+   compute_sun_noaa
+   compute_sun_nrelspa

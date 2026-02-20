@@ -1,0 +1,6 @@
+compute_sun_noaa
+================
+
+.. doxygenfile:: orbit_generation/sun/compute_sun_noaa.h
+   :project: saltro
+   :path: ../include/saltro

@@ -1,0 +1,1379 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>plannersettings &#8212; SALTRO 0.0.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=7026087e"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/plannersettings';</script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="prev" title="pybind" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../_static/rexlab.png" class="logo__image only-light" alt=""/>
+    <img src="../../_static/rexlab.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">SALTRO</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">plannersettings</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">pybind</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">plannersettings</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="plannersettings">
+<h1>plannersettings<a class="headerlink" href="#plannersettings" title="Link to this heading">#</a></h1>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-variables">Variables</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv416MAX_OUTER_PASSES">
+<span id="_CPPv316MAX_OUTER_PASSES"></span><span id="_CPPv216MAX_OUTER_PASSES"></span><span id="MAX_OUTER_PASSES__i"></span><span class="target" id="plannersettings_8h_1ad034ab6a1b44d49e2108350dcb9f0a45"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_OUTER_PASSES</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">2</span></span><a class="headerlink" href="#_CPPv416MAX_OUTER_PASSES" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv414InitTrajConfig">
+<span id="_CPPv314InitTrajConfig"></span><span id="_CPPv214InitTrajConfig"></span><span id="InitTrajConfig"></span><span class="target" id="structInitTrajConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">InitTrajConfig</span></span></span><a class="headerlink" href="#_CPPv414InitTrajConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Initial trajectory configuration. </p>
+<p>Settings controlling how the initial control/state trajectory is generated before running the ALTRO optimization. The initialization can strongly affect convergence speed and robustness of the solver.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param initcontroller<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Integer flag selecting which controller or strategy is used to generate the initial trajectory guess. Typical uses include zero-input rollout, PD control, or a custom warm-start controller. </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N14InitTrajConfig14initcontrollerE">
+<span id="_CPPv3N14InitTrajConfig14initcontrollerE"></span><span id="_CPPv2N14InitTrajConfig14initcontrollerE"></span><span id="InitTrajConfig::initcontroller__i"></span><span class="target" id="structInitTrajConfig_1ab5c407736bc60e3d5a42c5a1feaa04c4"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">initcontroller</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N14InitTrajConfig14initcontrollerE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv417DisturbanceConfig">
+<span id="_CPPv317DisturbanceConfig"></span><span id="_CPPv217DisturbanceConfig"></span><span id="DisturbanceConfig"></span><span class="target" id="structDisturbanceConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DisturbanceConfig</span></span></span><a class="headerlink" href="#_CPPv417DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Disturbance modeling configuration. </p>
+<p>Enables and parameterizes disturbance models that the optimizer accounts for during trajectory optimization. These disturbances are incorporated into the system dynamics or cost to improve robustness and realism.</p>
+<p>Enabled disturbances may include:<ul class="simple">
+<li><p>Aerodynamic drag</p></li>
+<li><p>Propulsion torques</p></li>
+<li><p>Solar radiation pressure (SRP)</p></li>
+<li><p>Gravity-gradient torque</p></li>
+<li><p>Generic external torques</p></li>
+<li><p>Residual magnetic dipole effects</p></li>
+</ul>
+</p>
+<p>Coefficient vectors represent linear scaling parameters used in disturbance models. If enabled, they are applied during forward rollout and linearization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param plan_for_aero<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Enable aerodynamic disturbance model </p>
+</dd>
+<dt class="field-even">Param plan_for_prop<span class="colon">:</span></dt>
+<dd class="field-even"><p>Enable propulsion torque disturbance </p>
+</dd>
+<dt class="field-odd">Param plan_for_srp<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Enable solar radiation pressure disturbance </p>
+</dd>
+<dt class="field-even">Param plan_for_gg<span class="colon">:</span></dt>
+<dd class="field-even"><p>Enable gravity-gradient disturbance </p>
+</dd>
+<dt class="field-odd">Param plan_for_gendist<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Enable generic disturbance torque </p>
+</dd>
+<dt class="field-even">Param plan_for_resdipole<span class="colon">:</span></dt>
+<dd class="field-even"><p>Enable residual dipole torque</p>
+</dd>
+<dt class="field-odd">Param srp_coeff<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Solar radiation pressure coefficients </p>
+</dd>
+<dt class="field-even">Param drag_coeff<span class="colon">:</span></dt>
+<dd class="field-even"><p>Aerodynamic drag coefficients </p>
+</dd>
+<dt class="field-odd">Param coeff_N<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of disturbance coefficients used in estimation</p>
+</dd>
+<dt class="field-even">Param res_dipole<span class="colon">:</span></dt>
+<dd class="field-even"><p>Residual dipole torque vector </p>
+</dd>
+<dt class="field-odd">Param prop_torque<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Constant propulsion torque vector </p>
+</dd>
+<dt class="field-even">Param gendist_torque<span class="colon">:</span></dt>
+<dd class="field-even"><p>Generic disturbance torque vector </p>
+</dd>
+<dt class="field-odd">Param J_est<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Estimated inertia matrix used for disturbance modeling </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig13plan_for_aeroE">
+<span id="_CPPv3N17DisturbanceConfig13plan_for_aeroE"></span><span id="_CPPv2N17DisturbanceConfig13plan_for_aeroE"></span><span id="DisturbanceConfig::plan_for_aero__b"></span><span class="target" id="structDisturbanceConfig_1a2f31acde5fe7fd4452b4484319a0d01c"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">plan_for_aero</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig13plan_for_aeroE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig13plan_for_propE">
+<span id="_CPPv3N17DisturbanceConfig13plan_for_propE"></span><span id="_CPPv2N17DisturbanceConfig13plan_for_propE"></span><span id="DisturbanceConfig::plan_for_prop__b"></span><span class="target" id="structDisturbanceConfig_1aa0eedebddbcd2551f57fec695c710bf3"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">plan_for_prop</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig13plan_for_propE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig12plan_for_srpE">
+<span id="_CPPv3N17DisturbanceConfig12plan_for_srpE"></span><span id="_CPPv2N17DisturbanceConfig12plan_for_srpE"></span><span id="DisturbanceConfig::plan_for_srp__b"></span><span class="target" id="structDisturbanceConfig_1a17f2f4b4936e3211001a8fac38323f68"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">plan_for_srp</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig12plan_for_srpE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig11plan_for_ggE">
+<span id="_CPPv3N17DisturbanceConfig11plan_for_ggE"></span><span id="_CPPv2N17DisturbanceConfig11plan_for_ggE"></span><span id="DisturbanceConfig::plan_for_gg__b"></span><span class="target" id="structDisturbanceConfig_1a8c963f24f5ab37edf1c01ffbae47d209"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">plan_for_gg</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig11plan_for_ggE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig16plan_for_gendistE">
+<span id="_CPPv3N17DisturbanceConfig16plan_for_gendistE"></span><span id="_CPPv2N17DisturbanceConfig16plan_for_gendistE"></span><span id="DisturbanceConfig::plan_for_gendist__b"></span><span class="target" id="structDisturbanceConfig_1add0b688662b41505711d5cbfde7c4086"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">plan_for_gendist</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig16plan_for_gendistE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig18plan_for_resdipoleE">
+<span id="_CPPv3N17DisturbanceConfig18plan_for_resdipoleE"></span><span id="_CPPv2N17DisturbanceConfig18plan_for_resdipoleE"></span><span id="DisturbanceConfig::plan_for_resdipole__b"></span><span class="target" id="structDisturbanceConfig_1ae24d3f6a94068e9a7989552464356de7"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">plan_for_resdipole</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig18plan_for_resdipoleE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig9srp_coeffE">
+<span id="_CPPv3N17DisturbanceConfig9srp_coeffE"></span><span id="_CPPv2N17DisturbanceConfig9srp_coeffE"></span><span id="DisturbanceConfig::srp_coeff__Eigen::Vector3d"></span><span class="target" id="structDisturbanceConfig_1a759c7b89bf36859b128fdd9a502807f4"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">srp_coeff</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Zero</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig9srp_coeffE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig10drag_coeffE">
+<span id="_CPPv3N17DisturbanceConfig10drag_coeffE"></span><span id="_CPPv2N17DisturbanceConfig10drag_coeffE"></span><span id="DisturbanceConfig::drag_coeff__Eigen::Vector3d"></span><span class="target" id="structDisturbanceConfig_1ac9bf74a99e9fce15faf011b747eea389"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">drag_coeff</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Zero</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig10drag_coeffE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig7coeff_NE">
+<span id="_CPPv3N17DisturbanceConfig7coeff_NE"></span><span id="_CPPv2N17DisturbanceConfig7coeff_NE"></span><span id="DisturbanceConfig::coeff_N__i"></span><span class="target" id="structDisturbanceConfig_1ad88696c65fd6fa89a0e3dd281cecb31c"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">coeff_N</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig7coeff_NE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig10res_dipoleE">
+<span id="_CPPv3N17DisturbanceConfig10res_dipoleE"></span><span id="_CPPv2N17DisturbanceConfig10res_dipoleE"></span><span id="DisturbanceConfig::res_dipole__Eigen::Vector3d"></span><span class="target" id="structDisturbanceConfig_1aa7b30a78abd7142308f14e4c767b4c12"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">res_dipole</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Zero</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig10res_dipoleE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig11prop_torqueE">
+<span id="_CPPv3N17DisturbanceConfig11prop_torqueE"></span><span id="_CPPv2N17DisturbanceConfig11prop_torqueE"></span><span id="DisturbanceConfig::prop_torque__Eigen::Vector3d"></span><span class="target" id="structDisturbanceConfig_1aee20c41b2ec87cfd90c8b1f7b31ab21a"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">prop_torque</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Zero</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig11prop_torqueE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig14gendist_torqueE">
+<span id="_CPPv3N17DisturbanceConfig14gendist_torqueE"></span><span id="_CPPv2N17DisturbanceConfig14gendist_torqueE"></span><span id="DisturbanceConfig::gendist_torque__Eigen::Vector3d"></span><span class="target" id="structDisturbanceConfig_1a25badc0f905fdb638f468473465b6d9a"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">gendist_torque</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Zero</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig14gendist_torqueE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17DisturbanceConfig5J_estE">
+<span id="_CPPv3N17DisturbanceConfig5J_estE"></span><span id="_CPPv2N17DisturbanceConfig5J_estE"></span><span id="DisturbanceConfig::J_est__Eigen::Matrix3d"></span><span class="target" id="structDisturbanceConfig_1a136c1a9cc4c9c8cb36a58cdcb3e5b463"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix3d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">J_est</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix3d</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Zero</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><a class="headerlink" href="#_CPPv4N17DisturbanceConfig5J_estE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv416ConstraintConfig">
+<span id="_CPPv316ConstraintConfig"></span><span id="_CPPv216ConstraintConfig"></span><span id="ConstraintConfig"></span><span class="target" id="structConstraintConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ConstraintConfig</span></span></span><a class="headerlink" href="#_CPPv416ConstraintConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Constraint configuration. </p>
+<p>Defines hard and soft constraints enforced during optimization. These are typically handled via the augmented Lagrangian framework inside ALTRO.</p>
+<p>Constraints may include actuator limits, angular velocity bounds, and environmental pointing constraints (e.g., sun avoidance).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param control_limit_scale<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Scaling factor applied to actuator limits </p>
+</dd>
+<dt class="field-even">Param u_max<span class="colon">:</span></dt>
+<dd class="field-even"><p>Maximum control input vector </p>
+</dd>
+<dt class="field-odd">Param wmax<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum allowable angular velocity magnitude (rad/s) </p>
+</dd>
+<dt class="field-even">Param sun_limit_angle<span class="colon">:</span></dt>
+<dd class="field-even"><p>Minimum allowed angle to sun direction (rad) </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig19control_limit_scaleE">
+<span id="_CPPv3N16ConstraintConfig19control_limit_scaleE"></span><span id="_CPPv2N16ConstraintConfig19control_limit_scaleE"></span><span id="ConstraintConfig::control_limit_scale__double"></span><span class="target" id="structConstraintConfig_1aacd8b33275e308fc75832cf5a44b9e40"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">control_limit_scale</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.75</span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig19control_limit_scaleE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig5u_maxE">
+<span id="_CPPv3N16ConstraintConfig5u_maxE"></span><span id="_CPPv2N16ConstraintConfig5u_maxE"></span><span id="ConstraintConfig::u_max__Eigen::VectorXd"></span><span class="target" id="structConstraintConfig_1a9edabf3d9acbc376fd85c0adf3a6427b"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXd</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">u_max</span></span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig5u_maxE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig4wmaxE">
+<span id="_CPPv3N16ConstraintConfig4wmaxE"></span><span id="_CPPv2N16ConstraintConfig4wmaxE"></span><span id="ConstraintConfig::wmax__double"></span><span class="target" id="structConstraintConfig_1a5df8636668cef276c96ff452d47bbd97"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">wmax</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">20.0</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><span class="n"><span class="pre">M_PI</span></span><span class="w"> </span><span class="o"><span class="pre">/</span></span><span class="w"> </span><span class="m"><span class="pre">180.0</span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig4wmaxE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig15sun_limit_angleE">
+<span id="_CPPv3N16ConstraintConfig15sun_limit_angleE"></span><span id="_CPPv2N16ConstraintConfig15sun_limit_angleE"></span><span id="ConstraintConfig::sun_limit_angle__double"></span><span class="target" id="structConstraintConfig_1a477471a578d8be92f8ebc747cca8ae47"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">sun_limit_angle</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">20.0</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><span class="n"><span class="pre">M_PI</span></span><span class="w"> </span><span class="o"><span class="pre">/</span></span><span class="w"> </span><span class="m"><span class="pre">180.0</span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig15sun_limit_angleE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv410CostConfig">
+<span id="_CPPv310CostConfig"></span><span id="_CPPv210CostConfig"></span><span id="CostConfig"></span><span class="target" id="structCostConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CostConfig</span></span></span><a class="headerlink" href="#_CPPv410CostConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Cost function configuration. </p>
+<p>Defines the weights and structure of the stage and terminal cost functions used in the ALTRO optimization. Costs typically penalize:</p>
+<p><ul class="simple">
+<li><p>Orientation error</p></li>
+<li><p>Angular velocity error</p></li>
+<li><p>Control effort</p></li>
+<li><p>Reaction wheel momentum</p></li>
+<li><p>Actuator stiction or saturation</p></li>
+</ul>
+</p>
+<p>Stage costs are applied at each timestep:  <div class="math notranslate nohighlight">
+\[
+\ell_k = w_\theta e_\theta^2 + w_\omega e_\omega^2 + w_u \|\mathbf{u}_k\|^2
+\]</div>
+</p>
+<p>Terminal costs are applied at the final timestep:  <div class="math notranslate nohighlight">
+\[
+\ell_N = w_\theta^N e_\theta^2 + w_\omega^N e_\omega^2
+\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param angle<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Weight on orientation error </p>
+</dd>
+<dt class="field-even">Param ang_vel<span class="colon">:</span></dt>
+<dd class="field-even"><p>Weight on angular velocity error </p>
+</dd>
+<dt class="field-odd">Param ang_vel_mag<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Weight on angular velocity magnitude </p>
+</dd>
+<dt class="field-even">Param ang_vel_err_dir<span class="colon">:</span></dt>
+<dd class="field-even"><p>Weight on angular velocity direction error </p>
+</dd>
+<dt class="field-odd">Param control_mult<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Global multiplier on control cost</p>
+</dd>
+<dt class="field-even">Param mtq_control_weight<span class="colon">:</span></dt>
+<dd class="field-even"><p>Magnetorquer control cost weight </p>
+</dd>
+<dt class="field-odd">Param rw_control_weight<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Reaction wheel control cost weight </p>
+</dd>
+<dt class="field-even">Param magic_control_weight<span class="colon">:</span></dt>
+<dd class="field-even"><p>Additional actuator control weight </p>
+</dd>
+<dt class="field-odd">Param rw_AM_weight<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Reaction wheel angular momentum penalty </p>
+</dd>
+<dt class="field-even">Param rw_stic_weight<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reaction wheel stiction penalty</p>
+</dd>
+<dt class="field-odd">Param RWh_max_mult<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Multiplier when wheel momentum near saturation </p>
+</dd>
+<dt class="field-even">Param RWh_stiction_mult<span class="colon">:</span></dt>
+<dd class="field-even"><p>Multiplier for stiction region </p>
+</dd>
+<dt class="field-odd">Param RWh_ok_mult<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Multiplier when wheel is within safe region</p>
+</dd>
+<dt class="field-even">Param angle_N<span class="colon">:</span></dt>
+<dd class="field-even"><p>Terminal orientation weight </p>
+</dd>
+<dt class="field-odd">Param ang_vel_N<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Terminal angular velocity weight </p>
+</dd>
+<dt class="field-even">Param ang_vel_mag_N<span class="colon">:</span></dt>
+<dd class="field-even"><p>Terminal angular velocity magnitude weight </p>
+</dd>
+<dt class="field-odd">Param ang_vel_err_dir_N<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Terminal angular velocity direction weight</p>
+</dd>
+<dt class="field-even">Param ang_cost_func_type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Type of orientation error cost function used </p>
+</dd>
+<dt class="field-odd">Param use_cost_hess<span class="colon">:</span></dt>
+<dd class="field-odd"><p>If true, use analytic Hessians of cost </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig5angleE">
+<span id="_CPPv3N10CostConfig5angleE"></span><span id="_CPPv2N10CostConfig5angleE"></span><span id="CostConfig::angle__double"></span><span class="target" id="structCostConfig_1aa7dbf2c5d240fdfe0dd9fdb6872683bd"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">angle</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e3</span></span><a class="headerlink" href="#_CPPv4N10CostConfig5angleE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig7ang_velE">
+<span id="_CPPv3N10CostConfig7ang_velE"></span><span id="_CPPv2N10CostConfig7ang_velE"></span><span id="CostConfig::ang_vel__double"></span><span class="target" id="structCostConfig_1ab11bd95ed78896ace30378963016b691"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_vel</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e4</span></span><a class="headerlink" href="#_CPPv4N10CostConfig7ang_velE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig11ang_vel_magE">
+<span id="_CPPv3N10CostConfig11ang_vel_magE"></span><span id="_CPPv2N10CostConfig11ang_vel_magE"></span><span id="CostConfig::ang_vel_mag__double"></span><span class="target" id="structCostConfig_1a528118a70b66899efea2eb3dfd570f7c"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_vel_mag</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N10CostConfig11ang_vel_magE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig15ang_vel_err_dirE">
+<span id="_CPPv3N10CostConfig15ang_vel_err_dirE"></span><span id="_CPPv2N10CostConfig15ang_vel_err_dirE"></span><span id="CostConfig::ang_vel_err_dir__double"></span><span class="target" id="structCostConfig_1a1d88b06c663d5ff78b390bfb6397e483"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_vel_err_dir</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N10CostConfig15ang_vel_err_dirE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig12control_multE">
+<span id="_CPPv3N10CostConfig12control_multE"></span><span id="_CPPv2N10CostConfig12control_multE"></span><span id="CostConfig::control_mult__double"></span><span class="target" id="structCostConfig_1acbcf79cac370a896ddc8d54d6c2b6d94"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">control_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span><a class="headerlink" href="#_CPPv4N10CostConfig12control_multE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig18mtq_control_weightE">
+<span id="_CPPv3N10CostConfig18mtq_control_weightE"></span><span id="_CPPv2N10CostConfig18mtq_control_weightE"></span><span id="CostConfig::mtq_control_weight__double"></span><span class="target" id="structCostConfig_1a88ec60e5cc26dde74ef88ed1a95d5775"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">mtq_control_weight</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e3</span></span><a class="headerlink" href="#_CPPv4N10CostConfig18mtq_control_weightE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig17rw_control_weightE">
+<span id="_CPPv3N10CostConfig17rw_control_weightE"></span><span id="_CPPv2N10CostConfig17rw_control_weightE"></span><span id="CostConfig::rw_control_weight__double"></span><span class="target" id="structCostConfig_1a53c52d4195c81c3fe5dedfc5f133460b"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_control_weight</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e8</span></span><a class="headerlink" href="#_CPPv4N10CostConfig17rw_control_weightE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig20magic_control_weightE">
+<span id="_CPPv3N10CostConfig20magic_control_weightE"></span><span id="_CPPv2N10CostConfig20magic_control_weightE"></span><span id="CostConfig::magic_control_weight__double"></span><span class="target" id="structCostConfig_1a965475787b34a65a99e36680a13143b0"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">magic_control_weight</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0001</span></span><a class="headerlink" href="#_CPPv4N10CostConfig20magic_control_weightE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig12rw_AM_weightE">
+<span id="_CPPv3N10CostConfig12rw_AM_weightE"></span><span id="_CPPv2N10CostConfig12rw_AM_weightE"></span><span id="CostConfig::rw_AM_weight__double"></span><span class="target" id="structCostConfig_1a128c896d89191f1d6fc5e079acee3669"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_AM_weight</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e4</span></span><a class="headerlink" href="#_CPPv4N10CostConfig12rw_AM_weightE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig14rw_stic_weightE">
+<span id="_CPPv3N10CostConfig14rw_stic_weightE"></span><span id="_CPPv2N10CostConfig14rw_stic_weightE"></span><span id="CostConfig::rw_stic_weight__double"></span><span class="target" id="structCostConfig_1a635ba20bdf1562a9ff66256553690c1b"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_stic_weight</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span><a class="headerlink" href="#_CPPv4N10CostConfig14rw_stic_weightE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig12RWh_max_multE">
+<span id="_CPPv3N10CostConfig12RWh_max_multE"></span><span id="_CPPv2N10CostConfig12RWh_max_multE"></span><span id="CostConfig::RWh_max_mult__double"></span><span class="target" id="structCostConfig_1a6e1b2b6b01405a359556d80968ff548b"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RWh_max_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.8</span></span><a class="headerlink" href="#_CPPv4N10CostConfig12RWh_max_multE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig17RWh_stiction_multE">
+<span id="_CPPv3N10CostConfig17RWh_stiction_multE"></span><span id="_CPPv2N10CostConfig17RWh_stiction_multE"></span><span id="CostConfig::RWh_stiction_mult__double"></span><span class="target" id="structCostConfig_1a5de96970c4b1bb4b411dcce3f2e20ec9"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RWh_stiction_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.01</span></span><a class="headerlink" href="#_CPPv4N10CostConfig17RWh_stiction_multE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig11RWh_ok_multE">
+<span id="_CPPv3N10CostConfig11RWh_ok_multE"></span><span id="_CPPv2N10CostConfig11RWh_ok_multE"></span><span id="CostConfig::RWh_ok_mult__double"></span><span class="target" id="structCostConfig_1af33d1d19b881bfbba7fdd4df56266181"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RWh_ok_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.5</span></span><a class="headerlink" href="#_CPPv4N10CostConfig11RWh_ok_multE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig7angle_NE">
+<span id="_CPPv3N10CostConfig7angle_NE"></span><span id="_CPPv2N10CostConfig7angle_NE"></span><span id="CostConfig::angle_N__double"></span><span class="target" id="structCostConfig_1a1567bab87e5ac539c7c1a7963413cf77"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">angle_N</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e4</span></span><a class="headerlink" href="#_CPPv4N10CostConfig7angle_NE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig9ang_vel_NE">
+<span id="_CPPv3N10CostConfig9ang_vel_NE"></span><span id="_CPPv2N10CostConfig9ang_vel_NE"></span><span id="CostConfig::ang_vel_N__double"></span><span class="target" id="structCostConfig_1a8d07651301a912e53a2d5f2f506fc3a2"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_vel_N</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e5</span></span><a class="headerlink" href="#_CPPv4N10CostConfig9ang_vel_NE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig13ang_vel_mag_NE">
+<span id="_CPPv3N10CostConfig13ang_vel_mag_NE"></span><span id="_CPPv2N10CostConfig13ang_vel_mag_NE"></span><span id="CostConfig::ang_vel_mag_N__double"></span><span class="target" id="structCostConfig_1a2099850aec3dc6ff9b7b470cdc7e838a"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_vel_mag_N</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N10CostConfig13ang_vel_mag_NE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig17ang_vel_err_dir_NE">
+<span id="_CPPv3N10CostConfig17ang_vel_err_dir_NE"></span><span id="_CPPv2N10CostConfig17ang_vel_err_dir_NE"></span><span id="CostConfig::ang_vel_err_dir_N__double"></span><span class="target" id="structCostConfig_1ae6a0fc12db8464f88756ea9ea0ae1836"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_vel_err_dir_N</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N10CostConfig17ang_vel_err_dir_NE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig18ang_cost_func_typeE">
+<span id="_CPPv3N10CostConfig18ang_cost_func_typeE"></span><span id="_CPPv2N10CostConfig18ang_cost_func_typeE"></span><span id="CostConfig::ang_cost_func_type__i"></span><span class="target" id="structCostConfig_1a754ad1eaba8100f969d1dab07b537395"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_cost_func_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">2</span></span><a class="headerlink" href="#_CPPv4N10CostConfig18ang_cost_func_typeE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig13use_cost_hessE">
+<span id="_CPPv3N10CostConfig13use_cost_hessE"></span><span id="_CPPv2N10CostConfig13use_cost_hessE"></span><span id="CostConfig::use_cost_hess__b"></span><span class="target" id="structCostConfig_1a820b136d647ad151e86a4b772698fd64"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">use_cost_hess</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N10CostConfig13use_cost_hessE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv412AugLagConfig">
+<span id="_CPPv312AugLagConfig"></span><span id="_CPPv212AugLagConfig"></span><span id="AugLagConfig"></span><span class="target" id="structAugLagConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AugLagConfig</span></span></span><a class="headerlink" href="#_CPPv412AugLagConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Augmented Lagrangian configuration. </p>
+<p>Controls the outer-loop constraint handling in ALTRO using an augmented Lagrangian method. Constraints are enforced by iteratively updating penalty parameters and Lagrange multipliers:</p>
+<p><div class="math notranslate nohighlight">
+\[
+\mathcal{L}(x,u,\lambda,\mu) =
+J(x,u) + \lambda^\top g(x,u) + \frac{\mu}{2}\|g(x,u)\|^2
+\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param max_outer_iters<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum number of outer iterations </p>
+</dd>
+<dt class="field-even">Param lag_mult_init<span class="colon">:</span></dt>
+<dd class="field-even"><p>Initial Lagrange multiplier value </p>
+</dd>
+<dt class="field-odd">Param lag_mult_max<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum allowed Lagrange multiplier</p>
+</dd>
+<dt class="field-even">Param penalty_init<span class="colon">:</span></dt>
+<dd class="field-even"><p>Initial penalty parameter </p>
+</dd>
+<dt class="field-odd">Param penalty_max<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum penalty parameter </p>
+</dd>
+<dt class="field-even">Param penalty_scale<span class="colon">:</span></dt>
+<dd class="field-even"><p>Multiplicative increase per iteration</p>
+</dd>
+<dt class="field-odd">Param constraint_tol<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Constraint satisfaction tolerance </p>
+</dd>
+<dt class="field-even">Param total_cost_tol<span class="colon">:</span></dt>
+<dd class="field-even"><p>Total cost convergence tolerance </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N12AugLagConfig15max_outer_itersE">
+<span id="_CPPv3N12AugLagConfig15max_outer_itersE"></span><span id="_CPPv2N12AugLagConfig15max_outer_itersE"></span><span id="AugLagConfig::max_outer_iters__i"></span><span class="target" id="structAugLagConfig_1add6a191d211069e1d37e3ff690058f3d"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">max_outer_iters</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">30</span></span><a class="headerlink" href="#_CPPv4N12AugLagConfig15max_outer_itersE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N12AugLagConfig13lag_mult_initE">
+<span id="_CPPv3N12AugLagConfig13lag_mult_initE"></span><span id="_CPPv2N12AugLagConfig13lag_mult_initE"></span><span id="AugLagConfig::lag_mult_init__double"></span><span class="target" id="structAugLagConfig_1a9de162560b2acce4da83186b647b9380"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">lag_mult_init</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N12AugLagConfig13lag_mult_initE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N12AugLagConfig12lag_mult_maxE">
+<span id="_CPPv3N12AugLagConfig12lag_mult_maxE"></span><span id="_CPPv2N12AugLagConfig12lag_mult_maxE"></span><span id="AugLagConfig::lag_mult_max__double"></span><span class="target" id="structAugLagConfig_1aab2e28f4e756f8833ae99e5c1a0dfdd9"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">lag_mult_max</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e20</span></span><a class="headerlink" href="#_CPPv4N12AugLagConfig12lag_mult_maxE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N12AugLagConfig12penalty_initE">
+<span id="_CPPv3N12AugLagConfig12penalty_initE"></span><span id="_CPPv2N12AugLagConfig12penalty_initE"></span><span id="AugLagConfig::penalty_init__double"></span><span class="target" id="structAugLagConfig_1ad2b58dee746d87cf5e044312c447da8d"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">penalty_init</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-1</span></span><a class="headerlink" href="#_CPPv4N12AugLagConfig12penalty_initE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N12AugLagConfig11penalty_maxE">
+<span id="_CPPv3N12AugLagConfig11penalty_maxE"></span><span id="_CPPv2N12AugLagConfig11penalty_maxE"></span><span id="AugLagConfig::penalty_max__double"></span><span class="target" id="structAugLagConfig_1a642511b1d167570c5aaf3382efa968ba"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">penalty_max</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e16</span></span><a class="headerlink" href="#_CPPv4N12AugLagConfig11penalty_maxE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N12AugLagConfig13penalty_scaleE">
+<span id="_CPPv3N12AugLagConfig13penalty_scaleE"></span><span id="_CPPv2N12AugLagConfig13penalty_scaleE"></span><span id="AugLagConfig::penalty_scale__double"></span><span class="target" id="structAugLagConfig_1a0ea26c2fdcb7b013789e8c04e04dd0e1"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">penalty_scale</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">10.0</span></span><a class="headerlink" href="#_CPPv4N12AugLagConfig13penalty_scaleE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N12AugLagConfig14constraint_tolE">
+<span id="_CPPv3N12AugLagConfig14constraint_tolE"></span><span id="_CPPv2N12AugLagConfig14constraint_tolE"></span><span id="AugLagConfig::constraint_tol__double"></span><span class="target" id="structAugLagConfig_1acf85da5c897dc7cb75a61be1272f2e08"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">constraint_tol</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.002</span></span><a class="headerlink" href="#_CPPv4N12AugLagConfig14constraint_tolE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N12AugLagConfig14total_cost_tolE">
+<span id="_CPPv3N12AugLagConfig14total_cost_tolE"></span><span id="_CPPv2N12AugLagConfig14total_cost_tolE"></span><span id="AugLagConfig::total_cost_tol__double"></span><span class="target" id="structAugLagConfig_1afc9932277690755e723fc87949c9c3e3"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">total_cost_tol</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-2</span></span><a class="headerlink" href="#_CPPv4N12AugLagConfig14total_cost_tolE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv410ILQRConfig">
+<span id="_CPPv310ILQRConfig"></span><span id="_CPPv210ILQRConfig"></span><span id="ILQRConfig"></span><span class="target" id="structILQRConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ILQRConfig</span></span></span><a class="headerlink" href="#_CPPv410ILQRConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>iLQR inner-loop configuration. </p>
+<p>Settings for the inner iterative LQR solver used by ALTRO to optimize trajectories between augmented Lagrangian updates.</p>
+<p>The solver iteratively linearizes dynamics and quadratizes costs:  <div class="math notranslate nohighlight">
+\[
+\mathbf{x}_{k+1} \approx f(\mathbf{x}_k,\mathbf{u}_k)
+\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param max_iters<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum number of iLQR iterations </p>
+</dd>
+<dt class="field-even">Param grad_tol<span class="colon">:</span></dt>
+<dd class="field-even"><p>Gradient norm convergence tolerance </p>
+</dd>
+<dt class="field-odd">Param cost_tol<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Cost improvement tolerance </p>
+</dd>
+<dt class="field-even">Param z_count_lim<span class="colon">:</span></dt>
+<dd class="field-even"><p>Maximum number of zero-improvement steps</p>
+</dd>
+<dt class="field-odd">Param max_cost<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Abort if cost exceeds this value </p>
+</dd>
+<dt class="field-even">Param state_bound<span class="colon">:</span></dt>
+<dd class="field-even"><p>Maximum allowed state magnitude </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig9max_itersE">
+<span id="_CPPv3N10ILQRConfig9max_itersE"></span><span id="_CPPv2N10ILQRConfig9max_itersE"></span><span id="ILQRConfig::max_iters__i"></span><span class="target" id="structILQRConfig_1a517d89d4b0a2f266d84e7882de780d73"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">max_iters</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">250</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig9max_itersE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig8grad_tolE">
+<span id="_CPPv3N10ILQRConfig8grad_tolE"></span><span id="_CPPv2N10ILQRConfig8grad_tolE"></span><span id="ILQRConfig::grad_tol__double"></span><span class="target" id="structILQRConfig_1a3e9216b8c27e3f219d536fd27d26c18c"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">grad_tol</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-3</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig8grad_tolE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig8cost_tolE">
+<span id="_CPPv3N10ILQRConfig8cost_tolE"></span><span id="_CPPv2N10ILQRConfig8cost_tolE"></span><span id="ILQRConfig::cost_tol__double"></span><span class="target" id="structILQRConfig_1a32167574bd00e6e0facba16aae07d6b7"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">cost_tol</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-1</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig8cost_tolE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig11z_count_limE">
+<span id="_CPPv3N10ILQRConfig11z_count_limE"></span><span id="_CPPv2N10ILQRConfig11z_count_limE"></span><span id="ILQRConfig::z_count_lim__i"></span><span class="target" id="structILQRConfig_1aedca076b74e2b84bd62f553525f621f1"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">z_count_lim</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">10</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig11z_count_limE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig8max_costE">
+<span id="_CPPv3N10ILQRConfig8max_costE"></span><span id="_CPPv2N10ILQRConfig8max_costE"></span><span id="ILQRConfig::max_cost__double"></span><span class="target" id="structILQRConfig_1a9b0fdaa948393a90377873f9aaa2cced"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">max_cost</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e40</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig8max_costE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig11state_boundE">
+<span id="_CPPv3N10ILQRConfig11state_boundE"></span><span id="_CPPv2N10ILQRConfig11state_boundE"></span><span id="ILQRConfig::state_bound__double"></span><span class="target" id="structILQRConfig_1ada0d26f51c8b3933558e548192c94eb2"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">state_bound</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">10.0</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig11state_boundE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv420RegularizationConfig">
+<span id="_CPPv320RegularizationConfig"></span><span id="_CPPv220RegularizationConfig"></span><span id="RegularizationConfig"></span><span class="target" id="structRegularizationConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RegularizationConfig</span></span></span><a class="headerlink" href="#_CPPv420RegularizationConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Regularization configuration. </p>
+<p>Controls Levenberg–Marquardt-style regularization used to ensure numerical stability when solving Riccati equations and backward passes.</p>
+<p>Regularization modifies the Hessian:  <div class="math notranslate nohighlight">
+\[
+Q_{uu} \leftarrow Q_{uu} + \rho I
+\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param reg_init<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Initial regularization value </p>
+</dd>
+<dt class="field-even">Param reg_min<span class="colon">:</span></dt>
+<dd class="field-even"><p>Minimum regularization </p>
+</dd>
+<dt class="field-odd">Param reg_max<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum regularization </p>
+</dd>
+<dt class="field-even">Param reg_scale<span class="colon">:</span></dt>
+<dd class="field-even"><p>Multiplicative scaling factor </p>
+</dd>
+<dt class="field-odd">Param reg_bump<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Factor used when increasing regularization</p>
+</dd>
+<dt class="field-even">Param reg_min_cond<span class="colon">:</span></dt>
+<dd class="field-even"><p>Minimum condition threshold </p>
+</dd>
+<dt class="field-odd">Param rand_add_ratio<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Random diagonal perturbation ratio</p>
+</dd>
+<dt class="field-even">Param use_dynamics_hess<span class="colon">:</span></dt>
+<dd class="field-even"><p>Use second derivatives of dynamics </p>
+</dd>
+<dt class="field-odd">Param use_constraint_hess<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Use second derivatives of constraints </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig8reg_initE">
+<span id="_CPPv3N20RegularizationConfig8reg_initE"></span><span id="_CPPv2N20RegularizationConfig8reg_initE"></span><span id="RegularizationConfig::reg_init__double"></span><span class="target" id="structRegularizationConfig_1a1264c4b3394b96ca0a63dd8a80d451d9"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">reg_init</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-2</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig8reg_initE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig7reg_minE">
+<span id="_CPPv3N20RegularizationConfig7reg_minE"></span><span id="_CPPv2N20RegularizationConfig7reg_minE"></span><span id="RegularizationConfig::reg_min__double"></span><span class="target" id="structRegularizationConfig_1a8b3edb6dfd6586b8373a8f5be04a9713"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">reg_min</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-8</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig7reg_minE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig7reg_maxE">
+<span id="_CPPv3N20RegularizationConfig7reg_maxE"></span><span id="_CPPv2N20RegularizationConfig7reg_maxE"></span><span id="RegularizationConfig::reg_max__double"></span><span class="target" id="structRegularizationConfig_1a44e57999beef2a6f482a668ce6a8d1c2"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">reg_max</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e30</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig7reg_maxE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig9reg_scaleE">
+<span id="_CPPv3N20RegularizationConfig9reg_scaleE"></span><span id="_CPPv2N20RegularizationConfig9reg_scaleE"></span><span id="RegularizationConfig::reg_scale__double"></span><span class="target" id="structRegularizationConfig_1afd6444e8cfbf6557995497aff4250604"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">reg_scale</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.6</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig9reg_scaleE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig8reg_bumpE">
+<span id="_CPPv3N20RegularizationConfig8reg_bumpE"></span><span id="_CPPv2N20RegularizationConfig8reg_bumpE"></span><span id="RegularizationConfig::reg_bump__double"></span><span class="target" id="structRegularizationConfig_1a6c72de7ead38c2aa47c198c7a97aea01"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">reg_bump</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">10.0</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig8reg_bumpE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig12reg_min_condE">
+<span id="_CPPv3N20RegularizationConfig12reg_min_condE"></span><span id="_CPPv2N20RegularizationConfig12reg_min_condE"></span><span id="RegularizationConfig::reg_min_cond__i"></span><span class="target" id="structRegularizationConfig_1afc3a6b98649055a23549f85ad5b95d67"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">reg_min_cond</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">2</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig12reg_min_condE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig14rand_add_ratioE">
+<span id="_CPPv3N20RegularizationConfig14rand_add_ratioE"></span><span id="_CPPv2N20RegularizationConfig14rand_add_ratioE"></span><span id="RegularizationConfig::rand_add_ratio__double"></span><span class="target" id="structRegularizationConfig_1aed9be555e2ee29f988b9ad1d2f699f53"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rand_add_ratio</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig14rand_add_ratioE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig17use_dynamics_hessE">
+<span id="_CPPv3N20RegularizationConfig17use_dynamics_hessE"></span><span id="_CPPv2N20RegularizationConfig17use_dynamics_hessE"></span><span id="RegularizationConfig::use_dynamics_hess__b"></span><span class="target" id="structRegularizationConfig_1a583ab32e20d24df7944d44e09948b07d"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">use_dynamics_hess</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig17use_dynamics_hessE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig19use_constraint_hessE">
+<span id="_CPPv3N20RegularizationConfig19use_constraint_hessE"></span><span id="_CPPv2N20RegularizationConfig19use_constraint_hessE"></span><span id="RegularizationConfig::use_constraint_hess__b"></span><span class="target" id="structRegularizationConfig_1a161fa046ccd986241568e94fee8c2f54"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">use_constraint_hess</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig19use_constraint_hessE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv416LineSearchConfig">
+<span id="_CPPv316LineSearchConfig"></span><span id="_CPPv216LineSearchConfig"></span><span id="LineSearchConfig"></span><span class="target" id="structLineSearchConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">LineSearchConfig</span></span></span><a class="headerlink" href="#_CPPv416LineSearchConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Line search configuration. </p>
+<p>Parameters for backtracking line search used during forward rollout. The step size <span class="math notranslate nohighlight">\(\alpha\)</span> is reduced until sufficient decrease is achieved:</p>
+<p><div class="math notranslate nohighlight">
+\[
+J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
+\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param max_iters<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum line search iterations </p>
+</dd>
+<dt class="field-even">Param beta1<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sufficient decrease parameter </p>
+</dd>
+<dt class="field-odd">Param beta2<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum allowable cost increase factor </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16LineSearchConfig9max_itersE">
+<span id="_CPPv3N16LineSearchConfig9max_itersE"></span><span id="_CPPv2N16LineSearchConfig9max_itersE"></span><span id="LineSearchConfig::max_iters__i"></span><span class="target" id="structLineSearchConfig_1a740a09093fd8927265005e5f8a4f487d"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">max_iters</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">20</span></span><a class="headerlink" href="#_CPPv4N16LineSearchConfig9max_itersE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16LineSearchConfig5beta1E">
+<span id="_CPPv3N16LineSearchConfig5beta1E"></span><span id="_CPPv2N16LineSearchConfig5beta1E"></span><span id="LineSearchConfig::beta1__double"></span><span class="target" id="structLineSearchConfig_1a70e4dea98a96746fda24ebf43ae9ad0c"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">beta1</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-10</span></span><a class="headerlink" href="#_CPPv4N16LineSearchConfig5beta1E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16LineSearchConfig5beta2E">
+<span id="_CPPv3N16LineSearchConfig5beta2E"></span><span id="_CPPv2N16LineSearchConfig5beta2E"></span><span id="LineSearchConfig::beta2__double"></span><span class="target" id="structLineSearchConfig_1a921bc1378c36c191598945b2306cf510"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">beta2</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">500.0</span></span><a class="headerlink" href="#_CPPv4N16LineSearchConfig5beta2E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv410PassConfig">
+<span id="_CPPv310PassConfig"></span><span id="_CPPv210PassConfig"></span><span id="PassConfig"></span><span class="target" id="structPassConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PassConfig</span></span></span><a class="headerlink" href="#_CPPv410PassConfig" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Per-pass optimization configuration. </p>
+<p>Each ALTRO outer pass may use different cost weights, regularization, or time discretization. This allows coarse-to-fine optimization strategies.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param cost<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Cost configuration for this pass </p>
+</dd>
+<dt class="field-even">Param auglag<span class="colon">:</span></dt>
+<dd class="field-even"><p>Augmented Lagrangian configuration </p>
+</dd>
+<dt class="field-odd">Param ilqr<span class="colon">:</span></dt>
+<dd class="field-odd"><p>iLQR configuration </p>
+</dd>
+<dt class="field-even">Param reg<span class="colon">:</span></dt>
+<dd class="field-even"><p>Regularization configuration </p>
+</dd>
+<dt class="field-odd">Param linesearch<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Line search configuration </p>
+</dd>
+<dt class="field-even">Param dt<span class="colon">:</span></dt>
+<dd class="field-even"><p>Timestep used for discretization </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10PassConfig4costE">
+<span id="_CPPv3N10PassConfig4costE"></span><span id="_CPPv2N10PassConfig4costE"></span><span id="PassConfig::cost__CostConfig"></span><span class="target" id="structPassConfig_1a02e307d6155347ee25619857628146e0"></span><a class="reference internal" href="#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">cost</span></span></span><a class="headerlink" href="#_CPPv4N10PassConfig4costE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10PassConfig6auglagE">
+<span id="_CPPv3N10PassConfig6auglagE"></span><span id="_CPPv2N10PassConfig6auglagE"></span><span id="PassConfig::auglag__AugLagConfig"></span><span class="target" id="structPassConfig_1a2fa1baece26c8c623d801038c7237a7c"></span><a class="reference internal" href="#_CPPv412AugLagConfig" title="AugLagConfig"><span class="n"><span class="pre">AugLagConfig</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">auglag</span></span></span><a class="headerlink" href="#_CPPv4N10PassConfig6auglagE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10PassConfig4ilqrE">
+<span id="_CPPv3N10PassConfig4ilqrE"></span><span id="_CPPv2N10PassConfig4ilqrE"></span><span id="PassConfig::ilqr__ILQRConfig"></span><span class="target" id="structPassConfig_1aef2a975733a1e5978c9b476c221a4fc5"></span><a class="reference internal" href="#_CPPv410ILQRConfig" title="ILQRConfig"><span class="n"><span class="pre">ILQRConfig</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ilqr</span></span></span><a class="headerlink" href="#_CPPv4N10PassConfig4ilqrE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10PassConfig3regE">
+<span id="_CPPv3N10PassConfig3regE"></span><span id="_CPPv2N10PassConfig3regE"></span><span id="PassConfig::reg__RegularizationConfig"></span><span class="target" id="structPassConfig_1a7bd252c5d3fbbd6f845849a7cf87d5f7"></span><a class="reference internal" href="#_CPPv420RegularizationConfig" title="RegularizationConfig"><span class="n"><span class="pre">RegularizationConfig</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">reg</span></span></span><a class="headerlink" href="#_CPPv4N10PassConfig3regE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10PassConfig10linesearchE">
+<span id="_CPPv3N10PassConfig10linesearchE"></span><span id="_CPPv2N10PassConfig10linesearchE"></span><span id="PassConfig::linesearch__LineSearchConfig"></span><span class="target" id="structPassConfig_1a6152488ce315a167f49fce1aac9b7a4f"></span><a class="reference internal" href="#_CPPv416LineSearchConfig" title="LineSearchConfig"><span class="n"><span class="pre">LineSearchConfig</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">linesearch</span></span></span><a class="headerlink" href="#_CPPv4N10PassConfig10linesearchE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10PassConfig2dtE">
+<span id="_CPPv3N10PassConfig2dtE"></span><span id="_CPPv2N10PassConfig2dtE"></span><span id="PassConfig::dt__double"></span><span class="target" id="structPassConfig_1ad82dbbab2caab1fe932fc731d79ba9e6"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dt</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span><a class="headerlink" href="#_CPPv4N10PassConfig2dtE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv415PlannerSettings">
+<span id="_CPPv315PlannerSettings"></span><span id="_CPPv215PlannerSettings"></span><span id="PlannerSettings"></span><span class="target" id="structPlannerSettings"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PlannerSettings</span></span></span><a class="headerlink" href="#_CPPv415PlannerSettings" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;plannersettings.h&gt;</em></div>
+<p>Top-level planner settings. </p>
+<p>Aggregates all configuration parameters required by the ALTRO optimizer. Multiple passes can be executed sequentially, each refining the trajectory.</p>
+<p>Typical workflow:<ol class="loweralpha simple">
+<li><p>Initialize trajectory</p></li>
+<li><p>Run ALTRO passes</p></li>
+<li><p>Update penalties and constraints</p></li>
+<li><p>Return optimized trajectory</p></li>
+</ol>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Param constraints<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Constraint configuration </p>
+</dd>
+<dt class="field-even">Param disturbances<span class="colon">:</span></dt>
+<dd class="field-even"><p>Disturbance modeling configuration </p>
+</dd>
+<dt class="field-odd">Param init_traj<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Initial trajectory configuration</p>
+</dd>
+<dt class="field-even">Param num_passes<span class="colon">:</span></dt>
+<dd class="field-even"><p>Number of optimization passes </p>
+</dd>
+<dt class="field-odd">Param passes<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Array of pass-specific configurations </p>
+</dd>
+</dl>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N15PlannerSettings11constraintsE">
+<span id="_CPPv3N15PlannerSettings11constraintsE"></span><span id="_CPPv2N15PlannerSettings11constraintsE"></span><span id="PlannerSettings::constraints__ConstraintConfig"></span><span class="target" id="structPlannerSettings_1adb022466d87c2464083ebd41d5c9ee15"></span><a class="reference internal" href="#_CPPv416ConstraintConfig" title="ConstraintConfig"><span class="n"><span class="pre">ConstraintConfig</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">constraints</span></span></span><a class="headerlink" href="#_CPPv4N15PlannerSettings11constraintsE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N15PlannerSettings12disturbancesE">
+<span id="_CPPv3N15PlannerSettings12disturbancesE"></span><span id="_CPPv2N15PlannerSettings12disturbancesE"></span><span id="PlannerSettings::disturbances__DisturbanceConfig"></span><span class="target" id="structPlannerSettings_1aa841eb8bd6e2a0cb98c5e6487b6774d6"></span><a class="reference internal" href="#_CPPv417DisturbanceConfig" title="DisturbanceConfig"><span class="n"><span class="pre">DisturbanceConfig</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">disturbances</span></span></span><a class="headerlink" href="#_CPPv4N15PlannerSettings12disturbancesE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N15PlannerSettings9init_trajE">
+<span id="_CPPv3N15PlannerSettings9init_trajE"></span><span id="_CPPv2N15PlannerSettings9init_trajE"></span><span id="PlannerSettings::init_traj__InitTrajConfig"></span><span class="target" id="structPlannerSettings_1a42910fb64452e1d262170f6e45f1f1bf"></span><a class="reference internal" href="#_CPPv414InitTrajConfig" title="InitTrajConfig"><span class="n"><span class="pre">InitTrajConfig</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">init_traj</span></span></span><a class="headerlink" href="#_CPPv4N15PlannerSettings9init_trajE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N15PlannerSettings10num_passesE">
+<span id="_CPPv3N15PlannerSettings10num_passesE"></span><span id="_CPPv2N15PlannerSettings10num_passesE"></span><span id="PlannerSettings::num_passes__i"></span><span class="target" id="structPlannerSettings_1adaa70072b3f71c5d1cdf224a72813487"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">num_passes</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N15PlannerSettings10num_passesE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N15PlannerSettings6passesE">
+<span id="_CPPv3N15PlannerSettings6passesE"></span><span id="_CPPv2N15PlannerSettings6passesE"></span><span id="PlannerSettings::passes__std::array:PassConfig.MAX_OUTER_PASSES:"></span><span class="target" id="structPlannerSettings_1a88bb3b48db5fb52a01154fbd51738aaf"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv410PassConfig" title="PassConfig"><span class="n"><span class="pre">PassConfig</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv416MAX_OUTER_PASSES" title="MAX_OUTER_PASSES"><span class="n"><span class="pre">MAX_OUTER_PASSES</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">passes</span></span></span><a class="headerlink" href="#_CPPv4N15PlannerSettings6passesE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">pybind</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv416MAX_OUTER_PASSES"><code class="docutils literal notranslate"><span class="pre">MAX_OUTER_PASSES</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv414InitTrajConfig"><code class="docutils literal notranslate"><span class="pre">InitTrajConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14InitTrajConfig14initcontrollerE"><code class="docutils literal notranslate"><span class="pre">initcontroller</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv417DisturbanceConfig"><code class="docutils literal notranslate"><span class="pre">DisturbanceConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig13plan_for_aeroE"><code class="docutils literal notranslate"><span class="pre">plan_for_aero</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig13plan_for_propE"><code class="docutils literal notranslate"><span class="pre">plan_for_prop</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig12plan_for_srpE"><code class="docutils literal notranslate"><span class="pre">plan_for_srp</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig11plan_for_ggE"><code class="docutils literal notranslate"><span class="pre">plan_for_gg</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig16plan_for_gendistE"><code class="docutils literal notranslate"><span class="pre">plan_for_gendist</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig18plan_for_resdipoleE"><code class="docutils literal notranslate"><span class="pre">plan_for_resdipole</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig9srp_coeffE"><code class="docutils literal notranslate"><span class="pre">srp_coeff</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig10drag_coeffE"><code class="docutils literal notranslate"><span class="pre">drag_coeff</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig7coeff_NE"><code class="docutils literal notranslate"><span class="pre">coeff_N</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig10res_dipoleE"><code class="docutils literal notranslate"><span class="pre">res_dipole</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig11prop_torqueE"><code class="docutils literal notranslate"><span class="pre">prop_torque</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig14gendist_torqueE"><code class="docutils literal notranslate"><span class="pre">gendist_torque</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17DisturbanceConfig5J_estE"><code class="docutils literal notranslate"><span class="pre">J_est</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv416ConstraintConfig"><code class="docutils literal notranslate"><span class="pre">ConstraintConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig19control_limit_scaleE"><code class="docutils literal notranslate"><span class="pre">control_limit_scale</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig5u_maxE"><code class="docutils literal notranslate"><span class="pre">u_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig4wmaxE"><code class="docutils literal notranslate"><span class="pre">wmax</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig15sun_limit_angleE"><code class="docutils literal notranslate"><span class="pre">sun_limit_angle</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv410CostConfig"><code class="docutils literal notranslate"><span class="pre">CostConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig5angleE"><code class="docutils literal notranslate"><span class="pre">angle</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig7ang_velE"><code class="docutils literal notranslate"><span class="pre">ang_vel</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig11ang_vel_magE"><code class="docutils literal notranslate"><span class="pre">ang_vel_mag</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig15ang_vel_err_dirE"><code class="docutils literal notranslate"><span class="pre">ang_vel_err_dir</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig12control_multE"><code class="docutils literal notranslate"><span class="pre">control_mult</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig18mtq_control_weightE"><code class="docutils literal notranslate"><span class="pre">mtq_control_weight</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig17rw_control_weightE"><code class="docutils literal notranslate"><span class="pre">rw_control_weight</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig20magic_control_weightE"><code class="docutils literal notranslate"><span class="pre">magic_control_weight</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig12rw_AM_weightE"><code class="docutils literal notranslate"><span class="pre">rw_AM_weight</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig14rw_stic_weightE"><code class="docutils literal notranslate"><span class="pre">rw_stic_weight</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig12RWh_max_multE"><code class="docutils literal notranslate"><span class="pre">RWh_max_mult</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig17RWh_stiction_multE"><code class="docutils literal notranslate"><span class="pre">RWh_stiction_mult</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig11RWh_ok_multE"><code class="docutils literal notranslate"><span class="pre">RWh_ok_mult</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig7angle_NE"><code class="docutils literal notranslate"><span class="pre">angle_N</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig9ang_vel_NE"><code class="docutils literal notranslate"><span class="pre">ang_vel_N</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig13ang_vel_mag_NE"><code class="docutils literal notranslate"><span class="pre">ang_vel_mag_N</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig17ang_vel_err_dir_NE"><code class="docutils literal notranslate"><span class="pre">ang_vel_err_dir_N</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig18ang_cost_func_typeE"><code class="docutils literal notranslate"><span class="pre">ang_cost_func_type</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig13use_cost_hessE"><code class="docutils literal notranslate"><span class="pre">use_cost_hess</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv412AugLagConfig"><code class="docutils literal notranslate"><span class="pre">AugLagConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N12AugLagConfig15max_outer_itersE"><code class="docutils literal notranslate"><span class="pre">max_outer_iters</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N12AugLagConfig13lag_mult_initE"><code class="docutils literal notranslate"><span class="pre">lag_mult_init</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N12AugLagConfig12lag_mult_maxE"><code class="docutils literal notranslate"><span class="pre">lag_mult_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N12AugLagConfig12penalty_initE"><code class="docutils literal notranslate"><span class="pre">penalty_init</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N12AugLagConfig11penalty_maxE"><code class="docutils literal notranslate"><span class="pre">penalty_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N12AugLagConfig13penalty_scaleE"><code class="docutils literal notranslate"><span class="pre">penalty_scale</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N12AugLagConfig14constraint_tolE"><code class="docutils literal notranslate"><span class="pre">constraint_tol</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N12AugLagConfig14total_cost_tolE"><code class="docutils literal notranslate"><span class="pre">total_cost_tol</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv410ILQRConfig"><code class="docutils literal notranslate"><span class="pre">ILQRConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig9max_itersE"><code class="docutils literal notranslate"><span class="pre">max_iters</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig8grad_tolE"><code class="docutils literal notranslate"><span class="pre">grad_tol</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig8cost_tolE"><code class="docutils literal notranslate"><span class="pre">cost_tol</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig11z_count_limE"><code class="docutils literal notranslate"><span class="pre">z_count_lim</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig8max_costE"><code class="docutils literal notranslate"><span class="pre">max_cost</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig11state_boundE"><code class="docutils literal notranslate"><span class="pre">state_bound</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv420RegularizationConfig"><code class="docutils literal notranslate"><span class="pre">RegularizationConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig8reg_initE"><code class="docutils literal notranslate"><span class="pre">reg_init</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig7reg_minE"><code class="docutils literal notranslate"><span class="pre">reg_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig7reg_maxE"><code class="docutils literal notranslate"><span class="pre">reg_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig9reg_scaleE"><code class="docutils literal notranslate"><span class="pre">reg_scale</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig8reg_bumpE"><code class="docutils literal notranslate"><span class="pre">reg_bump</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig12reg_min_condE"><code class="docutils literal notranslate"><span class="pre">reg_min_cond</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig14rand_add_ratioE"><code class="docutils literal notranslate"><span class="pre">rand_add_ratio</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig17use_dynamics_hessE"><code class="docutils literal notranslate"><span class="pre">use_dynamics_hess</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig19use_constraint_hessE"><code class="docutils literal notranslate"><span class="pre">use_constraint_hess</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv416LineSearchConfig"><code class="docutils literal notranslate"><span class="pre">LineSearchConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16LineSearchConfig9max_itersE"><code class="docutils literal notranslate"><span class="pre">max_iters</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16LineSearchConfig5beta1E"><code class="docutils literal notranslate"><span class="pre">beta1</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16LineSearchConfig5beta2E"><code class="docutils literal notranslate"><span class="pre">beta2</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv410PassConfig"><code class="docutils literal notranslate"><span class="pre">PassConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10PassConfig4costE"><code class="docutils literal notranslate"><span class="pre">cost</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10PassConfig6auglagE"><code class="docutils literal notranslate"><span class="pre">auglag</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10PassConfig4ilqrE"><code class="docutils literal notranslate"><span class="pre">ilqr</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10PassConfig3regE"><code class="docutils literal notranslate"><span class="pre">reg</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10PassConfig10linesearchE"><code class="docutils literal notranslate"><span class="pre">linesearch</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10PassConfig2dtE"><code class="docutils literal notranslate"><span class="pre">dt</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv415PlannerSettings"><code class="docutils literal notranslate"><span class="pre">PlannerSettings</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N15PlannerSettings11constraintsE"><code class="docutils literal notranslate"><span class="pre">constraints</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N15PlannerSettings12disturbancesE"><code class="docutils literal notranslate"><span class="pre">disturbances</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N15PlannerSettings9init_trajE"><code class="docutils literal notranslate"><span class="pre">init_traj</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N15PlannerSettings10num_passesE"><code class="docutils literal notranslate"><span class="pre">num_passes</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N15PlannerSettings6passesE"><code class="docutils literal notranslate"><span class="pre">passes</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/api/pybind/plannersettings.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Niclas Scheuer, Patrick McKeen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

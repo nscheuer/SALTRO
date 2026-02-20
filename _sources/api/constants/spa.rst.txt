@@ -1,0 +1,6 @@
+spa
+===
+
+.. doxygenfile:: constants/spa.h
+   :project: saltro
+   :path: ../include/saltro

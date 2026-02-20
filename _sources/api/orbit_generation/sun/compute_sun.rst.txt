@@ -1,0 +1,6 @@
+compute_sun
+===========
+
+.. doxygenfile:: orbit_generation/sun/compute_sun.h
+   :project: saltro
+   :path: ../include/saltro

@@ -1,0 +1,6 @@
+compute_density
+===============
+
+.. doxygenfile:: orbit_generation/density/compute_density.h
+   :project: saltro
+   :path: ../include/saltro

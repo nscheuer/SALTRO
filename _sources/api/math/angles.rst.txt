@@ -1,0 +1,6 @@
+angles
+======
+
+.. doxygenfile:: math/angles.h
+   :project: saltro
+   :path: ../include/saltro

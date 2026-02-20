@@ -1,0 +1,6 @@
+igrf8
+=====
+
+.. doxygenfile:: constants/igrf8.h
+   :project: saltro
+   :path: ../include/saltro

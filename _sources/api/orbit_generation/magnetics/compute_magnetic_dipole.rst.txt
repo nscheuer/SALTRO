@@ -1,0 +1,6 @@
+compute_magnetic_dipole
+=======================
+
+.. doxygenfile:: orbit_generation/magnetics/compute_magnetic_dipole.h
+   :project: saltro
+   :path: ../include/saltro

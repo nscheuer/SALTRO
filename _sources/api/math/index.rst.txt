@@ -4,4 +4,6 @@ math
 .. toctree::
    :maxdepth: 1
 
-   addition
+   integrators/index
+   angles
+   frames

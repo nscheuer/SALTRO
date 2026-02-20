@@ -1,0 +1,8 @@
+density
+=======
+
+.. toctree::
+   :maxdepth: 1
+
+   compute_density
+   compute_density_harrispriester
