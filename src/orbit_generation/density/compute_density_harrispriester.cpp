@@ -1,7 +1,7 @@
 #include <saltro/orbit_generation/density/compute_density_harrispriester.h>
 
 #include <saltro/constants/harrispriester.h>
-#include <saltro/math/frames.h>
+#include <saltro/math/angles.h>
 
 #include <cmath>
 #include <cstddef>

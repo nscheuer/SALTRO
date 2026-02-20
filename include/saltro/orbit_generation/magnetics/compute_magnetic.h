@@ -8,24 +8,26 @@ namespace saltro::orbits {
 /**
  * @brief Compute geomagnetic field along a trajectory using a selected model.
  *
- * Evaluates the Earth magnetic field for each trajectory sample using one
- * of several available geomagnetic models.
+ * Dispatches magnetic field computation to one of the available geomagnetic
+ * models based on the integer selector \p magnetic_model.
  *
- * For each sample \(k\):
+ * For each trajectory sample \f$k\f$, the magnetic field is evaluated as:
  * \f[
  * \mathbf{B}_k =
  * \mathbf{B}_{\text{model}}\!\left(\mathbf{R}_k, t_k\right)
  * \f]
  *
- * where \f$\mathbf{R}_k\f$ is the position vector and \f$t_k\f$ is the
- * Julian time. The model used is determined by the @p magnetic_model flag.
+ * where:
+ * - \f$\mathbf{R}_k\f$ is the spacecraft position vector (meters),
+ * - \f$t_k\f$ is the corresponding Julian time,
+ * - \f$\mathbf{B}_k\f$ is the magnetic field vector (Tesla).
  *
  * Supported models:
- * - 0: Tilted dipole approximation  
- * - 1: IGRF-8 spherical harmonic model  
- * - 2: IGRF-13 spherical harmonic model  
+ * - \f$0\f$ → Tilted dipole approximation  
+ * - \f$1\f$ → IGRF-8 spherical harmonic model  
+ * - \f$2\f$ → IGRF-13 spherical harmonic model  
  *
- * The resulting magnetic field matrix is filled column-wise:
+ * The output magnetic field is written column-wise:
  * \f[
  * \mathbf{B} =
  * \begin{bmatrix}
@@ -33,15 +35,19 @@ namespace saltro::orbits {
  * \end{bmatrix}
  * \f]
  *
- * @param R Position vectors of the trajectory (meters). Each column is a
- *          sample position.
- * @param jtime Julian time values associated with each sample.
+ * This function performs model selection only; the physical computation is
+ * delegated to the corresponding model implementation.
+ *
+ * @param R Spacecraft position vectors (meters). Each column corresponds
+ *          to one trajectory sample.
+ * @param jtime Julian time values associated with each trajectory sample.
  * @param jtime_length Number of valid trajectory samples.
  * @param magnetic_model Integer identifier selecting the magnetic model:
- *        0 = tilted dipole, 1 = IGRF8, 2 = IGRF13.
+ *        0 = tilted dipole, 1 = IGRF-8, 2 = IGRF-13.
  * @param B Output magnetic field vectors (Tesla), column-wise.
  *
- * @return True if the computation succeeds, false otherwise.
+ * @return True if the selected model computation succeeds for all samples,
+ *         false if the model identifier is invalid or a computation fails.
  */
 bool compute_magnetic(
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& R,

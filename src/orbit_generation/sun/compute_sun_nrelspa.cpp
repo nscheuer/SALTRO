@@ -1,7 +1,7 @@
 #include <cmath>
 #include <saltro/constants/constants.h>
 #include <saltro/constants/spa.h>
-#include <saltro/math/frames.h>
+#include <saltro/math/angles.h>
 #include <saltro/limits.h>
 
 namespace saltro::orbits {

@@ -1,5 +1,6 @@
 #include <saltro/orbit_generation/sun/compute_sun.h>
 #include <saltro/orbit_generation/sun/compute_sun_noaa.h>
+#include <saltro/orbit_generation/sun/compute_sun_nrelspa.h>
 
 namespace saltro::orbits {
 
@@ -14,9 +15,7 @@ bool compute_sun(
         case 0: // NOAA
             return compute_sun_noaa(R, jtime, jtime_length, S);
         case 1: // NRELSPA
-
-        case 2: // VSOP87
-
+            return compute_sun_nrelspa(R, jtime, jtime_length, S);
         default:
             return false;
     }
