@@ -41,3 +41,4 @@ breathe_projects = {
     "saltro": "./xml"
 }
 breathe_default_project = "saltro"
+suppress_warnings = ["duplicate_declaration.cpp"]

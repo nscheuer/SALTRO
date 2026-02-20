@@ -9,5 +9,9 @@ documentation for details.
 .. toctree::
    :maxdepth: 1
 
+   api/limits
+   api/constants/index
    api/math/index
+   api/orbit_generation/index
+   api/pybind/index
 

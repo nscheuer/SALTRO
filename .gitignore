@@ -56,3 +56,12 @@ docs/source/xml/
 docs/source/html/
 docs/source/api/
 docs/build
+
+# Build Folder
+build/
+
+# External libraries
+external/
+
+# Test Log
+Testing/
