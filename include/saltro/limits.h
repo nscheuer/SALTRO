@@ -9,6 +9,7 @@ namespace saltro::limits {
     inline constexpr int MAX_NUM_PASSES = 3;
     inline constexpr int MAX_NUM_MTQ    = 4;
     inline constexpr int MAX_NUM_RW     = 4;
+    inline constexpr int MAX_NUM_GEOMETRY_FACES = 20;
 
     // Derived maximum dimensions for statically-allocated vectors/matrices.
     // These ensure no heap allocation occurs in the Satellite class or configs.

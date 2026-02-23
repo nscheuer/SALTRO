@@ -12,6 +12,7 @@
 #include <saltro/pybind/plannersettings.h>
 #include <saltro/math/angles.h>
 #include <saltro/math/quaternion.h>
+#include <saltro/pybind/disturbances/geometryconfig.h>
 
 class Satellite {
 public:
@@ -32,13 +33,13 @@ public:
     using MatX  = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0,
                                 MaxDim, MaxDim>;
 
-    using DynHessXX = Tensor3<saltro::limits::MAX_STATE_DIM,
+    using DynHessXX = saltro::math::Tensor3<saltro::limits::MAX_STATE_DIM,
                               saltro::limits::MAX_STATE_DIM,
                               saltro::limits::MAX_STATE_DIM>;
-    using DynHessUX = Tensor3<saltro::limits::MAX_CTRL_DIM,
+    using DynHessUX = saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
                               saltro::limits::MAX_STATE_DIM,
                               saltro::limits::MAX_STATE_DIM>;
-    using DynHessUU = Tensor3<saltro::limits::MAX_CTRL_DIM,
+    using DynHessUU = saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
                               saltro::limits::MAX_CTRL_DIM,
                               saltro::limits::MAX_STATE_DIM>;
 
@@ -56,6 +57,10 @@ public:
     const Mat33& invInertia() const { return invJcom_; }
     const Mat33& inertiaNoRW() const { return Jcom_noRW_; }
     const Mat33& invInertiaNoRW() const { return invJcom_noRW_; }
+
+    void setGeometryConfig(const saltro::disturbances::GeometryConfig& config);
+    const saltro::disturbances::GeometryConfig& geometryConfig() const { return geometry_config_; }
+    saltro::disturbances::GeometryConfig& geometryConfig() { return geometry_config_; }
 
     void addMTQ(const Vec3& axis, double max_dipole);
     void addRW(const Vec3& axis, double max_torque, double J, double h0, double h_max);
@@ -75,10 +80,9 @@ public:
     void setSettings(const PlannerSettings& settings) { settings_ = settings; }
     const PlannerSettings& settings() const { return settings_; }
 
-    VecX dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist) const;
-    Vec3 actuatorTorque(const VecX& x, const VecX& u, const Vec3& B_body) const;
-    Vec3 disturbanceTorque(const VecX& x, const DisturbanceConfig& dist) const;
-
+    Vec3 actuatorTorque(const VecX& x, const VecX& u, const Vec3& B_eci) const;
+    Vec3 disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const int rho) const;
+    VecX dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const int rho) const;
 
     std::tuple<MatX, MatX, MatX> dynamicsJacobians(const VecX& x, const VecX& u, const DisturbanceConfig& dist) const;
     std::tuple<DynHessXX, DynHessUX, DynHessUU> dynamicsHessians(const VecX& x, const VecX& u, const DisturbanceConfig& dist) const;
@@ -105,6 +109,7 @@ private:
     int num_rw_ = 0;
 
     PlannerSettings settings_;
+    saltro::disturbances::GeometryConfig geometry_config_;
 
     void updateInertiaNoRW();
 

@@ -31,6 +31,10 @@ void Satellite::setInertia(const Mat33& Jcom_in) {
     updateInertiaNoRW();
 }
 
+void Satellite::setGeometryConfig(const saltro::disturbances::GeometryConfig& config) {
+    geometry_config_ = config;
+}
+
 void Satellite::addMTQ(const Vec3& axis, double max_dipole) {
     if (num_mtq_ >= saltro::limits::MAX_NUM_MTQ) {
         throw out_of_range("Exceeded MAX_NUM_MTQ.");
@@ -85,5 +89,83 @@ void Satellite::setSettings(const PlannerSettings& settings) {
 
 const PlannerSettings& Satellite::settings() const {
     return settings_;
+}
+
+void Satellite::updateInertiaNoRW() {
+    Jcom_noRW_ = Jcom_;
+    
+    for (int i = 0; i < num_rw_; ++i) {
+        const RW& rw = getRW(i);
+        Vec3 axis = rw.axis();
+        double J_rw = rw.wheelInertia();
+        Jcom_noRW_ -= J_rw * axis * axis.transpose();
+    }
+    
+    invJcom_noRW_ = Jcom_noRW_.inverse();
+}
+
+Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Vec3& B_eci) const {
+    Vec3 torque = Vec3::Zero();
+    
+    Vec4 q = x.segment<4>(QUAT_INDEX);
+    Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+    Vec3 B_body = R_T * B_eci;
+    
+    if (num_mtq_ > 0) {
+        for (int i = 0; i < num_mtq_; ++i) {
+            double u_i = u(i);
+            const MTQ& mtq = getMTQ(i);
+            torque += mtq.torque(u_i, x, B_body);
+        }
+    }
+    
+    if (num_rw_ > 0) {
+        for (int i = 0; i < num_rw_; ++i) {
+            int ctrl_idx = num_mtq_ + i;
+            double u_i = u(ctrl_idx);
+            const RW& rw = getRW(i);
+            torque += rw.torque(u_i, x);
+        }
+    }
+    
+    return torque;
+}
+
+Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const int rho) const {
+    Vec3 torque = Vec3::Zero();
+    return torque;
+}
+
+Satellite::VecX Satellite::dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const int rho) const {
+    Vec3 w = x.segment<3>(AV_INDEX);
+    Vec4 q = x.segment<4>(QUAT_INDEX);
+    Vec3 tau_act = actuatorTorque(x, u, B_eci);
+    Vec3 tau_dist = disturbanceTorque(x, dist, B_eci, S_eci, rho);
+    Vec3 h_rw = Vec3::Zero();
+    if (num_rw_ > 0) {
+        for (int i = 0; i < num_rw_; ++i) {
+            double h_i = x(RW_MOMENTUM_INDEX + i);
+            h_rw += h_i * getRW(i).axis();
+        }
+    }
+    Vec3 wdot = invJcom_noRW_ * (tau_act + tau_dist - w.cross(Jcom_ * w + h_rw));
+    Mat43 W = saltro::math::findWMat(q);
+    Vec4 qdot = 0.5 * W * w;
+    VecX xdot(stateDim());
+    xdot.segment<3>(AV_INDEX) = wdot;
+    xdot.segment<4>(QUAT_INDEX) = qdot;
+    if (num_rw_ > 0) {
+        for (int i = 0; i < num_rw_; ++i) {
+            int ctrl_idx = num_mtq_ + i;
+            double tau_rw_cmd = (ctrl_idx < controlDim()) ? u(ctrl_idx) : 0.0;
+            
+            const RW& rw = getRW(i);
+            Vec3 axis = rw.axis();
+            double J_rw = rw.wheelInertia();
+            double hdot_i = -tau_rw_cmd - J_rw * axis.dot(wdot);
+            xdot(RW_MOMENTUM_INDEX + i) = hdot_i;
+        }
+    }
+    return xdot;
 }
 
