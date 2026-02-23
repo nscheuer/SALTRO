@@ -2,6 +2,7 @@
 #include <array>
 #include <cmath>
 #include <Eigen/Dense>
+#include <saltro/limits.h>
 
 static constexpr int MAX_OUTER_PASSES = 2;
 
@@ -90,7 +91,8 @@ struct DisturbanceConfig {
 
 struct ConstraintConfig {
     double control_limit_scale = 0.75;
-    Eigen::VectorXd u_max;
+    /// Stack-allocated bounded control limit vector (no heap allocation).
+    Eigen::Matrix<double, Eigen::Dynamic, 1, 0, saltro::limits::MAX_CTRL_DIM, 1> u_max;
     double wmax = 20.0 * M_PI / 180.0;
     double sun_limit_angle = 20.0 * M_PI / 180.0;
 };
