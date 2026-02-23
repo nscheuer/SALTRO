@@ -29,6 +29,13 @@ public:
         for (auto& s : data_) s.setZero();
     }
 
+    bool isZero() const {
+        for (const auto& s : data_) {
+            if (!s.isZero()) return false;
+        }
+        return true;
+    }
+
     Slice& slice(int k) { return data_[static_cast<std::size_t>(k)]; }
     const Slice& slice(int k) const { return data_[static_cast<std::size_t>(k)]; }
 

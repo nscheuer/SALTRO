@@ -83,14 +83,6 @@ RW& Satellite::getRW(int i) {
     return *rw_actuators_[i];
 }
 
-void Satellite::setSettings(const PlannerSettings& settings) {
-    settings_ = settings;
-}
-
-const PlannerSettings& Satellite::settings() const {
-    return settings_;
-}
-
 void Satellite::updateInertiaNoRW() {
     Jcom_noRW_ = Jcom_;
     
@@ -107,6 +99,9 @@ void Satellite::updateInertiaNoRW() {
 Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Vec3& B_eci) const {
     Vec3 torque = Vec3::Zero();
     
+    // Extract base state (first 7 elements: w + q)
+    Vec7 x_base = x.head<7>();
+    
     Vec4 q = x.segment<4>(QUAT_INDEX);
     Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
     Vec3 B_body = R_T * B_eci;
@@ -115,7 +110,7 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
         for (int i = 0; i < num_mtq_; ++i) {
             double u_i = u(i);
             const MTQ& mtq = getMTQ(i);
-            torque += mtq.torque(u_i, x, B_body);
+            torque += mtq.torque(u_i, x_base, B_body);
         }
     }
     
@@ -124,7 +119,7 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
             int ctrl_idx = num_mtq_ + i;
             double u_i = u(ctrl_idx);
             const RW& rw = getRW(i);
-            torque += rw.torque(u_i, x);
+            torque += rw.torque(u_i, x_base);
         }
     }
     

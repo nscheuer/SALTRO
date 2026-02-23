@@ -28,23 +28,26 @@ MTQ::T113 MTQ::ddtorq_dudu(double, const BaseState&, const Vec3&) const {
 }
 
 MTQ::T173 MTQ::ddtorq_dudbasestate(double, const BaseState&, const Vec3&, const Eigen::Matrix<double,4,3>& dB_dq) const {
-    T173 H;
+    T173 H = T173::Zero();
 
-    for (int i = 0; i < 4; ++i) {
-        Eigen::Vector3d row = -(dB_dq.row(i).transpose().cross(axis_));
-        H.slice(0).row(3 + i) = row.transpose();
+    for (int k = 0; k < 3; ++k) {
+        for (int i = 0; i < 4; ++i) {
+            Eigen::Vector3d dB_dqi = dB_dq.row(i).transpose();
+            double dtau_k = -(dB_dqi.cross(axis_))[k];
+            H.slice(k)(0, 3 + i) = dtau_k;
+        }
     }
 
     return H;
 }
 
 MTQ::T773 MTQ::ddtorq_dbasestatedbasestate(double u, const BaseState&, const Eigen::Matrix<double,4,3>&, const std::array<Eigen::Matrix<double,4,4>,3>& d2B_dq2) const {
-    T773 H;
+    T773 H = T773::Zero();
 
     for (int k = 0; k < 3; ++k) {
         for (int i = 0; i < 4; ++i) {
             for (int j = 0; j < 4; ++j) {
-                double val = -d2B_dq2[k](i,j) * u;
+                double val = -(d2B_dq2[k](i,j)) * u;
                 H.slice(k)(3+i, 3+j) = val;
             }
         }
