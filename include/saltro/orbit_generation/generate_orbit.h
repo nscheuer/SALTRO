@@ -82,6 +82,8 @@ namespace saltro::orbits {
  * - Sun model:
  *   - 0 → NOAA
  *   - 1 → NREL SPA
+ * - Eclipse model:
+ *   - 0 → Cylindrical shadow
  * - Density model:
  *   - 0 → Harris–Priester
  *
@@ -96,6 +98,7 @@ namespace saltro::orbits {
  * @param orbit_model Orbit model selector.
  * @param magnetic_model Magnetic field model selector.
  * @param sun_model Solar position model selector.
+ * @param eclipse_model Eclipse shadow model selector.
  * @param density_model Atmospheric density model selector.
  * @param R Output propagated position vectors (meters), column-wise.
  * @param V Output propagated velocity vectors (m/s), column-wise.
@@ -113,6 +116,7 @@ bool generate_orbit(
     const int orbit_model,
     const int magnetic_model,
     const int sun_model,
+    const int eclipse_model,
     const int density_model,
 
     Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& R,

@@ -31,6 +31,7 @@ def test_generate_orbit_basic_dimensions():
         orbit_model=0,
         magnetic_model=0,
         sun_model=0,
+        eclipse_model=0,
         density_model=0
     )
 
@@ -55,7 +56,7 @@ def test_generate_orbit_single_point():
 
     ok, R, V, B, S, rho = saltro_py.generate_orbit(
         r0, v0, jtime,
-        0, 0, 0, 0
+        0, 0, 0, 0, 0
     )
 
     assert ok
@@ -73,7 +74,7 @@ def test_generate_orbit_invalid_empty_jtime():
     with pytest.raises(RuntimeError):
         saltro_py.generate_orbit(
             r0, v0, jtime,
-            0, 0, 0, 0
+            0, 0, 0, 0, 0
         )
 
 
@@ -84,7 +85,7 @@ def test_generate_orbit_non_increasing_time():
 
     ok, *_ = saltro_py.generate_orbit(
         r0, v0, jtime,
-        0, 0, 0, 0
+        0, 0, 0, 0, 0
     )
 
     assert not ok
@@ -96,7 +97,7 @@ def test_generate_orbit_time_not_finite():
 
     ok, *_ = saltro_py.generate_orbit(
         r0, v0, jtime,
-        0, 0, 0, 0
+        0, 0, 0, 0, 0
     )
 
     assert not ok
@@ -110,7 +111,7 @@ def test_generate_orbit_time_is_julian_date_rejected():
 
     ok, *_ = saltro_py.generate_orbit(
         r0, v0, jtime,
-        0, 0, 0, 0
+        0, 0, 0, 0, 0
     )
 
     assert not ok
@@ -123,7 +124,7 @@ def test_generate_orbit_invalid_r0_magnitude():
 
     ok, *_ = saltro_py.generate_orbit(
         r0_bad, v0, jtime,
-        0, 0, 0, 0
+        0, 0, 0, 0, 0
     )
 
     assert not ok
@@ -136,7 +137,7 @@ def test_generate_orbit_invalid_v0_magnitude():
 
     ok, *_ = saltro_py.generate_orbit(
         r0, v0_bad, jtime,
-        0, 0, 0, 0
+        0, 0, 0, 0, 0
     )
 
     assert not ok
@@ -149,7 +150,7 @@ def test_generate_orbit_nonfinite_state():
 
     ok, *_ = saltro_py.generate_orbit(
         r0_bad, v0, jtime,
-        0, 0, 0, 0
+        0, 0, 0, 0, 0
     )
 
     assert not ok
@@ -165,5 +166,5 @@ def test_generate_orbit_exceeds_max_length():
     with pytest.raises(RuntimeError):
         saltro_py.generate_orbit(
             r0, v0, jtime,
-            0, 0, 0, 0
+            0, 0, 0, 0, 0
         )

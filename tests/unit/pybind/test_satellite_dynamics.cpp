@@ -54,7 +54,7 @@ public:
         
         bool success = orbits::generate_orbit(
             r0, v0, jtime, n_steps,
-            0, 0, 0, 0,
+            0, 0, 0, 0, 0,
             R, V, B, S, rho
         );
         REQUIRE(success);

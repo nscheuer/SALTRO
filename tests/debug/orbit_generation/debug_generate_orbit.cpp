@@ -30,6 +30,7 @@ int main() {
         0,  // orbit_model
         0,  // magnetic_model
         0,  // sun_model
+        0,  // eclipse_model
         0,  // density_model
         R, V, B, S, rho
     );

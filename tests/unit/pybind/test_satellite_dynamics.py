@@ -46,9 +46,9 @@ class TestSatelliteDynamicsFixture:
         
         jtime = np.array([i * self.dt for i in range(self.n_steps)])
         
-        # Generate orbit (using simple models: 0, 0, 0, 0)
+        # Generate orbit (using simple models: 0, 0, 0, 0, 0)
         ok, self.R, self.V, self.B, self.S, self.rho = saltro_py.generate_orbit(
-            r0, v0, jtime, 0, 0, 0, 0
+            r0, v0, jtime, 0, 0, 0, 0, 0
         )
         assert ok, "Orbit generation failed"
     

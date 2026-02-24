@@ -113,7 +113,7 @@ int main() {
     
     bool orbit_ok = orbits::generate_orbit(
         r0, v0, jtime, n_steps,
-        0, 0, 0, 0,  // Use simple models
+        0, 0, 0, 0, 0,  // Use simple models
         R, V, B, S, rho
     );
     
