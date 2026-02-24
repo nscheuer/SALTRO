@@ -1,5 +1,6 @@
 #include <saltro/orbit_generation/orbits/compute_orbit.h>
 #include <saltro/orbit_generation/orbits/compute_orbit_keplerian.h>
+#include <saltro/orbit_generation/orbits/compute_orbit_J2_RK4.h>
 
 namespace saltro::orbits {
 
@@ -16,6 +17,8 @@ bool compute_orbit(
     switch (orbit_model) {
         case 0: // KEPLERIAN
             return compute_orbit_keplerian(r0, v0, jtime, jtime_length, R, V);
+        case 1: // J2_RK4
+            return compute_orbit_J2_RK4(r0, v0, jtime, jtime_length, R, V);
         default:
             return false;
     }

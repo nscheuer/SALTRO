@@ -5,19 +5,69 @@
 
 namespace saltro::constants {
 
+/**
+ * @brief WGS84 ellipsoid semi-major axis (equatorial radius).
+ * 
+ * Defined as \f$6\,378\,137\f$ meters. Used for computing geodetic altitude
+ * from Earth-centered coordinates.
+ */
 inline constexpr double WGS84_A_M = 6378137.0;
+
+/**
+ * @brief WGS84 ellipsoid flattening parameter.
+ * 
+ * Defined as \f$f = \frac{1}{298.257223563} \approx 3.357 \times 10^{-3}\f$.
+ * Characterizes Earth's oblate spheroid shape.
+ */
 inline constexpr double WGS84_F = 1.0 / 298.257223563;
 
+/**
+ * @brief Solar direction lag angle for Harris-Priester model.
+ * 
+ * Defines the phase lag between the spacecraft's local solar noon and the
+ * actual peak of the atmospheric bulge. Defined as \f$30°\f$ (≈ 0.524 radians).
+ * Accounts for the diurnal bulge offset due to atmospheric winds.
+ */
 inline constexpr double HARRIS_PRIESTER_LAG_RAD = 0.5235987755982988730771072305465838;
+
+/**
+ * @brief Minimum cosine value threshold for Harris-Priester model.
+ * 
+     * Used to avoid division by very small numbers in the weighting function.
+ * Set to \f$10^{-12}\f$ for numerical stability.
+ */
 inline constexpr double HARRIS_PRIESTER_MIN_COS = 1e-12;
+
+/**
+ * @brief Exponent for cosine weighting in Harris-Priester model.
+ * 
+ * Controls the steepness of the day-night density transition. An exponent of 4
+ * provides a smooth transition between minimum and maximum densities.
+ */
 inline constexpr double HARRIS_PRIESTER_COS_EXPONENT = 4.0;
 
+/**
+ * @brief Single entry in the Harris-Priester atmospheric density table.
+ * 
+ * Each entry corresponds to a discrete altitude level and provides both
+ * minimum (nightside) and maximum (dayside) density values.
+ */
 struct HarrisPriesterEntry {
-    double alt_m;
-    double rho_min_kg_m3;
-    double rho_max_kg_m3;
+    double alt_m;           ///< Altitude above Earth surface in meters
+    double rho_min_kg_m3;   ///< Minimum (nightside) density in kg/m³
+    double rho_max_kg_m3;   ///< Maximum (dayside) density in kg/m³
 };
 
+/**
+ * @brief Harris-Priester atmospheric density model lookup table.
+ * 
+ * Tabulated density values at 50 discrete altitudes from 100 to 1000 km.
+ * Each entry contains minimum (nightside) and maximum (dayside) density
+ * values. Interpolation or table lookup is performed during density
+ * computation to evaluate the model at arbitrary altitudes.
+ * 
+ * Reference: Harris, M. J., and W. Priester, 1962.
+ */
 inline constexpr std::array<HarrisPriesterEntry, 50> HARRIS_PRIESTER_TABLE = {{
     {  100000.0, 4.974e-07, 4.974e-07 },
     {  120000.0, 2.490e-08, 2.490e-08 },

@@ -10,3 +10,11 @@ sudo apt install ccache
 cmake -S . -B build -DSALTRO_BUILD_PYTHON=ON
 cmake --build build -j
 ```
+
+# Test
+```bash
+cd build
+ctest --output-on-failure
+cd ../tests
+pytest -q
+```

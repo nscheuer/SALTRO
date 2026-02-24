@@ -52,9 +52,64 @@ target_link_libraries(saltro PUBLIC Eigen3::Eigen)
 
 if(SALTRO_BUILD_PYTHON)
 
-    file(GLOB_RECURSE PYTHON_BINDING_SOURCES
+    file(GLOB_RECURSE PYTHON_BINDING_SOURCES_TEMP
         ${CMAKE_SOURCE_DIR}/python/*_py.cpp
     )
+
+    # Parse dependencies from PYBIND_DEPENDS comments
+    set(BINDINGS_WITH_DEPS "")
+    set(BINDINGS_WITHOUT_DEPS "")
+    set(DEPENDENCY_MAP "")
+    
+    foreach(binding ${PYTHON_BINDING_SOURCES_TEMP})
+        get_filename_component(fname ${binding} NAME_WE)
+        string(REPLACE "_py" "" base ${fname})
+        
+        file(READ ${binding} binding_content)
+        string(REGEX MATCH "// PYBIND_DEPENDS: ([^\n]+)" dep_match "${binding_content}")
+        
+        if(dep_match)
+            string(REGEX REPLACE "// PYBIND_DEPENDS: ([^\n]+)" "\\1" deps "${dep_match}")
+            string(STRIP "${deps}" deps)
+            # Convert space-separated string to CMake list
+            string(REPLACE " " ";" deps_list "${deps}")
+            list(APPEND BINDINGS_WITH_DEPS ${binding})
+            set(DEPS_${base} ${deps_list})
+        else()
+            list(APPEND BINDINGS_WITHOUT_DEPS ${binding})
+        endif()
+    endforeach()
+    
+    # Build ordered list: dependencies first, then dependents, then rest
+    set(PYTHON_BINDING_SOURCES "")
+    set(PROCESSED "")
+    
+    # Add files without dependencies first
+    foreach(binding ${BINDINGS_WITHOUT_DEPS})
+        list(APPEND PYTHON_BINDING_SOURCES ${binding})
+        get_filename_component(fname ${binding} NAME_WE)
+        string(REPLACE "_py" "" base ${fname})
+        list(APPEND PROCESSED ${base})
+    endforeach()
+    
+    # Add files with dependencies (simple one-level resolution)
+    foreach(binding ${BINDINGS_WITH_DEPS})
+        get_filename_component(fname ${binding} NAME_WE)
+        string(REPLACE "_py" "" base ${fname})
+        
+        # Check if dependencies are satisfied
+        set(deps_satisfied TRUE)
+        foreach(dep ${DEPS_${base}})
+            list(FIND PROCESSED ${dep} dep_idx)
+            if(dep_idx EQUAL -1)
+                set(deps_satisfied FALSE)
+                message(WARNING "Dependency '${dep}' for '${base}' not yet processed")
+            endif()
+        endforeach()
+        
+        list(APPEND PYTHON_BINDING_SOURCES ${binding})
+        list(APPEND PROCESSED ${base})
+    endforeach()
 
     if(NOT PYTHON_BINDING_SOURCES)
         message(WARNING "No Python binding sources found in python/")

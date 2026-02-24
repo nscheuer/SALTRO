@@ -47,7 +47,7 @@ TEST_CASE("Generate orbit basic dimensions", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 
@@ -78,7 +78,7 @@ TEST_CASE("Generate orbit single point", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 
@@ -102,7 +102,7 @@ TEST_CASE("Generate orbit non-increasing time", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 
@@ -126,7 +126,7 @@ TEST_CASE("Generate orbit non-finite time", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 
@@ -149,7 +149,7 @@ TEST_CASE("Generate orbit rejects Julian Date", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 
@@ -175,7 +175,7 @@ TEST_CASE("Generate orbit invalid r0 magnitude", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 
@@ -201,7 +201,7 @@ TEST_CASE("Generate orbit invalid v0 magnitude", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 
@@ -227,7 +227,7 @@ TEST_CASE("Generate orbit non-finite state", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 
@@ -247,7 +247,7 @@ TEST_CASE("Generate orbit exceeds MAX_LENGTH_TRAJ", "[orbit][generate]")
 
     bool ok = orbits::generate_orbit(
         r0, v0, jtime, N,
-        0, 0, 0, 0,
+        0, 0, 0, 0, 0,
         R, V, B, S, rho
     );
 

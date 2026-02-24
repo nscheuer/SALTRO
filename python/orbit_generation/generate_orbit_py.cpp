@@ -14,6 +14,7 @@ py::tuple generate_orbit_py(
     const int orbit_model,
     const int magnetic_model,
     const int sun_model,
+    const int eclipse_model,
     const int density_model
 )
 {
@@ -42,6 +43,7 @@ py::tuple generate_orbit_py(
         orbit_model,
         magnetic_model,
         sun_model,
+        eclipse_model,
         density_model,
         R,
         V,
@@ -70,6 +72,7 @@ void bind_generate_orbit(py::module_& m)
         py::arg("orbit_model"),
         py::arg("magnetic_model"),
         py::arg("sun_model"),
+        py::arg("eclipse_model"),
         py::arg("density_model"),
         R"doc(
 Generate orbit and environmental data along trajectory.
@@ -85,6 +88,7 @@ jtime : ndarray (N,)
 orbit_model : int
 magnetic_model : int
 sun_model : int
+eclipse_model : int
 density_model : int
 
 Returns
