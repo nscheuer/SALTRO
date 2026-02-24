@@ -81,8 +81,8 @@ public:
     const PlannerSettings& settings() const { return settings_; }
 
     Vec3 actuatorTorque(const VecX& x, const VecX& u, const Vec3& B_eci) const;
-    Vec3 disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const int rho) const;
-    VecX dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const int rho) const;
+    Vec3 disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const;
+    VecX dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const;
 
     std::tuple<MatX, MatX, MatX> dynamicsJacobians(const VecX& x, const VecX& u, const DisturbanceConfig& dist) const;
     std::tuple<DynHessXX, DynHessUX, DynHessUU> dynamicsHessians(const VecX& x, const VecX& u, const DisturbanceConfig& dist) const;

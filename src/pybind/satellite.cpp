@@ -126,16 +126,16 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
     return torque;
 }
 
-Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const int rho) const {
+Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 torque = Vec3::Zero();
     return torque;
 }
 
-Satellite::VecX Satellite::dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const int rho) const {
+Satellite::VecX Satellite::dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 w = x.segment<3>(AV_INDEX);
     Vec4 q = x.segment<4>(QUAT_INDEX);
     Vec3 tau_act = actuatorTorque(x, u, B_eci);
-    Vec3 tau_dist = disturbanceTorque(x, dist, B_eci, S_eci, rho);
+    Vec3 tau_dist = disturbanceTorque(x, dist, B_eci, S_eci, V_eci, rho);
     Vec3 h_rw = Vec3::Zero();
     if (num_rw_ > 0) {
         for (int i = 0; i < num_rw_; ++i) {

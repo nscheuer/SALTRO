@@ -210,6 +210,7 @@ ndarray (3,)
              py::arg("dist"),
              py::arg("B_eci"),
              py::arg("S_eci"),
+             py::arg("V_eci"),
              py::arg("rho"),
              R"doc(
 Compute total disturbance torque.
@@ -224,6 +225,8 @@ B_eci : ndarray (3,)
     Magnetic field in ECI frame
 S_eci : ndarray (3,)
     Sun direction in ECI frame
+V_eci : ndarray (3,)
+    Velocity in ECI frame
 rho : int
     Atmospheric density
 
@@ -238,6 +241,7 @@ ndarray (3,)
              py::arg("dist"),
              py::arg("B_eci"),
              py::arg("S_eci"),
+             py::arg("V_eci"),
              py::arg("rho"),
              R"doc(
 Compute satellite dynamics (state derivative).
@@ -254,6 +258,8 @@ B_eci : ndarray (3,)
     Magnetic field in ECI frame
 S_eci : ndarray (3,)
     Sun direction in ECI frame
+V_eci : ndarray (3,)
+    Velocity in ECI frame
 rho : int
     Atmospheric density
 
