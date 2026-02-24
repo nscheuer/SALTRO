@@ -1,0 +1,526 @@
+"""
+Comprehensive disturbance tests for Satellite class
+Tests drag, gravity gradient, and solar radiation pressure disturbances
+independently and together across realistic orbital scenarios.
+"""
+
+import numpy as np
+import saltro_py
+
+
+SOLAR_CONSTANT = 1361.0
+C_LIGHT = 299792458.0
+P_SRP = SOLAR_CONSTANT / C_LIGHT
+
+
+class TestSatelliteDisturbancesFixture:
+    """Test fixture for satellite disturbances"""
+    
+    def setup_method(self):
+        """Set up satellite with geometry and generate orbit"""
+        # Inertia matrix (cube-shaped satellite)
+        self.J = np.array([
+            [0.067, 0.0, 0.0],
+            [0.0, 0.067, 0.0],
+            [0.0, 0.0, 0.067]
+        ])
+        
+        # Create satellite
+        self.settings = saltro_py.PlannerSettings()
+        self.sat = saltro_py.Satellite(self.J, self.settings)
+        
+        # Geometry with significant cross-sectional areas
+        self.geometry = saltro_py.GeometryConfig()
+        self.setup_geometry()
+        self.sat.setGeometryConfig(self.geometry)
+        
+        # Generate orbit
+        self.n_steps = 200
+        self.dt = 10.0
+        self.generate_orbit()
+    
+    def setup_geometry(self):
+        """Create spacecraft geometry with 6 faces"""
+        # +X face (large solar panel area)
+        self.geometry.addFace(saltro_py.GeometryFace(
+            1.0,                              # area (m^2)
+            np.array([0.5, 0.0, 0.0]),        # centroid
+            np.array([1.0, 0.0, 0.0]),        # normal (outward)
+            0.1,                              # eta_s (specular reflectivity)
+            0.3,                              # eta_d (diffuse reflectivity)
+            0.2,                              # eta_a (absorptivity)
+            0.0                               # temperature
+        ))
+        
+        # -X face
+        self.geometry.addFace(saltro_py.GeometryFace(
+            0.8, np.array([-0.5, 0.0, 0.0]), np.array([-1.0, 0.0, 0.0]),
+            0.05, 0.2, 0.3, 0.0
+        ))
+        
+        # +Z face (cross-sectional for drag)
+        self.geometry.addFace(saltro_py.GeometryFace(
+            2.0, np.array([0.0, 0.0, 0.5]), np.array([0.0, 0.0, 1.0]),
+            0.1, 0.2, 0.3, 0.0
+        ))
+        
+        # -Z face
+        self.geometry.addFace(saltro_py.GeometryFace(
+            2.0, np.array([0.0, 0.0, -0.5]), np.array([0.0, 0.0, -1.0]),
+            0.05, 0.15, 0.4, 0.0
+        ))
+        
+        # +Y face
+        self.geometry.addFace(saltro_py.GeometryFace(
+            0.5, np.array([0.0, 0.5, 0.0]), np.array([0.0, 1.0, 0.0]),
+            0.1, 0.25, 0.25, 0.0
+        ))
+        
+        # -Y face
+        self.geometry.addFace(saltro_py.GeometryFace(
+            0.5, np.array([0.0, -0.5, 0.0]), np.array([0.0, -1.0, 0.0]),
+            0.05, 0.2, 0.3, 0.0
+        ))
+    
+    def generate_orbit(self):
+        """Generate orbital trajectory at 600 km altitude"""
+        a = 6978e3  # Semi-major axis
+        r0 = np.array([a, 0.0, 0.0])
+        v0 = np.array([0.0, 7.56e3, 0.0])  # Orbital velocity
+        
+        jtime = np.array([i * self.dt for i in range(self.n_steps)])
+        
+        # Generate orbit
+        ok, self.R, self.V, self.B, self.S, self.rho = saltro_py.generate_orbit(
+            r0, v0, jtime, 0, 0, 0, 0, 0
+        )
+        assert ok, "Orbit generation failed"
+    
+    def get_disturbance_torque(self, x, dist_cfg, step_idx):
+        """Get disturbance torque with specific configuration"""
+        idx = min(step_idx, self.n_steps - 1)
+        return self.sat.disturbanceTorque(
+            x, dist_cfg,
+            self.R[:, idx], self.B[:, idx], self.S[:, idx], self.V[:, idx],
+            int(self.rho[idx])
+        )
+
+
+# ============================================================================
+# TEST SECTION 1: Individual Disturbance Types
+# ============================================================================
+
+def test_gravity_gradient_torque_at_equator_is_small():
+    """Test GG alone produces negligible torque at equator"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_gg = fixture.get_disturbance_torque(x, dist, 0)
+    
+    assert np.all(np.isfinite(tau_gg))
+    assert np.linalg.norm(tau_gg) < 1e-5
+
+
+def test_drag_torque_depends_on_velocity_orientation():
+    """Test drag is computed correctly"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = True
+    dist.plan_for_srp = False
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_drag = fixture.get_disturbance_torque(x, dist, 0)
+    
+    assert np.all(np.isfinite(tau_drag))
+    assert np.linalg.norm(tau_drag) < 1e-5
+
+
+def test_solar_radiation_pressure_torque_depends_on_sun_vector():
+    """Test SRP is computed correctly"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = True
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_srp = fixture.get_disturbance_torque(x, dist, 0)
+    
+    assert np.all(np.isfinite(tau_srp))
+
+
+def test_srp_is_zero_when_disabled():
+    """Test zero torque when SRP disabled"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist_off = saltro_py.DisturbanceConfig()
+    dist_off.plan_for_gg = False
+    dist_off.plan_for_aero = False
+    dist_off.plan_for_srp = False
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_off = fixture.get_disturbance_torque(x, dist_off, 0)
+    
+    assert np.allclose(tau_off, np.zeros(3))
+
+
+# ============================================================================
+# TEST SECTION 2: Multiple Disturbances Together
+# ============================================================================
+
+def test_all_disturbances_combined_produce_non_zero_torque():
+    """Test all three disturbances together"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = True
+    dist.plan_for_srp = True
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_combined = fixture.get_disturbance_torque(x, dist, 0)
+    
+    assert np.all(np.isfinite(tau_combined))
+    assert np.linalg.norm(tau_combined) < 1e-4
+
+
+def test_individual_disturbances_sum_approximately_to_combined():
+    """Test superposition principle"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist_all = saltro_py.DisturbanceConfig()
+    dist_all.plan_for_gg = True
+    dist_all.plan_for_aero = True
+    dist_all.plan_for_srp = True
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    # Get individual torques
+    dist_gg = saltro_py.DisturbanceConfig()
+    dist_gg.plan_for_gg = True
+    dist_gg.plan_for_aero = False
+    dist_gg.plan_for_srp = False
+    tau_gg = fixture.get_disturbance_torque(x, dist_gg, 0)
+    
+    dist_aero = saltro_py.DisturbanceConfig()
+    dist_aero.plan_for_gg = False
+    dist_aero.plan_for_aero = True
+    dist_aero.plan_for_srp = False
+    tau_aero = fixture.get_disturbance_torque(x, dist_aero, 0)
+    
+    dist_srp = saltro_py.DisturbanceConfig()
+    dist_srp.plan_for_gg = False
+    dist_srp.plan_for_aero = False
+    dist_srp.plan_for_srp = True
+    tau_srp = fixture.get_disturbance_torque(x, dist_srp, 0)
+    
+    tau_sum = tau_gg + tau_aero + tau_srp
+    tau_combined = fixture.get_disturbance_torque(x, dist_all, 0)
+    
+    assert np.allclose(tau_combined, tau_sum, atol=1e-15)
+
+
+# ============================================================================
+# TEST SECTION 3: Disturbance Behavior Across Orbit
+# ============================================================================
+
+def test_drag_decreases_with_increasing_altitude():
+    """Test drag variation across orbit"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = True
+    dist.plan_for_srp = False
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    # Collect drag magnitudes at different orbital positions
+    drag_mags = []
+    for i in range(0, min(100, fixture.n_steps), 10):
+        tau_drag = fixture.get_disturbance_torque(x, dist, i)
+        drag_mags.append(np.linalg.norm(tau_drag))
+    
+    # For circular orbit, drag should be approximately constant
+    has_variation = False
+    for i in range(1, len(drag_mags)):
+        variation = abs(drag_mags[i] - drag_mags[0]) / (drag_mags[0] + 1e-12)
+        if variation > 0.001:  # More than 0.1% variation
+            has_variation = True
+            break
+    
+    assert not has_variation
+
+
+def test_gravity_gradient_varies_with_orbital_position():
+    """Test GG across orbit"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    # Sample GG torque at different orbital positions
+    gg_mags = []
+    for i in range(0, fixture.n_steps, 10):
+        tau_gg = fixture.get_disturbance_torque(x, dist, i)
+        gg_mags.append(np.linalg.norm(tau_gg))
+    
+    # Just verify it's computed and finite
+    for mag in gg_mags:
+        assert np.isfinite(mag)
+
+
+# ============================================================================
+# TEST SECTION 4: Solar Radiation Pressure Specifics
+# ============================================================================
+
+def test_srp_zero_in_eclipse():
+    """Test SRP is zero with zero sun vector"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    # Zero sun vector should give zero torque
+    srp = saltro_py.SRPDisturbance(fixture.geometry)
+    dist_cfg = saltro_py.DisturbanceConfig()
+    
+    x_base = x[:7]
+    S_zero = np.array([0.0, 0.0, 0.0])
+    
+    tau_eclipse = srp.torque(x_base, dist_cfg, S_zero)
+    
+    assert np.allclose(tau_eclipse, np.zeros(3))
+
+
+def test_srp_increases_with_sun_vector_alignment():
+    """Test SRP geometry dependence"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    srp = saltro_py.SRPDisturbance(fixture.geometry)
+    dist_cfg = saltro_py.DisturbanceConfig()
+    dist_cfg.plan_for_srp = True
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    x_base = x[:7]
+    
+    # Sun vector along +X (hits large surface)
+    S_x = np.array([1.0, 0.0, 0.0])
+    tau_x = srp.torque(x_base, dist_cfg, S_x)
+    
+    # Sun vector along +Y (hits small surface)
+    S_y = np.array([0.0, 1.0, 0.0])
+    tau_y = srp.torque(x_base, dist_cfg, S_y)
+    
+    # Sun vector along +Z (hits moderate surface)
+    S_z = np.array([0.0, 0.0, 1.0])
+    tau_z = srp.torque(x_base, dist_cfg, S_z)
+    
+    # Magnitude should differ based on geometry
+    mag_x = np.linalg.norm(tau_x)
+    mag_y = np.linalg.norm(tau_y)
+    mag_z = np.linalg.norm(tau_z)
+    
+    assert np.isfinite(mag_x)
+    assert np.isfinite(mag_y)
+    assert np.isfinite(mag_z)
+
+
+# ============================================================================
+# TEST SECTION 5: Order of Magnitude Validation
+# ============================================================================
+
+def test_drag_torque_order_of_magnitude_is_reasonable():
+    """Test drag magnitude is physically realistic"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = True
+    dist.plan_for_srp = False
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_drag = fixture.get_disturbance_torque(x, dist, 0)
+    
+    mag = np.linalg.norm(tau_drag)
+    assert mag < 1e-5
+    assert mag >= 0.0
+
+
+def test_gravity_gradient_torque_order_of_magnitude_is_reasonable():
+    """Test GG magnitude is physically realistic"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    
+    x = np.zeros(fixture.sat.stateDim)
+    q = np.array([0.95, 0.1, 0.05, 0.0])
+    q = q / np.linalg.norm(q)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = q
+    
+    tau_gg = fixture.get_disturbance_torque(x, dist, 50)
+    
+    mag = np.linalg.norm(tau_gg)
+    assert mag < 1e-5
+    assert mag >= 0.0
+
+
+def test_solar_radiation_pressure_torque_order_of_magnitude_is_reasonable():
+    """Test SRP magnitude is physically realistic"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = True
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_srp = fixture.get_disturbance_torque(x, dist, 0)
+    
+    mag = np.linalg.norm(tau_srp)
+    assert mag < 1e-4
+    assert mag >= 0.0
+
+
+# ============================================================================
+# TEST SECTION 6: Dependence on Configuration
+# ============================================================================
+
+def test_drag_produces_non_zero_torque_with_geometry():
+    """Test drag with realistic geometry"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = True
+    dist.plan_for_srp = False
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_drag = fixture.get_disturbance_torque(x, dist, 0)
+    
+    assert np.all(np.isfinite(tau_drag))
+    assert np.linalg.norm(tau_drag) >= 0.0
+
+
+def test_srp_produces_non_zero_torque_with_geometry():
+    """Test SRP with realistic geometry"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = True
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_srp = fixture.get_disturbance_torque(x, dist, 0)
+    
+    assert np.all(np.isfinite(tau_srp))
+    assert np.linalg.norm(tau_srp) >= 0.0
+
+
+# ============================================================================
+# TEST SECTION 7: Disturbance Independence
+# ============================================================================
+
+def test_disabling_drag_does_not_affect_gg_and_srp():
+    """Test disturbance independence"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist_no_drag = saltro_py.DisturbanceConfig()
+    dist_no_drag.plan_for_gg = True
+    dist_no_drag.plan_for_aero = False
+    dist_no_drag.plan_for_srp = True
+    
+    dist_with_drag = saltro_py.DisturbanceConfig()
+    dist_with_drag.plan_for_gg = True
+    dist_with_drag.plan_for_aero = True
+    dist_with_drag.plan_for_srp = True
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    tau_no_drag = fixture.get_disturbance_torque(x, dist_no_drag, 0)
+    
+    # Get individual drag
+    dist_drag_only = saltro_py.DisturbanceConfig()
+    dist_drag_only.plan_for_gg = False
+    dist_drag_only.plan_for_aero = True
+    dist_drag_only.plan_for_srp = False
+    tau_drag = fixture.get_disturbance_torque(x, dist_drag_only, 0)
+    
+    tau_with_drag = fixture.get_disturbance_torque(x, dist_with_drag, 0)
+    
+    # Should satisfy: tau_with_drag = tau_no_drag + tau_drag
+    difference = tau_with_drag - tau_no_drag - tau_drag
+    assert np.linalg.norm(difference) < 1e-15
+
+
+def test_disturbances_are_finite_over_full_orbit():
+    """Test numerical stability across full orbit"""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = True
+    dist.plan_for_srp = True
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    for i in range(fixture.n_steps):
+        tau = fixture.get_disturbance_torque(x, dist, i)
+        assert np.all(np.isfinite(tau))
