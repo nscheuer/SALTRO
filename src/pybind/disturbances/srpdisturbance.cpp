@@ -7,6 +7,8 @@
 namespace saltro::disturbances {
 namespace {
 
+constexpr double kSunVecEps = 1e-12;
+
 struct NormalizedDerivatives {
     SRPDisturbance::Vec3 u = SRPDisturbance::Vec3::Zero();
     SRPDisturbance::Mat34 du_dq = SRPDisturbance::Mat34::Zero();
@@ -18,7 +20,7 @@ struct NormalizedDerivatives {
 
 bool normalizeVec(const SRPDisturbance::Vec3& v, SRPDisturbance::Vec3& u) {
     const double n = v.norm();
-    if (!std::isfinite(n) || n <= 0.0) {
+    if (!std::isfinite(n) || n <= kSunVecEps) {
         u.setZero();
         return false;
     }
@@ -31,7 +33,7 @@ NormalizedDerivatives normalizeVecWithJacobian(const SRPDisturbance::Vec3& v,
     NormalizedDerivatives out;
 
     const double n = v.norm();
-    if (!std::isfinite(n) || n <= 0.0) {
+    if (!std::isfinite(n) || n <= kSunVecEps) {
         return out;
     }
 
@@ -48,7 +50,7 @@ NormalizedDerivatives normalizeVecWithDerivatives(const SRPDisturbance::Vec3& v,
     NormalizedDerivatives out;
 
     const double n = v.norm();
-    if (!std::isfinite(n) || n <= 0.0) {
+    if (!std::isfinite(n) || n <= kSunVecEps) {
         return out;
     }
 

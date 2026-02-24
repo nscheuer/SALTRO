@@ -25,14 +25,14 @@ void bind_srpdisturbance(py::module_& m) {
                  &SRPDisturbance::torque, py::const_),
              py::arg("x"),
              py::arg("dist_cfg"),
-             "Compute SRP torque (requires body-frame sun vector overload)")
+                "Compute SRP torque (zero if inactive or in eclipse)")
         .def("torque",
              py::overload_cast<const SRPDisturbance::BaseState&, const DisturbanceConfig&, const SRPDisturbance::Vec3&>(
                  &SRPDisturbance::torque, py::const_),
              py::arg("x"),
              py::arg("dist_cfg"),
              py::arg("v_body"),
-             "Compute SRP torque using provided body-frame sun vector")
+             "Compute SRP torque using provided body-frame sun vector; zero if near-zero")
         .def("dtorque_dq",
              py::overload_cast<const SRPDisturbance::BaseState&, const DisturbanceConfig&, const SRPDisturbance::Vec3&, const SRPDisturbance::Mat34&>(
                  &SRPDisturbance::dtorque_dq, py::const_),

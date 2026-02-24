@@ -137,7 +137,8 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
     Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
     Vec3 V_body = R_T * V_eci;
     Vec3 R_body = R_T * R_eci;
-    Vec3 S_body = R_T * (S_eci - R_eci);
+    // S_eci is spacecraft-to-Sun; keep eclipse zeroing intact in body frame.
+    Vec3 S_body = R_T * S_eci;
     Mat34 dV_dq = saltro::math::drotmatTvecdq(q, V_eci).transpose();
     auto d2V_dq2 = saltro::math::ddrotmatTvecdqdq(q, V_eci);
     (void)B_eci;
