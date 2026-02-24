@@ -71,4 +71,48 @@ Mat33 skewSymmetric(const Vec3& v) {
     return S;
 }
 
+Mat43 drotmatTvecdq(const Vec4& q, const Vec3& v) {
+    const double q0 = q(0);
+    const Vec3 qv = q.tail<3>();
+
+    Mat43 J;
+    const Vec3 top = q0 * v - qv.cross(v);
+    J.row(0) = (2.0 * top).transpose();
+
+    const Mat33 bottom = Mat33::Identity() * qv.dot(v)
+                         - qv * v.transpose()
+                         + v * qv.transpose()
+                         - q0 * skewSymmetric(v);
+    J.block<3, 3>(1, 0) = 2.0 * bottom;
+
+    return J;
+}
+
+std::array<Mat44, 3> ddrotmatTvecdqdq(const Vec4& /*q*/, const Vec3& v) {
+    std::array<Mat44, 3> output = {Mat44::Zero(), Mat44::Zero(), Mat44::Zero()};
+
+    Mat43 stack;
+    stack.row(0) = v.transpose();
+    stack.block<3, 3>(1, 0) = -skewSymmetric(v);
+
+    for (int k = 0; k < 3; ++k) {
+        for (int j = 0; j < 4; ++j) {
+            const double val = 2.0 * stack(j, k);
+            output[static_cast<size_t>(k)](0, j) = val;
+            output[static_cast<size_t>(k)](j, 0) = val;
+        }
+    }
+
+    for (int k = 0; k < 3; ++k) {
+        for (int a = 0; a < 3; ++a) {
+            for (int b = 0; b < 3; ++b) {
+                const double val = (a == k) ? 2.0 * v(b) : 0.0;
+                output[static_cast<size_t>(k)](1 + a, 1 + b) += val;
+            }
+        }
+    }
+
+    return output;
+}
+
 }

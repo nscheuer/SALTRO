@@ -131,7 +131,7 @@ def test_dynamics_with_zero_state_and_zero_control_returns_zero():
     B_eci = np.zeros(3)
     S_eci = np.zeros(3)
     
-    dxdt = fixture.sat.dynamics(x, u, dist, B_eci, S_eci, 0)
+    dxdt = fixture.sat.dynamics(x, u, dist, B_eci, S_eci, np.zeros(3), 0)
     
     # Angular velocity derivative should be zero
     av_deriv = dxdt[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3]

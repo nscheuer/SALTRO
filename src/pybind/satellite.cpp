@@ -1,4 +1,5 @@
 #include <saltro/pybind/satellite.h>
+#include <saltro/pybind/disturbances/dragdisturbance.h>
 
 #include <stdexcept>
 #include <cmath>
@@ -128,6 +129,23 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
 
 Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 torque = Vec3::Zero();
+    Vec7 x_base = x.head<7>();
+    Vec4 q = x.segment<4>(QUAT_INDEX);
+
+    Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+    Vec3 V_body = R_T * V_eci;
+    Mat34 dV_dq = saltro::math::drotmatTvecdq(q, V_eci).transpose();
+    auto d2V_dq2 = saltro::math::ddrotmatTvecdqdq(q, V_eci);
+    (void)B_eci;
+    (void)S_eci;
+    (void)rho;
+    (void)dV_dq;
+    (void)d2V_dq2;
+
+    if (dist.plan_for_aero) {
+        saltro::disturbances::DragDisturbance drag(geometry_config_);
+        torque += drag.torque(x_base, dist, V_body);
+    }
     return torque;
 }
 
