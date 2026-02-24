@@ -208,6 +208,7 @@ ndarray (3,)
         .def("disturbanceTorque", &Satellite::disturbanceTorque,
              py::arg("x"),
              py::arg("dist"),
+             py::arg("R_eci"),
              py::arg("B_eci"),
              py::arg("S_eci"),
              py::arg("V_eci"),
@@ -221,6 +222,8 @@ x : ndarray
     State vector (size: stateDim)
 dist : DisturbanceConfig
     Disturbance configuration
+R_eci : ndarray (3,)
+    Position in ECI frame
 B_eci : ndarray (3,)
     Magnetic field in ECI frame
 S_eci : ndarray (3,)
@@ -239,6 +242,7 @@ ndarray (3,)
              py::arg("x"),
              py::arg("u"),
              py::arg("dist"),
+             py::arg("R_eci"),
              py::arg("B_eci"),
              py::arg("S_eci"),
              py::arg("V_eci"),
@@ -254,6 +258,8 @@ u : ndarray
     Control vector: [MTQ_controls (numMTQ), RW_controls (numRW)]
 dist : DisturbanceConfig
     Disturbance configuration
+R_eci : ndarray (3,)
+    Position in ECI frame
 B_eci : ndarray (3,)
     Magnetic field in ECI frame
 S_eci : ndarray (3,)

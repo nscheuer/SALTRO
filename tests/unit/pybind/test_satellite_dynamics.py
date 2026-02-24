@@ -65,7 +65,7 @@ class TestSatelliteDynamicsFixture:
         
         # RK4 integration
         def dynamics_func(t, x_in):
-            return self.sat.dynamics(x_in, u, dist, B_eci, S_eci, self.V[:, idx], rho_idx)
+            return self.sat.dynamics(x_in, u, dist, self.R[:, idx], B_eci, S_eci, self.V[:, idx], rho_idx)
         
         t0 = step_idx * self.dt
         x_next = self.rk4_step(dynamics_func, x, t0, dt_step)
@@ -131,7 +131,7 @@ def test_dynamics_with_zero_state_and_zero_control_returns_zero():
     B_eci = np.zeros(3)
     S_eci = np.zeros(3)
     
-    dxdt = fixture.sat.dynamics(x, u, dist, B_eci, S_eci, np.zeros(3), 0)
+    dxdt = fixture.sat.dynamics(x, u, dist, np.zeros(3), B_eci, S_eci, np.zeros(3), 0)
     
     # Angular velocity derivative should be zero
     av_deriv = dxdt[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3]
@@ -149,7 +149,7 @@ def test_dynamics_output_has_correct_dimensions():
     u = np.zeros(fixture.sat.controlDim)
     dist = saltro_py.DisturbanceConfig()
     
-    dxdt = fixture.sat.dynamics(x, u, dist, fixture.B[:, 0], fixture.S[:, 0], fixture.V[:, 0], 0)
+    dxdt = fixture.sat.dynamics(x, u, dist, fixture.R[:, 0], fixture.B[:, 0], fixture.S[:, 0], fixture.V[:, 0], 0)
     
     assert len(dxdt) == fixture.sat.stateDim
 
@@ -236,7 +236,7 @@ def test_quaternion_derivative_follows_kinematics_equation():
     u_zero = np.zeros(fixture.sat.controlDim)
     dist = saltro_py.DisturbanceConfig()
     
-    dxdt = fixture.sat.dynamics(x, u_zero, dist, fixture.B[:, 0], fixture.S[:, 0], fixture.V[:, 0], 0)
+    dxdt = fixture.sat.dynamics(x, u_zero, dist, fixture.R[:, 0], fixture.B[:, 0], fixture.S[:, 0], fixture.V[:, 0], 0)
     
     q = x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4]
     q_dot_expected = np.array([
@@ -288,7 +288,7 @@ def test_rw_control_produces_angular_acceleration():
     u[fixture.sat.numMTQ + 0] = 0.001  # Max torque on X RW
     
     dist = saltro_py.DisturbanceConfig()
-    dxdt = fixture.sat.dynamics(x, u, dist, fixture.B[:, 0], fixture.S[:, 0], fixture.V[:, 0], 0)
+    dxdt = fixture.sat.dynamics(x, u, dist, fixture.R[:, 0], fixture.B[:, 0], fixture.S[:, 0], fixture.V[:, 0], 0)
     
     alpha_x = dxdt[saltro_py.Satellite.AV_INDEX]
     assert abs(alpha_x) > 1e-6
@@ -327,11 +327,11 @@ def test_mtq_torque_depends_on_magnetic_field():
     
     # Zero B-field
     B_zero = np.zeros(3)
-    dxdt_zero = fixture.sat.dynamics(x, u, dist, B_zero, fixture.S[:, 0], fixture.V[:, 0], 0)
+    dxdt_zero = fixture.sat.dynamics(x, u, dist, fixture.R[:, 0], B_zero, fixture.S[:, 0], fixture.V[:, 0], 0)
     
     # Non-zero B-field
     B_nonzero = np.array([0.0, 0.0, 3e-5])
-    dxdt_nonzero = fixture.sat.dynamics(x, u, dist, B_nonzero, fixture.S[:, 0], fixture.V[:, 0], 0)
+    dxdt_nonzero = fixture.sat.dynamics(x, u, dist, fixture.R[:, 0], B_nonzero, fixture.S[:, 0], fixture.V[:, 0], 0)
     
     alpha_zero = dxdt_zero[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3]
     alpha_nonzero = dxdt_nonzero[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3]

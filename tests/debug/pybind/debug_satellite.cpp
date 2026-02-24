@@ -191,7 +191,7 @@ int main() {
         
         // RK4 integration
         auto dynamics_func = [&](double t, const Satellite::VecX& x, Satellite::VecX& dxdt) {
-            dxdt = sat.dynamics(x, u_zero, dist, B_eci_i, S_eci_i, V.col(i), rho_i);
+            dxdt = sat.dynamics(x, u_zero, dist, R.col(i), B_eci_i, S_eci_i, V.col(i), rho_i);
         };
         
         Satellite::VecX x_next(sat.stateDim());
@@ -238,7 +238,7 @@ int main() {
         int rho_i = static_cast<int>(rho(std::min(i, n_steps-1)));
         
         auto dynamics_func = [&](double t, const Satellite::VecX& x, Satellite::VecX& dxdt) {
-            dxdt = sat.dynamics(x, u_zero, dist, B_eci_i, S_eci_i, V.col(std::min(i, n_steps-1)), rho_i);
+            dxdt = sat.dynamics(x, u_zero, dist, R.col(std::min(i, n_steps-1)), B_eci_i, S_eci_i, V.col(std::min(i, n_steps-1)), rho_i);
         };
         
         Satellite::VecX x_next(sat.stateDim());
@@ -306,7 +306,7 @@ int main() {
         int rho_i = static_cast<int>(rho(std::min(i, n_steps-1)));
         
         auto dynamics_func = [&](double t, const Satellite::VecX& x, Satellite::VecX& dxdt) {
-            dxdt = sat.dynamics(x, u_pd, dist, B_eci_i, S_eci_i, V.col(std::min(i, n_steps-1)), rho_i);
+            dxdt = sat.dynamics(x, u_pd, dist, R.col(std::min(i, n_steps-1)), B_eci_i, S_eci_i, V.col(std::min(i, n_steps-1)), rho_i);
         };
         
         Satellite::VecX x_next(sat.stateDim());

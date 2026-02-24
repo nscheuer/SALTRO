@@ -69,7 +69,7 @@ public:
         int rho_idx = static_cast<int>(rho(std::min(step_idx, n_steps-1)));
         
         auto dynamics_func = [&](double t, const Satellite::VecX& x_in, Satellite::VecX& dxdt) {
-            dxdt = sat.dynamics(x_in, u, dist, B_eci, S_eci, V.col(std::min(step_idx, n_steps-1)), rho_idx);
+            dxdt = sat.dynamics(x_in, u, dist, R.col(std::min(step_idx, n_steps-1)), B_eci, S_eci, V.col(std::min(step_idx, n_steps-1)), rho_idx);
         };
         
         Satellite::VecX x_next(sat.stateDim());
@@ -133,7 +133,7 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Dynamics with zero state and zero co
     Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
     Eigen::Vector3d S_eci = Eigen::Vector3d::Zero();
     
-    Satellite::VecX dxdt = sat.dynamics(x, u, dist, B_eci, S_eci, Eigen::Vector3d::Zero(), 0);
+    Satellite::VecX dxdt = sat.dynamics(x, u, dist, Eigen::Vector3d::Zero(), B_eci, S_eci, Eigen::Vector3d::Zero(), 0);
     
     // Angular velocity derivative should be zero (no torques)
     REQUIRE_THAT(dxdt.segment<3>(Satellite::AV_INDEX).norm(), 
@@ -148,7 +148,7 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Dynamics output has correct dimensio
     Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
     DisturbanceConfig dist;
     
-    Satellite::VecX dxdt = sat.dynamics(x, u, dist, B.col(0), S.col(0), V.col(0), 0);
+    Satellite::VecX dxdt = sat.dynamics(x, u, dist, R.col(0), B.col(0), S.col(0), V.col(0), 0);
     
     REQUIRE(dxdt.size() == sat.stateDim());
 }
@@ -224,7 +224,7 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Quaternion derivative follows kinema
     Satellite::VecX u_zero = Satellite::VecX::Zero(sat.controlDim());
     DisturbanceConfig dist;
     
-    Satellite::VecX dxdt = sat.dynamics(x, u_zero, dist, B.col(0), S.col(0), V.col(0), 0);
+    Satellite::VecX dxdt = sat.dynamics(x, u_zero, dist, R.col(0), B.col(0), S.col(0), V.col(0), 0);
     
     // Quaternion derivative should follow: q_dot = 0.5 * Omega(w) * q
     Eigen::Vector4d q = x.segment<4>(Satellite::QUAT_INDEX);
@@ -269,7 +269,7 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "RW control produces angular accelera
     u(sat.numMTQ() + 0) = 0.001; // Max torque on X-axis RW
     
     DisturbanceConfig dist;
-    Satellite::VecX dxdt = sat.dynamics(x, u, dist, B.col(0), S.col(0), V.col(0), 0);
+    Satellite::VecX dxdt = sat.dynamics(x, u, dist, R.col(0), B.col(0), S.col(0), V.col(0), 0);
     
     // Should produce angular acceleration about X-axis
     double alpha_x = dxdt(Satellite::AV_INDEX);
@@ -306,11 +306,11 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "MTQ torque depends on magnetic field
     
     // Test with zero B-field
     Eigen::Vector3d B_zero = Eigen::Vector3d::Zero();
-    Satellite::VecX dxdt_zero = sat.dynamics(x, u, dist, B_zero, S.col(0), V.col(0), 0);
+    Satellite::VecX dxdt_zero = sat.dynamics(x, u, dist, R.col(0), B_zero, S.col(0), V.col(0), 0);
     
     // Test with non-zero B-field
     Eigen::Vector3d B_nonzero(0.0, 0.0, 3e-5); // Z-axis field
-    Satellite::VecX dxdt_nonzero = sat.dynamics(x, u, dist, B_nonzero, S.col(0), V.col(0), 0);
+    Satellite::VecX dxdt_nonzero = sat.dynamics(x, u, dist, R.col(0), B_nonzero, S.col(0), V.col(0), 0);
     
     // Torque should be different with B-field present
     double alpha_diff = (dxdt_nonzero.segment<3>(Satellite::AV_INDEX) - 
