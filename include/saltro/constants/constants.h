@@ -9,6 +9,7 @@ namespace saltro::constants {
 
     inline constexpr double C_LIGHT = 299792458.0; // m/s
     inline constexpr double SOLAR_CONSTANT = 1361.0; // W/m^2
+    inline constexpr double R_SUN = 6.957e8; // m
 
     inline constexpr double MU_EARTH = 3.986004418e14; // km^3/s^2
     inline constexpr double R_EARTH = 6378136.3; // m

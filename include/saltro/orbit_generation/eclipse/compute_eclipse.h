@@ -23,6 +23,7 @@ namespace saltro::orbits {
  *
  * Supported models:
  * - \f$0\f$ → Cylindrical shadow model
+ * - \f$1\f$ → Analytical penumbra/umbra shadow cone model
  *
  * @param R Spacecraft position vectors (meters). Each column corresponds
  *          to one trajectory sample.
@@ -31,6 +32,7 @@ namespace saltro::orbits {
  * @param jtime_length Number of valid trajectory samples.
  * @param eclipse_model Integer identifier selecting the eclipse model:
  *        0 = cylindrical shadow.
+ *        1 = analytical penumbra/umbra shadow cone.
  * @param S Spacecraft-to-Sun vectors (meters), column-wise. Modified in-place;
  *          set to zero where spacecraft is in eclipse.
  *
