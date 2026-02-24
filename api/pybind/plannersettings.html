@@ -46,7 +46,8 @@
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/plannersettings';</script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="prev" title="pybind" href="index.html" />
+    <link rel="next" title="satellite" href="satellite.html" />
+    <link rel="prev" title="srpdisturbance" href="disturbances/srpdisturbance.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -302,7 +303,22 @@
      aria-label="Section Navigation">
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="actuators/index.html">actuators</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="actuators/MTQ.html">MTQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actuators/RW.html">RW</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actuators/actuator.html">actuator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="disturbances/index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="disturbances/disturbance.html">disturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="disturbances/dragdisturbance.html">dragdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="disturbances/geometryconfig.html">geometryconfig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="disturbances/ggdisturbance.html">ggdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="disturbances/srpdisturbance.html">srpdisturbance</a></li>
+</ul>
+</details></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">plannersettings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="satellite.html">satellite</a></li>
 </ul>
 </div>
 </nav></div>
@@ -400,7 +416,7 @@
 <span id="_CPPv317DisturbanceConfig"></span><span id="_CPPv217DisturbanceConfig"></span><span id="DisturbanceConfig"></span><span class="target" id="structDisturbanceConfig"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DisturbanceConfig</span></span></span><a class="headerlink" href="#_CPPv417DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
 <dd><div class="docutils container">
 <em>#include &lt;plannersettings.h&gt;</em></div>
-<p>Disturbance modeling configuration. </p>
+<p><a class="reference internal" href="disturbances/disturbance.html#classDisturbance"><span class="std std-ref">Disturbance</span></a> modeling configuration. </p>
 <p>Enables and parameterizes disturbance models that the optimizer accounts for during trajectory optimization. These disturbances are incorporated into the system dynamics or cost to improve robustness and realism.</p>
 <p>Enabled disturbances may include:<ul class="simple">
 <li><p>Aerodynamic drag</p></li>
@@ -554,8 +570,9 @@
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig5u_maxE">
-<span id="_CPPv3N16ConstraintConfig5u_maxE"></span><span id="_CPPv2N16ConstraintConfig5u_maxE"></span><span id="ConstraintConfig::u_max__Eigen::VectorXd"></span><span class="target" id="structConstraintConfig_1a9edabf3d9acbc376fd85c0adf3a6427b"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXd</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">u_max</span></span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig5u_maxE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<span id="_CPPv3N16ConstraintConfig5u_maxE"></span><span id="_CPPv2N16ConstraintConfig5u_maxE"></span><span id="ConstraintConfig::u_max__Eigen::Matrix:double.Eigen::Dynamic.1.0.saltro::limits::MAX_CTRL_DIM.1:"></span><span class="target" id="structConstraintConfig_1a77f242c4fe0f559f9afbfbdec96af168"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Dynamic</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../constants/constants.html#_CPPv46saltro" title="saltro"><span class="n"><span class="pre">saltro</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../limits.html#_CPPv4N6saltro6limitsE" title="saltro::limits"><span class="n"><span class="pre">limits</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../limits.html#_CPPv4N6saltro6limits12MAX_CTRL_DIME" title="saltro::limits::MAX_CTRL_DIM"><span class="n"><span class="pre">MAX_CTRL_DIM</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">u_max</span></span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig5u_maxE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Stack-allocated bounded control limit vector (no heap allocation). </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig4wmaxE">
@@ -582,7 +599,7 @@
 <li><p>Angular velocity error</p></li>
 <li><p>Control effort</p></li>
 <li><p>Reaction wheel momentum</p></li>
-<li><p>Actuator stiction or saturation</p></li>
+<li><p><a class="reference internal" href="actuators/actuator.html#classActuator"><span class="std std-ref">Actuator</span></a> stiction or saturation</p></li>
 </ul>
 </p>
 <p>Stage costs are applied at each timestep:  <div class="math notranslate nohighlight">
@@ -1120,7 +1137,7 @@ J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
 <dd class="field-odd"><p>Constraint configuration </p>
 </dd>
 <dt class="field-even">Param disturbances<span class="colon">:</span></dt>
-<dd class="field-even"><p>Disturbance modeling configuration </p>
+<dd class="field-even"><p><a class="reference internal" href="disturbances/disturbance.html#classDisturbance"><span class="std std-ref">Disturbance</span></a> modeling configuration </p>
 </dd>
 <dt class="field-odd">Param init_traj<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Initial trajectory configuration</p>
@@ -1175,13 +1192,22 @@ J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="index.html"
+       href="disturbances/srpdisturbance.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">pybind</p>
+        <p class="prev-next-title">srpdisturbance</p>
       </div>
+    </a>
+    <a class="right-next"
+       href="satellite.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">satellite</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
     </a>
 </div>
                 </footer>

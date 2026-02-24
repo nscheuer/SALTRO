@@ -42,6 +42,7 @@
     <script src="../../_static/documentation_options.js?v=7026087e"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/constants/harrispriester';</script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -380,32 +381,48 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants9WGS84_A_ME">
 <span id="_CPPv3N6saltro9constants9WGS84_A_ME"></span><span id="_CPPv2N6saltro9constants9WGS84_A_ME"></span><span id="saltro::constants::WGS84_A_M__double"></span><span class="target" id="namespacesaltro_1_1constants_1a5486305c768dcc4d10ca702fa8c07acc"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">WGS84_A_M</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">6378137.0</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants9WGS84_A_ME" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>WGS84 ellipsoid semi-major axis (equatorial radius). </p>
+<p>Defined as <span class="math notranslate nohighlight">\(6\,378\,137\)</span> meters. Used for computing geodetic altitude from Earth-centered coordinates. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7WGS84_FE">
 <span id="_CPPv3N6saltro9constants7WGS84_FE"></span><span id="_CPPv2N6saltro9constants7WGS84_FE"></span><span id="saltro::constants::WGS84_F__double"></span><span class="target" id="namespacesaltro_1_1constants_1a8ace5701d01870af33cef93e6c706d56"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">WGS84_F</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span><span class="w"> </span><span class="o"><span class="pre">/</span></span><span class="w"> </span><span class="m"><span class="pre">298.257223563</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7WGS84_FE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>WGS84 ellipsoid flattening parameter. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(f = \frac{1}{298.257223563} \approx 3.357 \times 10^{-3}\)</span>. Characterizes Earth’s oblate spheroid shape. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants23HARRIS_PRIESTER_LAG_RADE">
 <span id="_CPPv3N6saltro9constants23HARRIS_PRIESTER_LAG_RADE"></span><span id="_CPPv2N6saltro9constants23HARRIS_PRIESTER_LAG_RADE"></span><span id="saltro::constants::HARRIS_PRIESTER_LAG_RAD__double"></span><span class="target" id="namespacesaltro_1_1constants_1ace3d560fc43ec051cb0f004dfa554b8d"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HARRIS_PRIESTER_LAG_RAD</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.5235987755982988730771072305465838</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants23HARRIS_PRIESTER_LAG_RADE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Solar direction lag angle for Harris-Priester model. </p>
+<p>Defines the phase lag between the spacecraft’s local solar noon and the actual peak of the atmospheric bulge. Defined as <span class="math notranslate nohighlight">\(30°\)</span> (≈ 0.524 radians). Accounts for the diurnal bulge offset due to atmospheric winds. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants23HARRIS_PRIESTER_MIN_COSE">
 <span id="_CPPv3N6saltro9constants23HARRIS_PRIESTER_MIN_COSE"></span><span id="_CPPv2N6saltro9constants23HARRIS_PRIESTER_MIN_COSE"></span><span id="saltro::constants::HARRIS_PRIESTER_MIN_COS__double"></span><span class="target" id="namespacesaltro_1_1constants_1a9dc52d9ef319ab6dda1e234897b07d60"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HARRIS_PRIESTER_MIN_COS</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-12</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants23HARRIS_PRIESTER_MIN_COSE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Minimum cosine value threshold for Harris-Priester model. </p>
+<p><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Used</span> <span class="n">to</span> <span class="n">avoid</span> <span class="n">division</span> <span class="n">by</span> <span class="n">very</span> <span class="n">small</span> <span class="n">numbers</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">weighting</span> <span class="n">function</span><span class="o">.</span>
+</pre></div>
+</div>
+ Set to <span class="math notranslate nohighlight">\(10^{-12}\)</span> for numerical stability. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants28HARRIS_PRIESTER_COS_EXPONENTE">
 <span id="_CPPv3N6saltro9constants28HARRIS_PRIESTER_COS_EXPONENTE"></span><span id="_CPPv2N6saltro9constants28HARRIS_PRIESTER_COS_EXPONENTE"></span><span id="saltro::constants::HARRIS_PRIESTER_COS_EXPONENT__double"></span><span class="target" id="namespacesaltro_1_1constants_1af75c93327f9ec58548ab43e1ff83facc"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HARRIS_PRIESTER_COS_EXPONENT</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">4.0</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants28HARRIS_PRIESTER_COS_EXPONENTE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Exponent for cosine weighting in Harris-Priester model. </p>
+<p>Controls the steepness of the day-night density transition. An exponent of 4 provides a smooth transition between minimum and maximum densities. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants21HARRIS_PRIESTER_TABLEE">
 <span id="_CPPv3N6saltro9constants21HARRIS_PRIESTER_TABLEE"></span><span id="_CPPv2N6saltro9constants21HARRIS_PRIESTER_TABLEE"></span><span id="saltro::constants::HARRIS_PRIESTER_TABLE__std::array:HarrisPriesterEntry.50:"></span><span class="target" id="namespacesaltro_1_1constants_1abf01ad5c2754e36efcc52963678552b2"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6saltro9constants19HarrisPriesterEntryE" title="saltro::constants::HarrisPriesterEntry"><span class="n"><span class="pre">HarrisPriesterEntry</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">50</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HARRIS_PRIESTER_TABLE</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants21HARRIS_PRIESTER_TABLEE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Harris-Priester atmospheric density model lookup table. </p>
+<p>Tabulated density values at 50 discrete altitudes from 100 to 1000 km. Each entry contains minimum (nightside) and maximum (dayside) density values. Interpolation or table lookup is performed during density computation to evaluate the model at arbitrary altitudes.</p>
+<p>Reference: Harris, M. J., and W. Priester, 1962. </p>
+</dd></dl>
 
 </div>
 <dl class="cpp struct">
@@ -413,22 +430,27 @@
 <span id="_CPPv3N6saltro9constants19HarrisPriesterEntryE"></span><span id="_CPPv2N6saltro9constants19HarrisPriesterEntryE"></span><span id="saltro::constants::HarrisPriesterEntry"></span><span class="target" id="structsaltro_1_1constants_1_1HarrisPriesterEntry"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HarrisPriesterEntry</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants19HarrisPriesterEntryE" title="Link to this definition">#</a><br /></dt>
 <dd><div class="docutils container">
 <em>#include &lt;harrispriester.h&gt;</em></div>
+<p>Single entry in the Harris-Priester atmospheric density table. </p>
+<p>Each entry corresponds to a discrete altitude level and provides both minimum (nightside) and maximum (dayside) density values. </p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants19HarrisPriesterEntry5alt_mE">
 <span id="_CPPv3N6saltro9constants19HarrisPriesterEntry5alt_mE"></span><span id="_CPPv2N6saltro9constants19HarrisPriesterEntry5alt_mE"></span><span id="saltro::constants::HarrisPriesterEntry::alt_m__double"></span><span class="target" id="structsaltro_1_1constants_1_1HarrisPriesterEntry_1a0d7b45150feefcda361d8a51c9a11ef3"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">alt_m</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants19HarrisPriesterEntry5alt_mE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Altitude above Earth surface in meters. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants19HarrisPriesterEntry13rho_min_kg_m3E">
 <span id="_CPPv3N6saltro9constants19HarrisPriesterEntry13rho_min_kg_m3E"></span><span id="_CPPv2N6saltro9constants19HarrisPriesterEntry13rho_min_kg_m3E"></span><span id="saltro::constants::HarrisPriesterEntry::rho_min_kg_m3__double"></span><span class="target" id="structsaltro_1_1constants_1_1HarrisPriesterEntry_1a69465e9ff7c9dd16d35947ec5bf890ac"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rho_min_kg_m3</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants19HarrisPriesterEntry13rho_min_kg_m3E" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Minimum (nightside) density in kg/m³ </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants19HarrisPriesterEntry13rho_max_kg_m3E">
 <span id="_CPPv3N6saltro9constants19HarrisPriesterEntry13rho_max_kg_m3E"></span><span id="_CPPv2N6saltro9constants19HarrisPriesterEntry13rho_max_kg_m3E"></span><span id="saltro::constants::HarrisPriesterEntry::rho_max_kg_m3__double"></span><span class="target" id="structsaltro_1_1constants_1_1HarrisPriesterEntry_1a3b0b73a767d969b47630b0227f2f54ee"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rho_max_kg_m3</span></span></span><a class="headerlink" href="#_CPPv4N6saltro9constants19HarrisPriesterEntry13rho_max_kg_m3E" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Maximum (dayside) density in kg/m³ </p>
+</dd></dl>
 
 </div>
 </dd></dl>

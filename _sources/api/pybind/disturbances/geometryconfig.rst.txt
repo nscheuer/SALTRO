@@ -1,0 +1,6 @@
+geometryconfig
+==============
+
+.. doxygenfile:: pybind/disturbances/geometryconfig.h
+   :project: saltro
+   :path: ../include/saltro

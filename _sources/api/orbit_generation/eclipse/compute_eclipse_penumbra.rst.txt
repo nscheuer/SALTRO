@@ -1,0 +1,6 @@
+compute_eclipse_penumbra
+========================
+
+.. doxygenfile:: orbit_generation/eclipse/compute_eclipse_penumbra.h
+   :project: saltro
+   :path: ../include/saltro

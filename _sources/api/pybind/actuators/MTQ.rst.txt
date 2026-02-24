@@ -1,0 +1,6 @@
+MTQ
+===
+
+.. doxygenfile:: pybind/actuators/MTQ.h
+   :project: saltro
+   :path: ../include/saltro

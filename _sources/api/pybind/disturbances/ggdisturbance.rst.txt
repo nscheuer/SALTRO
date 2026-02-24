@@ -1,0 +1,6 @@
+ggdisturbance
+=============
+
+.. doxygenfile:: pybind/disturbances/ggdisturbance.h
+   :project: saltro
+   :path: ../include/saltro

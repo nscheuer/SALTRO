@@ -1,0 +1,6 @@
+satellite
+=========
+
+.. doxygenfile:: pybind/satellite.h
+   :project: saltro
+   :path: ../include/saltro

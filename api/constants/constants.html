@@ -42,6 +42,7 @@
     <script src="../../_static/documentation_options.js?v=7026087e"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/constants/constants';</script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -380,57 +381,102 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7DEG2RADE">
 <span id="_CPPv3N6saltro9constants7DEG2RADE"></span><span id="_CPPv2N6saltro9constants7DEG2RADE"></span><span id="saltro::constants::DEG2RAD__double"></span><span class="target" id="namespacesaltro_1_1constants_1abb31acf979fe0d1fa71105a53fe5207b"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DEG2RAD</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">M_PI</span></span><span class="w"> </span><span class="o"><span class="pre">/</span></span><span class="w"> </span><span class="m"><span class="pre">180.0</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7DEG2RADE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Conversion factor from degrees to radians. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(\frac{\pi}{180}\)</span>. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants22SEC_PER_JULIAN_CENTURYE">
 <span id="_CPPv3N6saltro9constants22SEC_PER_JULIAN_CENTURYE"></span><span id="_CPPv2N6saltro9constants22SEC_PER_JULIAN_CENTURYE"></span><span id="saltro::constants::SEC_PER_JULIAN_CENTURY__double"></span><span class="target" id="namespacesaltro_1_1constants_1a9ef4fe45d6b566ba6ac55b21e95c3d2c"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SEC_PER_JULIAN_CENTURY</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">36525.0</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><span class="m"><span class="pre">86400.0</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants22SEC_PER_JULIAN_CENTURYE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Number of seconds in one Julian century. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(36525 \times 86400 = 3155760000\)</span>. Used for time conversions in ephemeris computations. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants4AU_ME">
 <span id="_CPPv3N6saltro9constants4AU_ME"></span><span id="_CPPv2N6saltro9constants4AU_ME"></span><span id="saltro::constants::AU_M__double"></span><span class="target" id="namespacesaltro_1_1constants_1a82e80d1fdd81b9a47f7f47167b03856c"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AU_M</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">149597870700.0</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants4AU_ME" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Astronomical Unit in meters. </p>
+<p>The mean distance from Earth to Sun: <span class="math notranslate nohighlight">\(1.49597870700 \times 10^{11}\)</span> meters, used in solar ephemeris calculations. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7C_LIGHTE">
+<span id="_CPPv3N6saltro9constants7C_LIGHTE"></span><span id="_CPPv2N6saltro9constants7C_LIGHTE"></span><span id="saltro::constants::C_LIGHT__double"></span><span class="target" id="namespacesaltro_1_1constants_1a3583ab879ab4fbd4a614982c73dcb744"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">C_LIGHT</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">299792458.0</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7C_LIGHTE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Speed of light in vacuum. </p>
+<p>Defined as exactly <span class="math notranslate nohighlight">\(299\,792\,458\)</span> m/s. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants14SOLAR_CONSTANTE">
+<span id="_CPPv3N6saltro9constants14SOLAR_CONSTANTE"></span><span id="_CPPv2N6saltro9constants14SOLAR_CONSTANTE"></span><span id="saltro::constants::SOLAR_CONSTANT__double"></span><span class="target" id="namespacesaltro_1_1constants_1ac6f841a472ab08d6069704859918bbdb"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SOLAR_CONSTANT</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1361.0</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants14SOLAR_CONSTANTE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Solar irradiance constant. </p>
+<p>Mean solar irradiance at 1 AU, approximately <span class="math notranslate nohighlight">\(1361\)</span> W/m². Used for solar radiation pressure drag calculations. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants5R_SUNE">
+<span id="_CPPv3N6saltro9constants5R_SUNE"></span><span id="_CPPv2N6saltro9constants5R_SUNE"></span><span id="saltro::constants::R_SUN__double"></span><span class="target" id="namespacesaltro_1_1constants_1a603e424c075dc8c1b2c189e11fa47223"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R_SUN</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">6.957e8</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants5R_SUNE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Solar radius in meters. </p>
+<p>Approximate mean radius of the Sun: <span class="math notranslate nohighlight">\(6.957 \times 10^8\)</span> m. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants8MU_EARTHE">
 <span id="_CPPv3N6saltro9constants8MU_EARTHE"></span><span id="_CPPv2N6saltro9constants8MU_EARTHE"></span><span id="saltro::constants::MU_EARTH__double"></span><span class="target" id="namespacesaltro_1_1constants_1a04210f7de90bf0210c2cabf88da515ed"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MU_EARTH</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">3.986004418e14</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants8MU_EARTHE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Earth’s gravitational parameter. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(\mu = 3.986\,004\,418 \times 10^{14}\)</span> km³/s², where <span class="math notranslate nohighlight">\(\mu = GM\)</span> and <span class="math notranslate nohighlight">\(G\)</span> is the gravitational constant. Used in Kepler orbit propagation. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7R_EARTHE">
 <span id="_CPPv3N6saltro9constants7R_EARTHE"></span><span id="_CPPv2N6saltro9constants7R_EARTHE"></span><span id="saltro::constants::R_EARTH__double"></span><span class="target" id="namespacesaltro_1_1constants_1a130d9c56978b624cc6ea7de2298e354f"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">R_EARTH</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">6378136.3</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7R_EARTHE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Earth’s mean equatorial radius. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(6\,378\,136.3\)</span> meters. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants8J2_EARTHE">
 <span id="_CPPv3N6saltro9constants8J2_EARTHE"></span><span id="_CPPv2N6saltro9constants8J2_EARTHE"></span><span id="saltro::constants::J2_EARTH__double"></span><span class="target" id="namespacesaltro_1_1constants_1aaf7cb54a19dc38f7c02b6b482255cff7"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">J2_EARTH</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.08263e-3</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants8J2_EARTHE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Earth’s oblateness parameter (J2). </p>
+<p>Dimensionless coefficient describing Earth’s equatorial bulge: <div class="math notranslate nohighlight">
+\[J_2 \approx 1.08263 \times 10^{-3}\]</div>
+ Controls the magnitude of the J2 perturbation in orbit propagation. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants12MU0_OVER_4PIE">
 <span id="_CPPv3N6saltro9constants12MU0_OVER_4PIE"></span><span id="_CPPv2N6saltro9constants12MU0_OVER_4PIE"></span><span id="saltro::constants::MU0_OVER_4PI__double"></span><span class="target" id="namespacesaltro_1_1constants_1a537829d7136212fba11ff2935ff57694"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MU0_OVER_4PI</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-7</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants12MU0_OVER_4PIE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Vacuum permeability divided by <span class="math notranslate nohighlight">\(4\pi\)</span>. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(\mu_0/(4\pi) = 10^{-7}\)</span> N/A². </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7M_EARTHE">
 <span id="_CPPv3N6saltro9constants7M_EARTHE"></span><span id="_CPPv2N6saltro9constants7M_EARTHE"></span><span id="saltro::constants::M_EARTH__double"></span><span class="target" id="namespacesaltro_1_1constants_1a6920bcf4a77e5c1d195368517d817976"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">M_EARTH</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">7.94e22</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants7M_EARTHE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Earth’s magnetic dipole moment magnitude. </p>
+<p>Approximately <span class="math notranslate nohighlight">\(7.94 \times 10^{22}\)</span> A·m². </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants1KE">
 <span id="_CPPv3N6saltro9constants1KE"></span><span id="_CPPv2N6saltro9constants1KE"></span><span id="saltro::constants::K__double"></span><span class="target" id="namespacesaltro_1_1constants_1a25e43df325cb2cb057ccb819661ec0cc"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">K</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro9constants12MU0_OVER_4PIE" title="saltro::constants::MU0_OVER_4PI"><span class="n"><span class="pre">MU0_OVER_4PI</span></span></a><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro9constants7M_EARTHE" title="saltro::constants::M_EARTH"><span class="n"><span class="pre">M_EARTH</span></span></a><a class="headerlink" href="#_CPPv4N6saltro9constants1KE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Product of permeability and magnetic moment. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(K = \frac{\mu_0}{4\pi} M_{\text{Earth}}\)</span> in units of T·m³. Used in dipole magnetic field calculations. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants8TILT_RADE">
 <span id="_CPPv3N6saltro9constants8TILT_RADE"></span><span id="_CPPv2N6saltro9constants8TILT_RADE"></span><span id="saltro::constants::TILT_RAD__double"></span><span class="target" id="namespacesaltro_1_1constants_1a8bef0c1f46ed7d60d84ed9938b25abde"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TILT_RAD</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">11.0</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro9constants7DEG2RADE" title="saltro::constants::DEG2RAD"><span class="n"><span class="pre">DEG2RAD</span></span></a><a class="headerlink" href="#_CPPv4N6saltro9constants8TILT_RADE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Tilt angle of Earth’s magnetic dipole. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(11°\)</span> in radians. The dipole is tilted relative to the geographic pole in the dipole model. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants7LON_RADE">
 <span id="_CPPv3N6saltro9constants7LON_RADE"></span><span id="_CPPv2N6saltro9constants7LON_RADE"></span><span id="saltro::constants::LON_RAD__double"></span><span class="target" id="namespacesaltro_1_1constants_1aeabd740803511f9f220ec0e261acae23"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">LON_RAD</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">289.0</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro9constants7DEG2RADE" title="saltro::constants::DEG2RAD"><span class="n"><span class="pre">DEG2RAD</span></span></a><a class="headerlink" href="#_CPPv4N6saltro9constants7LON_RADE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Longitude of the magnetic dipole axis. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(289°\)</span> in radians (measured from prime meridian). Used to locate the magnetic dipole relative to Earth’s geographic reference frame. </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -491,6 +537,9 @@
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7DEG2RADE"><code class="docutils literal notranslate"><span class="pre">DEG2RAD</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants22SEC_PER_JULIAN_CENTURYE"><code class="docutils literal notranslate"><span class="pre">SEC_PER_JULIAN_CENTURY</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants4AU_ME"><code class="docutils literal notranslate"><span class="pre">AU_M</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7C_LIGHTE"><code class="docutils literal notranslate"><span class="pre">C_LIGHT</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants14SOLAR_CONSTANTE"><code class="docutils literal notranslate"><span class="pre">SOLAR_CONSTANT</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants5R_SUNE"><code class="docutils literal notranslate"><span class="pre">R_SUN</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants8MU_EARTHE"><code class="docutils literal notranslate"><span class="pre">MU_EARTH</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants7R_EARTHE"><code class="docutils literal notranslate"><span class="pre">R_EARTH</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro9constants8J2_EARTHE"><code class="docutils literal notranslate"><span class="pre">J2_EARTH</span></code></a></li>

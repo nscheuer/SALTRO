@@ -1,0 +1,6 @@
+actuator
+========
+
+.. doxygenfile:: pybind/actuators/actuator.h
+   :project: saltro
+   :path: ../include/saltro

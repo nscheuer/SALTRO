@@ -1,0 +1,662 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>disturbance &#8212; SALTRO 0.0.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=7026087e"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/disturbances/disturbance';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="dragdisturbance" href="dragdisturbance.html" />
+    <link rel="prev" title="disturbances" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/rexlab.png" class="logo__image only-light" alt=""/>
+    <img src="../../../_static/rexlab.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">SALTRO</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../actuators/index.html">actuators</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/MTQ.html">MTQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/RW.html">RW</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/actuator.html">actuator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">disturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dragdisturbance.html">dragdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometryconfig.html">geometryconfig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ggdisturbance.html">ggdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="srpdisturbance.html">srpdisturbance</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../plannersettings.html">plannersettings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../satellite.html">satellite</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">pybind</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">disturbances</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">disturbance</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="disturbance">
+<h1>disturbance<a class="headerlink" href="#disturbance" title="Link to this heading">#</a></h1>
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv411Disturbance">
+<span id="_CPPv311Disturbance"></span><span id="_CPPv211Disturbance"></span><span id="Disturbance"></span><span class="target" id="classDisturbance"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Disturbance</span></span></span><a class="headerlink" href="#_CPPv411Disturbance" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;disturbance.h&gt;</em></div>
+<p>Abstract base class for disturbance models. </p>
+<p>Represents physical disturbances acting on the spacecraft (e.g., aerodynamic drag, solar radiation pressure, gravity gradient). Each disturbance computes a torque vector and its derivatives with respect to the spacecraft state.</p>
+<p>Derived classes must implement:<ul class="simple">
+<li><p><code class="docutils literal notranslate"><a class="reference internal" href="#classDisturbance_1a9538a22c35e4552fd45ba422da99435f"><span class="std std-ref"><span class="pre">torque()</span></span></a></code>: compute the disturbance torque vector</p></li>
+<li><p>Optionally: Jacobians and Hessians for optimization algorithms </p></li>
+</ul>
+</p>
+<p>Subclassed by <a class="reference internal" href="dragdisturbance.html#classsaltro_1_1disturbances_1_1DragDisturbance"><span class="std std-ref">saltro::disturbances::DragDisturbance</span></a>, <a class="reference internal" href="ggdisturbance.html#classsaltro_1_1disturbances_1_1GGDisturbance"><span class="std std-ref">saltro::disturbances::GGDisturbance</span></a>, <a class="reference internal" href="srpdisturbance.html#classsaltro_1_1disturbances_1_1SRPDisturbance"><span class="std std-ref">saltro::disturbances::SRPDisturbance</span></a></p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N11Disturbance4Vec3E">
+<span id="_CPPv3N11Disturbance4Vec3E"></span><span id="_CPPv2N11Disturbance4Vec3E"></span><span class="target" id="classDisturbance_1a9b91ee5630d2e846aab1ef8e8c567e16"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Vec3</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><a class="headerlink" href="#_CPPv4N11Disturbance4Vec3E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N11Disturbance4Vec4E">
+<span id="_CPPv3N11Disturbance4Vec4E"></span><span id="_CPPv2N11Disturbance4Vec4E"></span><span class="target" id="classDisturbance_1a224ae3681c150d8ddc2ae55d81f0697f"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Vec4</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><a class="headerlink" href="#_CPPv4N11Disturbance4Vec4E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N11Disturbance9BaseStateE">
+<span id="_CPPv3N11Disturbance9BaseStateE"></span><span id="_CPPv2N11Disturbance9BaseStateE"></span><span class="target" id="classDisturbance_1ae86c343471d360ec03efe5282c320dcc"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">BaseState</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">7</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N11Disturbance9BaseStateE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N11Disturbance5Mat34E">
+<span id="_CPPv3N11Disturbance5Mat34E"></span><span id="_CPPv2N11Disturbance5Mat34E"></span><span class="target" id="classDisturbance_1a8b4d61ded9590e03546abfe4438030c4"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Mat34</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">4</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N11Disturbance5Mat34E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N11Disturbance5Mat44E">
+<span id="_CPPv3N11Disturbance5Mat44E"></span><span id="_CPPv2N11Disturbance5Mat44E"></span><span class="target" id="classDisturbance_1ac79dd894691db9f9028229e94238bef5"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Mat44</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">4</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">4</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N11Disturbance5Mat44E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N11Disturbance4T443E">
+<span id="_CPPv3N11Disturbance4T443E"></span><span id="_CPPv2N11Disturbance4T443E"></span><span class="target" id="classDisturbance_1a285ca9d3554716c80b2dcac023b0788c"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T443</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="../../constants/constants.html#_CPPv46saltro" title="saltro"><span class="n"><span class="pre">saltro</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../../math/angles.html#_CPPv4N6saltro4mathE" title="saltro::math"><span class="n"><span class="pre">math</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../../math/tensor.html#_CPPv4I_i_i_iEN6saltro4math7Tensor3E" title="saltro::math::Tensor3"><span class="n"><span class="pre">Tensor3</span></span></a><span class="p"><span class="pre">&lt;</span></span><span class="m"><span class="pre">4</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">4</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">3</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N11Disturbance4T443E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N11DisturbanceD0Ev">
+<span id="_CPPv3N11DisturbanceD0Ev"></span><span id="_CPPv2N11DisturbanceD0Ev"></span><span id="Disturbance::~Disturbance"></span><span class="target" id="classDisturbance_1ac21f629f3a609134027c6430e8894bb5"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">~Disturbance</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N11DisturbanceD0Ev" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK11Disturbance6torqueERK9BaseStateRK17DisturbanceConfig">
+<span id="_CPPv3NK11Disturbance6torqueERK9BaseStateRK17DisturbanceConfig"></span><span id="_CPPv2NK11Disturbance6torqueERK9BaseStateRK17DisturbanceConfig"></span><span id="Disturbance::torque__BaseStateCR.DisturbanceConfigCRC"></span><span class="target" id="classDisturbance_1a9538a22c35e4552fd45ba422da99435f"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance4Vec3E" title="Disturbance::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">torque</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance9BaseStateE" title="Disturbance::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../plannersettings.html#_CPPv417DisturbanceConfig" title="DisturbanceConfig"><span class="n"><span class="pre">DisturbanceConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dist_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4NK11Disturbance6torqueERK9BaseStateRK17DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute the disturbance torque. </p>
+<p>Pure virtual method accepting the base spacecraft state and disturbance configuration. Must be implemented by derived classes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Base state vector (7D: angular velocity + quaternion). </p></li>
+<li><p><strong>dist_cfg</strong> – <a class="reference internal" href="#classDisturbance"><span class="std std-ref">Disturbance</span></a> configuration (flags, coefficients, etc.). </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>3D disturbance torque vector in body frame (Newton-meters). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig">
+<span id="_CPPv3NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig"></span><span id="_CPPv2NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig"></span><span id="Disturbance::dtorque_dq__BaseStateCR.DisturbanceConfigCRC"></span><span class="target" id="classDisturbance_1aae862e9eb813f6216cec6069a30fe43f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance5Mat34E" title="Disturbance::Mat34"><span class="n"><span class="pre">Mat34</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dtorque_dq</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance9BaseStateE" title="Disturbance::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../plannersettings.html#_CPPv417DisturbanceConfig" title="DisturbanceConfig"><span class="n"><span class="pre">DisturbanceConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dist_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
+<dd><p>Jacobian of disturbance torque with respect to quaternion. </p>
+<p>Computes <span class="math notranslate nohighlight">\(\frac{\partial \boldsymbol{\tau}}{\partial \mathbf{q}}\)</span> as a 3×4 matrix. Default implementation returns zero (for disturbances independent of attitude).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Base state. </p></li>
+<li><p><strong>dist_cfg</strong> – <a class="reference internal" href="#classDisturbance"><span class="std std-ref">Disturbance</span></a> configuration. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>3×4 Jacobian matrix (zero by default). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig">
+<span id="_CPPv3NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig"></span><span id="_CPPv2NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig"></span><span id="Disturbance::ddtorque_dqdq__BaseStateCR.DisturbanceConfigCRC"></span><span class="target" id="classDisturbance_1addcfb3c1b436399da97222b7c0164935"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance4T443E" title="Disturbance::T443"><span class="n"><span class="pre">T443</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorque_dqdq</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance9BaseStateE" title="Disturbance::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../plannersettings.html#_CPPv417DisturbanceConfig" title="DisturbanceConfig"><span class="n"><span class="pre">DisturbanceConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dist_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
+<dd><p>Hessian of disturbance torque with respect to quaternion. </p>
+<p>Computes second derivatives <span class="math notranslate nohighlight">\(\frac{\partial^2 \tau_i}{\partial q_j \partial q_k}\)</span> as a 3-slice tensor of 4×4 matrices. Default implementation returns zero.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Base state. </p></li>
+<li><p><strong>dist_cfg</strong> – <a class="reference internal" href="#classDisturbance"><span class="std std-ref">Disturbance</span></a> configuration. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tensor3 with 3 slices of 4×4 matrices (zero by default). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N11Disturbance9setActiveEb">
+<span id="_CPPv3N11Disturbance9setActiveEb"></span><span id="_CPPv2N11Disturbance9setActiveEb"></span><span id="Disturbance::setActive__b"></span><span class="target" id="classDisturbance_1a48c8b30f3135e79a52691b4d6fb1bb97"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">setActive</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">active</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N11Disturbance9setActiveEb" title="Link to this definition">#</a><br /></dt>
+<dd><p>Enable or disable this disturbance for computations. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>active</strong> – True to enable, false to disable. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK11Disturbance8isActiveEv">
+<span id="_CPPv3NK11Disturbance8isActiveEv"></span><span id="_CPPv2NK11Disturbance8isActiveEv"></span><span id="Disturbance::isActiveC"></span><span class="target" id="classDisturbance_1a54f15b10d192822bc160b727fe867e1a"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">isActive</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK11Disturbance8isActiveEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Check if this disturbance is active. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if active, false otherwise. </p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-protected-attributes">Protected Attributes</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N11Disturbance7active_E">
+<span id="_CPPv3N11Disturbance7active_E"></span><span id="_CPPv2N11Disturbance7active_E"></span><span id="Disturbance::active___b"></span><span class="target" id="classDisturbance_1a987e19946dbdc68b27b49255fce29590"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">active_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">true</span></span><a class="headerlink" href="#_CPPv4N11Disturbance7active_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Activation flag. </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">disturbances</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="dragdisturbance.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">dragdisturbance</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv411Disturbance"><code class="docutils literal notranslate"><span class="pre">Disturbance</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11Disturbance4Vec3E"><code class="docutils literal notranslate"><span class="pre">Vec3</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11Disturbance4Vec4E"><code class="docutils literal notranslate"><span class="pre">Vec4</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11Disturbance9BaseStateE"><code class="docutils literal notranslate"><span class="pre">BaseState</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11Disturbance5Mat34E"><code class="docutils literal notranslate"><span class="pre">Mat34</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11Disturbance5Mat44E"><code class="docutils literal notranslate"><span class="pre">Mat44</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11Disturbance4T443E"><code class="docutils literal notranslate"><span class="pre">T443</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11DisturbanceD0Ev"><code class="docutils literal notranslate"><span class="pre">~Disturbance()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK11Disturbance6torqueERK9BaseStateRK17DisturbanceConfig"><code class="docutils literal notranslate"><span class="pre">torque()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig"><code class="docutils literal notranslate"><span class="pre">dtorque_dq()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig"><code class="docutils literal notranslate"><span class="pre">ddtorque_dqdq()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11Disturbance9setActiveEb"><code class="docutils literal notranslate"><span class="pre">setActive()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK11Disturbance8isActiveEv"><code class="docutils literal notranslate"><span class="pre">isActive()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N11Disturbance7active_E"><code class="docutils literal notranslate"><span class="pre">active_</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/api/pybind/disturbances/disturbance.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Niclas Scheuer, Patrick McKeen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

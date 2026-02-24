@@ -42,6 +42,7 @@
     <script src="../../_static/documentation_options.js?v=7026087e"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/constants/igrf13';</script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -383,22 +384,30 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants6IGRF134NMAXE">
 <span id="_CPPv3N6saltro9constants6IGRF134NMAXE"></span><span id="_CPPv2N6saltro9constants6IGRF134NMAXE"></span><span id="saltro::constants::IGRF13::NMAX__i"></span><span class="target" id="namespacesaltro_1_1constants_1_1IGRF13_1a567e4ca506dad2eff7f6096c0f33cc85"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">NMAX</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">13</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants6IGRF134NMAXE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Maximum degree of spherical harmonic expansion (IGRF-13). </p>
+<p>The IGRF-13 magnetic field model uses Gauss coefficients up to degree and order <span class="math notranslate nohighlight">\(n = m = 13\)</span>, providing high accuracy for global field representation across all altitudes. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants6IGRF131GE">
 <span id="_CPPv3N6saltro9constants6IGRF131GE"></span><span id="_CPPv2N6saltro9constants6IGRF131GE"></span><span id="saltro::constants::IGRF13::G__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1IGRF13_1a1cc14126d1fda762f89088b9189a205a"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">G</span></span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4N6saltro9constants6IGRF134NMAXE" title="saltro::constants::IGRF13::NMAX"><span class="n"><span class="pre">NMAX</span></span></a><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4N6saltro9constants6IGRF134NMAXE" title="saltro::constants::IGRF13::NMAX"><span class="n"><span class="pre">NMAX</span></span></a><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants6IGRF131GE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Gauss coefficients (cosine terms) for IGRF-13 model. </p>
+<p>Tabulated Gauss coefficients <span class="math notranslate nohighlight">\(g_n^m\)</span> representing the cosine components of the spherical harmonic expansion of Earth’s magnetic field. Array is dimensioned as <span class="math notranslate nohighlight">\((N_{\max}+1) \times (N_{\max}+1)\)</span>. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants6IGRF131HE">
 <span id="_CPPv3N6saltro9constants6IGRF131HE"></span><span id="_CPPv2N6saltro9constants6IGRF131HE"></span><span id="saltro::constants::IGRF13::H__doubleCAA"></span><span class="target" id="namespacesaltro_1_1constants_1_1IGRF13_1a61bcf4b182babf71c65844d59bb4dc08"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">H</span></span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4N6saltro9constants6IGRF134NMAXE" title="saltro::constants::IGRF13::NMAX"><span class="n"><span class="pre">NMAX</span></span></a><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#_CPPv4N6saltro9constants6IGRF134NMAXE" title="saltro::constants::IGRF13::NMAX"><span class="n"><span class="pre">NMAX</span></span></a><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">]</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants6IGRF131HE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Gauss coefficients (sine terms) for IGRF-13 model. </p>
+<p>Tabulated Gauss coefficients <span class="math notranslate nohighlight">\(h_n^m\)</span> representing the sine components of the spherical harmonic expansion. Array is dimensioned as <span class="math notranslate nohighlight">\((N_{\max}+1) \times (N_{\max}+1)\)</span>. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro9constants6IGRF1322EARTH_REFERENCE_RADIUSE">
 <span id="_CPPv3N6saltro9constants6IGRF1322EARTH_REFERENCE_RADIUSE"></span><span id="_CPPv2N6saltro9constants6IGRF1322EARTH_REFERENCE_RADIUSE"></span><span id="saltro::constants::IGRF13::EARTH_REFERENCE_RADIUS__double"></span><span class="target" id="namespacesaltro_1_1constants_1_1IGRF13_1acd9cc23fd74ff4a3601c37b51ac982e0"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">EARTH_REFERENCE_RADIUS</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">6371200.0</span></span><a class="headerlink" href="#_CPPv4N6saltro9constants6IGRF1322EARTH_REFERENCE_RADIUSE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Earth reference radius for IGRF coefficients. </p>
+<p>Defined as <span class="math notranslate nohighlight">\(6\,371\,200\)</span> meters. Gauss coefficients are normalized with respect to this radius. </p>
+</dd></dl>
 
 </div>
 </dd></dl>

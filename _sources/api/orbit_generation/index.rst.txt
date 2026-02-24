@@ -5,6 +5,7 @@ orbit_generation
    :maxdepth: 1
 
    density/index
+   eclipse/index
    magnetics/index
    orbits/index
    sun/index

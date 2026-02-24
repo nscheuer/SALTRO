@@ -4,4 +4,7 @@ pybind
 .. toctree::
    :maxdepth: 1
 
+   actuators/index
+   disturbances/index
    plannersettings
+   satellite

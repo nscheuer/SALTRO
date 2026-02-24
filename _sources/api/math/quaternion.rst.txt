@@ -1,0 +1,6 @@
+quaternion
+==========
+
+.. doxygenfile:: math/quaternion.h
+   :project: saltro
+   :path: ../include/saltro

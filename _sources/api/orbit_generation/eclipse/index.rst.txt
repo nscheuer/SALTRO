@@ -1,0 +1,9 @@
+eclipse
+=======
+
+.. toctree::
+   :maxdepth: 1
+
+   compute_eclipse
+   compute_eclipse_cylinder
+   compute_eclipse_penumbra

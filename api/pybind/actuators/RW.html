@@ -1,0 +1,884 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>RW &#8212; SALTRO 0.0.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=7026087e"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/actuators/RW';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="actuator" href="actuator.html" />
+    <link rel="prev" title="MTQ" href="MTQ.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/rexlab.png" class="logo__image only-light" alt=""/>
+    <img src="../../../_static/rexlab.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">SALTRO</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">actuators</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="MTQ.html">MTQ</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">RW</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actuator.html">actuator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../disturbances/index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/disturbance.html">disturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/dragdisturbance.html">dragdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/geometryconfig.html">geometryconfig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/ggdisturbance.html">ggdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/srpdisturbance.html">srpdisturbance</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../plannersettings.html">plannersettings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../satellite.html">satellite</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">pybind</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">actuators</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">RW</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="rw">
+<h1>RW<a class="headerlink" href="#rw" title="Link to this heading">#</a></h1>
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv42RW">
+<span id="_CPPv32RW"></span><span id="_CPPv22RW"></span><span id="RW"></span><span class="target" id="classRW"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RW</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="actuator.html#_CPPv48Actuator" title="Actuator"><span class="n"><span class="pre">Actuator</span></span></a><a class="headerlink" href="#_CPPv42RW" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;RW.h&gt;</em></div>
+<p>Reaction wheel (<a class="reference internal" href="#classRW"><span class="std std-ref">RW</span></a>) actuator class. </p>
+<p>Represents a momentum-exchange device that produces torque by changing its angular momentum. Inherits from <a class="reference internal" href="actuator.html#classActuator"><span class="std std-ref">Actuator</span></a> and extends functionality to track and constrain the wheel’s angular momentum state.</p>
+<p>Dynamics: The torque applied by the <a class="reference internal" href="#classRW"><span class="std std-ref">RW</span></a> depends on the desired rate of momentum change:  <div class="math notranslate nohighlight">
+\[
+\boldsymbol{\tau} = u \cdot \text{axis}
+\]</div>
+</p>
+<p>The wheel momentum evolves as:  <div class="math notranslate nohighlight">
+\[
+\frac{dh}{dt} = -u \quad \text{(reaction principle)}
+\]</div>
+</p>
+<p><div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="actuator.html#classActuator"><span class="std std-ref">Actuator</span></a> for base class interface </p>
+</div>
+</p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW4Vec3E">
+<span id="_CPPv3N2RW4Vec3E"></span><span id="_CPPv2N2RW4Vec3E"></span><span class="target" id="classRW_1aa47fe125976d31bb5b80a1f1f3e986ac"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Vec3</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="actuator.html#_CPPv48Actuator" title="Actuator"><span class="n"><span class="pre">Actuator</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="actuator.html#_CPPv4N8Actuator4Vec3E" title="Actuator::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><a class="headerlink" href="#_CPPv4N2RW4Vec3E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW9BaseStateE">
+<span id="_CPPv3N2RW9BaseStateE"></span><span id="_CPPv2N2RW9BaseStateE"></span><span class="target" id="classRW_1a46458e0023589a03d11ce3d6d2b253c1"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">BaseState</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="actuator.html#_CPPv48Actuator" title="Actuator"><span class="n"><span class="pre">Actuator</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="actuator.html#_CPPv4N8Actuator9BaseStateE" title="Actuator::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><a class="headerlink" href="#_CPPv4N2RW9BaseStateE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW5Mat13E">
+<span id="_CPPv3N2RW5Mat13E"></span><span id="_CPPv2N2RW5Mat13E"></span><span class="target" id="classRW_1afc6084b07e9feade51928ab582da22b6"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Mat13</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="actuator.html#_CPPv48Actuator" title="Actuator"><span class="n"><span class="pre">Actuator</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="actuator.html#_CPPv4N8Actuator5Mat13E" title="Actuator::Mat13"><span class="n"><span class="pre">Mat13</span></span></a><a class="headerlink" href="#_CPPv4N2RW5Mat13E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW5Mat73E">
+<span id="_CPPv3N2RW5Mat73E"></span><span id="_CPPv2N2RW5Mat73E"></span><span class="target" id="classRW_1a865475202032cace769e70df2270c0f0"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Mat73</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="actuator.html#_CPPv48Actuator" title="Actuator"><span class="n"><span class="pre">Actuator</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="actuator.html#_CPPv4N8Actuator5Mat73E" title="Actuator::Mat73"><span class="n"><span class="pre">Mat73</span></span></a><a class="headerlink" href="#_CPPv4N2RW5Mat73E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW5Mat11E">
+<span id="_CPPv3N2RW5Mat11E"></span><span id="_CPPv2N2RW5Mat11E"></span><span class="target" id="classRW_1a0350063ae6803195f89c83326e4eb2d0"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Mat11</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N2RW5Mat11E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW5Mat17E">
+<span id="_CPPv3N2RW5Mat17E"></span><span id="_CPPv2N2RW5Mat17E"></span><span class="target" id="classRW_1a67122d07b97d1fecdcee45174c984548"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Mat17</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">7</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N2RW5Mat17E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW5Mat71E">
+<span id="_CPPv3N2RW5Mat71E"></span><span id="_CPPv2N2RW5Mat71E"></span><span class="target" id="classRW_1a7b9d60ca99be488eb169d5ce202471b0"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Mat71</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Matrix</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">7</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N2RW5Mat71E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW4T113E">
+<span id="_CPPv3N2RW4T113E"></span><span id="_CPPv2N2RW4T113E"></span><span class="target" id="classRW_1a99f5bcc156b073035288d38688542e17"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T113</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="actuator.html#_CPPv48Actuator" title="Actuator"><span class="n"><span class="pre">Actuator</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="actuator.html#_CPPv4N8Actuator4T113E" title="Actuator::T113"><span class="n"><span class="pre">T113</span></span></a><a class="headerlink" href="#_CPPv4N2RW4T113E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW4T173E">
+<span id="_CPPv3N2RW4T173E"></span><span id="_CPPv2N2RW4T173E"></span><span class="target" id="classRW_1ab3d6c38b215718d1ad251b15fae91370"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T173</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="actuator.html#_CPPv48Actuator" title="Actuator"><span class="n"><span class="pre">Actuator</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="actuator.html#_CPPv4N8Actuator4T173E" title="Actuator::T173"><span class="n"><span class="pre">T173</span></span></a><a class="headerlink" href="#_CPPv4N2RW4T173E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW4T773E">
+<span id="_CPPv3N2RW4T773E"></span><span id="_CPPv2N2RW4T773E"></span><span class="target" id="classRW_1a6b03fd6515316caf90a1743c6a0c3241"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T773</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="actuator.html#_CPPv48Actuator" title="Actuator"><span class="n"><span class="pre">Actuator</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="actuator.html#_CPPv4N8Actuator4T773E" title="Actuator::T773"><span class="n"><span class="pre">T773</span></span></a><a class="headerlink" href="#_CPPv4N2RW4T773E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW2RWERK4Vec3dddd">
+<span id="_CPPv3N2RW2RWERK4Vec3dddd"></span><span id="_CPPv2N2RW2RWERK4Vec3dddd"></span><span id="RW::RW__Vec3CR.double.double.double.double"></span><span class="target" id="classRW_1af5e38b91c9c2861b474fb068d22eeae8"></span><span class="sig-name descname"><span class="n"><span class="pre">RW</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW4Vec3E" title="RW::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">axis</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_torque</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">J</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">h0</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">h_max</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N2RW2RWERK4Vec3dddd" title="Link to this definition">#</a><br /></dt>
+<dd><p>Construct a reaction wheel with specified parameters. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>axis</strong> – Unit vector specifying torque direction in body frame. </p></li>
+<li><p><strong>max_torque</strong> – Maximum torque magnitude (Nm). </p></li>
+<li><p><strong>J</strong> – Wheel moment of inertia (kg·m²). </p></li>
+<li><p><strong>h0</strong> – Initial wheel momentum (N·m·s). </p></li>
+<li><p><strong>h_max</strong> – Maximum allowable wheel momentum (N·m·s). </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N2RWD0Ev">
+<span id="_CPPv3N2RWD0Ev"></span><span id="_CPPv2N2RWD0Ev"></span><span id="RW::~RW"></span><span class="target" id="classRW_1af0cd53455b0301ca6596962a80cde253"></span><span class="sig-name descname"><span class="n"><span class="pre">~RW</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">override</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N2RWD0Ev" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW12wheelInertiaEv">
+<span id="_CPPv3NK2RW12wheelInertiaEv"></span><span id="_CPPv2NK2RW12wheelInertiaEv"></span><span id="RW::wheelInertiaC"></span><span class="target" id="classRW_1a3bd642e3ff9b755a7d482d139318c7ff"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">wheelInertia</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NK2RW12wheelInertiaEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the wheel’s moment of inertia. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>J value in kg·m². </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW8momentumEv">
+<span id="_CPPv3NK2RW8momentumEv"></span><span id="_CPPv2NK2RW8momentumEv"></span><span id="RW::momentumC"></span><span class="target" id="classRW_1a4edd2382186124ae884737cf7e4984d5"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">momentum</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NK2RW8momentumEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the current wheel momentum magnitude. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Current momentum in N·m·s. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW11momentumMaxEv">
+<span id="_CPPv3NK2RW11momentumMaxEv"></span><span id="_CPPv2NK2RW11momentumMaxEv"></span><span id="RW::momentumMaxC"></span><span class="target" id="classRW_1a8d209aa252bd0bafae0173d6d5526ca2"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">momentumMax</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NK2RW11momentumMaxEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the maximum allowable wheel momentum magnitude. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>h_max in N·m·s. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW11setMomentumEd">
+<span id="_CPPv3N2RW11setMomentumEd"></span><span id="_CPPv2N2RW11setMomentumEd"></span><span id="RW::setMomentum__double"></span><span class="target" id="classRW_1a400402f6fb1a8f3ba959f3b3575e9a40"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">setMomentum</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">h</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N2RW11setMomentumEd" title="Link to this definition">#</a><br /></dt>
+<dd><p>Set the wheel momentum to a new value. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>h</strong> – New momentum value (N·m·s). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW6torqueEdRK9BaseState">
+<span id="_CPPv3NK2RW6torqueEdRK9BaseState"></span><span id="_CPPv2NK2RW6torqueEdRK9BaseState"></span><span id="RW::torque__double.BaseStateCRC"></span><span class="target" id="classRW_1afe08c47142fc544aa32f6adfa94a435a"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW4Vec3E" title="RW::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">torque</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK2RW6torqueEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute the torque produced by the reaction wheel. </p>
+<p>Overrides base class. Torque depends on control input and wheel inertia:  <div class="math notranslate nohighlight">
+\[
+\boldsymbol{\tau} = u \cdot \text{axis}
+\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input (torque command rate, rad/s²·J). </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>3D torque vector. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW13storageTorqueEdRK9BaseState">
+<span id="_CPPv3NK2RW13storageTorqueEdRK9BaseState"></span><span id="_CPPv2NK2RW13storageTorqueEdRK9BaseState"></span><span id="RW::storageTorque__double.BaseStateCRC"></span><span class="target" id="classRW_1a8eafc9c62e069b53471dd6fab4fecf29"></span><a class="reference internal" href="#_CPPv4N2RW5Mat11E" title="RW::Mat11"><span class="n"><span class="pre">Mat11</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageTorque</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK2RW13storageTorqueEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Storage torque (momentum rate). </p>
+<p>Returns the rate of change of wheel momentum:  <div class="math notranslate nohighlight">
+\[
+\frac{dh}{dt} = -u
+\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>1×1 matrix containing momentum rate. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW8dtorq_duEdRK9BaseState">
+<span id="_CPPv3NK2RW8dtorq_duEdRK9BaseState"></span><span id="_CPPv2NK2RW8dtorq_duEdRK9BaseState"></span><span id="RW::dtorq_du__double.BaseStateCRC"></span><span class="target" id="classRW_1a1cf16d1101032a60ff2d76cc18fc8080"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW5Mat13E" title="RW::Mat13"><span class="n"><span class="pre">Mat13</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dtorq_du</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK2RW8dtorq_duEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Jacobian of torque with respect to control input. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>1×3 Jacobian. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW16dtorq_dbasestateEdRK9BaseState">
+<span id="_CPPv3NK2RW16dtorq_dbasestateEdRK9BaseState"></span><span id="_CPPv2NK2RW16dtorq_dbasestateEdRK9BaseState"></span><span id="RW::dtorq_dbasestate__double.BaseStateCRC"></span><span class="target" id="classRW_1a155a446075f22ca59ae544c98b71e34b"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW5Mat73E" title="RW::Mat73"><span class="n"><span class="pre">Mat73</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dtorq_dbasestate</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK2RW16dtorq_dbasestateEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Jacobian of torque with respect to base state. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>7×3 Jacobian. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW13dstor_torq_duEdRK9BaseState">
+<span id="_CPPv3NK2RW13dstor_torq_duEdRK9BaseState"></span><span id="_CPPv2NK2RW13dstor_torq_duEdRK9BaseState"></span><span id="RW::dstor_torq_du__double.BaseStateCRC"></span><span class="target" id="classRW_1a5786ceacca441f53b93ac334a4246562"></span><a class="reference internal" href="#_CPPv4N2RW5Mat11E" title="RW::Mat11"><span class="n"><span class="pre">Mat11</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dstor_torq_du</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK2RW13dstor_torq_duEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Jacobian of storage torque with respect to control input. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>1×1 Jacobian. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW21dstor_torq_dbasestateEdRK9BaseState">
+<span id="_CPPv3NK2RW21dstor_torq_dbasestateEdRK9BaseState"></span><span id="_CPPv2NK2RW21dstor_torq_dbasestateEdRK9BaseState"></span><span id="RW::dstor_torq_dbasestate__double.BaseStateCRC"></span><span class="target" id="classRW_1aa59696df23b6420360e129f14ce5ea4a"></span><a class="reference internal" href="#_CPPv4N2RW5Mat71E" title="RW::Mat71"><span class="n"><span class="pre">Mat71</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dstor_torq_dbasestate</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK2RW21dstor_torq_dbasestateEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Jacobian of storage torque with respect to base state. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>7×1 Jacobian. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW11ddtorq_duduEdRK9BaseState">
+<span id="_CPPv3NK2RW11ddtorq_duduEdRK9BaseState"></span><span id="_CPPv2NK2RW11ddtorq_duduEdRK9BaseState"></span><span id="RW::ddtorq_dudu__double.BaseStateCRC"></span><span class="target" id="classRW_1afd38d582684d146a45781206a417ace7"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW4T113E" title="RW::T113"><span class="n"><span class="pre">T113</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorq_dudu</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK2RW11ddtorq_duduEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Hessian of torque with respect to control input (second derivatives). </p>
+<p>Returns a 3-slice tensor of <span class="math notranslate nohighlight">\(\frac{\partial^2 \tau_i}{\partial u^2}\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tensor3 with 3 slices of 1×1 matrices (one per torque component). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW19ddtorq_dudbasestateEdRK9BaseState">
+<span id="_CPPv3NK2RW19ddtorq_dudbasestateEdRK9BaseState"></span><span id="_CPPv2NK2RW19ddtorq_dudbasestateEdRK9BaseState"></span><span id="RW::ddtorq_dudbasestate__double.BaseStateCRC"></span><span class="target" id="classRW_1a1bf1a763d21ac96d8dbb2eb39df7c6bc"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW4T173E" title="RW::T173"><span class="n"><span class="pre">T173</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorq_dudbasestate</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK2RW19ddtorq_dudbasestateEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Hessian of torque with respect to control input and base state. </p>
+<p>Returns mixed partial derivatives <span class="math notranslate nohighlight">\(\frac{\partial^2 \tau_i}{\partial u \partial x_j}\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tensor3 with 3 slices of 1×7 matrices. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK2RW27ddtorq_dbasestatedbasestateEdRK9BaseState">
+<span id="_CPPv3NK2RW27ddtorq_dbasestatedbasestateEdRK9BaseState"></span><span id="_CPPv2NK2RW27ddtorq_dbasestatedbasestateEdRK9BaseState"></span><span id="RW::ddtorq_dbasestatedbasestate__double.BaseStateCRC"></span><span class="target" id="classRW_1a3b6160760975fbb3e41393a639d2863c"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW4T773E" title="RW::T773"><span class="n"><span class="pre">T773</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorq_dbasestatedbasestate</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N2RW9BaseStateE" title="RW::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK2RW27ddtorq_dbasestatedbasestateEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Hessian of torque with respect to base state (full second derivatives). </p>
+<p>Returns <span class="math notranslate nohighlight">\(\frac{\partial^2 \tau_i}{\partial x_j \partial x_k}\)</span> for each component i.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tensor3 with 3 slices of 7×7 matrices. </p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-private-members">Private Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW2J_E">
+<span id="_CPPv3N2RW2J_E"></span><span id="_CPPv2N2RW2J_E"></span><span id="RW::J___double"></span><span class="target" id="classRW_1a08b7b3133d57003e43d71d492da7db02"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">J_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="m"><span class="pre">0.0</span></span><span class="p"><span class="pre">}</span></span><a class="headerlink" href="#_CPPv4N2RW2J_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Wheel moment of inertia (kg·m²) </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW2h_E">
+<span id="_CPPv3N2RW2h_E"></span><span id="_CPPv2N2RW2h_E"></span><span id="RW::h___double"></span><span class="target" id="classRW_1a40f1cddbfe7c0357ee5f3061ac88972a"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">h_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="m"><span class="pre">0.0</span></span><span class="p"><span class="pre">}</span></span><a class="headerlink" href="#_CPPv4N2RW2h_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Current momentum (N·m·s) </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW6h_max_E">
+<span id="_CPPv3N2RW6h_max_E"></span><span id="_CPPv2N2RW6h_max_E"></span><span id="RW::h_max___double"></span><span class="target" id="classRW_1a6b514830f2537810266fab2f9340fe7f"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">h_max_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="p"><span class="pre">{</span></span><span class="m"><span class="pre">0.0</span></span><span class="p"><span class="pre">}</span></span><a class="headerlink" href="#_CPPv4N2RW6h_max_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Maximum momentum (N·m·s) </p>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-private-static-attributes">Private Static Attributes</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW13kBaseStateDimE">
+<span id="_CPPv3N2RW13kBaseStateDimE"></span><span id="_CPPv2N2RW13kBaseStateDimE"></span><span id="RW::kBaseStateDim__i"></span><span class="target" id="classRW_1aedf1cc9716a0ed3a9a5eafb86fb3f810"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kBaseStateDim</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">7</span></span><a class="headerlink" href="#_CPPv4N2RW13kBaseStateDimE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N2RW11kStorageDimE">
+<span id="_CPPv3N2RW11kStorageDimE"></span><span id="_CPPv2N2RW11kStorageDimE"></span><span id="RW::kStorageDim__i"></span><span class="target" id="classRW_1a6f8f146465234217f9304d1d9de2adfb"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kStorageDim</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><a class="headerlink" href="#_CPPv4N2RW11kStorageDimE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="MTQ.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">MTQ</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="actuator.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">actuator</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv42RW"><code class="docutils literal notranslate"><span class="pre">RW</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW4Vec3E"><code class="docutils literal notranslate"><span class="pre">Vec3</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW9BaseStateE"><code class="docutils literal notranslate"><span class="pre">BaseState</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW5Mat13E"><code class="docutils literal notranslate"><span class="pre">Mat13</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW5Mat73E"><code class="docutils literal notranslate"><span class="pre">Mat73</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW5Mat11E"><code class="docutils literal notranslate"><span class="pre">Mat11</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW5Mat17E"><code class="docutils literal notranslate"><span class="pre">Mat17</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW5Mat71E"><code class="docutils literal notranslate"><span class="pre">Mat71</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW4T113E"><code class="docutils literal notranslate"><span class="pre">T113</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW4T173E"><code class="docutils literal notranslate"><span class="pre">T173</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW4T773E"><code class="docutils literal notranslate"><span class="pre">T773</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW2RWERK4Vec3dddd"><code class="docutils literal notranslate"><span class="pre">RW()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RWD0Ev"><code class="docutils literal notranslate"><span class="pre">~RW()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW12wheelInertiaEv"><code class="docutils literal notranslate"><span class="pre">wheelInertia()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW8momentumEv"><code class="docutils literal notranslate"><span class="pre">momentum()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW11momentumMaxEv"><code class="docutils literal notranslate"><span class="pre">momentumMax()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW11setMomentumEd"><code class="docutils literal notranslate"><span class="pre">setMomentum()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW6torqueEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">torque()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW13storageTorqueEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">storageTorque()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW8dtorq_duEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">dtorq_du()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW16dtorq_dbasestateEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">dtorq_dbasestate()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW13dstor_torq_duEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">dstor_torq_du()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW21dstor_torq_dbasestateEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">dstor_torq_dbasestate()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW11ddtorq_duduEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">ddtorq_dudu()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW19ddtorq_dudbasestateEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">ddtorq_dudbasestate()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK2RW27ddtorq_dbasestatedbasestateEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">ddtorq_dbasestatedbasestate()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW2J_E"><code class="docutils literal notranslate"><span class="pre">J_</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW2h_E"><code class="docutils literal notranslate"><span class="pre">h_</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW6h_max_E"><code class="docutils literal notranslate"><span class="pre">h_max_</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW13kBaseStateDimE"><code class="docutils literal notranslate"><span class="pre">kBaseStateDim</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N2RW11kStorageDimE"><code class="docutils literal notranslate"><span class="pre">kStorageDim</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/api/pybind/actuators/RW.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Niclas Scheuer, Patrick McKeen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

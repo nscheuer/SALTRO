@@ -1,0 +1,6 @@
+compute_eclipse
+===============
+
+.. doxygenfile:: orbit_generation/eclipse/compute_eclipse.h
+   :project: saltro
+   :path: ../include/saltro

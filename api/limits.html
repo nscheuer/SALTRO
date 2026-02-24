@@ -42,6 +42,7 @@
     <script src="../_static/documentation_options.js?v=7026087e"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/limits';</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -370,32 +371,79 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits15MAX_LENGTH_TRAJE">
 <span id="_CPPv3N6saltro6limits15MAX_LENGTH_TRAJE"></span><span id="_CPPv2N6saltro6limits15MAX_LENGTH_TRAJE"></span><span id="saltro::limits::MAX_LENGTH_TRAJ__i"></span><span class="target" id="namespacesaltro_1_1limits_1a73402578b0086023851c653d6223f791"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_LENGTH_TRAJ</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">5000</span></span><a class="headerlink" href="#_CPPv4N6saltro6limits15MAX_LENGTH_TRAJE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Maximum length of a discretized trajectory. </p>
+<p>Defines the compile-time maximum number of samples that can be stored in trajectory arrays. Used for pre-allocation in fixed-size containers. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits16KEPLER_MAX_ITERSE">
 <span id="_CPPv3N6saltro6limits16KEPLER_MAX_ITERSE"></span><span id="_CPPv2N6saltro6limits16KEPLER_MAX_ITERSE"></span><span id="saltro::limits::KEPLER_MAX_ITERS__i"></span><span class="target" id="namespacesaltro_1_1limits_1a85721d17721dbc0bdbd0f79cbbf656ca"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">KEPLER_MAX_ITERS</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">8</span></span><a class="headerlink" href="#_CPPv4N6saltro6limits16KEPLER_MAX_ITERSE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Maximum number of iterations for Kepler equation solver. </p>
+<p>Controls the iteration limit in Newton-Raphson or similar root-finding algorithms when solving the Kepler equation for time of flight problems. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits16KEPLER_TOLERANCEE">
 <span id="_CPPv3N6saltro6limits16KEPLER_TOLERANCEE"></span><span id="_CPPv2N6saltro6limits16KEPLER_TOLERANCEE"></span><span id="saltro::limits::KEPLER_TOLERANCE__double"></span><span class="target" id="namespacesaltro_1_1limits_1ae6af7805baad35750c8804b62ee6944d"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">KEPLER_TOLERANCE</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-10</span></span><a class="headerlink" href="#_CPPv4N6saltro6limits16KEPLER_TOLERANCEE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Convergence tolerance for Kepler equation solver. </p>
+<p>Defines the relative error threshold for terminating iterations in the Kepler equation solver. A value of <span class="math notranslate nohighlight">\(10^{-10}\)</span> ensures double precision accuracy. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits14MAX_NUM_PASSESE">
 <span id="_CPPv3N6saltro6limits14MAX_NUM_PASSESE"></span><span id="_CPPv2N6saltro6limits14MAX_NUM_PASSESE"></span><span id="saltro::limits::MAX_NUM_PASSES__i"></span><span class="target" id="namespacesaltro_1_1limits_1a62bee837ccd2d9d096c1e549f5b17105"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_NUM_PASSES</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">3</span></span><a class="headerlink" href="#_CPPv4N6saltro6limits14MAX_NUM_PASSESE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Maximum number of outer optimization loop passes. </p>
+<p>Constrains the outer iterations in trajectory optimization algorithms such as ALTRO. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits11MAX_NUM_MTQE">
 <span id="_CPPv3N6saltro6limits11MAX_NUM_MTQE"></span><span id="_CPPv2N6saltro6limits11MAX_NUM_MTQE"></span><span id="saltro::limits::MAX_NUM_MTQ__i"></span><span class="target" id="namespacesaltro_1_1limits_1ae2242977713fe7af512d6a60ca891e3d"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_NUM_MTQ</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">4</span></span><a class="headerlink" href="#_CPPv4N6saltro6limits11MAX_NUM_MTQE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Maximum number of magnetorquers (<a class="reference internal" href="pybind/actuators/MTQ.html#classMTQ"><span class="std std-ref">MTQ</span></a>) on the satellite. </p>
+<p>Defines the upper limit for magnetic torque coils that can be attached to the satellite. Used for pre-allocation of control authority vectors. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits10MAX_NUM_RWE">
 <span id="_CPPv3N6saltro6limits10MAX_NUM_RWE"></span><span id="_CPPv2N6saltro6limits10MAX_NUM_RWE"></span><span id="saltro::limits::MAX_NUM_RW__i"></span><span class="target" id="namespacesaltro_1_1limits_1afcec3341439cd24c5309f2ef4d77d77d"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_NUM_RW</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">4</span></span><a class="headerlink" href="#_CPPv4N6saltro6limits10MAX_NUM_RWE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Maximum number of reaction wheels (<a class="reference internal" href="pybind/actuators/RW.html#classRW"><span class="std std-ref">RW</span></a>) on the satellite. </p>
+<p>Defines the upper limit for momentum storage wheels on the satellite. Used for pre-allocation of angular momentum state vectors. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits22MAX_NUM_GEOMETRY_FACESE">
+<span id="_CPPv3N6saltro6limits22MAX_NUM_GEOMETRY_FACESE"></span><span id="_CPPv2N6saltro6limits22MAX_NUM_GEOMETRY_FACESE"></span><span id="saltro::limits::MAX_NUM_GEOMETRY_FACES__i"></span><span class="target" id="namespacesaltro_1_1limits_1a284b5e4cc427a71f4c5d6a67458950c2"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_NUM_GEOMETRY_FACES</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">20</span></span><a class="headerlink" href="#_CPPv4N6saltro6limits22MAX_NUM_GEOMETRY_FACESE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Maximum number of geometric faces for disturbance computation. </p>
+<p>Defines the upper limit for surface elements that can be modeled in aerodynamic drag and solar radiation pressure calculations. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits13MAX_STATE_DIME">
+<span id="_CPPv3N6saltro6limits13MAX_STATE_DIME"></span><span id="_CPPv2N6saltro6limits13MAX_STATE_DIME"></span><span id="saltro::limits::MAX_STATE_DIM__i"></span><span class="target" id="namespacesaltro_1_1limits_1a4eede68af4ff0666974d400c40044e04"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_STATE_DIM</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">7</span></span><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro6limits10MAX_NUM_RWE" title="saltro::limits::MAX_NUM_RW"><span class="n"><span class="pre">MAX_NUM_RW</span></span></a><a class="headerlink" href="#_CPPv4N6saltro6limits13MAX_STATE_DIME" title="Link to this definition">#</a><br /></dt>
+<dd><p>Derived maximum state dimension. </p>
+<p>Equals <span class="math notranslate nohighlight">\(7 + \text{MAX\_NUM\_RW}\)</span>, where 7 accounts for attitude (quaternion) and angular velocity (3D), plus one slot per reaction wheel for momentum storage. Guarantees no heap allocation in fixed-size state containers. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits21MAX_REDUCED_STATE_DIME">
+<span id="_CPPv3N6saltro6limits21MAX_REDUCED_STATE_DIME"></span><span id="_CPPv2N6saltro6limits21MAX_REDUCED_STATE_DIME"></span><span id="saltro::limits::MAX_REDUCED_STATE_DIM__i"></span><span class="target" id="namespacesaltro_1_1limits_1a9e9c692bcf38044531771740d8667bda"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_REDUCED_STATE_DIM</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">6</span></span><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro6limits10MAX_NUM_RWE" title="saltro::limits::MAX_NUM_RW"><span class="n"><span class="pre">MAX_NUM_RW</span></span></a><a class="headerlink" href="#_CPPv4N6saltro6limits21MAX_REDUCED_STATE_DIME" title="Link to this definition">#</a><br /></dt>
+<dd><p>Derived maximum reduced state dimension. </p>
+<p>Equals <span class="math notranslate nohighlight">\(6 + \text{MAX\_NUM\_RW}\)</span>, representing the minimal state needed for optimization (attitude error + angular velocity + <a class="reference internal" href="pybind/actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> momentum). </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits12MAX_CTRL_DIME">
+<span id="_CPPv3N6saltro6limits12MAX_CTRL_DIME"></span><span id="_CPPv2N6saltro6limits12MAX_CTRL_DIME"></span><span id="saltro::limits::MAX_CTRL_DIM__i"></span><span class="target" id="namespacesaltro_1_1limits_1a7aa08019b7367de35bc2a264bc7686b9"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_CTRL_DIM</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro6limits11MAX_NUM_MTQE" title="saltro::limits::MAX_NUM_MTQ"><span class="n"><span class="pre">MAX_NUM_MTQ</span></span></a><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro6limits10MAX_NUM_RWE" title="saltro::limits::MAX_NUM_RW"><span class="n"><span class="pre">MAX_NUM_RW</span></span></a><a class="headerlink" href="#_CPPv4N6saltro6limits12MAX_CTRL_DIME" title="Link to this definition">#</a><br /></dt>
+<dd><p>Derived maximum control input dimension. </p>
+<p>Equals <span class="math notranslate nohighlight">\(\text{MAX\_NUM\_MTQ} + \text{MAX\_NUM\_RW}\)</span>, the total number of control channels (magnetorquer dipoles + reaction wheel torques). </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro6limits18MAX_CONSTRAINT_DIME">
+<span id="_CPPv3N6saltro6limits18MAX_CONSTRAINT_DIME"></span><span id="_CPPv2N6saltro6limits18MAX_CONSTRAINT_DIME"></span><span id="saltro::limits::MAX_CONSTRAINT_DIM__i"></span><span class="target" id="namespacesaltro_1_1limits_1a763a2c0816e24f5be41b9d54c5b17f4f"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MAX_CONSTRAINT_DIM</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><span class="m"><span class="pre">1</span></span><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><span class="m"><span class="pre">2</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro6limits11MAX_NUM_MTQE" title="saltro::limits::MAX_NUM_MTQ"><span class="n"><span class="pre">MAX_NUM_MTQ</span></span></a><span class="w"> </span><span class="o"><span class="pre">+</span></span><span class="w"> </span><span class="m"><span class="pre">5</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro6limits10MAX_NUM_RWE" title="saltro::limits::MAX_NUM_RW"><span class="n"><span class="pre">MAX_NUM_RW</span></span></a><a class="headerlink" href="#_CPPv4N6saltro6limits18MAX_CONSTRAINT_DIME" title="Link to this definition">#</a><br /></dt>
+<dd><p>Derived maximum constraint dimension. </p>
+<p>Equals <span class="math notranslate nohighlight">\(1 + 1 + 2 \cdot \text{MAX\_NUM\_MTQ} + 5 \cdot \text{MAX\_NUM\_RW}\)</span>. Accounts for: angular velocity bound (1), sun pointing constraint (1), <a class="reference internal" href="pybind/actuators/MTQ.html#classMTQ"><span class="std std-ref">MTQ</span></a> dipole bounds (2 per <a class="reference internal" href="pybind/actuators/MTQ.html#classMTQ"><span class="std std-ref">MTQ</span></a>), and <a class="reference internal" href="pybind/actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> constraints: torque limit, momentum limits, and friction (5 per <a class="reference internal" href="pybind/actuators/RW.html#classRW"><span class="std std-ref">RW</span></a>). </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -459,6 +507,11 @@
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro6limits14MAX_NUM_PASSESE"><code class="docutils literal notranslate"><span class="pre">MAX_NUM_PASSES</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro6limits11MAX_NUM_MTQE"><code class="docutils literal notranslate"><span class="pre">MAX_NUM_MTQ</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro6limits10MAX_NUM_RWE"><code class="docutils literal notranslate"><span class="pre">MAX_NUM_RW</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro6limits22MAX_NUM_GEOMETRY_FACESE"><code class="docutils literal notranslate"><span class="pre">MAX_NUM_GEOMETRY_FACES</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro6limits13MAX_STATE_DIME"><code class="docutils literal notranslate"><span class="pre">MAX_STATE_DIM</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro6limits21MAX_REDUCED_STATE_DIME"><code class="docutils literal notranslate"><span class="pre">MAX_REDUCED_STATE_DIM</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro6limits12MAX_CTRL_DIME"><code class="docutils literal notranslate"><span class="pre">MAX_CTRL_DIM</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro6limits18MAX_CONSTRAINT_DIME"><code class="docutils literal notranslate"><span class="pre">MAX_CONSTRAINT_DIM</span></code></a></li>
 </ul>
 </li>
 </ul>

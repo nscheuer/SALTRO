@@ -1,0 +1,6 @@
+tensor
+======
+
+.. doxygenfile:: math/tensor.h
+   :project: saltro
+   :path: ../include/saltro

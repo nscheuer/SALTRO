@@ -7,3 +7,5 @@ math
    integrators/index
    angles
    frames
+   quaternion
+   tensor

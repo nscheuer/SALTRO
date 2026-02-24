@@ -1,0 +1,786 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>geometryconfig &#8212; SALTRO 0.0.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=7026087e"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/disturbances/geometryconfig';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="ggdisturbance" href="ggdisturbance.html" />
+    <link rel="prev" title="dragdisturbance" href="dragdisturbance.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/rexlab.png" class="logo__image only-light" alt=""/>
+    <img src="../../../_static/rexlab.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">SALTRO</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    pybind
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../actuators/index.html">actuators</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/MTQ.html">MTQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/RW.html">RW</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/actuator.html">actuator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="disturbance.html">disturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dragdisturbance.html">dragdisturbance</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">geometryconfig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ggdisturbance.html">ggdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="srpdisturbance.html">srpdisturbance</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../plannersettings.html">plannersettings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../satellite.html">satellite</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">pybind</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">disturbances</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">geometryconfig</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="geometryconfig">
+<h1>geometryconfig<a class="headerlink" href="#geometryconfig" title="Link to this heading">#</a></h1>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv46saltro">
+<span id="_CPPv36saltro"></span><span id="_CPPv26saltro"></span><span id="saltro"></span><span class="target" id="namespacesaltro"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">saltro</span></span></span><br /></dt>
+<dd><dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbancesE">
+<span id="_CPPv3N6saltro12disturbancesE"></span><span id="_CPPv2N6saltro12disturbancesE"></span><span id="saltro::disturbances"></span><span class="target" id="namespacesaltro_1_1disturbances"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">disturbances</span></span></span><br /></dt>
+<dd><dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfigE">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfigE"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfigE"></span><span id="saltro::disturbances::GeometryConfig"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GeometryConfig</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfigE" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;geometryconfig.h&gt;</em></div>
+<p>Static, flight-safe configuration for satellite geometry. </p>
+<p>The <a class="reference internal" href="#classsaltro_1_1disturbances_1_1GeometryConfig"><span class="std std-ref">GeometryConfig</span></a> class defines the geometric and aerodynamic properties of the satellite’s external surfaces. This configuration is used by disturbance models (e.g., drag, solar radiation pressure) to compute forces and torques.</p>
+<p>This implementation uses static allocation with a maximum number of faces defined by <a class="reference internal" href="../../limits.html#namespacesaltro_1_1limits_1a284b5e4cc427a71f4c5d6a67458950c2"><span class="std std-ref">saltro::limits::MAX_NUM_GEOMETRY_FACES</span></a>, ensuring no dynamic memory allocation occurs during runtime (flight-safe). </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig4Vec3E">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig4Vec3E"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig4Vec3E"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a32e81a4f366fa1342fa2ad39666bb93f"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Vec3</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig4Vec3E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig9FaceArrayE">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig9FaceArrayE"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig9FaceArrayE"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a37c0f3a4ae20bf023715b2176ac02b6e"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FaceArray</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N6saltro12disturbances12GeometryFaceE" title="saltro::disturbances::GeometryFace"><span class="n"><span class="pre">GeometryFace</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../../constants/constants.html#_CPPv46saltro" title="saltro"><span class="n"><span class="pre">saltro</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../../limits.html#_CPPv4N6saltro6limitsE" title="saltro::limits"><span class="n"><span class="pre">limits</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../../limits.html#_CPPv4N6saltro6limits22MAX_NUM_GEOMETRY_FACESE" title="saltro::limits::MAX_NUM_GEOMETRY_FACES"><span class="n"><span class="pre">MAX_NUM_GEOMETRY_FACES</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig9FaceArrayE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig14GeometryConfigEv">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig14GeometryConfigEv"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig14GeometryConfigEv"></span><span id="saltro::disturbances::GeometryConfig::GeometryConfig"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a7f797edcbac7198e72761040e6518279"></span><span class="sig-name descname"><span class="n"><span class="pre">GeometryConfig</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig14GeometryConfigEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Default constructor creates an empty geometry configuration. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig7addFaceERK12GeometryFace">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig7addFaceERK12GeometryFace"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig7addFaceERK12GeometryFace"></span><span id="saltro::disturbances::GeometryConfig::addFace__GeometryFaceCR"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a135826531e2680c30679794e57151197"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">addFace</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro12disturbances12GeometryFaceE" title="saltro::disturbances::GeometryFace"><span class="n"><span class="pre">GeometryFace</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">face</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig7addFaceERK12GeometryFace" title="Link to this definition">#</a><br /></dt>
+<dd><p>Add a face to the geometry configuration. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>face</strong> – The <a class="reference internal" href="#structsaltro_1_1disturbances_1_1GeometryFace"><span class="std std-ref">GeometryFace</span></a> to add </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>true if face was added successfully, false if max capacity reached </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6saltro12disturbances14GeometryConfig8numFacesEv">
+<span id="_CPPv3NK6saltro12disturbances14GeometryConfig8numFacesEv"></span><span id="_CPPv2NK6saltro12disturbances14GeometryConfig8numFacesEv"></span><span id="saltro::disturbances::GeometryConfig::numFacesC"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a0808ec1fcfe2fd88514d69c2dba2817f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">numFaces</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6saltro12disturbances14GeometryConfig8numFacesEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the number of faces currently configured. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of faces </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6saltro12disturbances14GeometryConfig7getFaceE6size_t">
+<span id="_CPPv3NK6saltro12disturbances14GeometryConfig7getFaceE6size_t"></span><span id="_CPPv2NK6saltro12disturbances14GeometryConfig7getFaceE6size_t"></span><span id="saltro::disturbances::GeometryConfig::getFace__sC"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a702cacc72cbe8ed3ca116bbaf2f9d5ed"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro12disturbances12GeometryFaceE" title="saltro::disturbances::GeometryFace"><span class="n"><span class="pre">GeometryFace</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">getFace</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">index</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6saltro12disturbances14GeometryConfig7getFaceE6size_t" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get a reference to a specific face. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>index</strong> – Face index [0, <a class="reference internal" href="#classsaltro_1_1disturbances_1_1GeometryConfig_1a0808ec1fcfe2fd88514d69c2dba2817f"><span class="std std-ref">numFaces()</span></a>) </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reference to the <a class="reference internal" href="#structsaltro_1_1disturbances_1_1GeometryFace"><span class="std std-ref">GeometryFace</span></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig7getFaceE6size_t">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig7getFaceE6size_t"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig7getFaceE6size_t"></span><span id="saltro::disturbances::GeometryConfig::getFace__s"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a5a447d49b85a4e4fc9636551d9141169"></span><a class="reference internal" href="#_CPPv4N6saltro12disturbances12GeometryFaceE" title="saltro::disturbances::GeometryFace"><span class="n"><span class="pre">GeometryFace</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">getFace</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">index</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig7getFaceE6size_t" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get mutable reference to a specific face. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>index</strong> – Face index [0, <a class="reference internal" href="#classsaltro_1_1disturbances_1_1GeometryConfig_1a0808ec1fcfe2fd88514d69c2dba2817f"><span class="std std-ref">numFaces()</span></a>) </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reference to the <a class="reference internal" href="#structsaltro_1_1disturbances_1_1GeometryFace"><span class="std std-ref">GeometryFace</span></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig5clearEv">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig5clearEv"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig5clearEv"></span><span id="saltro::disturbances::GeometryConfig::clear"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a806ccd4fdd86ecf7c6f88de4b3214967"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">clear</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig5clearEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Clear all faces from the configuration. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6saltro12disturbances14GeometryConfig5facesEv">
+<span id="_CPPv3NK6saltro12disturbances14GeometryConfig5facesEv"></span><span id="_CPPv2NK6saltro12disturbances14GeometryConfig5facesEv"></span><span id="saltro::disturbances::GeometryConfig::facesC"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a0f2d555df45d8f634f04136a135c92e3"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro12disturbances14GeometryConfig9FaceArrayE" title="saltro::disturbances::GeometryConfig::FaceArray"><span class="n"><span class="pre">FaceArray</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">faces</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6saltro12disturbances14GeometryConfig5facesEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Direct access to the underlying face array (const). </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Const reference to the face array </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig5facesEv">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig5facesEv"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig5facesEv"></span><span id="saltro::disturbances::GeometryConfig::faces"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a7fa60277d71b838cb2906ac023fb5959"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro12disturbances14GeometryConfig9FaceArrayE" title="saltro::disturbances::GeometryConfig::FaceArray"><span class="n"><span class="pre">FaceArray</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">faces</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig5facesEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Direct access to the underlying face array (mutable). </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Reference to the face array </p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-static-functions">Public Static Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig8maxFacesEv">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig8maxFacesEv"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig8maxFacesEv"></span><span id="saltro::disturbances::GeometryConfig::maxFacesCE"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a0141dbf1c5cc369ee130a4c24bc678f6"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">maxFaces</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig8maxFacesEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the maximum number of faces that can be stored. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Maximum capacity </p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-private-members">Private Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig6faces_E">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig6faces_E"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig6faces_E"></span><span id="saltro::disturbances::GeometryConfig::faces___FaceArray"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1a405a865d9bcc2fa2ed09247a72c07d42"></span><a class="reference internal" href="#_CPPv4N6saltro12disturbances14GeometryConfig9FaceArrayE" title="saltro::disturbances::GeometryConfig::FaceArray"><span class="n"><span class="pre">FaceArray</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">faces_</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig6faces_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Static array of geometry faces. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances14GeometryConfig10num_faces_E">
+<span id="_CPPv3N6saltro12disturbances14GeometryConfig10num_faces_E"></span><span id="_CPPv2N6saltro12disturbances14GeometryConfig10num_faces_E"></span><span id="saltro::disturbances::GeometryConfig::num_faces___s"></span><span class="target" id="classsaltro_1_1disturbances_1_1GeometryConfig_1ac54fe998c6e48236704a249e819c19ea"></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">num_faces_</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances14GeometryConfig10num_faces_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Current number of active faces. </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFaceE">
+<span id="_CPPv3N6saltro12disturbances12GeometryFaceE"></span><span id="_CPPv2N6saltro12disturbances12GeometryFaceE"></span><span id="saltro::disturbances::GeometryFace"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">GeometryFace</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFaceE" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;geometryconfig.h&gt;</em></div>
+<p>Represents a single geometric face/surface element of a satellite. </p>
+<p>Each face has:<ul class="simple">
+<li><p>Geometric properties: area, centroid, normal vector</p></li>
+<li><p>Optical properties: specular (eta_s), diffuse (eta_d), absorptivity (eta_a)</p></li>
+<li><p>Aerodynamic properties: drag coefficient (CD) </p></li>
+</ul>
+</p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace4Vec3E">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace4Vec3E"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace4Vec3E"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1a2772112699a303146daa720341288406"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Vec3</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace4Vec3E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace12GeometryFaceEv">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace12GeometryFaceEv"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace12GeometryFaceEv"></span><span id="saltro::disturbances::GeometryFace::GeometryFace"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1af54e33a6494f445e7fc514bc20d52a35"></span><span class="sig-name descname"><span class="n"><span class="pre">GeometryFace</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace12GeometryFaceEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Default constructor initializes all values to zero. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace12GeometryFaceEdRK4Vec3RK4Vec3dddd">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace12GeometryFaceEdRK4Vec3RK4Vec3dddd"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace12GeometryFaceEdRK4Vec3RK4Vec3dddd"></span><span id="saltro::disturbances::GeometryFace::GeometryFace__double.Vec3CR.Vec3CR.double.double.double.double"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1a5baa7a7de23c65eb37ae6897fb8af692"></span><span class="sig-name descname"><span class="n"><span class="pre">GeometryFace</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">area_</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro12disturbances12GeometryFace4Vec3E" title="saltro::disturbances::GeometryFace::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">centroid_</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6saltro12disturbances12GeometryFace4Vec3E" title="saltro::disturbances::GeometryFace::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">normal_</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">eta_s_</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">eta_d_</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">eta_a_</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">CD_</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace12GeometryFaceEdRK4Vec3RK4Vec3dddd" title="Link to this definition">#</a><br /></dt>
+<dd><p>Construct a <a class="reference internal" href="#structsaltro_1_1disturbances_1_1GeometryFace"><span class="std std-ref">GeometryFace</span></a> with specified parameters. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>area_</strong> – Surface area [m²] </p></li>
+<li><p><strong>centroid_</strong> – Centroid position vector [m] </p></li>
+<li><p><strong>normal_</strong> – Surface normal unit vector </p></li>
+<li><p><strong>eta_s_</strong> – Specular reflection coefficient (default: 0) </p></li>
+<li><p><strong>eta_d_</strong> – Diffuse reflection coefficient (default: 0) </p></li>
+<li><p><strong>eta_a_</strong> – Absorptivity coefficient (default: 0) </p></li>
+<li><p><strong>CD_</strong> – Drag coefficient (default: 0) </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace4areaE">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace4areaE"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace4areaE"></span><span id="saltro::disturbances::GeometryFace::area__double"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1aef667141a4842e23c6bcc5b70d09701d"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">area</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace4areaE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Surface area [m²]. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace8centroidE">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace8centroidE"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace8centroidE"></span><span id="saltro::disturbances::GeometryFace::centroid__Vec3"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1ad5d6b9f1f9ef1ac5371d901a8f3ddcee"></span><a class="reference internal" href="#_CPPv4N6saltro12disturbances12GeometryFace4Vec3E" title="saltro::disturbances::GeometryFace::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">centroid</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace8centroidE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Centroid position in body frame [m]. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace6normalE">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace6normalE"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace6normalE"></span><span id="saltro::disturbances::GeometryFace::normal__Vec3"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1a5bf30633fd5a34bc609c550f0ea4fbf7"></span><a class="reference internal" href="#_CPPv4N6saltro12disturbances12GeometryFace4Vec3E" title="saltro::disturbances::GeometryFace::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">normal</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace6normalE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Surface normal unit vector in body frame. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace5eta_sE">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace5eta_sE"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace5eta_sE"></span><span id="saltro::disturbances::GeometryFace::eta_s__double"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1ab7d5b0ae6d12bccdafccb16ee5723938"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">eta_s</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace5eta_sE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Specular reflection coefficient [0-1]. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace5eta_dE">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace5eta_dE"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace5eta_dE"></span><span id="saltro::disturbances::GeometryFace::eta_d__double"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1ac5b9afa117952719247d9ae5e99bc7b1"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">eta_d</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace5eta_dE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Diffuse reflection coefficient [0-1]. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace5eta_aE">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace5eta_aE"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace5eta_aE"></span><span id="saltro::disturbances::GeometryFace::eta_a__double"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1a7d418ddd504e0a54ebb166869bbf7835"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">eta_a</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace5eta_aE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Absorptivity coefficient [0-1]. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro12disturbances12GeometryFace2CDE">
+<span id="_CPPv3N6saltro12disturbances12GeometryFace2CDE"></span><span id="_CPPv2N6saltro12disturbances12GeometryFace2CDE"></span><span id="saltro::disturbances::GeometryFace::CD__double"></span><span class="target" id="structsaltro_1_1disturbances_1_1GeometryFace_1a80bd958187342f9ed4b3e523ae6ca1c2"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">CD</span></span></span><a class="headerlink" href="#_CPPv4N6saltro12disturbances12GeometryFace2CDE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Drag coefficient. </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="dragdisturbance.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">dragdisturbance</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="ggdisturbance.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">ggdisturbance</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv46saltro"><code class="docutils literal notranslate"><span class="pre">saltro</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbancesE"><code class="docutils literal notranslate"><span class="pre">saltro::disturbances</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfigE"><code class="docutils literal notranslate"><span class="pre">saltro::disturbances::GeometryConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig4Vec3E"><code class="docutils literal notranslate"><span class="pre">Vec3</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig9FaceArrayE"><code class="docutils literal notranslate"><span class="pre">FaceArray</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig14GeometryConfigEv"><code class="docutils literal notranslate"><span class="pre">GeometryConfig()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig7addFaceERK12GeometryFace"><code class="docutils literal notranslate"><span class="pre">addFace()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro12disturbances14GeometryConfig8numFacesEv"><code class="docutils literal notranslate"><span class="pre">numFaces()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro12disturbances14GeometryConfig7getFaceE6size_t"><code class="docutils literal notranslate"><span class="pre">getFace()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig7getFaceE6size_t"><code class="docutils literal notranslate"><span class="pre">getFace()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig5clearEv"><code class="docutils literal notranslate"><span class="pre">clear()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro12disturbances14GeometryConfig5facesEv"><code class="docutils literal notranslate"><span class="pre">faces()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig5facesEv"><code class="docutils literal notranslate"><span class="pre">faces()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig8maxFacesEv"><code class="docutils literal notranslate"><span class="pre">maxFaces()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig6faces_E"><code class="docutils literal notranslate"><span class="pre">faces_</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances14GeometryConfig10num_faces_E"><code class="docutils literal notranslate"><span class="pre">num_faces_</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFaceE"><code class="docutils literal notranslate"><span class="pre">saltro::disturbances::GeometryFace</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace4Vec3E"><code class="docutils literal notranslate"><span class="pre">Vec3</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace12GeometryFaceEv"><code class="docutils literal notranslate"><span class="pre">GeometryFace()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace12GeometryFaceEdRK4Vec3RK4Vec3dddd"><code class="docutils literal notranslate"><span class="pre">GeometryFace()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace4areaE"><code class="docutils literal notranslate"><span class="pre">area</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace8centroidE"><code class="docutils literal notranslate"><span class="pre">centroid</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace6normalE"><code class="docutils literal notranslate"><span class="pre">normal</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace5eta_sE"><code class="docutils literal notranslate"><span class="pre">eta_s</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace5eta_dE"><code class="docutils literal notranslate"><span class="pre">eta_d</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace5eta_aE"><code class="docutils literal notranslate"><span class="pre">eta_a</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro12disturbances12GeometryFace2CDE"><code class="docutils literal notranslate"><span class="pre">CD</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/api/pybind/disturbances/geometryconfig.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Niclas Scheuer, Patrick McKeen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>
