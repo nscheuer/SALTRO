@@ -75,6 +75,16 @@ public:
                               saltro::limits::MAX_CTRL_DIM,
                               saltro::limits::MAX_STATE_DIM>;
 
+    using ConstrHessXX = saltro::math::Tensor3<saltro::limits::MAX_STATE_DIM,
+                              saltro::limits::MAX_STATE_DIM,
+                              saltro::limits::MAX_CONSTRAINT_DIM>;
+    using ConstrHessUX = saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
+                              saltro::limits::MAX_STATE_DIM,
+                              saltro::limits::MAX_CONSTRAINT_DIM>;
+    using ConstrHessUU = saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
+                              saltro::limits::MAX_CTRL_DIM,
+                              saltro::limits::MAX_CONSTRAINT_DIM>;
+
     /**
      * @brief Index of angular velocity in state vector.
      * 
@@ -434,6 +444,17 @@ public:
      * 
      * Returns constraint violation vector. Zero means satisfied.
      * Constraints include angular velocity limits, actuator saturations, sun avoidance.
+        * 
+        * Constraint ordering:
+        * 1) Angular velocity magnitude constraint
+        * 2) Sun-avoidance constraint (body +X boresight)
+        * 3) If k < N-1: control and RW constraints in this order:
+        *    - MTQ upper/lower bounds (2 per MTQ)
+        *    - RW torque upper/lower bounds (2 per RW)
+        *    - RW momentum upper/lower bounds (2 per RW)
+        *    - RW stiction proxy (1 per RW)
+        * 
+        * All constraints are formulated as c <= 0.
      * 
      * @param k Time step.
      * @param N Total steps.
@@ -469,9 +490,9 @@ public:
      * @param u Control.
      * @param sun_eci Sun in ECI.
      * @param cnst_cfg Constraint configuration.
-     * @return Tuple of Hessian matrices.
+     * @return Tuple of Hessian tensors (Huu, Hux, Hxx).
      */
-    std::tuple<MatX, MatX, MatX> constraintHessians(int k, int N, const VecX& x, const VecX& u, 
+    std::tuple<ConstrHessUU, ConstrHessUX, ConstrHessXX> constraintHessians(int k, int N, const VecX& x, const VecX& u, 
                                                     const Vec3& sun_eci, const ConstraintConfig& cnst_cfg) const;
 
 private:
