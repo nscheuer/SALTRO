@@ -5,6 +5,7 @@
 #include <pybind11/stl.h>
 
 #include <saltro/pybind/satellite.h>
+#include "tensor_py.h"  // Include tensor type caster for Hessian return types
 
 namespace py = pybind11;
 
