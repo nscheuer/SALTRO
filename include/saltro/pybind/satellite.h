@@ -52,6 +52,7 @@ public:
     using Vec3 = Eigen::Vector3d;
     using Vec4 = Eigen::Vector4d;
     using Vec7 = Eigen::Matrix<double, 7, 1>;
+    using Mat13 = Eigen::Matrix<double, 1, 3>;
     using Mat33 = Eigen::Matrix3d;
     using Mat34 = Eigen::Matrix<double, 3, 4>;
     using Mat43 = Eigen::Matrix<double, 4, 3>;
@@ -351,10 +352,16 @@ public:
      * @param x State.
      * @param u Control.
      * @param dist Disturbances.
+     * @param R_eci Position vector (ECI).
+     * @param B_eci Magnetic field (ECI).
+     * @param S_eci Sun direction (ECI).
+     * @param V_eci Velocity (ECI).
      * @return Tuple of Jacobian matrices (Fx, Fu, Fd).
      */
     std::tuple<MatX, MatX, MatX> dynamicsJacobians(const VecX& x, const VecX& u, 
-                                                   const DisturbanceConfig& dist) const;
+                                                   const DisturbanceConfig& dist,
+                                                   const Vec3& R_eci, const Vec3& B_eci,
+                                                   const Vec3& S_eci, const Vec3& V_eci) const;
     
     /**
      * @brief Compute dynamics Hessians (second derivatives).
@@ -362,10 +369,16 @@ public:
      * @param x State.
      * @param u Control.
      * @param dist Disturbances.
+     * @param R_eci Position vector (ECI).
+     * @param B_eci Magnetic field (ECI).
+     * @param S_eci Sun direction (ECI).
+     * @param V_eci Velocity (ECI).
      * @return Tuple of Hessian tensors (Hxx, Hux, Huu).
      */
     std::tuple<DynHessXX, DynHessUX, DynHessUU> dynamicsHessians(const VecX& x, const VecX& u, 
-                                                                 const DisturbanceConfig& dist) const;
+                                                                 const DisturbanceConfig& dist,
+                                                                 const Vec3& R_eci, const Vec3& B_eci,
+                                                                 const Vec3& S_eci, const Vec3& V_eci) const;
 
     /**
      * @brief Compute stage cost (intermediate time step).
