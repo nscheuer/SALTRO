@@ -225,7 +225,9 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     c(idx++) = (w.squaredNorm() - wmax * wmax) / (wmax * wmax);
 
     const double sun_limit = std::clamp(cnst_cfg.sun_limit_angle, 0.0, M_PI);
-    const Vec4 q = x.segment<4>(QUAT_INDEX);
+    const Vec4 q_raw = x.segment<4>(QUAT_INDEX);
+    const double q_norm = q_raw.norm();
+    const Vec4 q = (q_norm > 1e-12) ? (q_raw / q_norm) : q_raw;
     const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
     const double sun_norm = sun_eci.norm();
     if (std::isfinite(sun_norm) && sun_norm > 1e-12) {
@@ -319,14 +321,24 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
     // 2) Sun constraint Jacobian: ∂/∂q of (R(q)^T * sun).x - cos(limit)
     const double sun_norm = sun_eci.norm();
     if (std::isfinite(sun_norm) && sun_norm > 1e-12) {
-        const Vec4 q = x.segment<4>(QUAT_INDEX);
-        const Vec3 sun_unit = sun_eci / sun_norm;
-        
-        // Derivative of (R^T * sun) w.r.t. q is a 4×3 matrix
-        const Mat34 dRTsun_dq = saltro::math::drotmatTvecdq(q, sun_unit).transpose();
-        
-        // We only care about the x-component, so take first row
-        c_x.block<1, 4>(idx, QUAT_INDEX) = dRTsun_dq.row(0);
+        const Vec4 q_raw = x.segment<4>(QUAT_INDEX);
+        const double q_norm = q_raw.norm();
+        if (q_norm > 1e-12) {
+            const Vec4 q = q_raw / q_norm;
+            const Vec3 sun_unit = sun_eci / sun_norm;
+
+            // Derivative of (R^T * sun) w.r.t. unit quaternion.
+            const Mat34 dRTsun_dq = saltro::math::drotmatTvecdq(q, sun_unit).transpose();
+
+            // Chain rule: q -> q / ||q||.
+            const Eigen::Matrix4d Jnorm = (1.0 / q_norm) *
+                                           (Eigen::Matrix4d::Identity() -
+                                            (q_raw * q_raw.transpose()) / (q_norm * q_norm));
+            const Mat34 dRTsun_dqraw = dRTsun_dq * Jnorm;
+
+            // We only care about the x-component, so take first row.
+            c_x.block<1, 4>(idx, QUAT_INDEX) = dRTsun_dqraw.row(0);
+        }
     }
     idx++;
 
@@ -438,17 +450,31 @@ Satellite::constraintHessians(
     H_xx.slice(idx).block<3, 3>(AV_INDEX, AV_INDEX) = scale_av * Mat33::Identity();
     idx++;
 
-    // 2) Sun constraint Hessian: ∂²/∂q² of (R(q)^T * sun).x - cos(limit)
+    // 2) Sun constraint Hessian: computed numerically to match normalization-aware Jacobian
     const double sun_norm = sun_eci.norm();
+    const int sun_idx = idx;
     if (std::isfinite(sun_norm) && sun_norm > 1e-12) {
-        const Vec4 q = x.segment<4>(QUAT_INDEX);
-        const Vec3 sun_unit = sun_eci / sun_norm;
-        
-        // Second derivative of (R^T * sun) w.r.t. q
-        const auto d2RTsun_dq2 = saltro::math::ddrotmatTvecdqdq(q, sun_unit);
-        
-        // Only x-component matters
-        H_xx.slice(idx).block<4, 4>(QUAT_INDEX, QUAT_INDEX) = d2RTsun_dq2[0];
+        const double eps = 1e-7;
+        for (int j = 0; j < stateDim(); ++j) {
+            VecX xp = x; xp(j) += eps;
+            VecX xm = x; xm(j) -= eps;
+            if (j >= QUAT_INDEX && j < QUAT_INDEX + 4) {
+                Vec4 qxp = xp.segment<4>(QUAT_INDEX);
+                Vec4 qxm = xm.segment<4>(QUAT_INDEX);
+                qxp.normalize();
+                qxm.normalize();
+                xp.segment<4>(QUAT_INDEX) = qxp;
+                xm.segment<4>(QUAT_INDEX) = qxm;
+            }
+
+            auto [_, c_xp] = constraintJacobians(k, N, xp, u, sun_eci, cnst_cfg);
+            auto [_2, c_xm] = constraintJacobians(k, N, xm, u, sun_eci, cnst_cfg);
+            const Eigen::VectorXd fd_row =
+                (c_xp.row(sun_idx) - c_xm.row(sun_idx)).transpose() / (2.0 * eps);
+            auto col = H_xx.slice(sun_idx).col(j);
+            col.setZero();
+            col.head(stateDim()) = fd_row;
+        }
     }
     idx++;
 
