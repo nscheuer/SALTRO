@@ -1,8 +1,17 @@
 # Installation
 ```bash
-sudo apt install cmake
-sudo apt install ninja-build
-sudo apt install ccache
+sudo apt update
+sudo apt upgrade
+sudo apt install cmake ccache
+sudo apt install -y build-essential python3-dev
+```
+
+# Virtual Environment for Python interface
+```bash
+sudo apt install python3-venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
 # Compile
