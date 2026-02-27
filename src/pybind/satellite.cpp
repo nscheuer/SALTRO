@@ -104,9 +104,10 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
     Vec3 torque = Vec3::Zero();
     
     // Extract base state (first 7 elements: w + q)
+    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     Vec7 x_base = x.head<7>();
-    
-    Vec4 q = x.segment<4>(QUAT_INDEX);
+    x_base.segment<4>(QUAT_INDEX) = q;
+
     Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
     Vec3 B_body = R_T * B_eci;
     
@@ -132,8 +133,9 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
 
 Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 torque = Vec3::Zero();
+    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     Vec7 x_base = x.head<7>();
-    Vec4 q = x.segment<4>(QUAT_INDEX);
+    x_base.segment<4>(QUAT_INDEX) = q;
 
     Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
     Vec3 V_body = R_T * V_eci;
@@ -167,7 +169,7 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
 
 Satellite::VecX Satellite::dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 w = x.segment<3>(AV_INDEX);
-    Vec4 q = x.segment<4>(QUAT_INDEX);
+    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     Vec3 tau_act = actuatorTorque(x, u, B_eci);
     Vec3 tau_dist = disturbanceTorque(x, dist, R_eci, B_eci, S_eci, V_eci, rho);
     Vec3 h_rw = Vec3::Zero();
@@ -215,9 +217,10 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamic
     
     // Extract state components
     Vec3 w = x.segment<3>(AV_INDEX);
-    Vec4 q = x.segment<4>(QUAT_INDEX);
+    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     Vec7 x_base = x.head<7>();
-    
+    x_base.segment<4>(QUAT_INDEX) = q;
+
     // Compute rotation matrix and body-frame vectors (flight-safe)
     Mat33 R = saltro::math::rotationMatrix(q);
     Mat33 R_T = R.transpose();
@@ -457,6 +460,20 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamic
         }
     }
     
+    // =========================================================================
+    // Normalization projection for quaternion input columns
+    // =========================================================================
+    // dynamics() normalizes q internally (q → q/|q|), so the effective Jacobian
+    // w.r.t. a raw quaternion perturbation δq_k is:
+    //   ∂f/∂q_k_raw = Σ_l (∂f/∂q_l_norm) * (I - q*q^T)_{lk}
+    // i.e., right-multiply the quaternion input columns by (I - q*q^T).
+    {
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+        Mat44 proj_q = Mat44::Identity() - q * q.transpose();
+        jac_x.block(0, QUAT_INDEX, nx, 4) =
+            jac_x.block(0, QUAT_INDEX, nx, 4) * proj_q;
+    }
+
     return std::make_tuple(jac_x, jac_u, jac_dist);
 }
 
@@ -477,9 +494,10 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     
     // Extract state components
     Vec3 w = x.segment<3>(AV_INDEX);
-    Vec4 q = x.segment<4>(QUAT_INDEX);
+    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     Vec7 x_base = x.head<7>();
-    
+    x_base.segment<4>(QUAT_INDEX) = q;
+
     // Compute rotation matrix and body-frame vectors (flight-safe)
     Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
     Vec3 B_body = R_T * B_eci;
@@ -689,27 +707,27 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     
     Mat43 W = saltro::math::findWMat(q);
     
-    // ∂²qdot/∂w∂w = 0 (linear in w)
-    // ∂²qdot_i/∂q_j∂w_k = 0.5 * ∂W_ij/∂q_j applied to w_k
-    // Compute from the result of Jacobian computation
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            for (int k = 0; k < 3; ++k) {
-                // ∂²qdot_i/∂q_j∂w_k = 0.5 * (∂²W_ij/∂q_j∂w_k)
-                // Since W matrices are linear in w, this is just ∂W_ik/∂q_j
-                // Already computed in quaternion Jacobian as: 2 * jac_x(i, j)
-                // We need the (i,k) element of ∂W/∂q_j
-                // This is captured implicitly in quaternion Jacobian expansion
-                // Set to zero for now as this is very small effect
-                hess_xx.slice(QUAT_INDEX + i)(QUAT_INDEX + j, AV_INDEX + k) = 0.0;
-                hess_xx.slice(QUAT_INDEX + i)(AV_INDEX + k, QUAT_INDEX + j) = 0.0;
-            }
-        }
-        // ∂²qdot_i/∂q_j∂q_k terms: second derivatives of W matrix
-        for (int j = 0; j < 4; ++j) {
-            for (int k = 0; k < 4; ++k) {
-                hess_xx.slice(QUAT_INDEX + i)(QUAT_INDEX + j, QUAT_INDEX + k) = 0.0;
-            }
+    // ∂²qdot/∂w∂w = 0 (qdot is linear in w)
+    // ∂²qdot/∂q∂q = 0 (W is linear in q, so second q-derivatives vanish)
+    //
+    // ∂²qdot_r/(∂q_j ∂w_k) = 0.5 * ∂W[r,k]/∂q_j  (NON-ZERO due to bilinear structure)
+    //
+    // W matrix:
+    //   W = [[-q1, -q2, -q3],
+    //        [ q0, -q3,  q2],
+    //        [ q3,  q0, -q1],
+    //        [-q2,  q1,  q0]]
+    //
+    // Each entry W[r,k] = sign * q[j], encoded as W_qidx[r][k]=j, W_sign[r][k]=sign:
+    static const int    W_qidx[4][3] = {{1,2,3},{0,3,2},{3,0,1},{2,1,0}};
+    static const double W_sign[4][3] = {{-1,-1,-1},{+1,-1,+1},{+1,+1,-1},{-1,+1,+1}};
+
+    for (int r = 0; r < 4; ++r) {
+        for (int k = 0; k < 3; ++k) {
+            int j = W_qidx[r][k];
+            double val = 0.5 * W_sign[r][k];
+            hess_xx.slice(QUAT_INDEX + r)(QUAT_INDEX + j, AV_INDEX + k) = val;
+            hess_xx.slice(QUAT_INDEX + r)(AV_INDEX + k, QUAT_INDEX + j) = val;
         }
     }
     
@@ -845,6 +863,33 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
         }
     }
     
+    // =========================================================================
+    // Normalization projection for quaternion input directions
+    // =========================================================================
+    // Mirrors the projection applied in dynamicsJacobians().
+    // For each output-component slice, apply (I - q*q^T) to:
+    //   - quaternion columns of hess_xx (right multiply)
+    //   - quaternion rows   of hess_xx (left  multiply)
+    //   - quaternion columns of hess_ux  (right multiply)
+    {
+        constexpr int NX = saltro::limits::MAX_STATE_DIM;
+        constexpr int NU = saltro::limits::MAX_CTRL_DIM;
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+        const Mat44 proj_q = Mat44::Identity() - q * q.transpose();
+        for (int si = 0; si < nx; ++si) {
+            auto& Hxx = hess_xx.slice(si);
+            // Right-project quaternion columns
+            Hxx.template block<NX, 4>(0, QUAT_INDEX) =
+                Hxx.template block<NX, 4>(0, QUAT_INDEX) * proj_q;
+            // Left-project quaternion rows
+            Hxx.template block<4, NX>(QUAT_INDEX, 0) =
+                proj_q * Hxx.template block<4, NX>(QUAT_INDEX, 0);
+            // Right-project quaternion columns of hess_ux
+            hess_ux.slice(si).template block<NU, 4>(0, QUAT_INDEX) =
+                hess_ux.slice(si).template block<NU, 4>(0, QUAT_INDEX) * proj_q;
+        }
+    }
+
     return std::make_tuple(hess_xx, hess_ux, hess_uu);
 }
 

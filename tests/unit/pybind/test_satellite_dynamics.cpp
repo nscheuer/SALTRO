@@ -691,13 +691,8 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. state matches finite
         x_plus(j) += eps;
         x_minus(j) -= eps;
         
-        // Renormalize quaternion after perturbation
-        Eigen::Vector4d q_plus = x_plus.segment<4>(Satellite::QUAT_INDEX);
-        Eigen::Vector4d q_minus = x_minus.segment<4>(Satellite::QUAT_INDEX);
-        q_plus.normalize();
-        q_minus.normalize();
-        x_plus.segment<4>(Satellite::QUAT_INDEX) = q_plus;
-        x_minus.segment<4>(Satellite::QUAT_INDEX) = q_minus;
+        // No external renormalization: dynamics() normalizes q internally, and the
+        // analytical Jacobian already accounts for the normalization projection.
         
         Satellite::VecX f_plus = sat.dynamics(x_plus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
         Satellite::VecX f_minus = sat.dynamics(x_minus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
@@ -706,8 +701,9 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. state matches finite
     }
     
     // Compare analytical vs numerical
-    const double rel_tol = 0.50;  // 50% relative tolerance (for now - these are finite diff tests)
-    const double abs_tol = 1e-5;  // Absolute tolerance
+    // FD truncation error is O(eps^2) ~ 1e-12; round-off O(eps_mach/eps) ~ 1e-10.
+    const double rel_tol = 1e-5;
+    const double abs_tol = 1e-9;
     
     for (int i = 0; i < nx; ++i) {
         for (int j = 0; j < nx; ++j) {
@@ -769,8 +765,8 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. control matches fini
     }
     
     // Compare analytical vs numerical
-    const double rel_tol = 0.05;  // 5% relative tolerance
-    const double abs_tol = 1e-7;
+    const double rel_tol = 1e-5;
+    const double abs_tol = 1e-9;
     
     for (int i = 0; i < nx; ++i) {
         for (int j = 0; j < nu; ++j) {
@@ -822,13 +818,7 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. state with disturban
         x_plus(j) += eps;
         x_minus(j) -= eps;
         
-        // Renormalize quaternion after perturbation
-        Eigen::Vector4d q_plus = x_plus.segment<4>(Satellite::QUAT_INDEX);
-        Eigen::Vector4d q_minus = x_minus.segment<4>(Satellite::QUAT_INDEX);
-        q_plus.normalize();
-        q_minus.normalize();
-        x_plus.segment<4>(Satellite::QUAT_INDEX) = q_plus;
-        x_minus.segment<4>(Satellite::QUAT_INDEX) = q_minus;
+        // No external renormalization: dynamics() normalizes q internally.
         
         Satellite::VecX f_plus = sat.dynamics(x_plus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
         Satellite::VecX f_minus = sat.dynamics(x_minus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
@@ -836,9 +826,9 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. state with disturban
         jac_x_numerical.col(j) = (f_plus - f_minus) / (2.0 * eps);
     }
     
-    // Compare analytical vs numerical (note: disturbances add complexity, use looser tolerance)
-    const double rel_tol = 0.50;  // 50% relative tolerance (for now - these are finite diff tests)
-    const double abs_tol = 1e-5;
+    // Compare analytical vs numerical
+    const double rel_tol = 1e-5;
+    const double abs_tol = 1e-9;
     
     for (int i = 0; i < nx; ++i) {
         for (int j = 0; j < nx; ++j) {
@@ -1003,12 +993,7 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian w.r.t. state matches finite 
             x_mp(j1) -= eps; x_mp(j2) += eps;
             x_mm(j1) -= eps; x_mm(j2) -= eps;
             
-            // Renormalize quaternions after perturbation
-            for (auto& x_var : {&x_pp, &x_pm, &x_mp, &x_mm}) {
-                Eigen::Vector4d q = x_var->segment<4>(Satellite::QUAT_INDEX);
-                q.normalize();
-                x_var->segment<4>(Satellite::QUAT_INDEX) = q;
-            }
+            // No external renormalization: dynamics() normalizes q internally.
             
             double f_pp = sat.dynamics(x_pp, u, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
             double f_pm = sat.dynamics(x_pm, u, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
@@ -1022,9 +1007,9 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian w.r.t. state matches finite 
         }
     }
     
-    // Compare
-    const double rel_tol = 0.10;  // 10% tolerance for Hessian (second derivatives are more sensitive, disturbances add complexity)
-    const double abs_tol = 1e-5;
+    // Compare: 4-point stencil truncation error O(eps^2)~1e-10, round-off O(eps_mach/eps^2)~2e-6.
+    const double rel_tol = 5e-3;
+    const double abs_tol = 1e-6;
     
     for (int j1 = 0; j1 < nx; ++j1) {
         for (int j2 = 0; j2 < nx; ++j2) {
@@ -1094,8 +1079,8 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian w.r.t. control matches finit
         }
     }
     
-    const double rel_tol = 0.05;
-    const double abs_tol = 1e-6;
+    const double rel_tol = 5e-3;
+    const double abs_tol = 1e-9;
     
     for (int j_u = 0; j_u < nu; ++j_u) {
         for (int j_x = 0; j_x < nx; ++j_x) {
@@ -1164,8 +1149,10 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian w.r.t. control-control match
         }
     }
     
-    const double rel_tol = 0.05;
-    const double abs_tol = 1e-6;
+    // All hess_uu entries are analytically zero (dynamics linear in u).
+    // FD noise floor: ~f*eps_mach/eps^2 ~ 0.001*2e-16/1e-10 ~ 2e-9. Use abs_tol > noise.
+    const double rel_tol = 5e-3;
+    const double abs_tol = 1e-7;
     
     for (int j1 = 0; j1 < nu; ++j1) {
         for (int j2 = 0; j2 < nu; ++j2) {
