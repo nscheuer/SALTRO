@@ -5,6 +5,7 @@
 #include <pybind11/stl.h>
 
 #include <saltro/pybind/satellite.h>
+#include "tensor_py.h"  // Include tensor type caster for Hessian return types
 
 namespace py = pybind11;
 
@@ -274,10 +275,107 @@ Returns
 ndarray
     State derivative (size: stateDim)
 )doc")
+        .def("constraints", &Satellite::constraints,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("sun_eci"),
+             py::arg("cnst_cfg"),
+             R"doc(
+Evaluate inequality constraints c(x,u) <= 0.
+
+Constraint ordering:
+1) Angular velocity magnitude limit
+2) Sun avoidance limit using body +X boresight
+3) (k < N-1 only) MTQ and RW bounds, RW momentum bounds, RW stiction proxy
+
+Parameters
+----------
+k : int
+    Current time step
+N : int
+    Total number of time steps
+x : ndarray
+    State vector (size: stateDim)
+u : ndarray
+    Control vector (size: controlDim)
+sun_eci : ndarray (3,)
+    Sun direction vector in ECI frame
+cnst_cfg : ConstraintConfig
+    Constraint configuration
+
+Returns
+-------
+ndarray
+    Constraint vector c where each entry should satisfy c_i <= 0
+)doc")
+        .def("constraintJacobians", &Satellite::constraintJacobians,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("sun_eci"),
+             py::arg("cnst_cfg"),
+             R"doc(
+Compute constraint Jacobians ∂c/∂u and ∂c/∂x.
+
+Parameters
+----------
+k : int
+    Current time step
+N : int
+    Total number of time steps
+x : ndarray
+    State vector (size: stateDim)
+u : ndarray
+    Control vector (size: controlDim)
+sun_eci : ndarray (3,)
+    Sun direction vector in ECI frame
+cnst_cfg : ConstraintConfig
+    Constraint configuration
+
+Returns
+-------
+tuple[ndarray, ndarray]
+    (c_u, c_x) where c_u is (n_constraints, controlDim) and c_x is (n_constraints, stateDim)
+)doc")
+        .def("constraintHessians", &Satellite::constraintHessians,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("sun_eci"),
+             py::arg("cnst_cfg"),
+             R"doc(
+Compute constraint Hessians (second derivatives).
+
+Returns tensors H_uu, H_ux, H_xx where each slice k contains the Hessian
+of constraint k with respect to the corresponding variables.
+
+Parameters
+----------
+k : int
+    Current time step
+N : int
+    Total number of time steps
+x : ndarray
+    State vector (size: stateDim)
+u : ndarray
+    Control vector (size: controlDim)
+sun_eci : ndarray (3,)
+    Sun direction vector in ECI frame
+cnst_cfg : ConstraintConfig
+    Constraint configuration
+
+Returns
+-------
+tuple[Tensor3, Tensor3, Tensor3]
+    (H_uu, H_ux, H_xx) Hessian tensors for each constraint
+)doc")
         // Note: The following methods are declared but not yet implemented:
         // - dynamicsJacobians, dynamicsHessians
         // - stageCost, terminalCost, stageCostJacobians, stageCostHessians
-        // - constraints, constraintJacobians, constraintHessians
         // They will be added once implemented in satellite.cpp
         
         // State index constants

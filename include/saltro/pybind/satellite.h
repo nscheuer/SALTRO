@@ -52,6 +52,7 @@ public:
     using Vec3 = Eigen::Vector3d;
     using Vec4 = Eigen::Vector4d;
     using Vec7 = Eigen::Matrix<double, 7, 1>;
+    using Mat13 = Eigen::Matrix<double, 1, 3>;
     using Mat33 = Eigen::Matrix3d;
     using Mat34 = Eigen::Matrix<double, 3, 4>;
     using Mat43 = Eigen::Matrix<double, 4, 3>;
@@ -74,6 +75,16 @@ public:
     using DynHessUU = saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
                               saltro::limits::MAX_CTRL_DIM,
                               saltro::limits::MAX_STATE_DIM>;
+
+    using ConstrHessXX = saltro::math::Tensor3<saltro::limits::MAX_STATE_DIM,
+                              saltro::limits::MAX_STATE_DIM,
+                              saltro::limits::MAX_CONSTRAINT_DIM>;
+    using ConstrHessUX = saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
+                              saltro::limits::MAX_STATE_DIM,
+                              saltro::limits::MAX_CONSTRAINT_DIM>;
+    using ConstrHessUU = saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
+                              saltro::limits::MAX_CTRL_DIM,
+                              saltro::limits::MAX_CONSTRAINT_DIM>;
 
     /**
      * @brief Index of angular velocity in state vector.
@@ -341,10 +352,16 @@ public:
      * @param x State.
      * @param u Control.
      * @param dist Disturbances.
+     * @param R_eci Position vector (ECI).
+     * @param B_eci Magnetic field (ECI).
+     * @param S_eci Sun direction (ECI).
+     * @param V_eci Velocity (ECI).
      * @return Tuple of Jacobian matrices (Fx, Fu, Fd).
      */
     std::tuple<MatX, MatX, MatX> dynamicsJacobians(const VecX& x, const VecX& u, 
-                                                   const DisturbanceConfig& dist) const;
+                                                   const DisturbanceConfig& dist,
+                                                   const Vec3& R_eci, const Vec3& B_eci,
+                                                   const Vec3& S_eci, const Vec3& V_eci) const;
     
     /**
      * @brief Compute dynamics Hessians (second derivatives).
@@ -352,10 +369,16 @@ public:
      * @param x State.
      * @param u Control.
      * @param dist Disturbances.
+     * @param R_eci Position vector (ECI).
+     * @param B_eci Magnetic field (ECI).
+     * @param S_eci Sun direction (ECI).
+     * @param V_eci Velocity (ECI).
      * @return Tuple of Hessian tensors (Hxx, Hux, Huu).
      */
     std::tuple<DynHessXX, DynHessUX, DynHessUU> dynamicsHessians(const VecX& x, const VecX& u, 
-                                                                 const DisturbanceConfig& dist) const;
+                                                                 const DisturbanceConfig& dist,
+                                                                 const Vec3& R_eci, const Vec3& B_eci,
+                                                                 const Vec3& S_eci, const Vec3& V_eci) const;
 
     /**
      * @brief Compute stage cost (intermediate time step).
@@ -434,6 +457,17 @@ public:
      * 
      * Returns constraint violation vector. Zero means satisfied.
      * Constraints include angular velocity limits, actuator saturations, sun avoidance.
+        * 
+        * Constraint ordering:
+        * 1) Angular velocity magnitude constraint
+        * 2) Sun-avoidance constraint (body +X boresight)
+        * 3) If k < N-1: control and RW constraints in this order:
+        *    - MTQ upper/lower bounds (2 per MTQ)
+        *    - RW torque upper/lower bounds (2 per RW)
+        *    - RW momentum upper/lower bounds (2 per RW)
+        *    - RW stiction proxy (1 per RW)
+        * 
+        * All constraints are formulated as c <= 0.
      * 
      * @param k Time step.
      * @param N Total steps.
@@ -469,9 +503,9 @@ public:
      * @param u Control.
      * @param sun_eci Sun in ECI.
      * @param cnst_cfg Constraint configuration.
-     * @return Tuple of Hessian matrices.
+     * @return Tuple of Hessian tensors (Huu, Hux, Hxx).
      */
-    std::tuple<MatX, MatX, MatX> constraintHessians(int k, int N, const VecX& x, const VecX& u, 
+    std::tuple<ConstrHessUU, ConstrHessUX, ConstrHessXX> constraintHessians(int k, int N, const VecX& x, const VecX& u, 
                                                     const Vec3& sun_eci, const ConstraintConfig& cnst_cfg) const;
 
 private:
