@@ -266,7 +266,8 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamic
             
             // Get ∂τ_i/∂q from MTQ class (includes cross product with dB/dq)
             Mat73 dtau_dx = mtq.dtorq_dbasestate(u_i, x_base, B_body, dB_dq);
-            dwdot_dq += dtau_dx.block<3, 4>(3, 0);  // Extract quaternion block (rows 3-6)
+            // Extract quaternion block (rows 3-6, 4 rows) and transpose to match dwdot_dq (3x4)
+            dwdot_dq += dtau_dx.block<4, 3>(3, 0).transpose();
         }
     }
     
@@ -389,7 +390,7 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamic
             dW_col(0) = -w(1);         // row 0: -q_2 in column 1
             dW_col(1) = w(2);          // row 1: q_2 in column 2
             dW_col(2) = 0.0;           // row 2: no q_2 in first position
-            dW_col(3) = w(0);          // row 3: q_2 in column 0
+            dW_col(3) = -w(0);         // row 3: -q_2 in column 0 (row3 = -q2*w0+q1*w1+q0*w2)
         } else if (j == 3) {
             // ∂W/∂q_3: -q_3 in row 0, affects row 0
             dW_col(0) = -w(2);         // row 0: -q_3 in column 2
@@ -566,14 +567,20 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
                     double u_j = u(j);
                     
                     // Get mixed Hessian ∂²τ/∂u∂q from MTQ class
+                    // H_mtq_ux is T173 = Tensor3<1,7,3>: each slice is 1x7.
+                    // Row index is always 0 (one control input per per-actuator call).
                     auto H_mtq_ux = mtq.ddtorq_dudbasestate(u_j, x_base, B_body, dB_dq);
                     
-                    // Extract and accumulate contributions (rows 0-2 for output i, cols 3-6 for quat)
-                    double val = H_mtq_ux.slice(i)(j, QUAT_INDEX + 0);  // ∂²τ_i/∂u_j∂q_0
-                    if (std::isfinite(val)) {
-                        hess_ux.slice(AV_INDEX + i)(j, QUAT_INDEX + 0) += (invJcom_noRW_(i, 0) * val +
-                                                                           invJcom_noRW_(i, 1) * H_mtq_ux.slice(1)(j, QUAT_INDEX + 0) +
-                                                                           invJcom_noRW_(i, 2) * H_mtq_ux.slice(2)(j, QUAT_INDEX + 0));
+                    // Accumulate ∂²wdot_i/∂u_j∂q_k for all 4 quaternion components
+                    for (int qk = 0; qk < 4; ++qk) {
+                        double contrib = 0.0;
+                        for (int m = 0; m < 3; ++m) {
+                            double val = H_mtq_ux.slice(m)(0, QUAT_INDEX + qk);
+                            if (std::isfinite(val)) {
+                                contrib += invJcom_noRW_(i, m) * val;
+                            }
+                        }
+                        hess_ux.slice(AV_INDEX + i)(j, QUAT_INDEX + qk) += contrib;
                     }
                 }
             } catch (...) {

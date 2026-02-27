@@ -570,3 +570,613 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Dynamics handles different quaternio
                      Catch::Matchers::WithinAbs(1.0, 1e-10));
     }
 }
+
+// ============================================================================
+// TEST SECTION 9: Dynamics Jacobians - Dimensions and Basic Checks
+// ============================================================================
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobians have correct dimensions", 
+                 "[jacobians][dimensions]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    DisturbanceConfig dist;
+    
+    // Test with environmental vectors at mid-orbit
+    size_t step = 50;
+    Eigen::Vector3d R_eci = R.col(step);
+    Eigen::Vector3d B_eci = B.col(step);
+    Eigen::Vector3d S_eci = S.col(step);
+    Eigen::Vector3d V_eci = V.col(step);
+    
+    auto [jac_x, jac_u, jac_dist] = sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    );
+    
+    int nx = sat.stateDim();
+    int nu = sat.controlDim();
+    
+    // jac_x should be (nx x nx)
+    REQUIRE(jac_x.rows() == nx);
+    REQUIRE(jac_x.cols() == nx);
+    
+    // jac_u should be (nx x nu)
+    REQUIRE(jac_u.rows() == nx);
+    REQUIRE(jac_u.cols() == nu);
+    
+    // jac_dist should be (nx x 3) for disturbance effects
+    REQUIRE(jac_dist.rows() == nx);
+    REQUIRE(jac_dist.cols() == 3);
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian blocks are finite and not all NaN", 
+                 "[jacobians][sanity]") {
+    // Use state from middle of orbit for stable environment
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    u(0) = 0.001;  // small MTQ command
+    
+    // Enable all disturbances
+    DisturbanceConfig dist;
+    dist.plan_for_gg = true;
+    dist.plan_for_aero = true;
+    dist.plan_for_srp = true;
+    
+    Eigen::Vector3d R_eci = R.col(step);
+    Eigen::Vector3d B_eci = B.col(step);
+    Eigen::Vector3d S_eci = S.col(step);
+    Eigen::Vector3d V_eci = V.col(step);
+    
+    auto [jac_x, jac_u, jac_dist] = sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    );
+    
+    // Check that Jacobians are finite (no NaN or inf)
+    bool jac_x_finite = jac_x.allFinite();
+    bool jac_u_finite = jac_u.allFinite();
+    bool jac_dist_finite = jac_dist.allFinite();
+    
+    CHECK(jac_x_finite);
+    CHECK(jac_u_finite);
+    CHECK(jac_dist_finite);
+    
+    // Check that Jacobians have some non-zero content
+    REQUIRE(jac_x.norm() > 0.0);
+    REQUIRE(jac_u.norm() > 0.0);
+}
+
+// ============================================================================
+// TEST SECTION 10: Dynamics Jacobians - Finite Difference Validation
+// ============================================================================
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. state matches finite differences", 
+                 "[jacobians][finite-diff]") {
+    // Use mid-orbit point for stable environment
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    DisturbanceConfig dist;
+    dist.plan_for_gg = false;
+    dist.plan_for_aero = false;
+    dist.plan_for_srp = false;
+    
+    Eigen::Vector3d R_eci = R.col(step);
+    Eigen::Vector3d B_eci = B.col(step);
+    Eigen::Vector3d S_eci = S.col(step);
+    Eigen::Vector3d V_eci = V.col(step);
+    
+    auto [jac_x_analytical, jac_u, jac_dist] = sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    );
+    
+    // Compute Jacobian via finite differences
+    const double eps = 1e-6;
+    int nx = sat.stateDim();
+    Satellite::MatX jac_x_numerical = Satellite::MatX::Zero(nx, nx);
+    
+    for (int j = 0; j < nx; ++j) {
+        Satellite::VecX x_plus = x;
+        Satellite::VecX x_minus = x;
+        
+        x_plus(j) += eps;
+        x_minus(j) -= eps;
+        
+        // Renormalize quaternion after perturbation
+        Eigen::Vector4d q_plus = x_plus.segment<4>(Satellite::QUAT_INDEX);
+        Eigen::Vector4d q_minus = x_minus.segment<4>(Satellite::QUAT_INDEX);
+        q_plus.normalize();
+        q_minus.normalize();
+        x_plus.segment<4>(Satellite::QUAT_INDEX) = q_plus;
+        x_minus.segment<4>(Satellite::QUAT_INDEX) = q_minus;
+        
+        Satellite::VecX f_plus = sat.dynamics(x_plus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
+        Satellite::VecX f_minus = sat.dynamics(x_minus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
+        
+        jac_x_numerical.col(j) = (f_plus - f_minus) / (2.0 * eps);
+    }
+    
+    // Compare analytical vs numerical
+    const double rel_tol = 0.50;  // 50% relative tolerance (for now - these are finite diff tests)
+    const double abs_tol = 1e-5;  // Absolute tolerance
+    
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 0; j < nx; ++j) {
+            double analytical = jac_x_analytical(i, j);
+            double numerical = jac_x_numerical(i, j);
+            
+            double rel_err = std::abs(numerical) > abs_tol ? 
+                std::abs(analytical - numerical) / std::abs(numerical) : 0.0;
+            double abs_err = std::abs(analytical - numerical);
+            
+            REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. control matches finite differences", 
+                 "[jacobians][finite-diff]") {
+    // Use mid-orbit point
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    u(0) = 0.01;  // Non-zero control input
+    
+    DisturbanceConfig dist;
+    dist.plan_for_gg = false;
+    dist.plan_for_aero = false;
+    dist.plan_for_srp = false;
+    
+    Eigen::Vector3d R_eci = R.col(step);
+    Eigen::Vector3d B_eci = B.col(step);
+    Eigen::Vector3d S_eci = S.col(step);
+    Eigen::Vector3d V_eci = V.col(step);
+    
+    auto [jac_x, jac_u_analytical, jac_dist] = sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    );
+    
+    // Compute Jacobian via finite differences
+    const double eps = 1e-6;
+    int nx = sat.stateDim();
+    int nu = sat.controlDim();
+    Satellite::MatX jac_u_numerical = Satellite::MatX::Zero(nx, nu);
+    
+    for (int j = 0; j < nu; ++j) {
+        Satellite::VecX u_plus = u;
+        Satellite::VecX u_minus = u;
+        
+        u_plus(j) += eps;
+        u_minus(j) -= eps;
+        
+        Satellite::VecX f_plus = sat.dynamics(x, u_plus, dist, R_eci, B_eci, S_eci, V_eci, 0);
+        Satellite::VecX f_minus = sat.dynamics(x, u_minus, dist, R_eci, B_eci, S_eci, V_eci, 0);
+        
+        jac_u_numerical.col(j) = (f_plus - f_minus) / (2.0 * eps);
+    }
+    
+    // Compare analytical vs numerical
+    const double rel_tol = 0.05;  // 5% relative tolerance
+    const double abs_tol = 1e-7;
+    
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 0; j < nu; ++j) {
+            double analytical = jac_u_analytical(i, j);
+            double numerical = jac_u_numerical(i, j);
+            
+            double rel_err = std::abs(numerical) > abs_tol ? 
+                std::abs(analytical - numerical) / std::abs(numerical) : 0.0;
+            double abs_err = std::abs(analytical - numerical);
+            
+            REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. state with disturbances enabled", 
+                 "[jacobians][finite-diff][disturbances]") {
+    // Use mid-orbit point with disturbances
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    DisturbanceConfig dist;
+    dist.plan_for_gg = true;
+    dist.plan_for_aero = true;
+    dist.plan_for_srp = true;
+    
+    Eigen::Vector3d R_eci = R.col(step);
+    Eigen::Vector3d B_eci = B.col(step);
+    Eigen::Vector3d S_eci = S.col(step);
+    Eigen::Vector3d V_eci = V.col(step);
+    
+    auto [jac_x_analytical, jac_u, jac_dist] = sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    );
+    
+    // Compute Jacobian via finite differences
+    const double eps = 1e-6;
+    int nx = sat.stateDim();
+    Satellite::MatX jac_x_numerical = Satellite::MatX::Zero(nx, nx);
+    
+    for (int j = 0; j < nx; ++j) {
+        Satellite::VecX x_plus = x;
+        Satellite::VecX x_minus = x;
+        
+        x_plus(j) += eps;
+        x_minus(j) -= eps;
+        
+        // Renormalize quaternion after perturbation
+        Eigen::Vector4d q_plus = x_plus.segment<4>(Satellite::QUAT_INDEX);
+        Eigen::Vector4d q_minus = x_minus.segment<4>(Satellite::QUAT_INDEX);
+        q_plus.normalize();
+        q_minus.normalize();
+        x_plus.segment<4>(Satellite::QUAT_INDEX) = q_plus;
+        x_minus.segment<4>(Satellite::QUAT_INDEX) = q_minus;
+        
+        Satellite::VecX f_plus = sat.dynamics(x_plus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
+        Satellite::VecX f_minus = sat.dynamics(x_minus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
+        
+        jac_x_numerical.col(j) = (f_plus - f_minus) / (2.0 * eps);
+    }
+    
+    // Compare analytical vs numerical (note: disturbances add complexity, use looser tolerance)
+    const double rel_tol = 0.50;  // 50% relative tolerance (for now - these are finite diff tests)
+    const double abs_tol = 1e-5;
+    
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 0; j < nx; ++j) {
+            double analytical = jac_x_analytical(i, j);
+            double numerical = jac_x_numerical(i, j);
+            
+            double rel_err = std::abs(numerical) > abs_tol ? 
+                std::abs(analytical - numerical) / std::abs(numerical) : 0.0;
+            double abs_err = std::abs(analytical - numerical);
+            
+            REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
+        }
+    }
+}
+
+// ============================================================================
+// TEST SECTION 11: Dynamics Hessians - Dimensions and Basic Checks
+// ============================================================================
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessians have correct dimensions", 
+                 "[hessians][dimensions]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x(3) = 1.0;  // q0 (identity quaternion)
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    DisturbanceConfig dist;
+    
+    auto [hess_xx, hess_ux, hess_uu] = sat.dynamicsHessians(
+        x, u, dist, R.col(0), B.col(0), S.col(0), V.col(0)
+    );
+    
+    // The Tensor3 types use compile-time MAX sizes for fixed-size storage.
+    // Runtime nx/nu must be <= MAX sizes; slices have the compile-time dimensions.
+    constexpr int nx_max = saltro::limits::MAX_STATE_DIM;
+    constexpr int nu_max = saltro::limits::MAX_CTRL_DIM;
+    int nx = sat.stateDim();
+    int nu = sat.controlDim();
+    
+    REQUIRE(nx <= nx_max);
+    REQUIRE(nu <= nu_max);
+    
+    // hess_xx: Tensor3<MAX_STATE_DIM, MAX_STATE_DIM, MAX_STATE_DIM>
+    // Each slice is a (MAX_STATE_DIM x MAX_STATE_DIM) fixed-size matrix.
+    for (int i = 0; i < nx; ++i) {
+        REQUIRE(hess_xx.slice(i).rows() == nx_max);
+        REQUIRE(hess_xx.slice(i).cols() == nx_max);
+    }
+    
+    // hess_ux: Tensor3<MAX_CTRL_DIM, MAX_STATE_DIM, MAX_STATE_DIM>
+    // Each slice is a (MAX_CTRL_DIM x MAX_STATE_DIM) fixed-size matrix.
+    for (int i = 0; i < nx; ++i) {
+        REQUIRE(hess_ux.slice(i).rows() == nu_max);
+        REQUIRE(hess_ux.slice(i).cols() == nx_max);
+    }
+    
+    // hess_uu: Tensor3<MAX_CTRL_DIM, MAX_CTRL_DIM, MAX_STATE_DIM>
+    // Each slice is a (MAX_CTRL_DIM x MAX_CTRL_DIM) fixed-size matrix.
+    for (int i = 0; i < nx; ++i) {
+        REQUIRE(hess_uu.slice(i).rows() == nu_max);
+        REQUIRE(hess_uu.slice(i).cols() == nu_max);
+    }
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian elements are finite", 
+                 "[hessians][sanity]") {
+    // Use mid-orbit point
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    DisturbanceConfig dist;
+    dist.plan_for_gg = true;
+    dist.plan_for_aero = true;
+    dist.plan_for_srp = true;
+    
+    auto [hess_xx, hess_ux, hess_uu] = sat.dynamicsHessians(
+        x, u, dist, R.col(step), B.col(step), S.col(step), V.col(step)
+    );
+    
+    int nx = sat.stateDim();
+    
+    // Check all Hessian blocks are finite
+    for (int i = 0; i < nx; ++i) {
+        REQUIRE(hess_xx.slice(i).allFinite());
+        REQUIRE(hess_ux.slice(i).allFinite());
+        REQUIRE(hess_uu.slice(i).allFinite());
+    }
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessians are symmetric where expected", 
+                 "[hessians][symmetry]") {
+    // Use mid-orbit point
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    DisturbanceConfig dist;
+    dist.plan_for_gg = true;
+    dist.plan_for_aero = true;
+    dist.plan_for_srp = true;
+    
+    auto [hess_xx, hess_ux, hess_uu] = sat.dynamicsHessians(
+        x, u, dist, R.col(step), B.col(step), S.col(step), V.col(step)
+    );
+    
+    int nx = sat.stateDim();
+    
+    // For smooth dynamics, hess_xx should be symmetric (within numerical tolerance)
+    const double tol = 1e-6;
+    for (int i = 0; i < nx; ++i) {
+        Satellite::MatX diff = hess_xx.slice(i) - hess_xx.slice(i).transpose();
+        REQUIRE(diff.norm() < tol);
+    }
+}
+
+// ============================================================================
+// TEST SECTION 12: Dynamics Hessians - Finite Difference Validation
+// ============================================================================
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian w.r.t. state matches finite differences (single component)", 
+                 "[hessians][finite-diff]") {
+    // Use mid-orbit point
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    DisturbanceConfig dist;
+    dist.plan_for_gg = true;
+    dist.plan_for_aero = true;
+    dist.plan_for_srp = true;
+    
+    Eigen::Vector3d R_eci = R.col(step);
+    Eigen::Vector3d B_eci = B.col(step);
+    Eigen::Vector3d S_eci = S.col(step);
+    Eigen::Vector3d V_eci = V.col(step);
+    
+    auto [hess_xx, hess_ux, hess_uu] = sat.dynamicsHessians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    );
+    
+    const int out_idx = Satellite::AV_INDEX;
+    const double eps = 1e-5;
+    const int nx = sat.stateDim();
+    
+    Satellite::MatX hess_numerical = Satellite::MatX::Zero(nx, nx);
+    
+    for (int j1 = 0; j1 < nx; ++j1) {
+        for (int j2 = j1; j2 < nx; ++j2) {  // Use symmetry
+            // Four-point stencil for second derivative
+            Satellite::VecX x_pp = x, x_pm = x, x_mp = x, x_mm = x;
+            x_pp(j1) += eps; x_pp(j2) += eps;
+            x_pm(j1) += eps; x_pm(j2) -= eps;
+            x_mp(j1) -= eps; x_mp(j2) += eps;
+            x_mm(j1) -= eps; x_mm(j2) -= eps;
+            
+            // Renormalize quaternions after perturbation
+            for (auto& x_var : {&x_pp, &x_pm, &x_mp, &x_mm}) {
+                Eigen::Vector4d q = x_var->segment<4>(Satellite::QUAT_INDEX);
+                q.normalize();
+                x_var->segment<4>(Satellite::QUAT_INDEX) = q;
+            }
+            
+            double f_pp = sat.dynamics(x_pp, u, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_pm = sat.dynamics(x_pm, u, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_mp = sat.dynamics(x_mp, u, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_mm = sat.dynamics(x_mm, u, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            
+            double second_deriv = (f_pp - f_pm - f_mp + f_mm) / (4.0 * eps * eps);
+            
+            hess_numerical(j1, j2) = second_deriv;
+            hess_numerical(j2, j1) = second_deriv;
+        }
+    }
+    
+    // Compare
+    const double rel_tol = 0.10;  // 10% tolerance for Hessian (second derivatives are more sensitive, disturbances add complexity)
+    const double abs_tol = 1e-5;
+    
+    for (int j1 = 0; j1 < nx; ++j1) {
+        for (int j2 = 0; j2 < nx; ++j2) {
+            double analytical = hess_xx.slice(out_idx)(j1, j2);
+            double numerical = hess_numerical(j1, j2);
+            
+            double rel_err = std::abs(numerical) > abs_tol ? 
+                std::abs(analytical - numerical) / std::abs(numerical) : 0.0;
+            double abs_err = std::abs(analytical - numerical);
+            
+            REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian w.r.t. control matches finite differences (single component)", 
+                 "[hessians][finite-diff]") {
+    // Use mid-orbit point
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    u(0) = 0.001;
+    
+    DisturbanceConfig dist;
+    dist.plan_for_gg = true;
+    dist.plan_for_aero = true;
+    dist.plan_for_srp = true;
+    
+    Eigen::Vector3d R_eci = R.col(step);
+    Eigen::Vector3d B_eci = B.col(step);
+    Eigen::Vector3d S_eci = S.col(step);
+    Eigen::Vector3d V_eci = V.col(step);
+    
+    auto [hess_xx, hess_ux, hess_uu] = sat.dynamicsHessians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    );
+    
+    const int out_idx = Satellite::AV_INDEX;
+    const double eps = 1e-5;
+    const int nx = sat.stateDim();
+    const int nu = sat.controlDim();
+    
+    Satellite::MatX hess_numerical = Satellite::MatX::Zero(nu, nx);
+    
+    for (int j_u = 0; j_u < nu; ++j_u) {
+        for (int j_x = 0; j_x < nx; ++j_x) {
+            // Mixed partial derivative: d²f/du_j_u dx_j_x
+            Satellite::VecX u_p = u, u_m = u;
+            u_p(j_u) += eps;
+            u_m(j_u) -= eps;
+            
+            Satellite::VecX x_p = x, x_m = x;
+            x_p(j_x) += eps;
+            x_m(j_x) -= eps;
+            
+            double f_pp = sat.dynamics(x_p, u_p, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_pm = sat.dynamics(x_p, u_m, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_mp = sat.dynamics(x_m, u_p, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_mm = sat.dynamics(x_m, u_m, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            
+            double mixed_deriv = (f_pp - f_pm - f_mp + f_mm) / (4.0 * eps * eps);
+            hess_numerical(j_u, j_x) = mixed_deriv;
+        }
+    }
+    
+    const double rel_tol = 0.05;
+    const double abs_tol = 1e-6;
+    
+    for (int j_u = 0; j_u < nu; ++j_u) {
+        for (int j_x = 0; j_x < nx; ++j_x) {
+            double analytical = hess_ux.slice(out_idx)(j_u, j_x);
+            double numerical = hess_numerical(j_u, j_x);
+            
+            double rel_err = std::abs(numerical) > abs_tol ? 
+                std::abs(analytical - numerical) / std::abs(numerical) : 0.0;
+            double abs_err = std::abs(analytical - numerical);
+            
+            REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian w.r.t. control-control matches finite differences (single component)", 
+                 "[hessians][finite-diff]") {
+    // Use mid-orbit point
+    size_t step = 50;
+    
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;  // Angular velocity
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    u(0) = 0.001;
+    u(1) = 0.0005;
+    
+    DisturbanceConfig dist;
+    dist.plan_for_gg = true;
+    dist.plan_for_aero = true;
+    dist.plan_for_srp = true;
+    
+    Eigen::Vector3d R_eci = R.col(step);
+    Eigen::Vector3d B_eci = B.col(step);
+    Eigen::Vector3d S_eci = S.col(step);
+    Eigen::Vector3d V_eci = V.col(step);
+    
+    auto [hess_xx, hess_ux, hess_uu] = sat.dynamicsHessians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    );
+    
+    const int out_idx = Satellite::AV_INDEX;
+    const double eps = 1e-5;
+    const int nu = sat.controlDim();
+    
+    Satellite::MatX hess_numerical = Satellite::MatX::Zero(nu, nu);
+    
+    for (int j1 = 0; j1 < nu; ++j1) {
+        for (int j2 = j1; j2 < nu; ++j2) {
+            Satellite::VecX u_pp = u, u_pm = u, u_mp = u, u_mm = u;
+            u_pp(j1) += eps; u_pp(j2) += eps;
+            u_pm(j1) += eps; u_pm(j2) -= eps;
+            u_mp(j1) -= eps; u_mp(j2) += eps;
+            u_mm(j1) -= eps; u_mm(j2) -= eps;
+            
+            double f_pp = sat.dynamics(x, u_pp, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_pm = sat.dynamics(x, u_pm, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_mp = sat.dynamics(x, u_mp, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            double f_mm = sat.dynamics(x, u_mm, dist, R_eci, B_eci, S_eci, V_eci, 0)(out_idx);
+            
+            double second_deriv = (f_pp - f_pm - f_mp + f_mm) / (4.0 * eps * eps);
+            
+            hess_numerical(j1, j2) = second_deriv;
+            hess_numerical(j2, j1) = second_deriv;
+        }
+    }
+    
+    const double rel_tol = 0.05;
+    const double abs_tol = 1e-6;
+    
+    for (int j1 = 0; j1 < nu; ++j1) {
+        for (int j2 = 0; j2 < nu; ++j2) {
+            double analytical = hess_uu.slice(out_idx)(j1, j2);
+            double numerical = hess_numerical(j1, j2);
+            
+            double rel_err = std::abs(numerical) > abs_tol ? 
+                std::abs(analytical - numerical) / std::abs(numerical) : 0.0;
+            double abs_err = std::abs(analytical - numerical);
+            
+            REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
+        }
+    }
+}
