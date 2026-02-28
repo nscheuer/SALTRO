@@ -5,6 +5,8 @@
 #include <saltro/limits.h>
 #include <saltro/validation/validate_plannersettings.h>
 #include <saltro/validation/validate_satellite.h>
+#include <saltro/validation/validate_initialstate.h>
+#include <saltro/validation/validate_orbitstate.h>
 
 namespace saltro::validation {
 
@@ -32,6 +34,16 @@ bool validatetrajOpt(
 
     if (!validateSatellite(satellite, nested_error)) {
         error_msg = "Satellite validation failed: " + nested_error;
+        return false;
+    }
+
+    if (!validateInitialState(x0, nested_error)) {
+        error_msg = "Initial state validation failed: " + nested_error;
+        return false;
+    }
+
+    if (!validateOrbitState(r0, v0, nested_error)) {
+        error_msg = "Orbit state validation failed: " + nested_error;
         return false;
     }
 

@@ -50,7 +50,7 @@ namespace saltro::constants {
     /**
      * @brief Earth's gravitational parameter.
      * 
-     * Defined as \f$\mu = 3.986\,004\,418 \times 10^{14}\f$ km³/s²,
+        * Defined as \f$\mu = 3.986\,004\,418 \times 10^{14}\f$ m³/s²,
      * where \f$\mu = GM\f$ and \f$G\f$ is the gravitational constant.
      * Used in Kepler orbit propagation.
      */
