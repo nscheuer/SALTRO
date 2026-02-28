@@ -6,6 +6,11 @@
 
 namespace saltro::optimizer {
 
+// Static workspace allocated in data segment at program initialization
+static Eigen::Matrix<double, saltro::limits::MAX_STATE_DIM, saltro::limits::MAX_LENGTH_TRAJ> X_static;
+static Eigen::Matrix<double, saltro::limits::MAX_CTRL_DIM, saltro::limits::MAX_LENGTH_TRAJ> U_static;
+static saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM, saltro::limits::MAX_STATE_DIM, saltro::limits::MAX_LENGTH_TRAJ> K_static;
+
 bool trajOpt(
 	const PlannerSettings& settings,
 	const Satellite& satellite,
@@ -23,9 +28,9 @@ bool trajOpt(
 ) {
 	(void)settings;
 
-	X.setZero();
-	U.setZero();
-	K.setZero();
+	X_static.setZero();
+	U_static.setZero();
+	K_static.setZero();
 
 	std::string error_msg;
 	
@@ -36,6 +41,11 @@ bool trajOpt(
 	if (!validation::validateSatellite(satellite, error_msg)) {
 		throw std::invalid_argument("Invalid Satellite configuration: " + error_msg);
 	}
+
+	// Copy static storage to output references
+	X = X_static;
+	U = U_static;
+	K = K_static;
 
 	return true;
 }
