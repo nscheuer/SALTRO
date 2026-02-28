@@ -1,9 +1,9 @@
 #pragma once
 
+#include <vector>
 #include <Eigen/Dense>
 
 #include <saltro/limits.h>
-#include <saltro/math/tensor.h>
 #include <saltro/pybind/plannersettings.h>
 #include <saltro/pybind/satellite.h>
 
@@ -15,14 +15,16 @@ bool trajOpt(
 	const Satellite::VecX& x0,
 	const Eigen::Vector3d& r0,
 	const Eigen::Vector3d& v0,
-	const Eigen::Matrix<double, 1, saltro::limits::MAX_LENGTH_TRAJ>& jtime,
-	const Eigen::Matrix<double, 4, saltro::limits::MAX_LENGTH_TRAJ>& q_goal,
-	int jtime_length,
-	Eigen::Matrix<double, saltro::limits::MAX_STATE_DIM, saltro::limits::MAX_LENGTH_TRAJ>& X,
-	Eigen::Matrix<double, saltro::limits::MAX_CTRL_DIM, saltro::limits::MAX_LENGTH_TRAJ>& U,
-	saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
-	                     saltro::limits::MAX_STATE_DIM,
-	                     saltro::limits::MAX_LENGTH_TRAJ>& K
+	const Eigen::Ref<const Eigen::VectorXd>& jtime,
+	const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
+
+	Eigen::Ref<Eigen::MatrixXd> X,
+	Eigen::Ref<Eigen::MatrixXd> U,
+	Eigen::Ref<Eigen::MatrixXd> K,
+
+	int state_dim,
+	int input_dim,
+	int N
 );
 
 }

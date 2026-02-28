@@ -4,13 +4,11 @@
 namespace saltro::validation {
 
 bool validatePlannerSettings(const PlannerSettings& settings, std::string& error_msg) {
-    // Validate num_passes
     if (settings.num_passes < 0 || settings.num_passes > MAX_OUTER_PASSES) {
         error_msg = "num_passes out of range";
         return false;
     }
 
-    // Validate constraint configuration
     if (settings.constraints.control_limit_scale < 0.0 || !std::isfinite(settings.constraints.control_limit_scale)) {
         error_msg = "control_limit_scale invalid";
         return false;
