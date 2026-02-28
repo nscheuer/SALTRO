@@ -594,3 +594,426 @@ def test_dynamics_handles_different_quaternion_orientations():
         
         q_final = x_final[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4]
         assert np.isclose(np.linalg.norm(q_final), 1.0, atol=1e-10)
+
+
+# ============================================================================
+# TEST SECTION 9: Dynamics Jacobians - Dimensions and Basic Checks
+# ============================================================================
+
+def test_jacobians_have_correct_dimensions():
+    """Test that Jacobians have correct dimensions"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    
+    step = 50
+    R_eci = fixture.R[:, step]
+    B_eci = fixture.B[:, step]
+    S_eci = fixture.S[:, step]
+    V_eci = fixture.V[:, step]
+    
+    jac_x, jac_u, jac_dist = fixture.sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    )
+    
+    nx = fixture.sat.stateDim
+    nu = fixture.sat.controlDim
+    
+    # jac_x should be (nx x nx)
+    assert jac_x.shape == (nx, nx)
+    
+    # jac_u should be (nx x nu)
+    assert jac_u.shape == (nx, nu)
+    
+    # jac_dist should be (nx x 3)
+    assert jac_dist.shape == (nx, 3)
+
+
+def test_jacobian_blocks_are_finite_and_not_all_nan():
+    """Test that Jacobian blocks are finite and not all NaN"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    step = 50
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    u[0] = 0.001
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = True
+    dist.plan_for_srp = True
+    
+    R_eci = fixture.R[:, step]
+    B_eci = fixture.B[:, step]
+    S_eci = fixture.S[:, step]
+    V_eci = fixture.V[:, step]
+    
+    jac_x, jac_u, jac_dist = fixture.sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    )
+    
+    # All should be finite
+    assert np.all(np.isfinite(jac_x))
+    assert np.all(np.isfinite(jac_u))
+    assert np.all(np.isfinite(jac_dist))
+    
+    # At least some non-zero entries
+    assert np.linalg.norm(jac_x) > 0
+    assert np.linalg.norm(jac_u) > 0
+
+
+# ============================================================================
+# TEST SECTION 10: Dynamics Jacobians - Finite Difference Validation
+# ============================================================================
+
+def test_jacobian_wrt_state_matches_finite_differences():
+    """Test that analytical Jacobian w.r.t. state matches finite differences"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    step = 50
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    
+    R_eci = fixture.R[:, step]
+    B_eci = fixture.B[:, step]
+    S_eci = fixture.S[:, step]
+    V_eci = fixture.V[:, step]
+    
+    jac_x_analytical, _, _ = fixture.sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    )
+    
+    # Compute Jacobian via finite differences
+    eps = 1e-6
+    nx = fixture.sat.stateDim
+    jac_x_numerical = np.zeros((nx, nx))
+    
+    for j in range(nx):
+        x_plus = x.copy()
+        x_minus = x.copy()
+        
+        x_plus[j] += eps
+        x_minus[j] -= eps
+        
+        f_plus = fixture.sat.dynamics(x_plus, u, dist, R_eci, B_eci, S_eci, V_eci, 0)
+        f_minus = fixture.sat.dynamics(x_minus, u, dist, R_eci, B_eci, S_eci, V_eci, 0)
+        
+        jac_x_numerical[:, j] = (f_plus - f_minus) / (2.0 * eps)
+    
+    # Compare analytical vs numerical
+    rel_tol = 1e-5
+    abs_tol = 1e-9
+    
+    for i in range(nx):
+        for j in range(nx):
+            analytical = jac_x_analytical[i, j]
+            numerical = jac_x_numerical[i, j]
+            
+            rel_err = abs(analytical - numerical) / abs(numerical) if abs(numerical) > abs_tol else 0.0
+            abs_err = abs(analytical - numerical)
+            
+            assert (rel_err <= rel_tol or abs_err <= abs_tol), \
+                f"Mismatch at ({i},{j}): analytical={analytical}, numerical={numerical}"
+
+
+def test_jacobian_wrt_control_matches_finite_differences():
+    """Test that analytical Jacobian w.r.t. control matches finite differences"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    step = 50
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    u[0] = 0.01
+    
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    
+    R_eci = fixture.R[:, step]
+    B_eci = fixture.B[:, step]
+    S_eci = fixture.S[:, step]
+    V_eci = fixture.V[:, step]
+    
+    _, jac_u_analytical, _ = fixture.sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    )
+    
+    # Compute Jacobian via finite differences
+    eps = 1e-6
+    nx = fixture.sat.stateDim
+    nu = fixture.sat.controlDim
+    jac_u_numerical = np.zeros((nx, nu))
+    
+    for j in range(nu):
+        u_plus = u.copy()
+        u_minus = u.copy()
+        
+        u_plus[j] += eps
+        u_minus[j] -= eps
+        
+        f_plus = fixture.sat.dynamics(x, u_plus, dist, R_eci, B_eci, S_eci, V_eci, 0)
+        f_minus = fixture.sat.dynamics(x, u_minus, dist, R_eci, B_eci, S_eci, V_eci, 0)
+        
+        jac_u_numerical[:, j] = (f_plus - f_minus) / (2.0 * eps)
+    
+    # Compare analytical vs numerical
+    rel_tol = 1e-5
+    abs_tol = 1e-9
+    
+    for i in range(nx):
+        for j in range(nu):
+            analytical = jac_u_analytical[i, j]
+            numerical = jac_u_numerical[i, j]
+            
+            rel_err = abs(analytical - numerical) / abs(numerical) if abs(numerical) > abs_tol else 0.0
+            abs_err = abs(analytical - numerical)
+            
+            assert (rel_err <= rel_tol or abs_err <= abs_tol)
+
+
+def test_jacobian_wrt_state_with_disturbances_enabled():
+    """Test that Jacobian w.r.t. state works with disturbances enabled"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    step = 50
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = True
+    dist.plan_for_srp = True
+    
+    R_eci = fixture.R[:, step]
+    B_eci = fixture.B[:, step]
+    S_eci = fixture.S[:, step]
+    V_eci = fixture.V[:, step]
+    
+    jac_x_analytical, _, _ = fixture.sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    )
+    
+    # Compute Jacobian via finite differences
+    eps = 1e-6
+    nx = fixture.sat.stateDim
+    jac_x_numerical = np.zeros((nx, nx))
+    
+    for j in range(nx):
+        x_plus = x.copy()
+        x_minus = x.copy()
+        
+        x_plus[j] += eps
+        x_minus[j] -= eps
+        
+        f_plus = fixture.sat.dynamics(x_plus, u, dist, R_eci, B_eci, S_eci, V_eci, 0)
+        f_minus = fixture.sat.dynamics(x_minus, u, dist, R_eci, B_eci, S_eci, V_eci, 0)
+        
+        jac_x_numerical[:, j] = (f_plus - f_minus) / (2.0 * eps)
+    
+    # Compare analytical vs numerical
+    rel_tol = 1e-5
+    abs_tol = 1e-9
+    
+    for i in range(nx):
+        for j in range(nx):
+            analytical = jac_x_analytical[i, j]
+            numerical = jac_x_numerical[i, j]
+            
+            rel_err = abs(analytical - numerical) / abs(numerical) if abs(numerical) > abs_tol else 0.0
+            abs_err = abs(analytical - numerical)
+            
+            assert (rel_err <= rel_tol or abs_err <= abs_tol)
+
+
+# ============================================================================
+# TEST SECTION 11: Dynamics Hessians - Dimensions and Basic Checks
+# ============================================================================
+
+def test_hessians_have_correct_dimensions():
+    """Test that Hessians have correct dimensions"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    
+    hess_xx, hess_ux, hess_uu = fixture.sat.dynamicsHessians(
+        x, u, dist, fixture.R[:, 0], fixture.B[:, 0], fixture.S[:, 0], fixture.V[:, 0]
+    )
+    
+    # Hessians are returned as Tensor3 objects which are numpy arrays in Python
+    # Each has shape based on the compile-time MAX dimensions
+    # We verify they are not empty and have reasonable structure
+    assert hess_xx.shape[0] > 0  # At least one slice
+    assert hess_ux.shape[0] > 0
+    assert hess_uu.shape[0] > 0
+
+
+def test_hessian_elements_are_finite():
+    """Test that Hessian elements are finite"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    step = 50
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = True
+    dist.plan_for_srp = True
+    
+    hess_xx, hess_ux, hess_uu = fixture.sat.dynamicsHessians(
+        x, u, dist, fixture.R[:, step], fixture.B[:, step], fixture.S[:, step], fixture.V[:, step]
+    )
+    
+    nx = fixture.sat.stateDim
+    
+    # Check all slices are finite (up to actual state dimension)
+    for i in range(nx):
+        assert np.all(np.isfinite(hess_xx[i]))
+        assert np.all(np.isfinite(hess_ux[i]))
+        assert np.all(np.isfinite(hess_uu[i]))
+
+
+def test_hessians_are_symmetric_where_expected():
+    """Test that Hessian matrices are symmetric where expected"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    step = 50
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = True
+    dist.plan_for_srp = True
+    
+    hess_xx, hess_ux, hess_uu = fixture.sat.dynamicsHessians(
+        x, u, dist, fixture.R[:, step], fixture.B[:, step], fixture.S[:, step], fixture.V[:, step]
+    )
+    
+    nx = fixture.sat.stateDim
+    tol = 1e-6
+    
+    # For smooth dynamics, hess_xx should be symmetric
+    for i in range(nx):
+        diff = np.linalg.norm(hess_xx[i] - hess_xx[i].T)
+        assert diff < tol
+
+
+# ============================================================================  
+# TEST SECTION 12: Dynamics Hessians - Finite Difference Validation
+# ============================================================================
+
+def test_hessian_wrt_state_matches_finite_differences_single_component():
+    """Test that Hessian w.r.t. state matches finite differences for one component"""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    
+    step = 50
+    
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    dist.plan_for_aero = True
+    dist.plan_for_srp = True
+    
+    R_eci = fixture.R[:, step]
+    B_eci = fixture.B[:, step]
+    S_eci = fixture.S[:, step]
+    V_eci = fixture.V[:, step]
+    
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    )
+    
+    out_idx = saltro_py.Satellite.AV_INDEX
+    eps = 1e-5
+    nx = fixture.sat.stateDim
+    
+    hess_numerical = np.zeros((nx, nx))
+    
+    # Four-point stencil for second derivative
+    for j1 in range(nx):
+        for j2 in range(j1, nx):
+            x_pp = x.copy()
+            x_pm = x.copy()
+            x_mp = x.copy()
+            x_mm = x.copy()
+            
+            x_pp[j1] += eps
+            x_pp[j2] += eps
+            x_pm[j1] += eps
+            x_pm[j2] -= eps
+            x_mp[j1] -= eps
+            x_mp[j2] += eps
+            x_mm[j1] -= eps
+            x_mm[j2] -= eps
+            
+            f_pp = fixture.sat.dynamics(x_pp, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
+            f_pm = fixture.sat.dynamics(x_pm, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
+            f_mp = fixture.sat.dynamics(x_mp, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
+            f_mm = fixture.sat.dynamics(x_mm, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
+            
+            second_deriv = (f_pp - f_pm - f_mp + f_mm) / (4.0 * eps * eps)
+            
+            hess_numerical[j1, j2] = second_deriv
+            hess_numerical[j2, j1] = second_deriv
+    
+    # Compare
+    rel_tol = 5e-3
+    abs_tol = 1e-6
+    
+    for j1 in range(nx):
+        for j2 in range(nx):
+            analytical = hess_xx[out_idx][j1, j2]
+            numerical = hess_numerical[j1, j2]
+            
+            rel_err = abs(analytical - numerical) / abs(numerical) if abs(numerical) > abs_tol else 0.0
+            abs_err = abs(analytical - numerical)
+            
+            assert (rel_err <= rel_tol or abs_err <= abs_tol)
