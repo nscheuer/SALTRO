@@ -275,6 +275,85 @@ Returns
 ndarray
     State derivative (size: stateDim)
 )doc")
+        .def("dynamicsJacobians", &Satellite::dynamicsJacobians,
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("dist"),
+             py::arg("R_eci"),
+             py::arg("B_eci"),
+             py::arg("S_eci"),
+             py::arg("V_eci"),
+             R"doc(
+Compute dynamics Jacobians (first-order partial derivatives).
+
+Computes the Jacobians of the dynamics function f(x, u) with respect to
+the state x, control u, and disturbance parameters.
+
+Parameters
+----------
+x : ndarray
+    State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
+u : ndarray
+    Control vector: [MTQ_controls (numMTQ), RW_controls (numRW)]
+dist : DisturbanceConfig
+    Disturbance configuration
+R_eci : ndarray (3,)
+    Position in ECI frame
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+S_eci : ndarray (3,)
+    Sun direction in ECI frame
+V_eci : ndarray (3,)
+    Velocity in ECI frame
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (jac_x, jac_u, jac_dist) where:
+    - jac_x: Jacobian w.r.t. state (stateDim x stateDim)
+    - jac_u: Jacobian w.r.t. control (stateDim x controlDim)
+    - jac_dist: Jacobian w.r.t. disturbance effects (stateDim x 3)
+)doc")
+        .def("dynamicsHessians", &Satellite::dynamicsHessians,
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("dist"),
+             py::arg("R_eci"),
+             py::arg("B_eci"),
+             py::arg("S_eci"),
+             py::arg("V_eci"),
+             R"doc(
+Compute dynamics Hessians (second-order partial derivatives).
+
+Computes the Hessian tensors of the dynamics function f(x, u) with respect to
+state-state, control-state, and control-control pairs. Each Hessian is a 3D
+tensor where slice i corresponds to the Hessian of the i-th output component.
+
+Parameters
+----------
+x : ndarray
+    State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
+u : ndarray
+    Control vector: [MTQ_controls (numMTQ), RW_controls (numRW)]
+dist : DisturbanceConfig
+    Disturbance configuration
+R_eci : ndarray (3,)
+    Position in ECI frame
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+S_eci : ndarray (3,)
+    Sun direction in ECI frame
+V_eci : ndarray (3,)
+    Velocity in ECI frame
+
+Returns
+-------
+tuple[Tensor3, Tensor3, Tensor3]
+    (hess_xx, hess_ux, hess_uu) where each is a 3D tensor:
+    - hess_xx: ∂²f/∂x² - indexed by output equation (stateDim slices of stateDim x stateDim)
+    - hess_ux: ∂²f/∂u∂x - indexed by output equation (stateDim slices of controlDim x stateDim)
+    - hess_uu: ∂²f/∂u² - indexed by output equation (stateDim slices of controlDim x controlDim)
+)doc")
         .def("constraints", &Satellite::constraints,
              py::arg("k"),
              py::arg("N"),
@@ -373,10 +452,6 @@ Returns
 tuple[Tensor3, Tensor3, Tensor3]
     (H_uu, H_ux, H_xx) Hessian tensors for each constraint
 )doc")
-        // Note: The following methods are declared but not yet implemented:
-        // - dynamicsJacobians, dynamicsHessians
-        // - stageCost, terminalCost, stageCostJacobians, stageCostHessians
-        // They will be added once implemented in satellite.cpp
         
         // State index constants
         .def_readonly_static("AV_INDEX", &Satellite::AV_INDEX,
