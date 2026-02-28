@@ -1,4 +1,6 @@
 #include <saltro/optimizer/trajOpt.h>
+#include <saltro/validation/validate_plannersettings.h>
+#include <saltro/validation/validate_satellite.h>
 
 #include <cmath>
 
@@ -25,43 +27,14 @@ bool trajOpt(
 	U.setZero();
 	K.setZero();
 
-	if (jtime_length <= 0 || jtime_length > saltro::limits::MAX_LENGTH_TRAJ) {
-		return false;
+	std::string error_msg;
+	
+	if (!validation::validatePlannerSettings(settings, error_msg)) {
+		throw std::invalid_argument("Invalid PlannerSettings: " + error_msg);
 	}
-
-	if (!r0.allFinite() || !v0.allFinite()) {
-		return false;
-	}
-
-	if (x0.size() != satellite.stateDim() || !x0.allFinite()) {
-		return false;
-	}
-
-	for (int i = 0; i < jtime_length; ++i) {
-		if (!std::isfinite(jtime(i))) {
-			return false;
-		}
-		if (!q_goal.col(i).allFinite()) {
-			return false;
-		}
-		if (q_goal.col(i).norm() <= 1e-12) {
-			return false;
-		}
-	}
-
-	for (int i = 1; i < jtime_length; ++i) {
-		if (jtime(i) <= jtime(i - 1)) {
-			return false;
-		}
-	}
-
-	const int nx = satellite.stateDim();
-	for (int k = 0; k < jtime_length; ++k) {
-		X.topRows(nx).col(k) = x0;
-		if (nx >= Satellite::QUAT_INDEX + 4) {
-			const Eigen::Vector4d qk = q_goal.col(k).normalized();
-			X.block<4, 1>(Satellite::QUAT_INDEX, k) = qk;
-		}
+	
+	if (!validation::validateSatellite(satellite, error_msg)) {
+		throw std::invalid_argument("Invalid Satellite configuration: " + error_msg);
 	}
 
 	return true;

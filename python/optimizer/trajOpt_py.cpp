@@ -40,19 +40,31 @@ py::tuple trajOpt_py(
 
 	Satellite::VecX x0 = x0_in;
 
-	Eigen::Matrix<double, 1, saltro::limits::MAX_LENGTH_TRAJ> jtime;
-	Eigen::Matrix<double, 4, saltro::limits::MAX_LENGTH_TRAJ> q_goal;
-	jtime.setZero();
-	q_goal.setZero();
+	// Use dynamic-sized matrices with heap allocation to avoid stack overflow
+	// These will be mapped to the fixed-size interface expected by C++ trajOpt
+	Eigen::Matrix<double, 1, Eigen::Dynamic> jtime_dyn(1, saltro::limits::MAX_LENGTH_TRAJ);
+	Eigen::Matrix<double, 4, Eigen::Dynamic> q_goal_dyn(4, saltro::limits::MAX_LENGTH_TRAJ);
+	jtime_dyn.setZero();
+	q_goal_dyn.setZero();
 
-	jtime.leftCols(jtime_length) = jtime_in.leftCols(jtime_length);
-	q_goal.leftCols(jtime_length) = q_goal_in.leftCols(jtime_length);
+	jtime_dyn.leftCols(jtime_length) = jtime_in.leftCols(jtime_length);
+	q_goal_dyn.leftCols(jtime_length) = q_goal_in.leftCols(jtime_length);
 
-	Eigen::Matrix<double, saltro::limits::MAX_STATE_DIM, saltro::limits::MAX_LENGTH_TRAJ> X;
-	Eigen::Matrix<double, saltro::limits::MAX_CTRL_DIM, saltro::limits::MAX_LENGTH_TRAJ> U;
-	saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
-	                     saltro::limits::MAX_STATE_DIM,
-	                     saltro::limits::MAX_LENGTH_TRAJ> K;
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> X_dyn(saltro::limits::MAX_STATE_DIM, saltro::limits::MAX_LENGTH_TRAJ);
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> U_dyn(saltro::limits::MAX_CTRL_DIM, saltro::limits::MAX_LENGTH_TRAJ);
+	X_dyn.setZero();
+	U_dyn.setZero();
+	
+	// Tensor3 must be heap-allocated due to its large size
+	auto K_ptr = new saltro::math::Tensor3<saltro::limits::MAX_CTRL_DIM,
+	                                        saltro::limits::MAX_STATE_DIM,
+	                                        saltro::limits::MAX_LENGTH_TRAJ>();
+
+	// Map dynamic matrices to fixed-size views for C++ function call
+	Eigen::Map<Eigen::Matrix<double, 1, saltro::limits::MAX_LENGTH_TRAJ>> jtime_map(jtime_dyn.data());
+	Eigen::Map<Eigen::Matrix<double, 4, saltro::limits::MAX_LENGTH_TRAJ>> q_goal_map(q_goal_dyn.data());
+	Eigen::Map<Eigen::Matrix<double, saltro::limits::MAX_STATE_DIM, saltro::limits::MAX_LENGTH_TRAJ>> X_map(X_dyn.data());
+	Eigen::Map<Eigen::Matrix<double, saltro::limits::MAX_CTRL_DIM, saltro::limits::MAX_LENGTH_TRAJ>> U_map(U_dyn.data());
 
 	const bool ok = saltro::optimizer::trajOpt(
 		settings,
@@ -60,12 +72,12 @@ py::tuple trajOpt_py(
 		x0,
 		r0,
 		v0,
-		jtime,
-		q_goal,
+		jtime_map,
+		q_goal_map,
 		jtime_length,
-		X,
-		U,
-		K
+		X_map,
+		U_map,
+		*K_ptr
 	);
 
 	const int nx = satellite.stateDim();
@@ -73,19 +85,20 @@ py::tuple trajOpt_py(
 	const int N = jtime_length;
 	const int N_u = std::max(0, N - 1);
 
-	Eigen::MatrixXd X_out = X.topRows(nx).leftCols(N);
-	Eigen::MatrixXd U_out = U.topRows(nu).leftCols(N_u);
+	Eigen::MatrixXd X_out = X_dyn.topRows(nx).leftCols(N);
+	Eigen::MatrixXd U_out = U_dyn.topRows(nu).leftCols(N_u);
 
 	py::array_t<double> K_out({N_u, nu, nx});
 	auto K_buf = K_out.mutable_unchecked<3>();
 	for (int k = 0; k < N_u; ++k) {
-		const auto& Kk = K.slice(k);
 		for (int i = 0; i < nu; ++i) {
 			for (int j = 0; j < nx; ++j) {
-				K_buf(k, i, j) = Kk(i, j);
+				K_buf(k, i, j) = K_ptr->slice(k)(i, j);
 			}
 		}
 	}
+	
+	delete K_ptr;
 
 	return py::make_tuple(ok, X_out, U_out, K_out);
 }
