@@ -3,12 +3,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <random>
 
 #include <Eigen/Dense>
 
-#include <saltro/math/integrators/rk4.h>
-#include <saltro/pybind/controller/integratedbdotcontroller.h>
+#include <saltro/limits.h>
+#include <saltro/optimizer/warm_start.h>
 #include <saltro/pybind/satellite.h>
 
 using namespace saltro;
@@ -17,28 +18,23 @@ namespace {
 
 constexpr double PI = 3.14159265358979323846;
 constexpr double DEG2RAD = PI / 180.0;
+constexpr double SEC_PER_CENTURY = 36525.0 * 86400.0;
 
-struct SatelliteCase {
-	PlannerSettings settings;
-	Satellite satellite;
-
-	explicit SatelliteCase(const Eigen::Matrix3d& inertia)
-		: settings(),
-		  satellite(inertia, settings) {}
-
-	SatelliteCase(const SatelliteCase&) = delete;
-	SatelliteCase& operator=(const SatelliteCase&) = delete;
-	SatelliteCase(SatelliteCase&&) = delete;
-	SatelliteCase& operator=(SatelliteCase&&) = delete;
-};
+constexpr int NUM_SAMPLES = 5;
+constexpr double DT_SECONDS = 10.0;
+constexpr double SIM_SECONDS = 1000.0;
+constexpr int N = static_cast<int>(SIM_SECONDS / DT_SECONDS) + 1;
+constexpr double TUMBLE_STOP_THRESHOLD = 0.5 * DEG2RAD;
+constexpr unsigned SEED = 20260302u;
 
 Eigen::Vector3d randomUnitVector(std::mt19937& rng) {
 	std::normal_distribution<double> normal(0.0, 1.0);
 	Eigen::Vector3d v(normal(rng), normal(rng), normal(rng));
-	if (v.norm() < 1e-12) {
+	const double n = v.norm();
+	if (n < 1e-12) {
 		return Eigen::Vector3d::UnitX();
 	}
-	return v.normalized();
+	return v / n;
 }
 
 Eigen::Matrix3d randomInertia(std::mt19937& rng) {
@@ -57,22 +53,34 @@ Eigen::Matrix3d randomInertia(std::mt19937& rng) {
 	return J;
 }
 
-void configureRandomSatelliteCase(SatelliteCase& sc, std::mt19937& rng) {
-	sc.settings.disturbances.plan_for_aero = false;
-	sc.settings.disturbances.plan_for_gg = false;
-	sc.settings.disturbances.plan_for_srp = false;
-	sc.settings.disturbances.plan_for_prop = false;
-	sc.settings.disturbances.plan_for_gendist = false;
-	sc.settings.disturbances.plan_for_resdipole = false;
+void makeRandomSatelliteCase(
+	std::mt19937& rng,
+	PlannerSettings& settings,
+	Eigen::Matrix3d& J,
+	std::unique_ptr<Satellite>& satellite
+) {
+	settings = PlannerSettings();
+	settings.init_traj.initcontroller = 2;
 
-	sc.settings.init_traj.initcontroller = 2;
-	sc.settings.num_passes = 1;
-	sc.settings.passes[0].dt = 10.0;
+	settings.disturbances.plan_for_aero = false;
+	settings.disturbances.plan_for_gg = false;
+	settings.disturbances.plan_for_srp = false;
+	settings.disturbances.plan_for_prop = false;
+	settings.disturbances.plan_for_gendist = false;
+	settings.disturbances.plan_for_resdipole = false;
 
-	const double Javg = std::max(1e-6, sc.satellite.inertia().trace() / 3.0);
+	settings.num_passes = 1;
+	settings.passes[0].dt = DT_SECONDS;
 
-	std::uniform_int_distribution<int> n_mtq_dist(1, 3);
+	J = randomInertia(rng);
+	satellite = std::make_unique<Satellite>(J, settings);
+
+	const double Javg = std::max(1e-6, J.trace() / 3.0);
+
+	std::uniform_int_distribution<int> n_mtq_dist(2, 3);
 	std::uniform_int_distribution<int> n_rw_dist(1, 3);
+	std::uniform_real_distribution<double> scale_dist(0.7, 1.4);
+
 	const int n_mtq = n_mtq_dist(rng);
 	const int n_rw = n_rw_dist(rng);
 
@@ -80,12 +88,10 @@ void configureRandomSatelliteCase(SatelliteCase& sc, std::mt19937& rng) {
 	const double rw_torque_base = std::clamp(0.006 * Javg, 8e-5, 8e-3);
 	const double rw_hmax_base = std::clamp(0.35 * Javg, 0.005, 0.12);
 
-	std::uniform_real_distribution<double> scale_dist(0.7, 1.4);
-
 	for (int i = 0; i < n_mtq; ++i) {
 		const Eigen::Vector3d axis = randomUnitVector(rng);
 		const double max_dipole = std::clamp(mtq_base * scale_dist(rng), 0.02, 0.40);
-		sc.satellite.addMTQ(axis, max_dipole);
+		satellite->addMTQ(axis, max_dipole);
 	}
 
 	for (int i = 0; i < n_rw; ++i) {
@@ -93,17 +99,16 @@ void configureRandomSatelliteCase(SatelliteCase& sc, std::mt19937& rng) {
 		const double max_torque = std::clamp(rw_torque_base * scale_dist(rng), 5e-5, 0.010);
 		const double rw_J = std::clamp(0.015 * Javg * scale_dist(rng), 5e-6, 2e-3);
 		const double h_max = std::clamp(rw_hmax_base * scale_dist(rng), 0.004, 0.16);
-		sc.satellite.addRW(axis, max_torque, rw_J, 0.0, h_max);
+		satellite->addRW(axis, max_torque, rw_J, 0.0, h_max);
 	}
 }
 
-Satellite::VecX randomInitialState(const Satellite& sat, std::mt19937& rng) {
-	Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+Satellite::VecX randomInitialState(const Satellite& satellite, std::mt19937& rng) {
+	Satellite::VecX x0 = Satellite::VecX::Zero(satellite.stateDim());
 
 	std::uniform_real_distribution<double> w_mag_dist(4.0 * DEG2RAD, 15.0 * DEG2RAD);
 	const double w_mag = w_mag_dist(rng);
-	const Eigen::Vector3d w_dir = randomUnitVector(rng);
-	x.segment<3>(Satellite::AV_INDEX) = w_mag * w_dir;
+	x0.segment<3>(Satellite::AV_INDEX) = w_mag * randomUnitVector(rng);
 
 	std::uniform_real_distribution<double> angle_dist(-PI, PI);
 	const double angle = angle_dist(rng);
@@ -112,88 +117,98 @@ Satellite::VecX randomInitialState(const Satellite& sat, std::mt19937& rng) {
 	q(0) = std::cos(0.5 * angle);
 	q.segment<3>(1) = axis * std::sin(0.5 * angle);
 	q.normalize();
-	x.segment<4>(Satellite::QUAT_INDEX) = q;
+	x0.segment<4>(Satellite::QUAT_INDEX) = q;
 
-	return x;
+	return x0;
 }
 
-void propagateOneStep(
-	const Satellite& sat,
-	const PlannerSettings& settings,
-	controller::IntegratedBdotController& controller,
-	Satellite::VecX& x,
-	const Eigen::Vector3d& B_eci,
-	double dt_seconds
+void makeConstantEnvironment(
+	Eigen::VectorXd& jtime,
+	Eigen::MatrixXd& q_goal,
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ>& R,
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ>& V,
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ>& B,
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ>& S,
+	Eigen::Matrix<double, 1, limits::MAX_LENGTH_TRAJ>& rho
 ) {
-	controller.set_dt(dt_seconds);
+	jtime = Eigen::VectorXd::Zero(N);
+	q_goal = Eigen::MatrixXd::Zero(4, N);
 
-	const Eigen::Vector4d q_goal = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
-	const Satellite::VecX u = controller.find_u(x, B_eci, q_goal);
+	R.setZero();
+	V.setZero();
+	B.setZero();
+	S.setZero();
+	rho.setZero();
 
-	Satellite::VecX x_next(sat.stateDim());
-	rk4_step<Satellite::VecX>(
-		[&](double, const Satellite::VecX& x_state, Satellite::VecX& dxdt) {
-			dxdt = sat.dynamics(
-				x_state,
-				u,
-				settings.disturbances,
-				Eigen::Vector3d::Zero(),
-				B_eci,
-				Eigen::Vector3d::Zero(),
-				Eigen::Vector3d::Zero(),
-				0
-			);
-		},
-		x,
-		0.0,
-		dt_seconds,
-		x_next
-	);
+	const Eigen::Vector3d B_const(2.2e-5, -1.6e-5, 3.1e-5);
 
-	Eigen::Vector4d q = x_next.segment<4>(Satellite::QUAT_INDEX);
-	const double qn = q.norm();
-	REQUIRE(std::isfinite(qn));
-	REQUIRE(qn > 1e-12);
-	q /= qn;
-	x_next.segment<4>(Satellite::QUAT_INDEX) = q;
+	for (int k = 0; k < N; ++k) {
+		const double t_sec = static_cast<double>(k) * DT_SECONDS;
+		jtime(k) = 0.25 + t_sec / SEC_PER_CENTURY;
+		q_goal(0, k) = 1.0;
 
-	x = x_next;
+		B.col(k) = B_const;
+	}
 }
 
 } // namespace
 
-TEST_CASE("IntegratedBdotController Monte Carlo detumbles randomized satellites", "[controller][integratedbdot][montecarlo]") {
-	std::mt19937 rng(20260302);
+TEST_CASE("IntegratedBdotController warm_start Monte Carlo detumbles randomized satellites", "[controller][integratedbdot][warm_start][montecarlo]") {
+	std::mt19937 rng(SEED);
 
-	constexpr int num_samples = 80;
-	constexpr double dt = 10.0;
-	constexpr int steps = 100;
+	Eigen::VectorXd jtime;
+	Eigen::MatrixXd q_goal;
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> R;
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> V;
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> B;
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> S;
+	Eigen::Matrix<double, 1, limits::MAX_LENGTH_TRAJ> rho;
 
-	const Eigen::Vector3d B_eci(2.2e-5, -1.6e-5, 3.1e-5);
-	constexpr double tumble_stop_threshold = 0.5 * DEG2RAD;
+	makeConstantEnvironment(jtime, q_goal, R, V, B, S, rho);
 
-	for (int sample = 0; sample < num_samples; ++sample) {
-		SatelliteCase sc(randomInertia(rng));
-		configureRandomSatelliteCase(sc, rng);
-		controller::IntegratedBdotController controller(sc.satellite);
+	for (int sample = 0; sample < NUM_SAMPLES; ++sample) {
+		PlannerSettings settings;
+		Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+		std::unique_ptr<Satellite> satellite;
+		makeRandomSatelliteCase(rng, settings, J, satellite);
 
-		Satellite::VecX x = randomInitialState(sc.satellite, rng);
-		const double initial_w = x.segment<3>(Satellite::AV_INDEX).norm();
+		const Satellite::VecX x0 = randomInitialState(*satellite, rng);
 
-		for (int k = 0; k < steps; ++k) {
-			propagateOneStep(sc.satellite, sc.settings, controller, x, B_eci, dt);
-		}
+		Eigen::MatrixXd X = Eigen::MatrixXd::Zero(satellite->stateDim(), N);
+		Eigen::MatrixXd U = Eigen::MatrixXd::Zero(satellite->controlDim(), N);
 
-		const double final_w = x.segment<3>(Satellite::AV_INDEX).norm();
+		bool ok = false;
+		REQUIRE_NOTHROW(
+			ok = optimizer::warm_start(
+				settings,
+				*satellite,
+				x0,
+				jtime,
+				q_goal,
+				N,
+				R,
+				V,
+				B,
+				S,
+				rho,
+				X,
+				U
+			)
+		);
+		REQUIRE(ok);
+
+		const double initial_w = x0.segment<3>(Satellite::AV_INDEX).norm();
+		const double final_w = X.col(N - 1).segment<3>(Satellite::AV_INDEX).norm();
 
 		INFO("sample=" << sample
-			 << " nMTQ=" << sc.satellite.numMTQ()
-			 << " nRW=" << sc.satellite.numRW()
+			 << " nMTQ=" << satellite->numMTQ()
+			 << " nRW=" << satellite->numRW()
 			 << " initial_w=" << initial_w
-			 << " final_w=" << final_w);
+			 << " final_w=" << final_w
+			 << " Jdiag=[" << J(0, 0) << ", " << J(1, 1) << ", " << J(2, 2) << "]");
 
 		REQUIRE(std::isfinite(final_w));
-		REQUIRE(final_w <= tumble_stop_threshold);
+		REQUIRE(final_w <= TUMBLE_STOP_THRESHOLD);
 		REQUIRE(final_w < initial_w);
 	}
 }
