@@ -1,29 +1,9 @@
 #include <saltro/optimizer/iLQR.h>
 #include <saltro/optimizer/backwardpass.h>
+#include <saltro/optimizer/forwardpass.h>
 
 #include <cmath>
 #include <vector>
-
-namespace {
-
-void forwardPassStub(
-	Eigen::Ref<Eigen::MatrixXd> X,
-	Eigen::Ref<Eigen::MatrixXd> U,
-	const std::vector<Eigen::MatrixXd>& K,
-	const std::vector<Eigen::VectorXd>& d,
-	const Eigen::Ref<const Eigen::Vector2d>& deltaV,
-	double J_prev,
-	double& J_new
-) {
-	(void)X;
-	(void)U;
-	(void)K;
-	(void)d;
-	(void)deltaV;
-	J_new = J_prev;
-}
-
-}
 
 namespace saltro::optimizer {
 
@@ -34,9 +14,10 @@ bool iLQR(
 	Eigen::Ref<Eigen::MatrixXd> U,
 	const Eigen::Ref<const Eigen::MatrixXd>& R,
 	const Eigen::Ref<const Eigen::MatrixXd>& V,
-	Eigen::Ref<Eigen::MatrixXd> B,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
 	const Eigen::Ref<const Eigen::MatrixXd>& S,
 	const Eigen::Ref<const Eigen::MatrixXd>& rho,
+	const Eigen::Ref<const Eigen::VectorXd>& jtime,
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 	const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
 	double& J
@@ -69,7 +50,25 @@ bool iLQR(
 			return false;
 		}
 
-		forwardPassStub(X, U, K, d, deltaV, J_prev, J);
+		forwardPass(
+			satellite,
+			X,
+			U,
+			K,
+			d,
+			deltaV,
+			B,
+			R,
+			V,
+			S,
+			rho,
+			boresight,
+			attitude_target,
+			settings,
+			jtime,
+			J_prev,
+			J
+		);
 		++iter;
 	}
 

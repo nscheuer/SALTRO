@@ -34,9 +34,10 @@ bool iLQR(
 	Eigen::Ref<Eigen::MatrixXd> U,
 	const Eigen::Ref<const Eigen::MatrixXd>& R,  // position trajectory (3 x N)
 	const Eigen::Ref<const Eigen::MatrixXd>& V,  // velocity trajectory (3 x N)
-	Eigen::Ref<Eigen::MatrixXd> B,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
 	const Eigen::Ref<const Eigen::MatrixXd>& S,  // sun direction trajectory (3 x N)
 	const Eigen::Ref<const Eigen::MatrixXd>& rho,  // density trajectory (1 x N)
+	const Eigen::Ref<const Eigen::VectorXd>& jtime, // julian centuries times (N)
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 	const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
 	double& J
