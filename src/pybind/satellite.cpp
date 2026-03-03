@@ -129,15 +129,15 @@ void Satellite::updateInertiaNoRW() {
     invJcom_noRW_ = Jcom_noRW_.inverse();
 }
 
-std::pair<Satellite::Vec4, bool> Satellite::processECITarget(
-    const Vec4& eci_target, const Vec3& sat_direction, const Vec4& q_current_unused) const {
+std::pair<Satellite::Vec4, bool> Satellite::processAttitudeTarget(
+    const Vec4& attitude_target, const Vec3& sat_direction, const Vec4& q_current_unused) const {
     (void)q_current_unused;  // Not used in current implementation
     
     // Check if this is ECI format: first element is NaN
-    if (isECIFormat(eci_target)) {
+    if (isECIFormat(attitude_target)) {
         // ECI goal vector format: [nan, x, y, z]
         // In this case, we want to align sat_direction with the ECI vector
-        Vec3 eci_vec = eci_target.tail(3);
+        Vec3 eci_vec = attitude_target.tail(3);
         Vec3 eci_normalized = eci_vec.normalized();
         Vec3 sat_dir_normalized = sat_direction.normalized();
         
@@ -174,7 +174,7 @@ std::pair<Satellite::Vec4, bool> Satellite::processECITarget(
         }
     } else {
         // Quaternion goal vector format: [q0, qx, qy, qz]
-        return std::make_pair(eci_target.normalized(), false);
+        return std::make_pair(attitude_target.normalized(), false);
     }
 }
 
@@ -972,7 +972,7 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
 }
 
 double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
-                            const Vec3& sat_direction, const Vec4& eci_target,
+                            const Vec3& sat_direction, const Vec4& attitude_target,
                             const Vec3& B_eci, const CostConfig& cost_cfg) const {
     if (N <= 0) {
         throw invalid_argument("N must be positive in stageCost().");
@@ -997,12 +997,12 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
     const Vec3 w = x.segment<3>(AV_INDEX);
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     
-    // Process eci_target to handle both ECI vector and quaternion formats
-    auto [q_goal, is_eci_format] = processECITarget(eci_target, sat_direction, q);
+    // Process attitude_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, sat_direction, q);
     
     // Disable angle cost if ECI target is invalid
     double w_ang_eff = w_ang;
-    if (is_eci_format && eci_target.tail(3).norm() < 1e-9) {
+    if (is_eci_format && attitude_target.tail(3).norm() < 1e-9) {
         w_ang_eff = 0.0;
     }
 
@@ -1089,15 +1089,15 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
     return state_cost + cross_cost + state_mag_cost + control_cost + rw_momentum_cost + rw_stiction_cost;
 }
 
-double Satellite::terminalCost(const VecX& x, const Vec3& sat_direction, const Vec4& eci_target,
+double Satellite::terminalCost(const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target,
                                const Vec3& B_eci, const CostConfig& cost_cfg) const {
     const VecX u_zero = VecX::Zero(controlDim());
-    return stageCost(0, 1, x, u_zero, sat_direction, eci_target, B_eci, cost_cfg);
+    return stageCost(0, 1, x, u_zero, sat_direction, attitude_target, B_eci, cost_cfg);
 }
 
 std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCostJacobians(
     int k, int N, const VecX& x, const VecX& u,
-    const Vec3& sat_direction, const Vec4& eci_target,
+    const Vec3& sat_direction, const Vec4& attitude_target,
     const Vec3& B_eci, const CostConfig& cost_cfg) const {
     
     if (N <= 0) {
@@ -1130,12 +1130,12 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     const Vec3 w = x.segment<3>(AV_INDEX);
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     
-    // Process eci_target to handle both ECI vector and quaternion formats
-    auto [q_goal, is_eci_format] = processECITarget(eci_target, sat_direction, q);
+    // Process attitude_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, sat_direction, q);
     
     // Disable angle cost if ECI target is invalid
     double w_ang_eff = w_ang;
-    if (is_eci_format && eci_target.tail(3).norm() < 1e-9) {
+    if (is_eci_format && attitude_target.tail(3).norm() < 1e-9) {
         w_ang_eff = 0.0;
     }
 
@@ -1326,15 +1326,15 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
 }
 
 std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::terminalCostJacobians(
-    const VecX& x, const Vec3& sat_direction, const Vec4& eci_target,
+    const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target,
     const Vec3& B_eci, const CostConfig& cost_cfg) const {
     const VecX u_zero = VecX::Zero(controlDim());
-    return stageCostJacobians(0, 1, x, u_zero, sat_direction, eci_target, B_eci, cost_cfg);
+    return stageCostJacobians(0, 1, x, u_zero, sat_direction, attitude_target, B_eci, cost_cfg);
 }
 
 std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCostHessians(
     int k, int N, const VecX& x, const VecX& u,
-    const Vec3& sat_direction, const Vec4& eci_target,
+    const Vec3& sat_direction, const Vec4& attitude_target,
     const Vec3& B_eci, const CostConfig& cost_cfg) const {
 
     if (N <= 0) {
@@ -1367,12 +1367,12 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     const Vec3 w = x.segment<3>(AV_INDEX);
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
 
-    // Process eci_target to handle both ECI vector and quaternion formats
-    auto [q_goal, is_eci_format] = processECITarget(eci_target, sat_direction, q);
+    // Process attitude_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, sat_direction, q);
     
     // Disable angle cost if ECI target is invalid
     double w_ang_eff = w_ang;
-    if (is_eci_format && eci_target.tail(3).norm() < 1e-9) {
+    if (is_eci_format && attitude_target.tail(3).norm() < 1e-9) {
         w_ang_eff = 0.0;
     }
 
@@ -1396,13 +1396,13 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     {
         const double eps = 1e-8;
         VecX x_pert = x;
-        auto lx_base = stageCostJacobians(k, N, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+        auto lx_base = stageCostJacobians(k, N, x, u, sat_direction, attitude_target, B_eci, cost_cfg);
         VecX grad_base = std::get<0>(lx_base);
 
         for (int j = 0; j < 4; ++j) {
             x_pert = x;
             x_pert(QUAT_INDEX + j) += eps;
-            auto lx_pert = stageCostJacobians(k, N, x_pert, u, sat_direction, eci_target, B_eci, cost_cfg);
+            auto lx_pert = stageCostJacobians(k, N, x_pert, u, sat_direction, attitude_target, B_eci, cost_cfg);
             VecX grad_pert = std::get<0>(lx_pert);
 
             VecX d_grad = (grad_pert - grad_base) / eps;
@@ -1483,16 +1483,16 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
 }
 
 std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::terminalCostHessians(
-    const VecX& x, const Vec3& sat_direction, const Vec4& eci_target,
+    const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target,
     const Vec3& B_eci, const CostConfig& cost_cfg) const {
     const VecX u_zero = VecX::Zero(controlDim());
-    return stageCostHessians(0, 1, x, u_zero, sat_direction, eci_target, B_eci, cost_cfg);
+    return stageCostHessians(0, 1, x, u_zero, sat_direction, attitude_target, B_eci, cost_cfg);
 }
 
 double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
                             const Eigen::Ref<const Eigen::MatrixXd>& U,
                             const Eigen::Ref<const Eigen::MatrixXd>& B,
-                            const Vec4& eci_target,
+                            const Vec4& attitude_target,
                             const CostConfig& cost_cfg) const {
     const int N = X.rows();
     const int nx = stateDim();
@@ -1533,7 +1533,7 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
         VecX u_k = U.row(k);
         Vec3 B_k = B.col(k);
         
-        double stage_cost = stageCost(k, N, x_k, u_k, sat_direction, eci_target, B_k, cost_cfg);
+        double stage_cost = stageCost(k, N, x_k, u_k, sat_direction, attitude_target, B_k, cost_cfg);
         J_total += stage_cost;
     }
     
@@ -1541,7 +1541,7 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
     VecX x_final = X.row(N - 1);
     Vec3 B_final = B.col(N - 1);
     
-    double terminal_cost = terminalCost(x_final, sat_direction, eci_target, B_final, cost_cfg);
+    double terminal_cost = terminalCost(x_final, sat_direction, attitude_target, B_final, cost_cfg);
     J_total += terminal_cost;
     
     return J_total;

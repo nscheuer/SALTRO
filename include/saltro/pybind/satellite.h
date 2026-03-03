@@ -393,13 +393,13 @@ public:
      * @param x State at step k.
      * @param u Control at step k.
      * @param sat_direction Target direction for satellite (body frame).
-     * @param eci_target Target quaternion in ECI frame.
+    * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field (ECI).
      * @param cost_cfg Cost configuration.
      * @return Scalar cost value.
      */
     double stageCost(int k, int N, const VecX& x, const VecX& u, 
-                    const Vec3& sat_direction, const Vec4& eci_target, 
+                    const Vec3& sat_direction, const Vec4& attitude_target, 
                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -407,12 +407,12 @@ public:
      * 
      * @param x Final state.
      * @param sat_direction Target satellite direction.
-     * @param eci_target Target quaternion.
+    * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Scalar terminal cost.
      */
-    double terminalCost(const VecX& x, const Vec3& sat_direction, const Vec4& eci_target, 
+    double terminalCost(const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target, 
                        const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -426,13 +426,13 @@ public:
      * @param x State.
      * @param u Control.
      * @param sat_direction Target direction.
-     * @param eci_target Target quaternion.
+    * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Tuple of (∇_x J, ∇_u J).
      */
     std::tuple<VecX, MatX, MatX> stageCostJacobians(int k, int N, const VecX& x, const VecX& u, 
-                                                    const Vec3& sat_direction, const Vec4& eci_target, 
+                                                    const Vec3& sat_direction, const Vec4& attitude_target, 
                                                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -442,12 +442,12 @@ public:
      * 
      * @param x State.
      * @param sat_direction Target direction.
-     * @param eci_target Target quaternion.
+    * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Tuple of (∇_x J, ∇_u J).
      */
-    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& sat_direction, const Vec4& eci_target, 
+    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target, 
                                                        const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -458,13 +458,13 @@ public:
      * @param x State.
      * @param u Control.
      * @param sat_direction Target direction.
-     * @param eci_target Target quaternion.
+    * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
      */
     std::tuple<MatX, MatX, MatX> stageCostHessians(int k, int N, const VecX& x, const VecX& u, 
-                                                   const Vec3& sat_direction, const Vec4& eci_target, 
+                                                   const Vec3& sat_direction, const Vec4& attitude_target, 
                                                    const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -474,12 +474,12 @@ public:
      * 
      * @param x State.
      * @param sat_direction Target direction.
-     * @param eci_target Target quaternion.
+    * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
      */
-    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& sat_direction, const Vec4& eci_target, 
+    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target, 
                                                       const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -490,7 +490,7 @@ public:
      * @param X State trajectory matrix (N × state_dim). Each row is state at step k.
      * @param U Control trajectory matrix ((N-1) × control_dim). Each row k is control from k to k+1.
      * @param B Magnetic field at each step (3 × N).
-     * @param eci_target Target quaternion in ECI frame.
+    * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param cost_cfg Cost configuration.
      * @return Total trajectory cost J = Σ_k c(x_k, u_k) + c_terminal(x_N).
      * 
@@ -499,7 +499,7 @@ public:
     double totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
                     const Eigen::Ref<const Eigen::MatrixXd>& U,
                     const Eigen::Ref<const Eigen::MatrixXd>& B,
-                    const Vec4& eci_target,
+                    const Vec4& attitude_target,
                     const CostConfig& cost_cfg) const;
 
     /**
@@ -578,17 +578,17 @@ private:
     void updateInertiaNoRW();
 
     /**
-     * @brief Helper to handle dual format of eci_target parameter.
+    * @brief Helper to handle dual format of attitude_target parameter.
      * 
-     * eci_target can be in two formats:
+    * attitude_target can be in two formats:
      * 1. ECI goal vector: [nan, x, y, z] - position vector with NaN in first element
      * 2. Quaternion goal vector: [q0, qx, qy, qz] - valid quaternion
      * 
-     * @param eci_target The target vector (4D)
+    * @param attitude_target The target vector (4D)
      * @param sat_direction Satellite direction vector (used only for ECI vector format)
      * @param q_current Current quaternion state
      * @return Pair<q_goal_quaternion, is_eci_format>
      */
-    std::pair<Vec4, bool> processECITarget(const Vec4& eci_target, const Vec3& sat_direction, const Vec4& q_current) const;
+    std::pair<Vec4, bool> processAttitudeTarget(const Vec4& attitude_target, const Vec3& sat_direction, const Vec4& q_current) const;
 
 };

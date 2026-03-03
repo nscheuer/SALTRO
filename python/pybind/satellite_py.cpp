@@ -460,7 +460,7 @@ tuple[Tensor3, Tensor3, Tensor3]
              py::arg("x"),
              py::arg("u"),
              py::arg("sat_direction"),
-             py::arg("eci_target"),
+             py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
              R"doc(
@@ -485,8 +485,8 @@ u : ndarray
     Control vector: [MTQ_controls (numMTQ), RW_controls (numRW)]
 sat_direction : ndarray (3,)
     Satellite direction (currently unused, may be reserved)
-eci_target : ndarray (4,)
-    Target quaternion in ECI frame (normalized)
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
     Magnetic field vector in ECI frame (Tesla)
 cost_cfg : CostConfig
@@ -500,7 +500,7 @@ float
         .def("terminalCost", &Satellite::terminalCost,
              py::arg("x"),
              py::arg("sat_direction"),
-             py::arg("eci_target"),
+             py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
              R"doc(
@@ -515,8 +515,8 @@ x : ndarray
     State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
 sat_direction : ndarray (3,)
     Satellite direction (currently unused)
-eci_target : ndarray (4,)
-    Target quaternion in ECI frame (normalized)
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
     Magnetic field vector in ECI frame (Tesla)
 cost_cfg : CostConfig
@@ -533,7 +533,7 @@ float
              py::arg("x"),
              py::arg("u"),
              py::arg("sat_direction"),
-             py::arg("eci_target"),
+             py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
              R"doc(
@@ -553,8 +553,8 @@ u : ndarray
     Control vector (size: controlDim)
 sat_direction : ndarray (3,)
     Satellite direction vector
-eci_target : ndarray (4,)
-    Target quaternion (normalized)
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
     Magnetic field in ECI frame
 cost_cfg : CostConfig
@@ -571,7 +571,7 @@ tuple[ndarray, ndarray, ndarray]
         .def("terminalCostJacobians", &Satellite::terminalCostJacobians,
              py::arg("x"),
              py::arg("sat_direction"),
-             py::arg("eci_target"),
+             py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
              R"doc(
@@ -583,8 +583,8 @@ x : ndarray
     State vector (size: stateDim)
 sat_direction : ndarray (3,)
     Satellite direction vector
-eci_target : ndarray (4,)
-    Target quaternion (normalized)
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
     Magnetic field in ECI frame
 cost_cfg : CostConfig
@@ -601,7 +601,7 @@ tuple[ndarray, ndarray, ndarray]
              py::arg("x"),
              py::arg("u"),
              py::arg("sat_direction"),
-             py::arg("eci_target"),
+             py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
              R"doc(
@@ -622,8 +622,8 @@ u : ndarray
     Control vector (size: controlDim)
 sat_direction : ndarray (3,)
     Satellite direction vector
-eci_target : ndarray (4,)
-    Target quaternion (normalized)
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
     Magnetic field in ECI frame
 cost_cfg : CostConfig
@@ -646,7 +646,7 @@ Notes
         .def("terminalCostHessians", &Satellite::terminalCostHessians,
              py::arg("x"),
              py::arg("sat_direction"),
-             py::arg("eci_target"),
+             py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
              R"doc(
@@ -658,8 +658,8 @@ x : ndarray
     State vector (size: stateDim)
 sat_direction : ndarray (3,)
     Satellite direction vector
-eci_target : ndarray (4,)
-    Target quaternion (normalized)
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
     Magnetic field in ECI frame
 cost_cfg : CostConfig
@@ -674,7 +674,7 @@ tuple[ndarray, ndarray, ndarray]
              py::arg("X"),
              py::arg("U"),
              py::arg("B"),
-             py::arg("eci_target"),
+             py::arg("attitude_target"),
              py::arg("cost_cfg"),
              R"doc(
 Compute total trajectory cost.
@@ -697,8 +697,8 @@ U : ndarray ((N-1), control_dim)
 B : ndarray (3, N)
     Magnetic field vector at each time step.
     Must have 3 rows (x, y, z components) and N columns.
-eci_target : ndarray (4,)
-    Target quaternion in ECI frame (normalized unit quaternion).
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z].
     Used for all stage and terminal cost evaluations.
 cost_cfg : CostConfig
     Cost weighting configuration specifying:
