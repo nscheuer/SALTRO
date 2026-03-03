@@ -1431,3 +1431,97 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     REQUIRE(std::isfinite(cost_small));
     REQUIRE(std::isfinite(cost_large));
 }
+
+// ============================================================================
+// TEST SECTION 10: Mid-run boresight switching behavior
+// ============================================================================
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Angle cost increases after mid-run boresight switch for ECI-vector target",
+    "[cost][boresight][midrun_switch]") {
+    const int N = 20;
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    cost_cfg.angle_N = 1e3;
+    cost_cfg.ang_vel = 0.0;
+    cost_cfg.ang_vel_N = 0.0;
+    cost_cfg.ang_vel_mag = 0.0;
+    cost_cfg.ang_vel_mag_N = 0.0;
+    cost_cfg.ang_vel_err_dir = 0.0;
+    cost_cfg.ang_vel_err_dir_N = 0.0;
+    cost_cfg.control_mult = 0.0;
+
+    // ECI-vector target: +X
+    Eigen::Vector4d attitude_target(std::nan(""), 1.0, 0.0, 0.0);
+
+    // Before switch: boresight aligned with target (+X)
+    Eigen::Vector3d boresight_before(1.0, 0.0, 0.0);
+    // After switch: boresight rotated away (+Y)
+    Eigen::Vector3d boresight_after(0.0, 1.0, 0.0);
+
+    const double cost_before = sat.stageCost(4, N, x, u, boresight_before, attitude_target, B_eci, cost_cfg);
+    const double cost_after = sat.stageCost(15, N, x, u, boresight_after, attitude_target, B_eci, cost_cfg);
+
+    REQUIRE(std::isfinite(cost_before));
+    REQUIRE(std::isfinite(cost_after));
+    REQUIRE(cost_before < cost_after);
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Total cost reflects boresight switch history",
+    "[cost][boresight][totalCost_switch]") {
+    const int N = 20;
+    const int nx = sat.stateDim();
+    const int nu = sat.controlDim();
+
+    Eigen::MatrixXd X = Eigen::MatrixXd::Zero(N, nx);
+    Eigen::MatrixXd U = Eigen::MatrixXd::Zero(N - 1, nu);
+    Eigen::MatrixXd B_hist = Eigen::MatrixXd::Zero(3, N);
+
+    // Keep state fixed at identity quaternion and zero angular velocity.
+    for (int k = 0; k < N; ++k) {
+        X(k, Satellite::QUAT_INDEX + 0) = 1.0;
+    }
+
+    Eigen::MatrixXd boresight_aligned = Eigen::MatrixXd::Zero(3, N);
+    Eigen::MatrixXd boresight_switched = Eigen::MatrixXd::Zero(3, N);
+
+    // Fully aligned schedule: +X for all k.
+    boresight_aligned.row(0).setOnes();
+
+    // Switched schedule: +X for first half, +Y for second half.
+    for (int k = 0; k < N; ++k) {
+        if (k < N / 2) {
+            boresight_switched(0, k) = 1.0;
+        } else {
+            boresight_switched(1, k) = 1.0;
+        }
+    }
+
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    cost_cfg.angle_N = 1e3;
+    cost_cfg.ang_vel = 0.0;
+    cost_cfg.ang_vel_N = 0.0;
+    cost_cfg.ang_vel_mag = 0.0;
+    cost_cfg.ang_vel_mag_N = 0.0;
+    cost_cfg.ang_vel_err_dir = 0.0;
+    cost_cfg.ang_vel_err_dir_N = 0.0;
+    cost_cfg.control_mult = 0.0;
+
+    Eigen::Vector4d attitude_target(std::nan(""), 1.0, 0.0, 0.0);
+
+    const double J_aligned = sat.totalCost(X, U, B_hist, boresight_aligned, attitude_target, cost_cfg);
+    const double J_switched = sat.totalCost(X, U, B_hist, boresight_switched, attitude_target, cost_cfg);
+
+    REQUIRE(std::isfinite(J_aligned));
+    REQUIRE(std::isfinite(J_switched));
+    REQUIRE(J_switched > J_aligned);
+}

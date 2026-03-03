@@ -1318,6 +1318,74 @@ class TestECITargetDualFormat:
         assert np.isfinite(cost_small), "Cost finite for small magnitude ECI vector"
         assert np.isfinite(cost_large), "Cost finite for larger magnitude ECI vector"
 
+    def test_angle_cost_increases_after_midrun_boresight_switch(self, fixture):
+        """Switching boresight mid-run should increase angle cost when target is fixed in ECI."""
+        N = 20
+        x = np.zeros(fixture.sat.stateDim)
+        x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX + 4] = [1.0, 0.0, 0.0, 0.0]
+        u = np.zeros(fixture.sat.controlDim)
+        B_eci = np.zeros(3)
+
+        cost_cfg = saltro.CostConfig()
+        cost_cfg.angle = 1e3
+        cost_cfg.angle_N = 1e3
+        cost_cfg.ang_vel = 0.0
+        cost_cfg.ang_vel_N = 0.0
+        cost_cfg.ang_vel_mag = 0.0
+        cost_cfg.ang_vel_mag_N = 0.0
+        cost_cfg.ang_vel_err_dir = 0.0
+        cost_cfg.ang_vel_err_dir_N = 0.0
+        cost_cfg.control_mult = 0.0
+
+        attitude_target = np.array([np.nan, 1.0, 0.0, 0.0])
+        boresight_before = np.array([1.0, 0.0, 0.0])
+        boresight_after = np.array([0.0, 1.0, 0.0])
+
+        cost_before = fixture.sat.stageCost(4, N, x, u, boresight_before, attitude_target, B_eci, cost_cfg)
+        cost_after = fixture.sat.stageCost(15, N, x, u, boresight_after, attitude_target, B_eci, cost_cfg)
+
+        assert np.isfinite(cost_before)
+        assert np.isfinite(cost_after)
+        assert cost_before < cost_after
+
+    def test_total_cost_reflects_boresight_switch_history(self, fixture):
+        """totalCost should increase when boresight history switches away from a fixed ECI target."""
+        N = 20
+        nx = fixture.sat.stateDim
+        nu = fixture.sat.controlDim
+
+        X = np.zeros((N, nx))
+        X[:, fixture.sat.QUAT_INDEX] = 1.0
+        U = np.zeros((N - 1, nu))
+        B = np.zeros((3, N))
+
+        boresight_aligned = np.zeros((3, N))
+        boresight_aligned[0, :] = 1.0
+
+        boresight_switched = np.zeros((3, N))
+        boresight_switched[0, : N // 2] = 1.0
+        boresight_switched[1, N // 2 :] = 1.0
+
+        cost_cfg = saltro.CostConfig()
+        cost_cfg.angle = 1e3
+        cost_cfg.angle_N = 1e3
+        cost_cfg.ang_vel = 0.0
+        cost_cfg.ang_vel_N = 0.0
+        cost_cfg.ang_vel_mag = 0.0
+        cost_cfg.ang_vel_mag_N = 0.0
+        cost_cfg.ang_vel_err_dir = 0.0
+        cost_cfg.ang_vel_err_dir_N = 0.0
+        cost_cfg.control_mult = 0.0
+
+        attitude_target = np.array([np.nan, 1.0, 0.0, 0.0])
+
+        J_aligned = fixture.sat.totalCost(X, U, B, boresight_aligned, attitude_target, cost_cfg)
+        J_switched = fixture.sat.totalCost(X, U, B, boresight_switched, attitude_target, cost_cfg)
+
+        assert np.isfinite(J_aligned)
+        assert np.isfinite(J_switched)
+        assert J_switched > J_aligned
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
