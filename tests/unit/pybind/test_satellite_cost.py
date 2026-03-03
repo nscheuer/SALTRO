@@ -1354,9 +1354,9 @@ class TestECITargetDualFormat:
         nx = fixture.sat.stateDim
         nu = fixture.sat.controlDim
 
-        X = np.zeros((N, nx))
-        X[:, fixture.sat.QUAT_INDEX] = 1.0
-        U = np.zeros((N - 1, nu))
+        X = np.zeros((nx, N))
+        X[fixture.sat.QUAT_INDEX, :] = 1.0
+        U = np.zeros((nu, N - 1))
         B = np.zeros((3, N))
 
         boresight_aligned = np.zeros((3, N))

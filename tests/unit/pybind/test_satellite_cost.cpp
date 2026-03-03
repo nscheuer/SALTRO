@@ -1481,13 +1481,13 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     const int nx = sat.stateDim();
     const int nu = sat.controlDim();
 
-    Eigen::MatrixXd X = Eigen::MatrixXd::Zero(N, nx);
-    Eigen::MatrixXd U = Eigen::MatrixXd::Zero(N - 1, nu);
+    Eigen::MatrixXd X = Eigen::MatrixXd::Zero(nx, N);
+    Eigen::MatrixXd U = Eigen::MatrixXd::Zero(nu, N - 1);
     Eigen::MatrixXd B_hist = Eigen::MatrixXd::Zero(3, N);
 
     // Keep state fixed at identity quaternion and zero angular velocity.
     for (int k = 0; k < N; ++k) {
-        X(k, Satellite::QUAT_INDEX + 0) = 1.0;
+        X(Satellite::QUAT_INDEX + 0, k) = 1.0;
     }
 
     Eigen::MatrixXd boresight_aligned = Eigen::MatrixXd::Zero(3, N);

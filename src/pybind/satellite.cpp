@@ -1495,34 +1495,34 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
                             const Eigen::Ref<const Eigen::MatrixXd>& boresight,
                             const Vec4& attitude_target,
                             const CostConfig& cost_cfg) const {
-    const int N = X.rows();
     const int nx = stateDim();
     const int nu = controlDim();
-    
-    if (X.cols() != nx) {
+    const int N = X.cols();
+
+    if (X.rows() != nx) {
         throw std::invalid_argument(
-            "totalCost: X has " + std::to_string(X.cols()) + 
-            " columns, expected " + std::to_string(nx));
+            "totalCost: X has " + std::to_string(X.rows()) +
+            " rows, expected " + std::to_string(nx) + " (nx x N layout)");
     }
-    if (U.rows() != N - 1) {
+    if (U.rows() != nu) {
         throw std::invalid_argument(
-            "totalCost: U has " + std::to_string(U.rows()) + 
-            " rows, expected " + std::to_string(N - 1));
+            "totalCost: U has " + std::to_string(U.rows()) +
+            " rows, expected " + std::to_string(nu) + " (nu x N-1 layout)");
     }
-    if (U.cols() != nu) {
+    if (U.cols() != N - 1) {
         throw std::invalid_argument(
-            "totalCost: U has " + std::to_string(U.cols()) + 
-            " columns, expected " + std::to_string(nu));
-    }
-    if (B.cols() != N) {
-        throw std::invalid_argument(
-            "totalCost: B has " + std::to_string(B.cols()) + 
-            " columns, expected " + std::to_string(N));
+            "totalCost: U has " + std::to_string(U.cols()) +
+            " columns, expected " + std::to_string(N - 1));
     }
     if (B.rows() != 3) {
         throw std::invalid_argument(
-            "totalCost: B has " + std::to_string(B.rows()) + 
+            "totalCost: B has " + std::to_string(B.rows()) +
             " rows, expected 3");
+    }
+    if (B.cols() != N) {
+        throw std::invalid_argument(
+            "totalCost: B has " + std::to_string(B.cols()) +
+            " columns, expected " + std::to_string(N));
     }
     if (boresight.cols() != N) {
         throw std::invalid_argument(
@@ -1538,20 +1538,20 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
     double J_total = 0.0;
     // Sum stage costs for k = 0 to N-2
     for (int k = 0; k < N - 1; ++k) {
-        VecX x_k = X.row(k);
-        VecX u_k = U.row(k);
+        VecX x_k = X.col(k);
+        VecX u_k = U.col(k);
         Vec3 B_k = B.col(k);
         Vec3 boresight_k = boresight.col(k);
-        
+
         double stage_cost = stageCost(k, N, x_k, u_k, boresight_k, attitude_target, B_k, cost_cfg);
         J_total += stage_cost;
     }
-    
+
     // Terminal cost at k = N-1
-    VecX x_final = X.row(N - 1);
+    VecX x_final = X.col(N - 1);
     Vec3 B_final = B.col(N - 1);
     Vec3 boresight_final = boresight.col(N - 1);
-    
+
     double terminal_cost = terminalCost(x_final, boresight_final, attitude_target, B_final, cost_cfg);
     J_total += terminal_cost;
     

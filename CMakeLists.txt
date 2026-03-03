@@ -52,7 +52,7 @@ target_link_libraries(saltro PUBLIC Eigen3::Eigen)
 
 if(SALTRO_BUILD_PYTHON)
 
-    file(GLOB_RECURSE PYTHON_BINDING_SOURCES_TEMP
+    file(GLOB_RECURSE PYTHON_BINDING_SOURCES_TEMP CONFIGURE_DEPENDS
         ${CMAKE_SOURCE_DIR}/python/*_py.cpp
     )
 
