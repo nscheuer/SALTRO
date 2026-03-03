@@ -17,7 +17,8 @@ py::tuple trajOpt_py(
 	const Eigen::Vector3d& r0,
 	const Eigen::Vector3d& v0,
 	const Eigen::Ref<const Eigen::VectorXd>& jtime,
-	const Eigen::Ref<const Eigen::MatrixXd>& q_goal
+	const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight
 )
 {
 	const int N = static_cast<int>(jtime.size());
@@ -33,6 +34,12 @@ py::tuple trajOpt_py(
 
 	if (q_goal.rows() != 4)
 		throw std::runtime_error("q_goal must have shape (4, N)");
+
+	if (boresight.cols() != N)
+		throw std::runtime_error("boresight must have N columns matching jtime length");
+
+	if (boresight.rows() != 3)
+		throw std::runtime_error("boresight must have shape (3, N)");
 
 	const int state_dim = satellite.stateDim();
 	const int input_dim = satellite.controlDim();
@@ -61,6 +68,7 @@ py::tuple trajOpt_py(
 		v0,
 		jtime,
 		q_goal,
+		boresight,
 		X,
 		U,
 		K,
@@ -84,6 +92,7 @@ void bind_trajOpt(py::module_& m)
 		py::arg("v0"),
 		py::arg("jtime"),
 		py::arg("q_goal"),
+		py::arg("boresight"),
 		R"doc(
 Run trajectory optimization.
 
@@ -101,6 +110,8 @@ jtime : ndarray (N,)
 	Julian times
 q_goal : ndarray (4,N)
 	Goal quaternion sequence
+boresight : ndarray (3,N)
+	Boresight direction sequence
 
 Returns
 -------

@@ -9,6 +9,7 @@
 #include <saltro/validation/validate_orbitstate.h>
 #include <saltro/validation/validate_juliantime.h>
 #include <saltro/validation/validate_qgoal.h>
+#include <saltro/validation/validate_boresight.h>
 
 namespace saltro::validation {
 
@@ -19,6 +20,7 @@ bool validateTrajOptCrossContext(
     const Eigen::Ref<const Eigen::VectorXd>& x0,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
+    const Eigen::Ref<const Eigen::MatrixXd>& boresight,
     const int state_dim,
     const int input_dim,
     const int N,
@@ -74,6 +76,16 @@ bool validateTrajOptCrossContext(
         return false;
     }
 
+    if (boresight.cols() != N) {
+        error_msg = "boresight column count does not match N";
+        return false;
+    }
+
+    if (boresight.rows() != 3) {
+        error_msg = "boresight must have 3 rows";
+        return false;
+    }
+
     return true;
 }
 
@@ -87,6 +99,7 @@ bool validatetrajOpt(
     const Eigen::Vector3d& v0,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
+    const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 
     int state_dim,
     int input_dim,
@@ -126,7 +139,12 @@ bool validatetrajOpt(
         return false;
     }
 
-    if (!validateTrajOptCrossContext(satellite, x0, jtime, q_goal, state_dim, input_dim, N, nested_error)) {
+    if (!validateBoresight(boresight, nested_error)) {
+        error_msg = "Boresight validation failed: " + nested_error;
+        return false;
+    }
+
+    if (!validateTrajOptCrossContext(satellite, x0, jtime, q_goal, boresight, state_dim, input_dim, N, nested_error)) {
         error_msg = "Cross-context validation failed: " + nested_error;
         return false;
     }

@@ -16,6 +16,7 @@ bool validatetrajOpt(
     const Eigen::Vector3d& v0,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
+    const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 
     int state_dim,
     int input_dim,
