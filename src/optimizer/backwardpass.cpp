@@ -2,7 +2,60 @@
 
 namespace saltro::optimizer {
 
-void backwardPass(
+/**
+ * @brief Solve a single Riccati step.
+ *
+ * Given the regularized control cost Hessian Q_uu_reg and related Q-matrices,
+ * computes the feedback gain K and feedforward term d, then propagates
+ * the value function (P, p) backward one timestep using Riccati equations.
+ */
+void solveRiccattiStep(
+	const Eigen::Ref<const Eigen::MatrixXd>& Q_uu_reg,
+	const Eigen::Ref<const Eigen::MatrixXd>& Q_uu,
+	const Eigen::Ref<const Eigen::VectorXd>& Q_u,
+	const Eigen::Ref<const Eigen::MatrixXd>& Q_ux,
+	const Eigen::Ref<const Eigen::MatrixXd>& Q_xx,
+	const Eigen::Ref<const Eigen::VectorXd>& Q_x,
+	int k,
+	std::vector<Eigen::MatrixXd>& K,
+	std::vector<Eigen::VectorXd>& d,
+	Eigen::Ref<Eigen::Vector2d> deltaV,
+	Eigen::Ref<Eigen::VectorXd> p_k,
+	Eigen::Ref<Eigen::MatrixXd> P_k
+) {
+	// Compute Q_uu_reg^{-1} using LLT
+	Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
+	
+	// Solve for feedback gain K_k = -(Q_uu + ρI)^{-1} * Q_ux
+	Eigen::MatrixXd K_k = -llt.solve(Q_ux);
+	K[k] = K_k;
+	
+	// Solve for feedforward term d_k = -(Q_uu + ρI)^{-1} * Q_u
+	Eigen::VectorXd d_k = -llt.solve(Q_u);
+	d[k] = d_k;
+	
+	// Riccati update for value function Hessian
+	// P_k = Q_xx + K_k^T * Q_uu * K_k + K_k^T * Q_ux + Q_ux^T * K_k
+	P_k = Q_xx 
+	  + K_k.transpose() * Q_uu * K_k 
+	  + K_k.transpose() * Q_ux 
+	  + Q_ux.transpose() * K_k;
+	
+	// Riccati update for value function gradient
+	// p_k = Q_x + K_k^T * Q_uu * d_k + K_k^T * Q_u + Q_ux^T * d_k
+	p_k = Q_x 
+	  + K_k.transpose() * Q_uu * d_k 
+	  + K_k.transpose() * Q_u 
+	  + Q_ux.transpose() * d_k;
+	
+	// Accumulate expected cost reduction
+	// V_1k = d_k^T * Q_u
+	// V_2k = 1/2 * d_k^T * Q_uu * d_k
+	deltaV(0) += d_k.dot(Q_u);
+	deltaV(1) += 0.5 * d_k.dot(Q_uu * d_k);
+}
+
+bool backwardPass(
 	const Satellite& satellite,
 	const Eigen::Ref<const Eigen::MatrixXd>& X,
 	const Eigen::Ref<const Eigen::MatrixXd>& U,
@@ -13,22 +66,26 @@ void backwardPass(
 	const Eigen::Ref<const Eigen::MatrixXd>& rho,
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 	const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
-	const CostConfig& cost_cfg,
-	Eigen::Ref<Eigen::MatrixXd> K,
-	Eigen::Ref<Eigen::MatrixXd> d,
+	const PlannerSettings& settings,
+	std::vector<Eigen::MatrixXd>& K,
+	std::vector<Eigen::VectorXd>& d,
 	Eigen::Ref<Eigen::Vector2d> deltaV
 ) {
-	const int N = X.rows();
-	const int nx = satellite.stateDim();
-	const int nu = satellite.controlDim();
+	(void)rho;  // Suppress unused parameter warning
+	const CostConfig& cost_cfg = settings.passes[0].cost;
+	const RegularizationConfig& reg_cfg = settings.passes[0].reg;
+
+	int N = static_cast<int>(X.cols());   // Number of timesteps
+	int nx = static_cast<int>(X.rows());  // State dimension
+	int nu = static_cast<int>(U.rows()); // Control dimension
 
 	// Initialize terminal cost-to-go: p_N and P_N
-	Eigen::VectorXd x_final = X.row(N - 1);
+	Eigen::VectorXd x_final = X.col(N - 1);
 	Eigen::Vector3d boresight_final = boresight.col(N - 1);
 	Eigen::Vector3d B_final = B.col(N - 1);
 
-	auto [p_N, _, __] = satellite.terminalCostJacobians(x_final, boresight_final, attitude_target, B_final, cost_cfg);
-	auto [P_N, ___, ____] = satellite.terminalCostHessians(x_final, boresight_final, attitude_target, B_final, cost_cfg);
+	auto [p_N, p_unused1, p_unused2] = satellite.terminalCostJacobians(x_final, boresight_final, attitude_target, B_final, cost_cfg);
+	auto [P_N, P_unused1, P_unused2] = satellite.terminalCostHessians(x_final, boresight_final, attitude_target, B_final, cost_cfg);
 
 	// Initialize value function at terminal time
 	Eigen::VectorXd p_k = p_N;
@@ -40,14 +97,13 @@ void backwardPass(
 	// Backward loop: k from N-2 down to 0
 	for (int k = N - 2; k >= 0; --k) {
 		// Extract trajectory data at time k
-		const Eigen::VectorXd x_k = X.row(k);
-		const Eigen::VectorXd u_k = U.row(k);
+		const Eigen::VectorXd x_k = X.col(k);
+		const Eigen::VectorXd u_k = U.col(k);
 		const Eigen::Vector3d B_k = B.col(k);
 		const Eigen::Vector3d boresight_k = boresight.col(k);
 		const Eigen::Vector3d R_k = R.col(k);
 		const Eigen::Vector3d V_k = V.col(k);
 		const Eigen::Vector3d S_k = S.col(k);
-		const int rho_k = static_cast<int>(rho(0, k));
 		
 		// Step 1: Compute stage cost Jacobians and Hessians
 		auto [lx, lu_mat, lux_grad] = satellite.stageCostJacobians(k, N, x_k, u_k, boresight_k, attitude_target, B_k, cost_cfg);
@@ -57,7 +113,7 @@ void backwardPass(
 		Eigen::VectorXd lu = lu_mat.row(0);
 		
 		// Step 2: Compute dynamics Jacobians
-		auto [A_k, B_k_dyn, _] = satellite.dynamicsJacobians(x_k, u_k, dist_config, R_k, B_k, S_k, V_k);
+		auto [A_k, B_k_dyn, dyn_unused] = satellite.dynamicsJacobians(x_k, u_k, dist_config, R_k, B_k, S_k, V_k);
 		
 		// Step 3: Assemble Q matrices
 		Eigen::MatrixXd Q_xx = lxx + A_k.transpose() * P_k * A_k;
@@ -66,16 +122,32 @@ void backwardPass(
 		Eigen::VectorXd Q_x = lx + A_k.transpose() * p_k;
 		Eigen::VectorXd Q_u = lu + B_k_dyn.transpose() * p_k;
 		
-		// TODO: Check convexity of Q_uu
-		// TODO: Compute K_k and d_k via linear solve
-		// TODO: Update P_k and p_k using Riccati
-		// TODO: Accumulate deltaV
-		(void)Q_xx; (void)Q_uu; (void)Q_ux; (void)Q_x; (void)Q_u; (void)rho_k;
+		// Step 4: Regularization loop - increase rho until Q_uu + rho*I is positive definite
+		double rho_reg = reg_cfg.reg_init;
+		bool converged = false;
+		
+		while (rho_reg <= reg_cfg.reg_max) {
+			Eigen::MatrixXd Q_uu_reg = Q_uu + rho_reg * Eigen::MatrixXd::Identity(nu, nu);
+			Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
+			
+			if (llt.info() == Eigen::Success) {
+				// Q_uu_reg is positive definite - solve for gains
+				solveRiccattiStep(Q_uu_reg, Q_uu, Q_u, Q_ux, Q_xx, Q_x, k, K, d, deltaV, p_k, P_k);
+				converged = true;
+				break;
+			}
+			// Increase regularization and try again
+			rho_reg *= reg_cfg.reg_scale;
+		}
+		
+		if (!converged) {
+			// Regularization failed - return false
+			return false;
+		}
 	}
 	
-	K.setZero();
-	d.setZero();
-	deltaV.setZero();
-}
+	return true;
+
+} 
 
 } // namespace saltro::optimizer

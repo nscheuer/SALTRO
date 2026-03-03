@@ -2,14 +2,15 @@
 #include <saltro/optimizer/backwardpass.h>
 
 #include <cmath>
+#include <vector>
 
 namespace {
 
 void forwardPassStub(
 	Eigen::Ref<Eigen::MatrixXd> X,
 	Eigen::Ref<Eigen::MatrixXd> U,
-	const Eigen::Ref<const Eigen::MatrixXd>& K,
-	const Eigen::Ref<const Eigen::MatrixXd>& d,
+	const std::vector<Eigen::MatrixXd>& K,
+	const std::vector<Eigen::VectorXd>& d,
 	const Eigen::Ref<const Eigen::Vector2d>& deltaV,
 	double J_prev,
 	double& J_new
@@ -46,13 +47,27 @@ bool iLQR(
 
 	double J_prev = J + 2.0 * ilqr_cfg.cost_tol;
 	int iter = 0;
-	Eigen::MatrixXd K = Eigen::MatrixXd::Zero(U.rows(), X.cols());
-	Eigen::MatrixXd d = Eigen::MatrixXd::Zero(U.rows(), U.cols());
+	
+	// Preallocate gain and feedforward term vectors
+	int N = X.cols();   // Number of timesteps
+	int nx = X.rows();  // State dimension
+	int nu = U.rows();  // Control dimension
+	std::vector<Eigen::MatrixXd> K(N - 1);
+	std::vector<Eigen::VectorXd> d(N - 1);
+	for (int k = 0; k < N - 1; ++k) {
+		K[k] = Eigen::MatrixXd::Zero(nu, nx);
+		d[k] = Eigen::VectorXd::Zero(nu);
+	}
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	while (std::abs(J_prev - J) > ilqr_cfg.cost_tol && iter < ilqr_cfg.max_iters) {
 		J_prev = J;
-		backwardPass(satellite, X, U, R, V, B, S, rho, boresight, attitude_target, cost_cfg, K, d, deltaV);
+		bool bp_success = backwardPass(satellite, X, U, R, V, B, S, rho, boresight, attitude_target, settings, K, d, deltaV);
+		
+		if (!bp_success) {
+			// Backward pass numerical failure
+			return false;
+		}
 
 		forwardPassStub(X, U, K, d, deltaV, J_prev, J);
 		++iter;
