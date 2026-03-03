@@ -17,8 +17,10 @@ namespace saltro::optimizer {
  * @param satellite Satellite model with dynamics and cost functions
  * @param X Input trajectory (state matrix, N x state_dim). Modified in-place with optimized trajectory.
  * @param U Input control sequence (N-1 x control_dim). Modified in-place with optimized controls.
- * @param B Input magnetic field trajectory (N x 3). Used for dynamics and cost evaluations.
- * @param J Output cost vector (length N), containing stage costs at each time step
+ * @param B Input magnetic field trajectory (3 x N)
+ * @param boresight Input boresight trajectory (3 x N)
+ * @param attitude_target Attitude goal in quaternion mode [q0,qx,qy,qz] or ECI mode [nan,x,y,z]
+ * @param J Output total trajectory cost for the current rollout.
  *
  * @return true if optimization succeeded, false if convergence or numerical issues occurred
  *
@@ -30,8 +32,14 @@ bool iLQR(
 	const Satellite& satellite,
 	Eigen::Ref<Eigen::MatrixXd> X,
 	Eigen::Ref<Eigen::MatrixXd> U,
-    Eigen::Ref<Eigen::VectorXd> B,
-	Eigen::Ref<Eigen::VectorXd> J
+	const Eigen::Ref<const Eigen::MatrixXd>& R,  // position trajectory (3 x N)
+	const Eigen::Ref<const Eigen::MatrixXd>& V,  // velocity trajectory (3 x N)
+	Eigen::Ref<Eigen::MatrixXd> B,
+	const Eigen::Ref<const Eigen::MatrixXd>& S,  // sun direction trajectory (3 x N)
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,  // density trajectory (1 x N)
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
+	double& J
 );
 
 } // namespace saltro::optimizer
