@@ -670,6 +670,70 @@ Returns
 tuple[ndarray, ndarray, ndarray]
     (lxx, luu, lux) - Hessian matrices w.r.t. state and control
 )doc")
+        .def("totalCost", &Satellite::totalCost,
+             py::arg("X"),
+             py::arg("U"),
+             py::arg("B"),
+             py::arg("eci_target"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute total trajectory cost.
+
+Sums stage costs for all intermediate steps and terminal cost at the final step.
+This is a convenience function for evaluating the complete trajectory cost:
+
+    J_total = Σ_{k=0}^{N-2} c_k(x_k, u_k) + c_N(x_{N-1})
+
+where c_k is stageCost and c_N is terminalCost.
+
+Parameters
+----------
+X : ndarray (N, state_dim)
+    State trajectory matrix where row k is the state at time step k.
+    Must have exactly stateDim columns.
+U : ndarray ((N-1), control_dim)
+    Control trajectory matrix where row k is the control applied from step k to k+1.
+    Must have N-1 rows and exactly controlDim columns.
+B : ndarray (3, N)
+    Magnetic field vector at each time step.
+    Must have 3 rows (x, y, z components) and N columns.
+eci_target : ndarray (4,)
+    Target quaternion in ECI frame (normalized unit quaternion).
+    Used for all stage and terminal cost evaluations.
+cost_cfg : CostConfig
+    Cost weighting configuration specifying:
+    - attitude/angular velocity weights (stage and terminal)
+    - control effort weights
+    - RW momentum management weights
+    - magnetic alignment weights
+    - cost function type (linear, quadratic, arccos, etc.)
+
+Returns
+-------
+float
+    Total trajectory cost J_total (non-negative scalar).
+    Lower values indicate better trajectories.
+
+Raises
+------
+ValueError
+    If dimensions of X, U, or B do not match trajectory size
+    
+Examples
+--------
+>>> import saltro
+>>> sat = saltro.Satellite(J, settings)
+>>> # X: (100, 10), U: (99, 6), B: (3, 100)
+>>> J = sat.totalCost(X, U, B, q_target, cost_cfg)
+>>> print(f"Trajectory cost: {J}")
+
+Notes
+-----
+- The satellite direction is set to zero for this convenience function.
+  Use explicit stageCost calls if you need to vary sat_direction.
+- For large trajectories, this is more efficient than summing individual
+  stageCost calls in Python, as it avoids Python-C++ overhead.
+)doc")
         
         // State index constants
         .def_readonly_static("AV_INDEX", &Satellite::AV_INDEX,

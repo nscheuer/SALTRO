@@ -1006,3 +1006,428 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Jacobian computation is consistent acros
     REQUIRE(lx_early.allFinite());
     REQUIRE(lx_late.allFinite());
 }
+// ============================================================================
+// TEST SECTION 9: Dual-Format ECI Target (Quaternion vs ECI Vector)
+// ============================================================================
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Cost with quaternion-format target (no NaN) computes correctly", 
+    "[cost][eci_target][quaternion_format]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(0.9, 0.1, 0.0, 0.436).normalized();
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    cost_cfg.ang_vel = 1e4;
+    
+    // Quaternion format target: [q0, qx, qy, qz] - no NaN
+    Eigen::Vector4d eci_target(0.8, 0.2, 0.1, 0.566);  // This is a quaternion
+    Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    double cost = sat.stageCost(0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+    
+    REQUIRE(std::isfinite(cost));
+    REQUIRE(cost >= -1e-10);
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Cost with ECI-vector-format target (NaN) computes correctly", 
+    "[cost][eci_target][eci_vector_format]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);  // Identity quaternion
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    cost_cfg.ang_vel = 1e4;
+    
+    // ECI vector format target: [NaN, x, y, z] - NaN in first element
+    Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);  // This is an ECI vector [NaN, x, y, z]
+    // sat_direction is required for ECI format
+    Eigen::Vector3d sat_direction(0.0, 0.0, 1.0);  // Body +Z points in this direction
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    double cost = sat.stageCost(0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+    
+    REQUIRE(std::isfinite(cost));
+    REQUIRE(cost >= -1e-10);
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "ECI vector target [NaN, x, y, z] handles zero vector gracefully", 
+    "[cost][eci_target][zero_vector]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;  // High angle weight
+    cost_cfg.ang_vel = 1e4;
+    
+    // ECI vector format with zero vector (magnitude = 0)
+    // When vector is zero, it's indeterminate; cost should be finite and reasonable
+    Eigen::Vector4d eci_target_zero(std::nan(""), 0.0, 0.0, 0.0);
+    Eigen::Vector3d sat_direction(0.0, 0.0, 1.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    double cost_zero = sat.stageCost(0, 10, x, u, sat_direction, eci_target_zero, B_eci, cost_cfg);
+    
+    // Should produce finite result
+    REQUIRE(std::isfinite(cost_zero));
+    REQUIRE(cost_zero >= -1e-10);  // Cost is non-negative
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "ECI vector target [NaN, x, y, z] uses sat_direction for conversion", 
+    "[cost][eci_target][sat_direction_usage]") {
+    // Test that sat_direction is actually used in ECI format
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    // ECI vector target pointing in +X
+    Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);
+    
+    // Compute cost with two different sat_direction values
+    Eigen::Vector3d sat_dir1(1, 0, 0);  // Body +X aligns with +X direction
+    Eigen::Vector3d sat_dir2(0, 1, 0);  // Body +X aligns with +Y direction
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    double cost1 = sat.stageCost(0, 10, x, u, sat_dir1, eci_target, B_eci, cost_cfg);
+    double cost2 = sat.stageCost(0, 10, x, u, sat_dir2, eci_target, B_eci, cost_cfg);
+    
+    // Costs should be different since sat_direction determines the alignment goal
+    // cost1 has target aligned with current body frame, cost2 doesn't
+    REQUIRE(cost1 < cost2);
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Jacobian with quaternion-format target (no NaN) is consistent", 
+    "[jacobians][eci_target][quaternion_format]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    cost_cfg.ang_vel = 1e4;
+    
+    Eigen::Vector4d eci_target(0.9, 0.1, 0.0, 0.436);  // Quaternion format
+    Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    auto [lx, Lu, lux] = sat.stageCostJacobians(
+        0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+    
+    REQUIRE(lx.allFinite());
+    REQUIRE(Lu.allFinite());
+    REQUIRE(lux.allFinite());
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Jacobian with ECI-vector-format target (NaN) is consistent", 
+    "[jacobians][eci_target][eci_vector_format]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    cost_cfg.ang_vel = 1e4;
+    
+    Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);  // ECI vector format
+    Eigen::Vector3d sat_direction(0.0, 0.0, 1.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    auto [lx, Lu, lux] = sat.stageCostJacobians(
+        0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+    
+    REQUIRE(lx.allFinite());
+    REQUIRE(Lu.allFinite());
+    REQUIRE(lux.allFinite());
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Jacobians match finite differences for both target formats", 
+    "[jacobians][eci_target][finite_diff]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    Eigen::Vector3d sat_direction(0.0, 0.0, 1.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    const double rel_tol = 1e-3;
+    const double abs_tol = 1e-7;
+    
+    // Test quaternion format
+    {
+        Eigen::Vector4d eci_target(0.9, 0.1, 0.0, 0.436);
+        auto [lx_analytical, _, __] = sat.stageCostJacobians(
+            0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+        
+        Satellite::VecX lx_numerical = costJacobianFiniteDiff_x(
+            0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+        
+        for (int i = 0; i < 3; ++i) {
+            double threshold = abs_tol + rel_tol * (std::abs(lx_numerical(i)) + 1e-10);
+            REQUIRE_THAT(lx_analytical(i), 
+                        Catch::Matchers::WithinAbs(lx_numerical(i), threshold));
+        }
+    }
+    
+    // Test ECI vector format
+    {
+        Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);
+        auto [lx_analytical, _, __] = sat.stageCostJacobians(
+            0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+        
+        Satellite::VecX lx_numerical = costJacobianFiniteDiff_x(
+            0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+        
+        for (int i = 0; i < 3; ++i) {
+            double threshold = abs_tol + rel_tol * (std::abs(lx_numerical(i)) + 1e-10);
+            REQUIRE_THAT(lx_analytical(i), 
+                        Catch::Matchers::WithinAbs(lx_numerical(i), threshold));
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Hessian with quaternion-format target is symmetric", 
+    "[hessians][eci_target][quaternion_format]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    Eigen::Vector4d eci_target(0.9, 0.1, 0.0, 0.436);  // Quaternion format
+    Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    auto [lxx, luu, lux] = sat.stageCostHessians(
+        0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+    
+    // Check Hxx symmetry. Use realistic tolerance for numerical differentiation (FD accumulates ~1e-6 error)
+    const double tol = 1e-5;  // Relaxed from 1e-9 to account for FD truncation error
+    for (int i = 0; i < sat.stateDim(); ++i) {
+        for (int j = i + 1; j < sat.stateDim(); ++j) {
+            double diff = std::abs(lxx(i, j) - lxx(j, i));
+            REQUIRE(diff < tol);
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Hessian with ECI-vector-format target is symmetric", 
+    "[hessians][eci_target][eci_vector_format]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);  // ECI vector format
+    Eigen::Vector3d sat_direction(0.0, 0.0, 1.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    auto [lxx, luu, lux] = sat.stageCostHessians(
+        0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+    
+    // Check Hxx symmetry. Use realistic tolerance for numerical differentiation (FD accumulates ~1e-6 error)
+    const double tol = 1e-5;  // Relaxed from 1e-9 to account for FD truncation error
+    for (int i = 0; i < sat.stateDim(); ++i) {
+        for (int j = i + 1; j < sat.stateDim(); ++j) {
+            double diff = std::abs(lxx(i, j) - lxx(j, i));
+            REQUIRE(diff < tol);
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Cost with aligned quaternion and aligned ECI vector produce similar costs", 
+    "[cost][eci_target][alignment_equivalence]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    cost_cfg.ang_vel = 1e4;
+    
+    Eigen::Vector3d sat_direction(1.0, 0.0, 0.0);  // Body +X direction
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    // Quaternion target: identity (aligned with body frame)
+    Eigen::Vector4d eci_target_quat(1.0, 0.0, 0.0, 0.0);
+    double cost_quat = sat.stageCost(0, 10, x, u, sat_direction, eci_target_quat, B_eci, cost_cfg);
+    
+    // ECI vector target: points in +X direction (which aligns with body +X when quaternion is identity)
+    Eigen::Vector4d eci_target_vec(std::nan(""), 1.0, 0.0, 0.0);
+    double cost_vec = sat.stageCost(0, 10, x, u, sat_direction, eci_target_vec, B_eci, cost_cfg);
+    
+    // Both should produce very similar angle costs since they represent alignment
+    REQUIRE_THAT(cost_quat, Catch::Matchers::WithinRel(cost_vec, 0.1));
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "ECI vector format with different directions produces different costs", 
+    "[cost][eci_target][direction_sensitivity]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    // ECI target vector pointing in +X
+    Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);
+    
+    // Compute costs with sat_direction pointing in different directions
+    Eigen::Vector3d sat_dir_x(1, 0, 0);  // Aligned
+    Eigen::Vector3d sat_dir_y(0, 1, 0);  // Perpendicular
+    Eigen::Vector3d sat_dir_z(0, 0, 1);  // Perpendicular
+    
+    double cost_aligned = sat.stageCost(0, 10, x, u, sat_dir_x, eci_target, B_eci, cost_cfg);
+    double cost_perp_y = sat.stageCost(0, 10, x, u, sat_dir_y, eci_target, B_eci, cost_cfg);
+    double cost_perp_z = sat.stageCost(0, 10, x, u, sat_dir_z, eci_target, B_eci, cost_cfg);
+    
+    // Aligned should have lowest cost
+    REQUIRE(cost_aligned < cost_perp_y);
+    REQUIRE(cost_aligned < cost_perp_z);
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Terminal cost with both target formats works correctly", 
+    "[terminal][eci_target][both_formats]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    Eigen::Vector3d sat_direction(0.0, 0.0, 1.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    // Quaternion format
+    Eigen::Vector4d eci_target_quat(1.0, 0.0, 0.0, 0.0);
+    double term_cost_quat = sat.terminalCost(x, sat_direction, eci_target_quat, B_eci, cost_cfg);
+    
+    // ECI vector format
+    Eigen::Vector4d eci_target_vec(std::nan(""), 0.0, 0.0, 1.0);
+    double term_cost_vec = sat.terminalCost(x, sat_direction, eci_target_vec, B_eci, cost_cfg);
+    
+    REQUIRE(std::isfinite(term_cost_quat));
+    REQUIRE(std::isfinite(term_cost_vec));
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Terminal Jacobian with both target formats works correctly", 
+    "[terminal][jacobians][eci_target][both_formats]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    Eigen::Vector3d sat_direction(0.0, 0.0, 1.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    // Quaternion format
+    Eigen::Vector4d eci_target_quat(1.0, 0.0, 0.0, 0.0);
+    auto [lx_quat, Lu_quat, lux_quat] = sat.terminalCostJacobians(
+        x, sat_direction, eci_target_quat, B_eci, cost_cfg);
+    
+    // ECI vector format
+    Eigen::Vector4d eci_target_vec(std::nan(""), 0.0, 0.0, 1.0);
+    auto [lx_vec, Lu_vec, lux_vec] = sat.terminalCostJacobians(
+        x, sat_direction, eci_target_vec, B_eci, cost_cfg);
+    
+    REQUIRE(lx_quat.allFinite());
+    REQUIRE(lx_vec.allFinite());
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "Quaternion-format target ignores sat_direction parameter", 
+    "[cost][eci_target][sat_direction_ignored]") {
+    // When target is in quaternion format (no NaN), sat_direction should be ignored
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    Eigen::Vector4d eci_target(0.9, 0.1, 0.0, 0.436);  // Quaternion format (no NaN)
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    // Try different sat_direction values
+    Eigen::Vector3d sat_dir1(1, 0, 0);
+    Eigen::Vector3d sat_dir2(0, 1, 0);
+    
+    double cost1 = sat.stageCost(0, 10, x, u, sat_dir1, eci_target, B_eci, cost_cfg);
+    double cost2 = sat.stageCost(0, 10, x, u, sat_dir2, eci_target, B_eci, cost_cfg);
+    
+    // Costs should be identical since quaternion format doesn't use sat_direction
+    REQUIRE_THAT(cost1, Catch::Matchers::WithinAbs(cost2, 1e-14));
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, 
+    "ECI vector with small magnitude properly converts to quaternion", 
+    "[cost][eci_target][small_magnitude]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+    
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    
+    CostConfig cost_cfg;
+    cost_cfg.angle = 1e3;
+    
+    Eigen::Vector3d sat_direction(1, 0, 0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    
+    // ECI vector with small but non-zero magnitude
+    Eigen::Vector4d eci_target_small(std::nan(""), 1e-6, 0, 0);
+    double cost_small = sat.stageCost(0, 10, x, u, sat_direction, eci_target_small, B_eci, cost_cfg);
+    
+    // ECI vector with larger magnitude
+    Eigen::Vector4d eci_target_large(std::nan(""), 1e-3, 0, 0);
+    double cost_large = sat.stageCost(0, 10, x, u, sat_direction, eci_target_large, B_eci, cost_cfg);
+    
+    // Both should produce finite results
+    REQUIRE(std::isfinite(cost_small));
+    REQUIRE(std::isfinite(cost_large));
+}

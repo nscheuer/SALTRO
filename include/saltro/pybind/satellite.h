@@ -483,6 +483,26 @@ public:
                                                       const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
+     * @brief Compute total trajectory cost.
+     * 
+     * Sums stage costs for all intermediate steps and terminal cost at final step.
+     * 
+     * @param X State trajectory matrix (N × state_dim). Each row is state at step k.
+     * @param U Control trajectory matrix ((N-1) × control_dim). Each row k is control from k to k+1.
+     * @param B Magnetic field at each step (3 × N).
+     * @param eci_target Target quaternion in ECI frame.
+     * @param cost_cfg Cost configuration.
+     * @return Total trajectory cost J = Σ_k c(x_k, u_k) + c_terminal(x_N).
+     * 
+     * @note sat_direction argument is set to zero for this convenience function.
+     */
+    double totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
+                    const Eigen::Ref<const Eigen::MatrixXd>& U,
+                    const Eigen::Ref<const Eigen::MatrixXd>& B,
+                    const Vec4& eci_target,
+                    const CostConfig& cost_cfg) const;
+
+    /**
      * @brief Evaluate constraints.
      * 
      * Returns constraint violation vector. Zero means satisfied.
@@ -556,5 +576,19 @@ private:
      * @brief Recompute inertia with and without RW contributions.
      */
     void updateInertiaNoRW();
+
+    /**
+     * @brief Helper to handle dual format of eci_target parameter.
+     * 
+     * eci_target can be in two formats:
+     * 1. ECI goal vector: [nan, x, y, z] - position vector with NaN in first element
+     * 2. Quaternion goal vector: [q0, qx, qy, qz] - valid quaternion
+     * 
+     * @param eci_target The target vector (4D)
+     * @param sat_direction Satellite direction vector (used only for ECI vector format)
+     * @param q_current Current quaternion state
+     * @return Pair<q_goal_quaternion, is_eci_format>
+     */
+    std::pair<Vec4, bool> processECITarget(const Vec4& eci_target, const Vec3& sat_direction, const Vec4& q_current) const;
 
 };

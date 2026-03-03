@@ -30,6 +30,13 @@ inline double safeNorm(const Eigen::Vector3d& v) {
     return std::isfinite(n) ? n : 0.0;
 }
 
+/**
+ * @brief Helper to check if first element is NaN (indicating ECI format).
+ */
+inline bool isECIFormat(const Eigen::Vector4d& vec) {
+    return std::isnan(vec(0));
+}
+
 }
 
 Satellite::Satellite() {
@@ -120,6 +127,55 @@ void Satellite::updateInertiaNoRW() {
     }
     
     invJcom_noRW_ = Jcom_noRW_.inverse();
+}
+
+std::pair<Satellite::Vec4, bool> Satellite::processECITarget(
+    const Vec4& eci_target, const Vec3& sat_direction, const Vec4& q_current_unused) const {
+    (void)q_current_unused;  // Not used in current implementation
+    
+    // Check if this is ECI format: first element is NaN
+    if (isECIFormat(eci_target)) {
+        // ECI goal vector format: [nan, x, y, z]
+        // In this case, we want to align sat_direction with the ECI vector
+        Vec3 eci_vec = eci_target.tail(3);
+        Vec3 eci_normalized = eci_vec.normalized();
+        Vec3 sat_dir_normalized = sat_direction.normalized();
+        
+        // Compute the rotation from sat_direction to eci_vec
+        // For simplicity, return a quaternion that represents this alignment
+        // The quaternion is used to compute alignment cost
+        Vec3 axis = sat_dir_normalized.cross(eci_normalized);
+        double axis_norm = axis.norm();
+        
+        if (axis_norm < 1e-8) {
+            // Vectors are parallel
+            double dot_prod = sat_dir_normalized.dot(eci_normalized);
+            if (dot_prod > 0) {
+                // Already aligned
+                return std::make_pair(Vec4(1.0, 0.0, 0.0, 0.0), true);
+            } else {
+                // Opposite direction - need 180 degree rotation around arbitrary perpendicular
+                Vec3 perp = (std::abs(sat_dir_normalized(0)) < 0.9) 
+                    ? Vec3(1.0, 0.0, 0.0) 
+                    : Vec3(0.0, 1.0, 0.0);
+                perp = perp - (perp.dot(sat_dir_normalized)) * sat_dir_normalized;
+                perp = perp.normalized();
+                return std::make_pair(Vec4(0.0, perp(0), perp(1), perp(2)), true);
+            }
+        } else {
+            // General case: compute quaternion for rotation
+            axis = axis.normalized();
+            double angle = std::acos(std::clamp(sat_dir_normalized.dot(eci_normalized), -1.0, 1.0));
+            double half_angle = angle / 2.0;
+            Vec4 q_goal;
+            q_goal(0) = std::cos(half_angle);
+            q_goal.tail(3) = std::sin(half_angle) * axis;
+            return std::make_pair(q_goal.normalized(), true);
+        }
+    } else {
+        // Quaternion goal vector format: [q0, qx, qy, qz]
+        return std::make_pair(eci_target.normalized(), false);
+    }
 }
 
 Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Vec3& B_eci) const {
@@ -931,8 +987,6 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
         throw invalid_argument("Control vector has insufficient dimension in stageCost().");
     }
 
-    (void)sat_direction;
-
     const bool terminal = (k >= N - 1);
     const double w_ang = terminal ? cost_cfg.angle_N : cost_cfg.angle;
     const double w_av = terminal ? cost_cfg.ang_vel_N : cost_cfg.ang_vel;
@@ -942,7 +996,15 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
 
     const Vec3 w = x.segment<3>(AV_INDEX);
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
-    const Vec4 q_goal = eci_target.normalized();
+    
+    // Process eci_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processECITarget(eci_target, sat_direction, q);
+    
+    // Disable angle cost if ECI target is invalid
+    double w_ang_eff = w_ang;
+    if (is_eci_format && eci_target.tail(3).norm() < 1e-9) {
+        w_ang_eff = 0.0;
+    }
 
     const double qdot = q_goal.dot(q);
     const double abs_qdot = clampUnit(safeAbs(qdot));
@@ -1023,7 +1085,7 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
         }
     }
 
-    const double state_cost = 0.5 * w_av * w.squaredNorm() + w_ang * ang_cost;
+    const double state_cost = 0.5 * w_av * w.squaredNorm() + w_ang_eff * ang_cost;
     return state_cost + cross_cost + state_mag_cost + control_cost + rw_momentum_cost + rw_stiction_cost;
 }
 
@@ -1051,8 +1113,6 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         throw invalid_argument("Control vector has insufficient dimension in stageCostJacobians().");
     }
 
-    (void)sat_direction;
-
     const int nx = stateDim();
     const int nu = controlDim();
     
@@ -1069,7 +1129,15 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
 
     const Vec3 w = x.segment<3>(AV_INDEX);
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
-    const Vec4 q_goal = eci_target.normalized();
+    
+    // Process eci_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processECITarget(eci_target, sat_direction, q);
+    
+    // Disable angle cost if ECI target is invalid
+    double w_ang_eff = w_ang;
+    if (is_eci_format && eci_target.tail(3).norm() < 1e-9) {
+        w_ang_eff = 0.0;
+    }
 
     const double qdot = q_goal.dot(q);
     const double abs_qdot = clampUnit(safeAbs(qdot));
@@ -1134,7 +1202,7 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     Vec4 dqdot_dq = q_goal;
     
     // ∂L/∂q from attitude cost: w_ang * ∂(ang_cost)/∂(qdot) * ∂(qdot)/∂q
-    lx.segment<4>(QUAT_INDEX) = w_ang * d_ang_cost_dqdot * dqdot_dq;
+    lx.segment<4>(QUAT_INDEX) = w_ang_eff * d_ang_cost_dqdot * dqdot_dq;
 
     // ∂(cross_cost)/∂q = ∂/∂q[-sign(qdot) * (q_goal^T * W * w) * w_avang]
     // = -sign(qdot)*w_avang * ∂(q_goal^T * W * w)/∂q
@@ -1282,8 +1350,6 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         throw invalid_argument("Control vector has insufficient dimension in stageCostHessians().");
     }
 
-    (void)sat_direction;
-
     const int nx = stateDim();
     const int nu = controlDim();
     
@@ -1301,7 +1367,16 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     const Vec3 w = x.segment<3>(AV_INDEX);
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
 
-    (void)w_ang;  // Unused in numerical Hessian, kept for consistency
+    // Process eci_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processECITarget(eci_target, sat_direction, q);
+    
+    // Disable angle cost if ECI target is invalid
+    double w_ang_eff = w_ang;
+    if (is_eci_format && eci_target.tail(3).norm() < 1e-9) {
+        w_ang_eff = 0.0;
+    }
+
+    (void)w_ang_eff;  // Used in numerical differentiation
     (void)w_avmag;
     (void)w_avang;
     (void)w;
@@ -1412,6 +1487,64 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::termina
     const Vec3& B_eci, const CostConfig& cost_cfg) const {
     const VecX u_zero = VecX::Zero(controlDim());
     return stageCostHessians(0, 1, x, u_zero, sat_direction, eci_target, B_eci, cost_cfg);
+}
+
+double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
+                            const Eigen::Ref<const Eigen::MatrixXd>& U,
+                            const Eigen::Ref<const Eigen::MatrixXd>& B,
+                            const Vec4& eci_target,
+                            const CostConfig& cost_cfg) const {
+    const int N = X.rows();
+    const int nx = stateDim();
+    const int nu = controlDim();
+    
+    if (X.cols() != nx) {
+        throw std::invalid_argument(
+            "totalCost: X has " + std::to_string(X.cols()) + 
+            " columns, expected " + std::to_string(nx));
+    }
+    if (U.rows() != N - 1) {
+        throw std::invalid_argument(
+            "totalCost: U has " + std::to_string(U.rows()) + 
+            " rows, expected " + std::to_string(N - 1));
+    }
+    if (U.cols() != nu) {
+        throw std::invalid_argument(
+            "totalCost: U has " + std::to_string(U.cols()) + 
+            " columns, expected " + std::to_string(nu));
+    }
+    if (B.cols() != N) {
+        throw std::invalid_argument(
+            "totalCost: B has " + std::to_string(B.cols()) + 
+            " columns, expected " + std::to_string(N));
+    }
+    if (B.rows() != 3) {
+        throw std::invalid_argument(
+            "totalCost: B has " + std::to_string(B.rows()) + 
+            " rows, expected 3");
+    }
+    
+    double J_total = 0.0;
+    const Vec3 sat_direction = Vec3::Zero();
+    
+    // Sum stage costs for k = 0 to N-2
+    for (int k = 0; k < N - 1; ++k) {
+        VecX x_k = X.row(k);
+        VecX u_k = U.row(k);
+        Vec3 B_k = B.col(k);
+        
+        double stage_cost = stageCost(k, N, x_k, u_k, sat_direction, eci_target, B_k, cost_cfg);
+        J_total += stage_cost;
+    }
+    
+    // Terminal cost at k = N-1
+    VecX x_final = X.row(N - 1);
+    Vec3 B_final = B.col(N - 1);
+    
+    double terminal_cost = terminalCost(x_final, sat_direction, eci_target, B_final, cost_cfg);
+    J_total += terminal_cost;
+    
+    return J_total;
 }
 
 Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& u,
