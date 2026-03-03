@@ -17,6 +17,7 @@ bool warm_start(
     const Satellite::VecX& x0,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
+    const Eigen::Ref<const Eigen::MatrixXd>& boresight,
     int N,
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& R,
     const Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& V,
@@ -28,6 +29,13 @@ bool warm_start(
 ) {
     const int nx = satellite.stateDim();
     const int nu = satellite.controlDim();
+
+    if (q_goal.rows() != 4 || q_goal.cols() != N) {
+        return false;
+    }
+    if (boresight.rows() != 3 || boresight.cols() != N) {
+        return false;
+    }
 
     std::unique_ptr<controller::Controller> active_controller;
     switch (settings.init_traj.initcontroller) {
@@ -75,7 +83,8 @@ bool warm_start(
         active_controller->set_dt(dt);
 
         const Eigen::Vector4d q_goal_k = q_goal.col(k);
-        Satellite::VecX uk = active_controller->find_u(xk, B.col(k), q_goal_k);
+        const Eigen::Vector3d boresight_k = boresight.col(k);
+        Satellite::VecX uk = active_controller->find_u(xk, B.col(k), q_goal_k, boresight_k);
 
         if (uk.size() != nu) {
             return false;

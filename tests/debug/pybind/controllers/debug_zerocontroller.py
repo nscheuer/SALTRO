@@ -83,6 +83,8 @@ def main():
 
 	q_goal = np.zeros((4, N), dtype=float)
 	q_goal[0, :] = 1.0
+	boresight = np.zeros((3, N), dtype=float)
+	boresight[0, :] = 1.0
 
 	ok_warm, X, U = saltro_py.warm_start(
 		settings,
@@ -90,6 +92,7 @@ def main():
 		x0,
 		jtime,
 		q_goal,
+		boresight,
 		R,
 		V,
 		B,

@@ -16,6 +16,7 @@ py::tuple warm_start_py(
 	const Eigen::Ref<const Eigen::VectorXd>& x0_in,
 	const Eigen::Ref<const Eigen::VectorXd>& jtime,
 	const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 	const Eigen::Ref<const Eigen::MatrixXd>& R_in,
 	const Eigen::Ref<const Eigen::MatrixXd>& V_in,
 	const Eigen::Ref<const Eigen::MatrixXd>& B_in,
@@ -33,6 +34,9 @@ py::tuple warm_start_py(
 
 	if (q_goal.rows() != 4 || q_goal.cols() != N)
 		throw std::runtime_error("q_goal must have shape (4, N)");
+
+	if (boresight.rows() != 3 || boresight.cols() != N)
+		throw std::runtime_error("boresight must have shape (3, N)");
 
 	if (R_in.rows() != 3 || R_in.cols() != N)
 		throw std::runtime_error("R must have shape (3, N)");
@@ -79,6 +83,7 @@ py::tuple warm_start_py(
 		x0,
 		jtime,
 		q_goal,
+		boresight,
 		N,
 		R,
 		V,
@@ -102,6 +107,7 @@ void bind_warm_start(py::module_& m)
 		py::arg("x0"),
 		py::arg("jtime"),
 		py::arg("q_goal"),
+		py::arg("boresight"),
 		py::arg("R"),
 		py::arg("V"),
 		py::arg("B"),
@@ -120,6 +126,8 @@ jtime : ndarray (N,)
 	Julian times
 q_goal : ndarray (4,N)
 	Goal quaternion sequence
+boresight : ndarray (3,N)
+	Boresight direction sequence (body frame)
 R : ndarray (3,N)
 	Orbit position sequence
 V : ndarray (3,N)

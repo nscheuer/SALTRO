@@ -15,7 +15,8 @@ public:
 	virtual Satellite::VecX find_u(
 		const Satellite::VecX& x,
 		const Eigen::Vector3d& B_eci,
-		const Eigen::Vector4d& q_goal
+		const Eigen::Vector4d& q_goal,
+		const Eigen::Vector3d& boresight_body
 	) const = 0;
 
 protected:

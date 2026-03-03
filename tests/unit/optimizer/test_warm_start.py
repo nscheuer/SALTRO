@@ -37,6 +37,7 @@ class WarmStartFixture:
 
         self.jtime = np.zeros(self.N)
         self.q_goal = np.zeros((4, self.N))
+        self.boresight = np.zeros((3, self.N))
         self.R = np.zeros((3, self.N))
         self.V = np.zeros((3, self.N))
         self.B = np.zeros((3, self.N))
@@ -46,6 +47,7 @@ class WarmStartFixture:
         for k in range(self.N):
             self.jtime[k] = 0.25 + k * dt_centuries
             self.q_goal[:, k] = np.array([1.0, 0.0, 0.0, 0.0])
+            self.boresight[:, k] = np.array([1.0, 0.0, 0.0])
 
             self.R[:, k] = np.array([7000e3, 100.0 * k, -50.0 * k])
             self.V[:, k] = np.array([0.0, 7500.0, 0.0])
@@ -86,6 +88,7 @@ def test_warm_start_dimensions(fixture):
         fixture.x0,
         fixture.jtime,
         fixture.q_goal,
+        fixture.boresight,
         fixture.R,
         fixture.V,
         fixture.B,
@@ -107,6 +110,7 @@ def test_warm_start_rk4_consistency_zero_controller(fixture):
         fixture.x0,
         fixture.jtime,
         fixture.q_goal,
+        fixture.boresight,
         fixture.R,
         fixture.V,
         fixture.B,
@@ -153,6 +157,7 @@ def test_warm_start_controllers_behavior(fixture):
         fixture.x0,
         fixture.jtime,
         fixture.q_goal,
+        fixture.boresight,
         fixture.R,
         fixture.V,
         fixture.B,
@@ -167,6 +172,7 @@ def test_warm_start_controllers_behavior(fixture):
         fixture.x0,
         fixture.jtime,
         fixture.q_goal,
+        fixture.boresight,
         fixture.R,
         fixture.V,
         fixture.B,

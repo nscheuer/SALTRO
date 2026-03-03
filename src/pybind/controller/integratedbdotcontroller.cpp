@@ -18,9 +18,11 @@ IntegratedBdotController::IntegratedBdotController(const Satellite& satellite)
 Satellite::VecX IntegratedBdotController::find_u(
     const Satellite::VecX& x,
     const Eigen::Vector3d& B_eci,
-    const Eigen::Vector4d& q_goal
+    const Eigen::Vector4d& q_goal,
+    const Eigen::Vector3d& boresight_body
 ) const {
     (void)q_goal;
+    (void)boresight_body;
 
     Satellite::VecX u(satellite_.controlDim());
     u.setZero();

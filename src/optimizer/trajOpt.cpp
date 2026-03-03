@@ -43,7 +43,7 @@ bool trajOpt(
 		throw std::runtime_error("trajOpt failed to generate orbit");
 	}
 
-	const bool warm_start_ok = warm_start(settings, satellite, x0, jtime, q_goal, N, R, V, B, S, rho, X, U);
+	const bool warm_start_ok = warm_start(settings, satellite, x0, jtime, q_goal, boresight, N, R, V, B, S, rho, X, U);
 
 	if (!warm_start_ok) {
 		throw std::runtime_error("trajOpt failed to warm-start trajectory");

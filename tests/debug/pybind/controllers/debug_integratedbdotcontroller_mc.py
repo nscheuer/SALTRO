@@ -123,8 +123,10 @@ def make_constant_environment():
 
 	q_goal = np.zeros((4, N), dtype=float)
 	q_goal[0, :] = 1.0
+	boresight = np.zeros((3, N), dtype=float)
+	boresight[0, :] = 1.0
 
-	return t_seconds, jtime, q_goal, R, V, B, S, rho
+	return t_seconds, jtime, q_goal, boresight, R, V, B, S, rho
 
 
 def plot_sample(sample_idx, t, X, U, satellite, initial_w, final_w, passed):
@@ -201,7 +203,7 @@ def plot_sample(sample_idx, t, X, U, satellite, initial_w, final_w, passed):
 
 def main():
 	rng = np.random.default_rng(SEED)
-	t, jtime, q_goal, R, V, B, S, rho = make_constant_environment()
+	t, jtime, q_goal, boresight, R, V, B, S, rho = make_constant_environment()
 
 	n_pass = 0
 
@@ -216,6 +218,7 @@ def main():
 				x0,
 				jtime,
 				q_goal,
+				boresight,
 				R,
 				V,
 				B,

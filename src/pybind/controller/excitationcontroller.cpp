@@ -13,7 +13,8 @@ ExcitationController::ExcitationController(const Satellite& satellite)
 Satellite::VecX ExcitationController::find_u(
     const Satellite::VecX& x,
     const Eigen::Vector3d& B_eci,
-    const Eigen::Vector4d& q_goal
+    const Eigen::Vector4d& q_goal,
+    const Eigen::Vector3d& boresight_body
 ) const {
     Satellite::VecX u(satellite_.controlDim());
     u.setZero();
@@ -28,7 +29,9 @@ Satellite::VecX ExcitationController::find_u(
     }
 
     Eigen::Vector3d goal_dir = Eigen::Vector3d::UnitX();
-    if (q_goal.tail<3>().allFinite() && q_goal.tail<3>().norm() > 1e-12) {
+    if (boresight_body.allFinite() && boresight_body.norm() > 1e-12) {
+        goal_dir = boresight_body.normalized();
+    } else if (q_goal.tail<3>().allFinite() && q_goal.tail<3>().norm() > 1e-12) {
         goal_dir = q_goal.tail<3>().normalized();
     }
 

@@ -392,27 +392,27 @@ public:
      * @param N Total time steps.
      * @param x State at step k.
      * @param u Control at step k.
-     * @param sat_direction Target direction for satellite (body frame).
+    * @param boresight_body Boresight direction in body frame.
     * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field (ECI).
      * @param cost_cfg Cost configuration.
      * @return Scalar cost value.
      */
     double stageCost(int k, int N, const VecX& x, const VecX& u, 
-                    const Vec3& sat_direction, const Vec4& attitude_target, 
+                    const Vec3& boresight_body, const Vec4& attitude_target, 
                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
      * @brief Compute terminal cost (final time step).
      * 
      * @param x Final state.
-     * @param sat_direction Target satellite direction.
+    * @param boresight_body Boresight direction in body frame.
     * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Scalar terminal cost.
      */
-    double terminalCost(const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target, 
+    double terminalCost(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
                        const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -425,14 +425,14 @@ public:
      * @param N Total steps.
      * @param x State.
      * @param u Control.
-     * @param sat_direction Target direction.
+    * @param boresight_body Boresight direction in body frame.
     * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Tuple of (∇_x J, ∇_u J).
      */
     std::tuple<VecX, MatX, MatX> stageCostJacobians(int k, int N, const VecX& x, const VecX& u, 
-                                                    const Vec3& sat_direction, const Vec4& attitude_target, 
+                                                    const Vec3& boresight_body, const Vec4& attitude_target, 
                                                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -441,13 +441,13 @@ public:
      * Delegates to stageCostJacobians with k=0, N=1 to apply terminal weights.
      * 
      * @param x State.
-     * @param sat_direction Target direction.
+    * @param boresight_body Boresight direction in body frame.
     * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Tuple of (∇_x J, ∇_u J).
      */
-    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target, 
+    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
                                                        const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -457,14 +457,14 @@ public:
      * @param N Total steps.
      * @param x State.
      * @param u Control.
-     * @param sat_direction Target direction.
+    * @param boresight_body Boresight direction in body frame.
     * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
      */
     std::tuple<MatX, MatX, MatX> stageCostHessians(int k, int N, const VecX& x, const VecX& u, 
-                                                   const Vec3& sat_direction, const Vec4& attitude_target, 
+                                                   const Vec3& boresight_body, const Vec4& attitude_target, 
                                                    const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -473,13 +473,13 @@ public:
      * Delegates to stageCostHessians with k=0, N=1 to apply terminal weights.
      * 
      * @param x State.
-     * @param sat_direction Target direction.
+    * @param boresight_body Boresight direction in body frame.
     * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param B_eci Magnetic field.
      * @param cost_cfg Cost configuration.
      * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
      */
-    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& sat_direction, const Vec4& attitude_target, 
+    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
                                                       const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -490,15 +490,15 @@ public:
      * @param X State trajectory matrix (N × state_dim). Each row is state at step k.
      * @param U Control trajectory matrix ((N-1) × control_dim). Each row k is control from k to k+1.
      * @param B Magnetic field at each step (3 × N).
+    * @param boresight Boresight history in body frame (3 × N), column k used at step k.
     * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
      * @param cost_cfg Cost configuration.
      * @return Total trajectory cost J = Σ_k c(x_k, u_k) + c_terminal(x_N).
-     * 
-     * @note sat_direction argument is set to zero for this convenience function.
      */
     double totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
                     const Eigen::Ref<const Eigen::MatrixXd>& U,
                     const Eigen::Ref<const Eigen::MatrixXd>& B,
+                const Eigen::Ref<const Eigen::MatrixXd>& boresight,
                     const Vec4& attitude_target,
                     const CostConfig& cost_cfg) const;
 
@@ -585,10 +585,10 @@ private:
      * 2. Quaternion goal vector: [q0, qx, qy, qz] - valid quaternion
      * 
     * @param attitude_target The target vector (4D)
-     * @param sat_direction Satellite direction vector (used only for ECI vector format)
+    * @param boresight_body Boresight direction in body frame (used only for ECI vector format)
      * @param q_current Current quaternion state
      * @return Pair<q_goal_quaternion, is_eci_format>
      */
-    std::pair<Vec4, bool> processAttitudeTarget(const Vec4& attitude_target, const Vec3& sat_direction, const Vec4& q_current) const;
+    std::pair<Vec4, bool> processAttitudeTarget(const Vec4& attitude_target, const Vec3& boresight_body, const Vec4& q_current) const;
 
 };

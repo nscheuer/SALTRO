@@ -28,6 +28,7 @@ public:
 	Satellite::VecX x0;
 	Eigen::VectorXd jtime;
 	Eigen::MatrixXd q_goal;
+	Eigen::MatrixXd boresight;
 
 	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> R;
 	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> V;
@@ -40,7 +41,8 @@ public:
 		  satellite(makeInertia(), settings),
 		  x0(Satellite::VecX::Zero(satellite.stateDim())),
 		  jtime(Eigen::VectorXd::Zero(N)),
-		  q_goal(Eigen::MatrixXd::Zero(4, N)) {
+		  q_goal(Eigen::MatrixXd::Zero(4, N)),
+		  boresight(Eigen::MatrixXd::Zero(3, N)) {
 		satellite.addMTQ(Eigen::Vector3d::UnitX(), 0.2);
 		satellite.addMTQ(Eigen::Vector3d::UnitY(), 0.2);
 		satellite.addMTQ(Eigen::Vector3d::UnitZ(), 0.2);
@@ -58,6 +60,7 @@ public:
 		for (int k = 0; k < N; ++k) {
 			jtime(k) = 0.25 + k * dt_centuries;
 			q_goal.col(k) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+			boresight.col(k) = Eigen::Vector3d::UnitX();
 
 			R.col(k) = Eigen::Vector3d(7000e3, 100.0 * k, -50.0 * k);
 			V.col(k) = Eigen::Vector3d(0.0, 7500.0, 0.0);
@@ -95,7 +98,7 @@ TEST_CASE_METHOD(WarmStartFixture, "warm_start returns correct output dimensions
 	Eigen::MatrixXd U = Eigen::MatrixXd::Zero(satellite.controlDim(), N);
 
 	const bool ok = optimizer::warm_start(
-		settings, satellite, x0, jtime, q_goal, N,
+		settings, satellite, x0, jtime, q_goal, boresight, N,
 		R, V, B, S, rho,
 		X, U
 	);
@@ -114,7 +117,7 @@ TEST_CASE_METHOD(WarmStartFixture, "warm_start uses RK4 propagation consistently
 	Eigen::MatrixXd U = Eigen::MatrixXd::Zero(satellite.controlDim(), N);
 
 	const bool ok = optimizer::warm_start(
-		settings, satellite, x0, jtime, q_goal, N,
+		settings, satellite, x0, jtime, q_goal, boresight, N,
 		R, V, B, S, rho,
 		X, U
 	);
@@ -168,14 +171,14 @@ TEST_CASE_METHOD(WarmStartFixture, "controllers produce expected warm_start beha
 
 	settings.init_traj.initcontroller = 0;
 	const bool ok_zero = optimizer::warm_start(
-		settings, satellite, x0, jtime, q_goal, N,
+		settings, satellite, x0, jtime, q_goal, boresight, N,
 		R, V, B, S, rho,
 		X_zero, U_zero
 	);
 
 	settings.init_traj.initcontroller = 1;
 	const bool ok_exc = optimizer::warm_start(
-		settings, satellite, x0, jtime, q_goal, N,
+		settings, satellite, x0, jtime, q_goal, boresight, N,
 		R, V, B, S, rho,
 		X_exc, U_exc
 	);

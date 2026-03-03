@@ -459,7 +459,7 @@ tuple[Tensor3, Tensor3, Tensor3]
              py::arg("N"),
              py::arg("x"),
              py::arg("u"),
-             py::arg("sat_direction"),
+             py::arg("boresight"),
              py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
@@ -483,8 +483,8 @@ x : ndarray
     State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
 u : ndarray
     Control vector: [MTQ_controls (numMTQ), RW_controls (numRW)]
-sat_direction : ndarray (3,)
-    Satellite direction (currently unused, may be reserved)
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
 attitude_target : ndarray (4,)
     Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
@@ -499,7 +499,7 @@ float
 )doc")
         .def("terminalCost", &Satellite::terminalCost,
              py::arg("x"),
-             py::arg("sat_direction"),
+             py::arg("boresight"),
              py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
@@ -513,8 +513,8 @@ Parameters
 ----------
 x : ndarray
     State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
-sat_direction : ndarray (3,)
-    Satellite direction (currently unused)
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
 attitude_target : ndarray (4,)
     Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
@@ -532,7 +532,7 @@ float
              py::arg("N"),
              py::arg("x"),
              py::arg("u"),
-             py::arg("sat_direction"),
+             py::arg("boresight"),
              py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
@@ -551,8 +551,8 @@ x : ndarray
     State vector (size: stateDim)
 u : ndarray
     Control vector (size: controlDim)
-sat_direction : ndarray (3,)
-    Satellite direction vector
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
 attitude_target : ndarray (4,)
     Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
@@ -570,7 +570,7 @@ tuple[ndarray, ndarray, ndarray]
 )doc")
         .def("terminalCostJacobians", &Satellite::terminalCostJacobians,
              py::arg("x"),
-             py::arg("sat_direction"),
+             py::arg("boresight"),
              py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
@@ -581,8 +581,8 @@ Parameters
 ----------
 x : ndarray
     State vector (size: stateDim)
-sat_direction : ndarray (3,)
-    Satellite direction vector
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
 attitude_target : ndarray (4,)
     Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
@@ -600,7 +600,7 @@ tuple[ndarray, ndarray, ndarray]
              py::arg("N"),
              py::arg("x"),
              py::arg("u"),
-             py::arg("sat_direction"),
+             py::arg("boresight"),
              py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
@@ -620,8 +620,8 @@ x : ndarray
     State vector (size: stateDim)
 u : ndarray
     Control vector (size: controlDim)
-sat_direction : ndarray (3,)
-    Satellite direction vector
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
 attitude_target : ndarray (4,)
     Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
@@ -645,7 +645,7 @@ Notes
 )doc")
         .def("terminalCostHessians", &Satellite::terminalCostHessians,
              py::arg("x"),
-             py::arg("sat_direction"),
+             py::arg("boresight"),
              py::arg("attitude_target"),
              py::arg("B_eci"),
              py::arg("cost_cfg"),
@@ -656,8 +656,8 @@ Parameters
 ----------
 x : ndarray
     State vector (size: stateDim)
-sat_direction : ndarray (3,)
-    Satellite direction vector
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
 attitude_target : ndarray (4,)
     Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
 B_eci : ndarray (3,)
@@ -674,6 +674,7 @@ tuple[ndarray, ndarray, ndarray]
              py::arg("X"),
              py::arg("U"),
              py::arg("B"),
+             py::arg("boresight"),
              py::arg("attitude_target"),
              py::arg("cost_cfg"),
              R"doc(
@@ -697,6 +698,9 @@ U : ndarray ((N-1), control_dim)
 B : ndarray (3, N)
     Magnetic field vector at each time step.
     Must have 3 rows (x, y, z components) and N columns.
+boresight : ndarray (3, N)
+    Boresight history in body frame, column k used at step k.
+    Must have 3 rows and N columns.
 attitude_target : ndarray (4,)
     Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z].
     Used for all stage and terminal cost evaluations.
@@ -724,13 +728,11 @@ Examples
 >>> import saltro
 >>> sat = saltro.Satellite(J, settings)
 >>> # X: (100, 10), U: (99, 6), B: (3, 100)
->>> J = sat.totalCost(X, U, B, q_target, cost_cfg)
+>>> J = sat.totalCost(X, U, B, boresight, q_target, cost_cfg)
 >>> print(f"Trajectory cost: {J}")
 
 Notes
 -----
-- The satellite direction is set to zero for this convenience function.
-  Use explicit stageCost calls if you need to vary sat_direction.
 - For large trajectories, this is more efficient than summing individual
   stageCost calls in Python, as it avoids Python-C++ overhead.
 )doc")

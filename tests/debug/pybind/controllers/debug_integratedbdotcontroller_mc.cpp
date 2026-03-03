@@ -125,6 +125,7 @@ Satellite::VecX randomInitialState(const Satellite& satellite, std::mt19937& rng
 void makeConstantEnvironment(
     Eigen::VectorXd& jtime,
     Eigen::MatrixXd& q_goal,
+    Eigen::MatrixXd& boresight,
     Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ>& R,
     Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ>& V,
     Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ>& B,
@@ -133,6 +134,7 @@ void makeConstantEnvironment(
 ) {
     jtime = Eigen::VectorXd::Zero(N);
     q_goal = Eigen::MatrixXd::Zero(4, N);
+    boresight = Eigen::MatrixXd::Zero(3, N);
 
     R.setZero();
     V.setZero();
@@ -146,6 +148,7 @@ void makeConstantEnvironment(
         const double t_sec = static_cast<double>(k) * DT_SECONDS;
         jtime(k) = 0.25 + t_sec / SEC_PER_CENTURY;
         q_goal(0, k) = 1.0;
+        boresight.col(k) = Eigen::Vector3d::UnitX();
 
         B.col(k) = B_const;
     }
@@ -158,13 +161,14 @@ int main() {
 
     Eigen::VectorXd jtime;
     Eigen::MatrixXd q_goal;
+    Eigen::MatrixXd boresight;
     Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> R;
     Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> V;
     Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> B;
     Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> S;
     Eigen::Matrix<double, 1, limits::MAX_LENGTH_TRAJ> rho;
 
-    makeConstantEnvironment(jtime, q_goal, R, V, B, S, rho);
+    makeConstantEnvironment(jtime, q_goal, boresight, R, V, B, S, rho);
 
     int n_pass = 0;
 
@@ -187,6 +191,7 @@ int main() {
                 x0,
                 jtime,
                 q_goal,
+                boresight,
                 N,
                 R,
                 V,
