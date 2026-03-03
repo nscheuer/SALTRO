@@ -453,6 +453,224 @@ tuple[Tensor3, Tensor3, Tensor3]
     (H_uu, H_ux, H_xx) Hessian tensors for each constraint
 )doc")
         
+        // Cost function methods
+        .def("stageCost", &Satellite::stageCost,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("sat_direction"),
+             py::arg("eci_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Evaluate stage cost at time step k.
+
+The cost combines:
+- Attitude error: how well quaternion aligns with target
+- Angular velocity penalty: low spin rate is preferred
+- Magnetic alignment: optional penalty for alignment with B-field
+- Control effort: penalizes actuator usage
+- RW momentum management: penalties for high or low momentum
+
+Parameters
+----------
+k : int
+    Current time step (0-based)
+N : int
+    Total number of time steps in trajectory
+x : ndarray
+    State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
+u : ndarray
+    Control vector: [MTQ_controls (numMTQ), RW_controls (numRW)]
+sat_direction : ndarray (3,)
+    Satellite direction (currently unused, may be reserved)
+eci_target : ndarray (4,)
+    Target quaternion in ECI frame (normalized)
+B_eci : ndarray (3,)
+    Magnetic field vector in ECI frame (Tesla)
+cost_cfg : CostConfig
+    Cost weighting configuration
+
+Returns
+-------
+float
+    Stage cost (non-negative scalar)
+)doc")
+        .def("terminalCost", &Satellite::terminalCost,
+             py::arg("x"),
+             py::arg("sat_direction"),
+             py::arg("eci_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Evaluate terminal cost.
+
+Uses terminal-specific cost weights (typically higher) to enforce end-of-horizon
+constraints. Mathematically equivalent to stageCost(0, 1, x, u_zero, ...).
+
+Parameters
+----------
+x : ndarray
+    State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
+sat_direction : ndarray (3,)
+    Satellite direction (currently unused)
+eci_target : ndarray (4,)
+    Target quaternion in ECI frame (normalized)
+B_eci : ndarray (3,)
+    Magnetic field vector in ECI frame (Tesla)
+cost_cfg : CostConfig
+    Cost weighting configuration (uses angle_N, ang_vel_N, etc.)
+
+Returns
+-------
+float
+    Terminal cost (non-negative scalar)
+)doc")
+        .def("stageCostJacobians", &Satellite::stageCostJacobians,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("sat_direction"),
+             py::arg("eci_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute stage cost first-order partial derivatives.
+
+Computes ∂L/∂x, ∂L/∂u, and ∂²L/∂u∂x where L is the stage cost function.
+
+Parameters
+----------
+k : int
+    Current time step
+N : int
+    Total number of time steps
+x : ndarray
+    State vector (size: stateDim)
+u : ndarray
+    Control vector (size: controlDim)
+sat_direction : ndarray (3,)
+    Satellite direction vector
+eci_target : ndarray (4,)
+    Target quaternion (normalized)
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+cost_cfg : CostConfig
+    Cost weighting configuration
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (lx, lu, lux) where:
+    - lx: Gradient w.r.t. state (size: stateDim)
+    - lu: Gradient w.r.t. control as 1×controlDim matrix
+    - lux: Mixed Hessian (controlDim × stateDim) - typically zero for separable costs
+)doc")
+        .def("terminalCostJacobians", &Satellite::terminalCostJacobians,
+             py::arg("x"),
+             py::arg("sat_direction"),
+             py::arg("eci_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute terminal cost first-order partial derivatives.
+
+Parameters
+----------
+x : ndarray
+    State vector (size: stateDim)
+sat_direction : ndarray (3,)
+    Satellite direction vector
+eci_target : ndarray (4,)
+    Target quaternion (normalized)
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+cost_cfg : CostConfig
+    Cost weighting configuration (uses terminal weights)
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (lx, lu, lux) - Jacobians w.r.t. state, control, and mixed
+)doc")
+        .def("stageCostHessians", &Satellite::stageCostHessians,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("sat_direction"),
+             py::arg("eci_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute stage cost second-order partial derivatives.
+
+Computes the Hessian matrices ∂²L/∂x², ∂²L/∂u², and ∂²L/∂u∂x of the stage cost.
+These are used by second-order optimization algorithms (Newton's method, iLQR).
+
+Parameters
+----------
+k : int
+    Current time step
+N : int
+    Total number of time steps
+x : ndarray
+    State vector (size: stateDim)
+u : ndarray
+    Control vector (size: controlDim)
+sat_direction : ndarray (3,)
+    Satellite direction vector
+eci_target : ndarray (4,)
+    Target quaternion (normalized)
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+cost_cfg : CostConfig
+    Cost weighting configuration
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (lxx, luu, lux) where:
+    - lxx: Hessian w.r.t. state (stateDim × stateDim)
+    - luu: Hessian w.r.t. control (controlDim × controlDim)
+    - lux: Mixed Hessian (controlDim × stateDim) - typically zero
+    
+Notes
+-----
+- lxx is symmetric (Schwarz's theorem applies to smooth functions)
+- luu is symmetric and positive semi-definite (cost is convex in u)
+- These Hessians may use finite differences for some complex terms
+)doc")
+        .def("terminalCostHessians", &Satellite::terminalCostHessians,
+             py::arg("x"),
+             py::arg("sat_direction"),
+             py::arg("eci_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute terminal cost second-order partial derivatives.
+
+Parameters
+----------
+x : ndarray
+    State vector (size: stateDim)
+sat_direction : ndarray (3,)
+    Satellite direction vector
+eci_target : ndarray (4,)
+    Target quaternion (normalized)
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+cost_cfg : CostConfig
+    Cost weighting configuration (uses terminal weights)
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (lxx, luu, lux) - Hessian matrices w.r.t. state and control
+)doc")
+        
         // State index constants
         .def_readonly_static("AV_INDEX", &Satellite::AV_INDEX,
                              "Index of angular velocity in state vector")

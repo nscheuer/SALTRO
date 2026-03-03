@@ -436,6 +436,21 @@ public:
                                                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
+     * @brief Compute terminal cost Jacobians.
+     * 
+     * Delegates to stageCostJacobians with k=0, N=1 to apply terminal weights.
+     * 
+     * @param x State.
+     * @param sat_direction Target direction.
+     * @param eci_target Target quaternion.
+     * @param B_eci Magnetic field.
+     * @param cost_cfg Cost configuration.
+     * @return Tuple of (∇_x J, ∇_u J).
+     */
+    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& sat_direction, const Vec4& eci_target, 
+                                                       const Vec3& B_eci, const CostConfig& cost_cfg) const;
+    
+    /**
      * @brief Compute stage cost Hessians.
      * 
      * @param k Time step.
@@ -451,6 +466,21 @@ public:
     std::tuple<MatX, MatX, MatX> stageCostHessians(int k, int N, const VecX& x, const VecX& u, 
                                                    const Vec3& sat_direction, const Vec4& eci_target, 
                                                    const Vec3& B_eci, const CostConfig& cost_cfg) const;
+
+    /**
+     * @brief Compute terminal cost Hessians.
+     * 
+     * Delegates to stageCostHessians with k=0, N=1 to apply terminal weights.
+     * 
+     * @param x State.
+     * @param sat_direction Target direction.
+     * @param eci_target Target quaternion.
+     * @param B_eci Magnetic field.
+     * @param cost_cfg Cost configuration.
+     * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
+     */
+    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& sat_direction, const Vec4& eci_target, 
+                                                      const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
      * @brief Evaluate constraints.

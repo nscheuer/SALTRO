@@ -6,9 +6,31 @@
 #include <stdexcept>
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 using std::invalid_argument;
 using std::out_of_range;
+
+namespace {
+
+inline double safeAbs(double x) {
+    return std::abs(x);
+}
+
+inline double safeSign(double x) {
+    return (x >= 0.0) ? 1.0 : -1.0;
+}
+
+inline double clampUnit(double x) {
+    return std::clamp(x, -1.0, 1.0);
+}
+
+inline double safeNorm(const Eigen::Vector3d& v) {
+    const double n = v.norm();
+    return std::isfinite(n) ? n : 0.0;
+}
+
+}
 
 Satellite::Satellite() {
     Jcom_.setIdentity();
@@ -891,6 +913,505 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     }
 
     return std::make_tuple(hess_xx, hess_ux, hess_uu);
+}
+
+double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
+                            const Vec3& sat_direction, const Vec4& eci_target,
+                            const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    if (N <= 0) {
+        throw invalid_argument("N must be positive in stageCost().");
+    }
+    if (k < 0 || k >= N) {
+        throw out_of_range("Time index k out of range in stageCost().");
+    }
+    if (x.size() < stateDim()) {
+        throw invalid_argument("State vector has insufficient dimension in stageCost().");
+    }
+    if (u.size() < controlDim()) {
+        throw invalid_argument("Control vector has insufficient dimension in stageCost().");
+    }
+
+    (void)sat_direction;
+
+    const bool terminal = (k >= N - 1);
+    const double w_ang = terminal ? cost_cfg.angle_N : cost_cfg.angle;
+    const double w_av = terminal ? cost_cfg.ang_vel_N : cost_cfg.ang_vel;
+    const double w_avmag = terminal ? cost_cfg.ang_vel_mag_N : cost_cfg.ang_vel_mag;
+    const double w_avang = terminal ? cost_cfg.ang_vel_err_dir_N : cost_cfg.ang_vel_err_dir;
+    const double w_u_mult = terminal ? 0.0 : cost_cfg.control_mult;
+
+    const Vec3 w = x.segment<3>(AV_INDEX);
+    const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    const Vec4 q_goal = eci_target.normalized();
+
+    const double qdot = q_goal.dot(q);
+    const double abs_qdot = clampUnit(safeAbs(qdot));
+
+    double ang_cost = 0.0;
+    switch (cost_cfg.ang_cost_func_type) {
+        case 0:
+            ang_cost = 1.0 - abs_qdot;
+            break;
+        case 1: {
+            const double err = 1.0 - abs_qdot;
+            ang_cost = 0.5 * err * err;
+            break;
+        }
+        case 2:
+            ang_cost = std::acos(abs_qdot);
+            break;
+        case 3: {
+            const double phi = std::acos(abs_qdot);
+            ang_cost = 0.5 * phi * phi;
+            break;
+        }
+        case 4:
+            ang_cost = 1.0 - abs_qdot * abs_qdot;
+            break;
+        default:
+            ang_cost = std::acos(abs_qdot);
+            break;
+    }
+
+    const Mat43 W = saltro::math::findWMat(q);
+    const double cross_cost = -safeSign(qdot) * (q_goal.transpose() * W * w)(0) * w_avang;
+
+    double state_mag_cost = 0.0;
+    const double b_norm = safeNorm(B_eci);
+    if (b_norm > 1e-12) {
+        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+        const Vec3 b_body = R_T * (B_eci / b_norm);
+        state_mag_cost = w_avmag * std::abs(w.dot(b_body));
+    }
+
+    double control_cost = 0.0;
+    if (!terminal && controlDim() > 0) {
+        for (int i = 0; i < num_mtq_; ++i) {
+            const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
+            const double normalized = u(i) / lim;
+            control_cost += 0.5 * w_u_mult * cost_cfg.mtq_control_weight * normalized * normalized;
+        }
+        for (int i = 0; i < num_rw_; ++i) {
+            const int ctrl_idx = num_mtq_ + i;
+            const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
+            const double normalized = u(ctrl_idx) / lim;
+            control_cost += 0.5 * w_u_mult * cost_cfg.rw_control_weight * normalized * normalized;
+        }
+    }
+
+    double rw_momentum_cost = 0.0;
+    double rw_stiction_cost = 0.0;
+    for (int i = 0; i < num_rw_; ++i) {
+        const double h = x(RW_MOMENTUM_INDEX + i);
+        const double z = std::abs(h);
+        const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+
+        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - h_thresh);
+        if (z > h_thresh) {
+            const double over = (z - h_thresh) / denom_high;
+            rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * over * over;
+        } else {
+            const double scaled = z / h_max;
+            rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * scaled * scaled;
+        }
+
+        const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
+        if (h_stic > 1e-12 && z < h_stic) {
+            const double near_zero = (h_stic - z) / h_stic;
+            rw_stiction_cost += 0.5 * cost_cfg.rw_stic_weight * near_zero * near_zero;
+        }
+    }
+
+    const double state_cost = 0.5 * w_av * w.squaredNorm() + w_ang * ang_cost;
+    return state_cost + cross_cost + state_mag_cost + control_cost + rw_momentum_cost + rw_stiction_cost;
+}
+
+double Satellite::terminalCost(const VecX& x, const Vec3& sat_direction, const Vec4& eci_target,
+                               const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    const VecX u_zero = VecX::Zero(controlDim());
+    return stageCost(0, 1, x, u_zero, sat_direction, eci_target, B_eci, cost_cfg);
+}
+
+std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCostJacobians(
+    int k, int N, const VecX& x, const VecX& u,
+    const Vec3& sat_direction, const Vec4& eci_target,
+    const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    
+    if (N <= 0) {
+        throw invalid_argument("N must be positive in stageCostJacobians().");
+    }
+    if (k < 0 || k >= N) {
+        throw out_of_range("Time index k out of range in stageCostJacobians().");
+    }
+    if (x.size() < stateDim()) {
+        throw invalid_argument("State vector has insufficient dimension in stageCostJacobians().");
+    }
+    if (u.size() < controlDim()) {
+        throw invalid_argument("Control vector has insufficient dimension in stageCostJacobians().");
+    }
+
+    (void)sat_direction;
+
+    const int nx = stateDim();
+    const int nu = controlDim();
+    
+    VecX lx = VecX::Zero(nx);
+    VecX lu = VecX::Zero(nu);
+    MatX lux = MatX::Zero(nu, nx);
+
+    const bool terminal = (k >= N - 1);
+    const double w_ang = terminal ? cost_cfg.angle_N : cost_cfg.angle;
+    const double w_av = terminal ? cost_cfg.ang_vel_N : cost_cfg.ang_vel;
+    const double w_avmag = terminal ? cost_cfg.ang_vel_mag_N : cost_cfg.ang_vel_mag;
+    const double w_avang = terminal ? cost_cfg.ang_vel_err_dir_N : cost_cfg.ang_vel_err_dir;
+    const double w_u_mult = terminal ? 0.0 : cost_cfg.control_mult;
+
+    const Vec3 w = x.segment<3>(AV_INDEX);
+    const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    const Vec4 q_goal = eci_target.normalized();
+
+    const double qdot = q_goal.dot(q);
+    const double abs_qdot = clampUnit(safeAbs(qdot));
+    const double sign_qdot = safeSign(qdot);
+
+    // =====================================================================
+    // Gradient w.r.t. angular velocity w: ∂L/∂w
+    // =====================================================================
+    lx.segment<3>(AV_INDEX) = w_av * w;
+
+    // From cross_cost = -sign(qdot) * (q_goal^T * W * w) * w_avang
+    // ∂cross_cost/∂w = -sign(qdot) * (W^T * q_goal) * w_avang
+    const Mat43 W = saltro::math::findWMat(q);
+    lx.segment<3>(AV_INDEX) += -sign_qdot * (W.transpose() * q_goal).head<3>() * w_avang;
+
+    // From state_mag_cost = w_avmag * |w · b_body|
+    const double b_norm = safeNorm(B_eci);
+    if (b_norm > 1e-12) {
+        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+        const Vec3 b_body = R_T * (B_eci / b_norm);
+        const double w_dot_b = w.dot(b_body);
+        const double sign_w_dot_b = safeSign(w_dot_b);
+        lx.segment<3>(AV_INDEX) += w_avmag * sign_w_dot_b * b_body;
+    }
+
+    // =====================================================================
+    // Gradient w.r.t. quaternion q: ∂L/∂q
+    // =====================================================================
+    
+    // Compute derivative of attitude cost w.r.t. q
+    double d_ang_cost_dqdot = 0.0;  // ∂(ang_cost)/∂(qdot)
+    switch (cost_cfg.ang_cost_func_type) {
+        case 0:  // ang_cost = 1 - |qdot|
+            d_ang_cost_dqdot = -sign_qdot;
+            break;
+        case 1: {  // ang_cost = 0.5 * (1 - |qdot|)^2
+            const double err = 1.0 - abs_qdot;
+            d_ang_cost_dqdot = -sign_qdot * err;
+            break;
+        }
+        case 2: {  // ang_cost = acos(|qdot|)
+            const double denom = std::sqrt(1.0 - abs_qdot * abs_qdot + 1e-12);
+            d_ang_cost_dqdot = -sign_qdot / denom;
+            break;
+        }
+        case 3: {  // ang_cost = 0.5 * acos(|qdot|)^2
+            const double phi = std::acos(abs_qdot);
+            const double denom = std::sqrt(1.0 - abs_qdot * abs_qdot + 1e-12);
+            d_ang_cost_dqdot = -sign_qdot * phi / denom;
+            break;
+        }
+        case 4:  // ang_cost = 1 - |qdot|^2
+            d_ang_cost_dqdot = -2.0 * sign_qdot * abs_qdot;
+            break;
+        default:
+            d_ang_cost_dqdot = -sign_qdot / std::sqrt(1.0 - abs_qdot * abs_qdot + 1e-12);
+            break;
+    }
+
+    // ∂(qdot)/∂q where qdot = q_goal · q
+    // = q_goal (as a row vector, or column in Jacobian context)
+    Vec4 dqdot_dq = q_goal;
+    
+    // ∂L/∂q from attitude cost: w_ang * ∂(ang_cost)/∂(qdot) * ∂(qdot)/∂q
+    lx.segment<4>(QUAT_INDEX) = w_ang * d_ang_cost_dqdot * dqdot_dq;
+
+    // ∂(cross_cost)/∂q = ∂/∂q[-sign(qdot) * (q_goal^T * W * w) * w_avang]
+    // = -sign(qdot)*w_avang * ∂(q_goal^T * W * w)/∂q
+    // where W depends on q
+    // W = 0.5*[[-q1, -q2, -q3], [q0, -q3, q2], [q3, q0, -q1], [-q2, q1, q0]]^T (4x3)
+    // ∂(W^T * q_goal)/∂q_j is a 3D vector
+    // For each component j, compute ∂(W^T * q_goal)/∂q_j · w
+    // This is complex, so use finite difference approach or compute analytically
+    // Let me compute it analytically by noting:
+    // (q_goal^T * W * w) = sum_i (q_goal_i * W_i,: * w) where W_i,: is i-th row of W
+    // For W matrix structure:
+    Vec4 d_qgoal_W_w_dq = Vec4::Zero();
+    {
+        // The W matrix is 4x3. We compute how (q_goal^T * W * w) changes with each q component.
+        // W(q) is linear in q, so we can compute its derivatives directly.
+        // W = 0.5 * [[-q(1), -q(2), -q(3)],
+        //            [q(0), -q(3), q(2)],
+        //            [q(3), q(0), -q(1)],
+        //            [-q(2), q(1), q(0)]]  (in quaternion [q0, q1, q2, q3] form)
+        // Each row i of W depends on q as: W_i = 0.5 * (linear combination of q components)
+        // ∂(W^T * q_goal)/∂q_j gives a 3D vector
+        // We need to compute how (q_goal^T * W * w) changes
+        
+        // Use numerical differentiation for simplicity and robustness
+        const double eps = 1e-8;
+        Vec4 q_pert = q;
+        double f0 = (q_goal.transpose() * W * w)(0);
+        
+        for (int j = 0; j < 4; ++j) {
+            q_pert = q;
+            q_pert(j) += eps;
+            q_pert.normalize();
+            const Mat43 W_pert = saltro::math::findWMat(q_pert);
+            const double f_pert = (q_goal.transpose() * W_pert * w)(0);
+            d_qgoal_W_w_dq(j) = (f_pert - f0) / eps;
+        }
+    }
+    lx.segment<4>(QUAT_INDEX) += -sign_qdot * w_avang * d_qgoal_W_w_dq;
+
+    // ∂(state_mag_cost)/∂q = ∂(w_avmag * |w · b_body|)/∂q
+    // = w_avmag * sign(w · b_body) * ∂(w · b_body)/∂q
+    // where b_body = R^T * (B_eci / |B_eci|)
+    // ∂b_body/∂q = ∂(R^T * b_unit)/∂q
+    if (b_norm > 1e-12) {
+        const Vec3 b_unit = B_eci / b_norm;
+        const Mat43 db_body_dq = saltro::math::drotmatTvecdq(q, b_unit);
+        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+        const Vec3 b_body = R_T * b_unit;
+        const double w_dot_b = w.dot(b_body);
+        const double sign_w_dot_b = safeSign(w_dot_b);
+        
+        // ∂(w · b_body)/∂q = J * w (as a 4D vector)
+        // where J is 4x3 (quaternion rows, vector cols)
+        Vec4 dw_dot_b_dq = db_body_dq * w;
+        lx.segment<4>(QUAT_INDEX) += w_avmag * sign_w_dot_b * dw_dot_b_dq;
+    }
+
+    // Apply quaternion normalization Jacobian projection
+    {
+        const double q_norm = q.norm();
+        if (q_norm > 1e-12) {
+            using Mat44 = Eigen::Matrix<double, 4, 4>;
+            const Mat44 proj_q = Mat44::Identity() - q * q.transpose() / (q_norm * q_norm);
+            lx.segment<4>(QUAT_INDEX) = proj_q * lx.segment<4>(QUAT_INDEX);
+        }
+    }
+
+    // =====================================================================
+    // Gradient w.r.t. RW momentum h: ∂L/∂h
+    // =====================================================================
+    for (int i = 0; i < num_rw_; ++i) {
+        const double h = x(RW_MOMENTUM_INDEX + i);
+        const double z = std::abs(h);
+        const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+
+        // RW momentum penalty: soft penalty in saturation and stiction regions
+        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - h_thresh);
+        const double sign_h = safeSign(h);
+        
+        if (z > h_thresh) {
+            const double over = (z - h_thresh) / denom_high;
+            lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * sign_h * over / denom_high;
+        } else {
+            const double scaled = z / h_max;
+            lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * sign_h * scaled / h_max;
+        }
+
+        // Stiction penalty
+        const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
+        if (h_stic > 1e-12 && z < h_stic) {
+            const double near_zero = (h_stic - z) / h_stic;
+            lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_stic_weight * (-sign_h) * near_zero / h_stic;
+        }
+    }
+
+    // =====================================================================
+    // Gradient w.r.t. control u: ∂L/∂u
+    // =====================================================================
+    if (!terminal && w_u_mult > 1e-12) {
+        // MTQ control costs
+        for (int i = 0; i < num_mtq_; ++i) {
+            const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
+            const double normalized = u(i) / lim;
+            lu(i) = w_u_mult * cost_cfg.mtq_control_weight * normalized / lim;
+        }
+        
+        // RW control costs
+        for (int i = 0; i < num_rw_; ++i) {
+            const int ctrl_idx = num_mtq_ + i;
+            const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
+            const double normalized = u(ctrl_idx) / lim;
+            lu(ctrl_idx) = w_u_mult * cost_cfg.rw_control_weight * normalized / lim;
+        }
+    }
+
+    // Reshape lu as a 1 × nu matrix for return type compatibility
+    MatX Lu_mat = lu.transpose();
+    
+    return std::make_tuple(lx, Lu_mat, lux);
+}
+
+std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::terminalCostJacobians(
+    const VecX& x, const Vec3& sat_direction, const Vec4& eci_target,
+    const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    const VecX u_zero = VecX::Zero(controlDim());
+    return stageCostJacobians(0, 1, x, u_zero, sat_direction, eci_target, B_eci, cost_cfg);
+}
+
+std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCostHessians(
+    int k, int N, const VecX& x, const VecX& u,
+    const Vec3& sat_direction, const Vec4& eci_target,
+    const Vec3& B_eci, const CostConfig& cost_cfg) const {
+
+    if (N <= 0) {
+        throw invalid_argument("N must be positive in stageCostHessians().");
+    }
+    if (k < 0 || k >= N) {
+        throw out_of_range("Time index k out of range in stageCostHessians().");
+    }
+    if (x.size() < stateDim()) {
+        throw invalid_argument("State vector has insufficient dimension in stageCostHessians().");
+    }
+    if (u.size() < controlDim()) {
+        throw invalid_argument("Control vector has insufficient dimension in stageCostHessians().");
+    }
+
+    (void)sat_direction;
+
+    const int nx = stateDim();
+    const int nu = controlDim();
+    
+    MatX lxx = MatX::Zero(nx, nx);
+    MatX luu = MatX::Zero(nu, nu);
+    MatX lux = MatX::Zero(nu, nx);
+
+    const bool terminal = (k >= N - 1);
+    const double w_ang = terminal ? cost_cfg.angle_N : cost_cfg.angle;
+    const double w_av = terminal ? cost_cfg.ang_vel_N : cost_cfg.ang_vel;
+    const double w_avmag = terminal ? cost_cfg.ang_vel_mag_N : cost_cfg.ang_vel_mag;
+    const double w_avang = terminal ? cost_cfg.ang_vel_err_dir_N : cost_cfg.ang_vel_err_dir;
+    const double w_u_mult = terminal ? 0.0 : cost_cfg.control_mult;
+
+    const Vec3 w = x.segment<3>(AV_INDEX);
+    const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+
+    (void)w_ang;  // Unused in numerical Hessian, kept for consistency
+    (void)w_avmag;
+    (void)w_avang;
+    (void)w;
+    (void)B_eci;
+
+    // =====================================================================
+    // Hessian w.r.t. angular velocity: ∂²L/∂w²
+    // =====================================================================
+    // From 0.5 * w_av * ‖w‖² → ∂²L/∂w² = w_av * I_3
+    lxx.block<3, 3>(AV_INDEX, AV_INDEX) += w_av * Mat33::Identity();
+
+    // =====================================================================
+    // Hessian w.r.t. quaternion: ∂²L/∂q² (attitude terms)
+    // =====================================================================
+    // This is complex and depends on ang_cost_func_type. 
+    // For robustness, use numerical differentiation of the gradient.
+    {
+        const double eps = 1e-8;
+        VecX x_pert = x;
+        auto lx_base = stageCostJacobians(k, N, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+        VecX grad_base = std::get<0>(lx_base);
+
+        for (int j = 0; j < 4; ++j) {
+            x_pert = x;
+            x_pert(QUAT_INDEX + j) += eps;
+            auto lx_pert = stageCostJacobians(k, N, x_pert, u, sat_direction, eci_target, B_eci, cost_cfg);
+            VecX grad_pert = std::get<0>(lx_pert);
+
+            VecX d_grad = (grad_pert - grad_base) / eps;
+            lxx.col(QUAT_INDEX + j) += d_grad;
+        }
+    }
+
+    // =====================================================================
+    // Hessian w.r.t. RW momentum: ∂²L/∂h²
+    // =====================================================================
+    for (int i = 0; i < num_rw_; ++i) {
+        const double h = x(RW_MOMENTUM_INDEX + i);
+        const double z = std::abs(h);
+        const double sign_h = safeSign(h);
+        const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+
+        // Angular momentum saturation penalty
+        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - h_thresh);
+        if (z > h_thresh) {
+            const double over = (z - h_thresh) / denom_high;
+            const double d2_over_dz2 = 1.0 / (denom_high * denom_high);
+            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
+                cost_cfg.rw_AM_weight * d2_over_dz2;
+        } else {
+            const double scaled = z / h_max;
+            const double d2_scaled_dz2 = 1.0 / (h_max * h_max);
+            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
+                cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * d2_scaled_dz2;
+        }
+
+        // Stiction penalty second derivative
+        const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
+        if (h_stic > 1e-12 && z < h_stic) {
+            const double near_zero = (h_stic - z) / h_stic;
+            const double d2_near_zero_dz2 = 1.0 / (h_stic * h_stic);
+            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
+                cost_cfg.rw_stic_weight * d2_near_zero_dz2;
+        }
+    }
+
+    // =====================================================================
+    // Hessian w.r.t. control: ∂²L/∂u²
+    // =====================================================================
+    if (!terminal && w_u_mult > 1e-12) {
+        // MTQ control costs: diagonal contributions
+        for (int i = 0; i < num_mtq_; ++i) {
+            const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
+            luu(i, i) += w_u_mult * cost_cfg.mtq_control_weight / (lim * lim);
+        }
+        
+        // RW control costs: diagonal contributions
+        for (int i = 0; i < num_rw_; ++i) {
+            const int ctrl_idx = num_mtq_ + i;
+            const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
+            luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.rw_control_weight / (lim * lim);
+        }
+    }
+
+    // =====================================================================
+    // Apply Quaternion Normalization Projection
+    // =====================================================================
+    // For normalized quaternions, gradients lie in the constraint manifold.
+    // Hessians must be projected: H_proj = (I - q·q^T) H (I - q·q^T)
+    {
+        const double q_norm = q.norm();
+        if (q_norm > 1e-12) {
+            using Mat44 = Eigen::Matrix<double, 4, 4>;
+            const Mat44 proj_q = Mat44::Identity() - q * q.transpose() / (q_norm * q_norm);
+            // Left projection
+            lxx.block(QUAT_INDEX, 0, 4, nx) = proj_q * lxx.block(QUAT_INDEX, 0, 4, nx);
+            // Right projection
+            lxx.block(0, QUAT_INDEX, nx, 4) = lxx.block(0, QUAT_INDEX, nx, 4) * proj_q;
+        }
+    }
+
+    return std::make_tuple(lxx, luu, lux);
+}
+
+std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::terminalCostHessians(
+    const VecX& x, const Vec3& sat_direction, const Vec4& eci_target,
+    const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    const VecX u_zero = VecX::Zero(controlDim());
+    return stageCostHessians(0, 1, x, u_zero, sat_direction, eci_target, B_eci, cost_cfg);
 }
 
 Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& u,
