@@ -1280,15 +1280,8 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         lx.segment<4>(QUAT_INDEX) += w_avmag * sign_w_dot_b * dw_dot_b_dq;
     }
 
-    // Apply quaternion normalization Jacobian projection
-    {
-        const double q_norm = q.norm();
-        if (q_norm > 1e-12) {
-            using Mat44 = Eigen::Matrix<double, 4, 4>;
-            const Mat44 proj_q = Mat44::Identity() - q * q.transpose() / (q_norm * q_norm);
-            lx.segment<4>(QUAT_INDEX) = proj_q * lx.segment<4>(QUAT_INDEX);
-        }
-    }
+    // NOTE: Quaternion projection is applied at the END (see below), not here.
+    // Applying it twice would corrupt the Hessian finite difference computation.
 
     // =====================================================================
     // Gradient w.r.t. RW momentum h: ∂L/∂h

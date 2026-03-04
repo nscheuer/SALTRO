@@ -118,7 +118,7 @@ def setup_satellite():
 
     # Costs (all zero; user can manually increase desired terms)
     cost = settings.passes[0].cost
-    cost.angle = 1e3
+    cost.angle = 1.0
     cost.ang_vel = 0.0
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
@@ -131,7 +131,7 @@ def setup_satellite():
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 1e3
+    cost.angle_N = 1.0
     cost.ang_vel_N = 0.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
