@@ -44,6 +44,10 @@ endif()
 
 add_library(saltro STATIC ${SALTRO_SOURCES})
 
+target_compile_definitions(saltro PUBLIC
+    $<$<CONFIG:Debug>:SALTRO_DEBUG_BUILD=1>
+)
+
 target_include_directories(saltro PUBLIC
     ${CMAKE_SOURCE_DIR}/include
 )

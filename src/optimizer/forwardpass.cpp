@@ -3,6 +3,15 @@
 #include <saltro/math/integrators/rk4.h>
 #include <algorithm>
 #include <cmath>
+#include <exception>
+#include <iostream>
+#include <limits>
+
+#if defined(SALTRO_DEBUG_BUILD)
+#define SALTRO_OPT_DLOG(msg) do { std::cout << msg << std::endl; } while (0)
+#else
+#define SALTRO_OPT_DLOG(msg) do {} while (0)
+#endif
 
 namespace saltro::optimizer {
 
@@ -70,12 +79,33 @@ bool forwardPass(
 
     for (int iter = 0; iter < ls_cfg.max_iters; ++iter) {
         const double alpha = std::ldexp(1.0, -iter); // 1, 0.5, 0.25, ...
+        SALTRO_OPT_DLOG("[FP] trial=" << iter << " alpha=" << alpha << " J_prev=" << J_prev);
 
         X_bar.setZero();
         U_bar.setZero();
         X_bar.col(0) = X.col(0);
 
         bool rollout_ok = true;
+        int fail_k = -1;
+        const char* fail_reason = "none";
+        auto valid_state_quat = [&](const Eigen::VectorXd& x_state) {
+            if (!x_state.allFinite()) {
+                return false;
+            }
+            if (x_state.size() >= 7) {
+                const Eigen::Vector4d q = x_state.segment<4>(3);
+                const double qn = q.norm();
+                if (!std::isfinite(qn) || qn < 1e-10) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        if (!valid_state_quat(X_bar.col(0))) {
+            SALTRO_OPT_DLOG("[FP] reject alpha=" << alpha << " reason=invalid_initial_state");
+            continue;
+        }
 
         for (int k = 0; k < N - 1; ++k) {
             double dt = 0.0;
@@ -90,6 +120,8 @@ bool forwardPass(
             }
             if (!std::isfinite(dt) || dt <= 0.0) {
                 rollout_ok = false;
+                fail_k = k;
+                fail_reason = "invalid_dt";
                 break;
             }
 
@@ -106,38 +138,48 @@ bool forwardPass(
 
             // Integrate dynamics with RK4 to get x_bar(k+1)
             Eigen::VectorXd x_next;
-            rk4_step<Eigen::VectorXd>(
-                [&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
-                    const Eigen::Vector3d R_k = (R.cols() > k) ? Eigen::Vector3d(R.col(k)) : Eigen::Vector3d::Zero();
-                    const Eigen::Vector3d V_k = (V.cols() > k) ? Eigen::Vector3d(V.col(k)) : Eigen::Vector3d::Zero();
-                    const Eigen::Vector3d S_k = (S.cols() > k) ? Eigen::Vector3d(S.col(k)) : Eigen::Vector3d::Zero();
-                    const int rho_k = (rho.cols() > k) ? static_cast<int>(std::max(0.0, std::round(rho(0, k)))) : 0;
-                    dxdt = satellite.dynamics(
-                        x_state,
-                        u_bar_k,
-                        dist_cfg,
-                        R_k,
-                        B.col(k),
-                        S_k,
-                        V_k,
-                        rho_k
-                    );
-                },
-                X_bar.col(k),
-                0.0,
-                dt,
-                x_next
-            );
+            try {
+                rk4_step<Eigen::VectorXd>(
+                    [&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
+                        const Eigen::Vector3d R_k = (R.cols() > k) ? Eigen::Vector3d(R.col(k)) : Eigen::Vector3d::Zero();
+                        const Eigen::Vector3d V_k = (V.cols() > k) ? Eigen::Vector3d(V.col(k)) : Eigen::Vector3d::Zero();
+                        const Eigen::Vector3d S_k = (S.cols() > k) ? Eigen::Vector3d(S.col(k)) : Eigen::Vector3d::Zero();
+                        const int rho_k = (rho.cols() > k) ? static_cast<int>(std::max(0.0, std::round(rho(0, k)))) : 0;
+                        dxdt = satellite.dynamics(
+                            x_state,
+                            u_bar_k,
+                            dist_cfg,
+                            R_k,
+                            B.col(k),
+                            S_k,
+                            V_k,
+                            rho_k
+                        );
+                    },
+                    X_bar.col(k),
+                    0.0,
+                    dt,
+                    x_next
+                );
+            } catch (const std::exception&) {
+                rollout_ok = false;
+                fail_k = k;
+                fail_reason = "dynamics_exception";
+                break;
+            }
 
-            if (x_next.size() == nx) {
+            if (x_next.size() == nx && valid_state_quat(x_next)) {
                 X_bar.col(k + 1) = x_next;
             } else {
                 rollout_ok = false;
+                fail_k = k;
+                fail_reason = "invalid_next_state";
                 break;
             }
         }
 
         if (!rollout_ok) {
+            SALTRO_OPT_DLOG("[FP] reject alpha=" << alpha << " k=" << fail_k << " reason=" << fail_reason);
             continue;
         }
 
@@ -146,6 +188,11 @@ bool forwardPass(
 
         // Line search check
         const bool ls_ok = linesearch(J_minus, J_new, X, U, X_bar, U_bar, alpha, deltaV, ls_cfg);
+        const double delta_V_alpha = alpha * (deltaV(0) + alpha * deltaV(1));
+        const double z = (std::isfinite(delta_V_alpha) && std::abs(delta_V_alpha) >= 1e-16)
+            ? (J_minus - J_new) / (-delta_V_alpha)
+            : std::numeric_limits<double>::quiet_NaN();
+        SALTRO_OPT_DLOG("[FP] alpha=" << alpha << " J_new=" << J_new << " z=" << z << " ls_ok=" << static_cast<int>(ls_ok));
         if (ls_ok) {
             // Overwrite outputs with the new trajectory/control
             X = X_bar;
@@ -154,10 +201,12 @@ bool forwardPass(
             } else if (U_bar.cols() == U.cols() - 1) {
                 U.leftCols(U_bar.cols()) = U_bar;
             }
+            SALTRO_OPT_DLOG("[FP] accepted alpha=" << alpha << " J=" << J_new);
             return true;
         }
     }
 
+    SALTRO_OPT_DLOG("[FP] failed all line-search trials; keep J=" << J_prev);
     J_new = J_prev;
     return false;
 }

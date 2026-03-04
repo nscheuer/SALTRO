@@ -1,4 +1,11 @@
 #include <saltro/optimizer/backwardpass.h>
+#include <iostream>
+
+#if defined(SALTRO_DEBUG_BUILD)
+#define SALTRO_OPT_DLOG(msg) do { std::cout << msg << std::endl; } while (0)
+#else
+#define SALTRO_OPT_DLOG(msg) do {} while (0)
+#endif
 
 namespace saltro::optimizer {
 
@@ -127,14 +134,23 @@ bool backwardPass(
 		// Step 4: Regularization loop - increase rho until Q_uu + rho*I is positive definite
 		double rho_reg = reg_cfg.reg_init;
 		bool converged = false;
+		int reg_tries = 0;
 		
 		while (rho_reg <= reg_cfg.reg_max) {
+			++reg_tries;
 			Eigen::MatrixXd Q_uu_reg = Q_uu + rho_reg * Eigen::MatrixXd::Identity(nu, nu);
 			Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
 			
 			if (llt.info() == Eigen::Success) {
 				// Q_uu_reg is positive definite - solve for gains
 				solveRiccattiStep(Q_uu_reg, Q_uu, Q_u, Q_ux, Q_xx, Q_x, k, K, d, deltaV, p_k, P_k);
+				SALTRO_OPT_DLOG("[BP] k=" << k
+					<< " rho=" << rho_reg
+					<< " tries=" << reg_tries
+					<< " ||Q_u||=" << Q_u.norm()
+					<< " ||d||=" << d[k].norm()
+					<< " dV1=" << deltaV(0)
+					<< " dV2=" << deltaV(1));
 				converged = true;
 				break;
 			}
@@ -144,9 +160,11 @@ bool backwardPass(
 		
 		if (!converged) {
 			// Regularization failed - return false
+			SALTRO_OPT_DLOG("[BP] FAIL k=" << k << " reg_init=" << reg_cfg.reg_init << " reg_max=" << reg_cfg.reg_max);
 			return false;
 		}
 	}
+	SALTRO_OPT_DLOG("[BP] success dV1=" << deltaV(0) << " dV2=" << deltaV(1));
 	
 	return true;
 

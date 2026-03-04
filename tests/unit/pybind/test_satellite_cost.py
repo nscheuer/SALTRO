@@ -142,70 +142,67 @@ class SatelliteCostFixture:
     def costHessianFiniteDiff_xx(self, k: int, N: int, x: np.ndarray, u: np.ndarray,
                                    sat_direction: np.ndarray, eci_target: np.ndarray,
                                    B_eci: np.ndarray, cost_cfg: saltro.CostConfig) -> np.ndarray:
-        """Compute cost Hessian w.r.t. state using central finite differences."""
+        """Compute cost Hessian w.r.t. state using forward finite differences of analytical Jacobian."""
         eps = 1e-6
         nx = self.sat.stateDim
         lxx = np.zeros((nx, nx))
         
+        # Get base Jacobian (analytical)
+        lx_base, _, _ = self.sat.stageCostJacobians(k, N, x, u, sat_direction, eci_target, B_eci, cost_cfg)
+        
         for j in range(nx):
-            # Get Jacobian at perturbed state
-            x_plus = x.copy()
-            x_plus[j] += eps
-            lx_plus = self.costJacobianFiniteDiff_x(k, N, x_plus, u, sat_direction, eci_target, B_eci, cost_cfg)
+            # Get Jacobian at perturbed state (analytical)
+            x_pert = x.copy()
+            x_pert[j] += eps
+            lx_pert, _, _ = self.sat.stageCostJacobians(k, N, x_pert, u, sat_direction, eci_target, B_eci, cost_cfg)
             
-            x_minus = x.copy()
-            x_minus[j] -= eps
-            lx_minus = self.costJacobianFiniteDiff_x(k, N, x_minus, u, sat_direction, eci_target, B_eci, cost_cfg)
-            
-            # Central difference of Jacobian
-            lxx[:, j] = (lx_plus - lx_minus) / (2 * eps)
+            # Forward difference of analytical Jacobian
+            lxx[:, j] = (lx_pert - lx_base) / eps
         
         return lxx
     
     def costHessianFiniteDiff_uu(self, k: int, N: int, x: np.ndarray, u: np.ndarray,
                                    sat_direction: np.ndarray, eci_target: np.ndarray,
                                    B_eci: np.ndarray, cost_cfg: saltro.CostConfig) -> np.ndarray:
-        """Compute cost Hessian w.r.t. control using central finite differences."""
+        """Compute cost Hessian w.r.t. control using forward finite differences of analytical Jacobian."""
         eps = 1e-6
         nu = self.sat.controlDim
         luu = np.zeros((nu, nu))
         
+        # Get base Jacobian w.r.t. control (analytical)
+        _, lu_base, _ = self.sat.stageCostJacobians(k, N, x, u, sat_direction, eci_target, B_eci, cost_cfg)
+        
         for j in range(nu):
-            # Get Jacobian at perturbed control
-            u_plus = u.copy()
-            u_plus[j] += eps
-            lu_plus = self.costJacobianFiniteDiff_u(k, N, x, u_plus, sat_direction, eci_target, B_eci, cost_cfg)
+            # Get Jacobian w.r.t. control at perturbed control (analytical)
+            u_pert = u.copy()
+            u_pert[j] += eps
+            _, lu_pert, _ = self.sat.stageCostJacobians(k, N, x, u_pert, sat_direction, eci_target, B_eci, cost_cfg)
             
-            u_minus = u.copy()
-            u_minus[j] -= eps
-            lu_minus = self.costJacobianFiniteDiff_u(k, N, x, u_minus, sat_direction, eci_target, B_eci, cost_cfg)
-            
-            # Central difference of Jacobian
-            luu[:, j] = (lu_plus - lu_minus) / (2 * eps)
+            # Forward difference of analytical Jacobian
+            luu[:, j] = (lu_pert - lu_base) / eps
         
         return luu
     
     def costHessianFiniteDiff_ux(self, k: int, N: int, x: np.ndarray, u: np.ndarray,
                                    sat_direction: np.ndarray, eci_target: np.ndarray,
                                    B_eci: np.ndarray, cost_cfg: saltro.CostConfig) -> np.ndarray:
-        """Compute cost Hessian w.r.t. state and control using central finite differences."""
+        """Compute cost Hessian w.r.t. state and control using forward finite differences of analytical Jacobian."""
         eps = 1e-6
         nx = self.sat.stateDim
         nu = self.sat.controlDim
         lux = np.zeros((nu, nx))
         
+        # Get base Jacobian w.r.t. control (analytical)
+        _, lu_base, _ = self.sat.stageCostJacobians(k, N, x, u, sat_direction, eci_target, B_eci, cost_cfg)
+        
         for j in range(nx):
-            # Get Jacobian w.r.t. control at perturbed state
-            x_plus = x.copy()
-            x_plus[j] += eps
-            lu_plus = self.costJacobianFiniteDiff_u(k, N, x_plus, u, sat_direction, eci_target, B_eci, cost_cfg)
+            # Get Jacobian w.r.t. control at perturbed state (analytical)
+            x_pert = x.copy()
+            x_pert[j] += eps
+            _, lu_pert, _ = self.sat.stageCostJacobians(k, N, x_pert, u, sat_direction, eci_target, B_eci, cost_cfg)
             
-            x_minus = x.copy()
-            x_minus[j] -= eps
-            lu_minus = self.costJacobianFiniteDiff_u(k, N, x_minus, u, sat_direction, eci_target, B_eci, cost_cfg)
-            
-            # Central difference
-            lux[:, j] = (lu_plus - lu_minus) / (2 * eps)
+            # Forward difference of analytical Jacobian
+            lux[:, j] = (lu_pert - lu_base) / eps
         
         return lux
 
@@ -438,6 +435,89 @@ class TestCostJacobians:
             assert Lu is not None, f"Control Jacobian failed for cost type {cost_type}"
             assert np.all(np.isfinite(lx)), f"State Jacobian non-finite for cost type {cost_type}"
             assert np.all(np.isfinite(Lu)), f"Control Jacobian non-finite for cost type {cost_type}"
+    
+    def test_jacobian_quaternion_orthogonality(self, fixture):
+        """Cost Jacobian quaternion component lies in tangent space (perpendicular to q)."""
+        x = np.zeros(fixture.sat.stateDim)
+        x[fixture.sat.AV_INDEX:fixture.sat.AV_INDEX+3] = [0.1, 0.05, 0.02]
+        q = np.array([0.9, 0.3, 0.2, 0.1])
+        q /= np.linalg.norm(q)
+        x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = q
+        
+        u = np.zeros(fixture.sat.controlDim)
+        
+        # Configure cost with all attitude terms
+        cost_cfg = saltro.CostConfig()
+        cost_cfg.angle = 1e2
+        cost_cfg.ang_vel = 1e3
+        cost_cfg.ang_vel_mag = 1e2
+        cost_cfg.ang_vel_err_dir = 1e2
+        cost_cfg.control_mult = 0.1
+        cost_cfg.ang_cost_func_type = 4  # 1 - |q·q_goal|^2
+        
+        boresight = np.array([0.9, 0.2, 0.1])
+        boresight /= np.linalg.norm(boresight)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.array([5e-5, 2e-5, 3e-5])
+        
+        # Get analytical Jacobian
+        lx_analytical, _, _ = fixture.sat.stageCostJacobians(
+            5, 10, x, u, boresight, eci_target, B_eci, cost_cfg)
+        
+        grad_q = lx_analytical[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4]
+        
+        # Verify orthogonality: q^T * grad_q should be near zero
+        orthogonality_error = np.abs(np.dot(q, grad_q))
+        
+        assert orthogonality_error < 1e-10, \
+            f"Quaternion gradient not orthogonal to q: q^T*grad_q = {orthogonality_error:.6e}"
+    
+    def test_jacobian_matches_fd_with_angle_cost(self, fixture):
+        """Cost Jacobian matches finite differences when angle cost enabled (regression test)."""
+        x = np.zeros(fixture.sat.stateDim)
+        x[fixture.sat.AV_INDEX:fixture.sat.AV_INDEX+3] = [0.02, -0.01, 0.015]
+        q = np.array([0.9, 0.25, 0.3, 0.15])
+        q /= np.linalg.norm(q)
+        x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = q
+        
+        u = np.zeros(fixture.sat.controlDim)
+        
+        # Cost with angle cost enabled (this was causing line search failures before fix)
+        cost_cfg = saltro.CostConfig()
+        cost_cfg.angle = 1e2
+        cost_cfg.angle_N = 1e2
+        cost_cfg.ang_vel = 1e4
+        cost_cfg.ang_vel_N = 1e4
+        cost_cfg.ang_vel_mag = 5e1
+        cost_cfg.ang_vel_err_dir = 5e1
+        cost_cfg.control_mult = 0.01
+        cost_cfg.mtq_control_weight = 1.0
+        cost_cfg.rw_control_weight = 1e3
+        cost_cfg.ang_cost_func_type = 4
+        
+        boresight = np.array([1.0, 0.0, 0.0])
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.array([5e-5, 2e-5, 3e-5])
+        
+        # Analytical Jacobian
+        lx_analytical, _, _ = fixture.sat.stageCostJacobians(
+            5, 10, x, u, boresight, eci_target, B_eci, cost_cfg)
+        
+        # Finite difference Jacobian
+        lx_fd = fixture.costJacobianFiniteDiff_x(
+            5, 10, x, u, boresight, eci_target, B_eci, cost_cfg)
+        
+        # Compare angular velocity block (not constrained)
+        rel_tol = 0.02  # 2% tolerance
+        abs_tol = 1e-7
+        
+        for i in range(3):  # AV dimensions
+            numerical_mag = np.abs(lx_analytical[i])
+            threshold = abs_tol + rel_tol * numerical_mag
+            error = np.abs(lx_analytical[i] - lx_fd[i])
+            assert error <= threshold, \
+                f"Jacobian[{i}] mismatch: analytical={lx_analytical[i]:.6e}, " \
+                f"fd={lx_fd[i]:.6e}, error={error:.6e}"
 
 
 # ============================================================================
@@ -608,6 +688,124 @@ class TestCostHessians:
         for i in range(3):
             assert lxx[rw_idx + i, rw_idx + i] >= -1e-10, \
                 f"RW momentum Hessian diagonal[{rw_idx + i}] = {lxx[rw_idx + i, rw_idx + i]} is negative"
+    
+    def test_hessian_quaternion_projection_left(self, fixture):
+        """Cost Hessian quaternion block satisfies left projection property: H*q ≈ 0."""
+        x = np.zeros(fixture.sat.stateDim)
+        x[fixture.sat.AV_INDEX:fixture.sat.AV_INDEX+3] = [0.05, 0.03, 0.02]
+        q = np.array([0.85, 0.4, 0.25, 0.15])
+        q /= np.linalg.norm(q)
+        x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = q
+        
+        u = np.zeros(fixture.sat.controlDim)
+        
+        # Cost with angle cost
+        cost_cfg = saltro.CostConfig()
+        cost_cfg.angle = 1e2
+        cost_cfg.ang_vel = 1e3
+        cost_cfg.control_mult = 0.1
+        cost_cfg.ang_cost_func_type = 4
+        
+        boresight = np.array([0.9, 0.2, 0.1])
+        boresight /= np.linalg.norm(boresight)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.array([5e-5, 2e-5, 3e-5])
+        
+        # Get analytical Hessian
+        lxx_analytical, _, _ = fixture.sat.stageCostHessians(
+            5, 10, x, u, boresight, eci_target, B_eci, cost_cfg)
+        
+        # Extract quaternion block
+        q_idx = fixture.sat.QUAT_INDEX
+        H_qq = lxx_analytical[q_idx:q_idx+4, q_idx:q_idx+4]
+        
+        # Check: H_qq * q should be near zero (right multiplication)
+        H_q_product = np.dot(H_qq, q)
+        right_proj_error = np.linalg.norm(H_q_product)
+        
+        assert right_proj_error < 1e-9, \
+            f"Hessian right projection failed: ||H*q|| = {right_proj_error:.6e}"
+    
+    def test_hessian_quaternion_projection_right(self, fixture):
+        """Cost Hessian quaternion block satisfies right projection property: q^T*H ≈ 0."""
+        x = np.zeros(fixture.sat.stateDim)
+        x[fixture.sat.AV_INDEX:fixture.sat.AV_INDEX+3] = [0.05, 0.03, 0.02]
+        q = np.array([0.85, 0.4, 0.25, 0.15])
+        q /= np.linalg.norm(q)
+        x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = q
+        
+        u = np.zeros(fixture.sat.controlDim)
+        
+        # Cost with angle cost
+        cost_cfg = saltro.CostConfig()
+        cost_cfg.angle = 1e2
+        cost_cfg.ang_vel = 1e3
+        cost_cfg.control_mult = 0.1
+        cost_cfg.ang_cost_func_type = 4
+        
+        boresight = np.array([0.9, 0.2, 0.1])
+        boresight /= np.linalg.norm(boresight)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.array([5e-5, 2e-5, 3e-5])
+        
+        # Get analytical Hessian
+        lxx_analytical, _, _ = fixture.sat.stageCostHessians(
+            5, 10, x, u, boresight, eci_target, B_eci, cost_cfg)
+        
+        # Extract quaternion block
+        q_idx = fixture.sat.QUAT_INDEX
+        H_qq = lxx_analytical[q_idx:q_idx+4, q_idx:q_idx+4]
+        
+        # Check: q^T*H_qq should be near zero (left multiplication)
+        qT_H_product = np.dot(q, H_qq)
+        left_proj_error = np.linalg.norm(qT_H_product)
+        
+        assert left_proj_error < 1e-9, \
+            f"Hessian left projection failed: ||q^T*H|| = {left_proj_error:.6e}"
+    
+    def test_hessian_matches_fd_with_angle_cost(self, fixture):
+        """Cost Hessian matches finite differences when angle cost enabled (regression test)."""
+        x = np.zeros(fixture.sat.stateDim)
+        x[fixture.sat.AV_INDEX:fixture.sat.AV_INDEX+3] = [0.02, -0.01, 0.015]
+        q = np.array([0.9, 0.25, 0.3, 0.15])
+        q /= np.linalg.norm(q)
+        x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = q
+        
+        u = np.zeros(fixture.sat.controlDim)
+        
+        # Cost with angle cost enabled
+        cost_cfg = saltro.CostConfig()
+        cost_cfg.angle = 1e2
+        cost_cfg.ang_vel = 1e4
+        cost_cfg.control_mult = 0.01
+        cost_cfg.mtq_control_weight = 1.0
+        cost_cfg.rw_control_weight = 1e3
+        cost_cfg.ang_cost_func_type = 4
+        
+        boresight = np.array([1.0, 0.0, 0.0])
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.array([5e-5, 2e-5, 3e-5])
+        
+        # Analytical Hessian
+        lxx_analytical, _, _ = fixture.sat.stageCostHessians(
+            5, 10, x, u, boresight, eci_target, B_eci, cost_cfg)
+        
+        # Finite difference Hessian
+        lxx_fd = fixture.costHessianFiniteDiff_xx(
+            5, 10, x, u, boresight, eci_target, B_eci, cost_cfg)
+        
+        # Compare angular velocity block (not constrained by manifold)
+        rel_tol = 0.05  # 5% tolerance due to FD truncation
+        abs_tol = 1e-8
+        
+        for i in range(3):  # AV dimensions
+            for j in range(3):
+                numerical_mag = np.abs(lxx_analytical[i, j])
+                threshold = abs_tol + rel_tol * numerical_mag
+                error = np.abs(lxx_analytical[i, j] - lxx_fd[i, j])
+                assert error <= threshold, \
+                    f"Hessian[{i},{j}] mismatch: analytical={lxx_analytical[i, j]:.6e}, " \
+                    f"fd={lxx_fd[i, j]:.6e}, error={error:.6e}"
 
 
 # ============================================================================

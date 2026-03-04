@@ -20,6 +20,13 @@ cmake -S . -B build -DSALTRO_BUILD_PYTHON=ON
 cmake --build build -j
 ```
 
+# Compile in Debug Mode
+```bash
+sudo apt install gdb
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DSALTRO_BUILD_PYTHON=ON
+cmake --build build -j
+```
+
 # Test
 ```bash
 cd build

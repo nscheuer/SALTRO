@@ -90,10 +90,23 @@ def _sanitize_quaternion_state_inplace(X, quat_start=3, eps=1e-10):
 
 
 def setup_satellite():
+    # Quick-tune optimization knobs
+    line_search_max_iters = 20
+    line_search_beta1 = 1e-10
+    line_search_beta2 = 5000.0
+    # Angle cost function selection:
+    # 0: 1-|q·q_goal|, 1: 0.5*(1-|q·q_goal|)^2, 2: acos(|q·q_goal|),
+    # 3: 0.5*acos(|q·q_goal|)^2, 4: 1-|q·q_goal|^2
+    ang_cost_func_type = 4
+
     settings = saltro_py.PlannerSettings()
     settings.num_passes = 1
     settings.passes[0].dt = 10.0
+    settings.passes[0].ilqr.cost_tol = 1e-2
     settings.init_traj.initcontroller = 2
+    settings.passes[0].linesearch.max_iters = line_search_max_iters
+    settings.passes[0].linesearch.beta1 = line_search_beta1
+    settings.passes[0].linesearch.beta2 = line_search_beta2
 
     # ---------------------------------------------------------------------
     # Manual objective/constraint baseline: start from effectively-zero setup
@@ -105,23 +118,24 @@ def setup_satellite():
 
     # Costs (all zero; user can manually increase desired terms)
     cost = settings.passes[0].cost
-    cost.angle = 1e4
+    cost.angle = 1e3
     cost.ang_vel = 0.0
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
-    cost.control_mult = 0.0
-    cost.mtq_control_weight = 0.0
-    cost.rw_control_weight = 0.0
+    cost.control_mult = 0.01
+    cost.mtq_control_weight = 1.0
+    cost.rw_control_weight = 1000.0
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 0.0
+    cost.angle_N = 1e3
     cost.ang_vel_N = 0.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
+    cost.ang_cost_func_type = ang_cost_func_type
     cost.use_cost_hess = False
 
     settings.disturbances.plan_for_aero = False
@@ -364,6 +378,10 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
 
     idx = {"value": 0}
 
+    def set_index(new_idx):
+        idx["value"] = int(np.clip(new_idx, 0, len(snapshots) - 1))
+        update_view(idx["value"])
+
     def update_view(i):
         snap = snapshots[i]
         X = snap["X"]
@@ -509,12 +527,10 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         fig.canvas.draw_idle()
 
     def on_prev(_event):
-        idx["value"] = max(0, idx["value"] - 1)
-        update_view(idx["value"])
+        set_index(idx["value"] - 1)
 
     def on_next(_event):
-        idx["value"] = min(len(snapshots) - 1, idx["value"] + 1)
-        update_view(idx["value"])
+        set_index(idx["value"] + 1)
 
     btn_prev_ax = fig.add_axes([0.42, 0.01, 0.08, 0.04])
     btn_next_ax = fig.add_axes([0.51, 0.01, 0.08, 0.04])
@@ -529,14 +545,22 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         elif event.key in ("right", "d"):
             on_next(None)
 
-    fig.canvas.mpl_connect("key_press_event", on_key)
+    def on_cost_click(event):
+        if event.inaxes is not ax_J or event.xdata is None:
+            return
+        if event.button != 1:
+            return
+        set_index(int(np.rint(event.xdata)))
 
-    update_view(0)
+    fig.canvas.mpl_connect("key_press_event", on_key)
+    fig.canvas.mpl_connect("button_press_event", on_cost_click)
+
+    set_index(0)
     plt.show()
 
 
 def main():
-    N = 10
+    N = 20
     dt = 10.0
 
     satellite, settings = setup_satellite()
@@ -555,6 +579,7 @@ def main():
 
     # Python-controlled iLQR loop with C++ passes
     settings.passes[0].ilqr.max_iters = 30
+    ilqr_t0 = time.time()
     snapshots, transitions, stop_reason = run_ilqr_python_loop(
         satellite,
         settings,
@@ -569,9 +594,11 @@ def main():
         boresight,
         attitude_target_traj,
     )
+    ilqr_time = time.time() - ilqr_t0
 
     X_final = snapshots[-1]["X"]
     print(f"Warm-start calculation time: {ws_time*1000:.2f} ms")
+    print(f"iLQR sequence calculation time: {ilqr_time*1000:.2f} ms")
     print(f"Angular rates final: {X_final[0:3, -1]}")
     print(f"iLQR snapshots available: {len(snapshots)} (warm-start + iterations)")
 

@@ -30,6 +30,16 @@ inline double safeNorm(const Eigen::Vector3d& v) {
     return std::isfinite(n) ? n : 0.0;
 }
 
+inline bool safeUnitQuat(const Eigen::Vector4d& q_raw, Eigen::Vector4d& q_unit) {
+    const double n = q_raw.norm();
+    if (!std::isfinite(n) || n < 1e-12) {
+        q_unit = Eigen::Vector4d::Zero();
+        return false;
+    }
+    q_unit = q_raw / n;
+    return true;
+}
+
 /**
  * @brief Helper to check if first element is NaN (indicating ECI format).
  */
@@ -182,7 +192,10 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
     Vec3 torque = Vec3::Zero();
     
     // Extract base state (first 7 elements: w + q)
-    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    Vec4 q;
+    if (!safeUnitQuat(x.segment<4>(QUAT_INDEX), q)) {
+        return Vec3::Zero();
+    }
     Vec7 x_base = x.head<7>();
     x_base.segment<4>(QUAT_INDEX) = q;
 
@@ -211,7 +224,10 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
 
 Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 torque = Vec3::Zero();
-    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    Vec4 q;
+    if (!safeUnitQuat(x.segment<4>(QUAT_INDEX), q)) {
+        return Vec3::Zero();
+    }
     Vec7 x_base = x.head<7>();
     x_base.segment<4>(QUAT_INDEX) = q;
 
@@ -247,7 +263,11 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
 
 Satellite::VecX Satellite::dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 w = x.segment<3>(AV_INDEX);
-    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    Vec4 q;
+    if (!safeUnitQuat(x.segment<4>(QUAT_INDEX), q)) {
+        return VecX::Constant(stateDim(), std::numeric_limits<double>::quiet_NaN());
+    }
+    
     Vec3 tau_act = actuatorTorque(x, u, B_eci);
     Vec3 tau_dist = disturbanceTorque(x, dist, R_eci, B_eci, S_eci, V_eci, rho);
     Vec3 h_rw = Vec3::Zero();
@@ -1319,6 +1339,17 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         }
     }
 
+    // =========================================================================
+    // Apply Quaternion Normalization Projection to Gradient
+    // =========================================================================
+    // Since cost function normalizes q, gradient must lie in tangent space
+    // grad_projected = (I - q*q^T) * grad_raw
+    {
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+        const Mat44 proj_q = Mat44::Identity() - q * q.transpose();
+        lx.segment<4>(QUAT_INDEX) = proj_q * lx.segment<4>(QUAT_INDEX);
+    }
+
     // Reshape lu as a 1 × nu matrix for return type compatibility
     MatX Lu_mat = lu.transpose();
     
@@ -1402,6 +1433,8 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         for (int j = 0; j < 4; ++j) {
             x_pert = x;
             x_pert(QUAT_INDEX + j) += eps;
+            // CRITICAL: Normalize the perturbed quaternion before computing gradient
+            x_pert.segment<4>(QUAT_INDEX).normalize();
             auto lx_pert = stageCostJacobians(k, N, x_pert, u, boresight_body, attitude_target, B_eci, cost_cfg);
             VecX grad_pert = std::get<0>(lx_pert);
 
@@ -1467,16 +1500,14 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     // =====================================================================
     // For normalized quaternions, gradients lie in the constraint manifold.
     // Hessians must be projected: H_proj = (I - q·q^T) H (I - q·q^T)
+    // Note: q is already normalized (line 1388), so q_norm = 1
     {
-        const double q_norm = q.norm();
-        if (q_norm > 1e-12) {
-            using Mat44 = Eigen::Matrix<double, 4, 4>;
-            const Mat44 proj_q = Mat44::Identity() - q * q.transpose() / (q_norm * q_norm);
-            // Left projection
-            lxx.block(QUAT_INDEX, 0, 4, nx) = proj_q * lxx.block(QUAT_INDEX, 0, 4, nx);
-            // Right projection
-            lxx.block(0, QUAT_INDEX, nx, 4) = lxx.block(0, QUAT_INDEX, nx, 4) * proj_q;
-        }
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+        const Mat44 proj_q = Mat44::Identity() - q * q.transpose();
+        // Left projection
+        lxx.block(QUAT_INDEX, 0, 4, nx) = proj_q * lxx.block(QUAT_INDEX, 0, 4, nx);
+        // Right projection
+        lxx.block(0, QUAT_INDEX, nx, 4) = lxx.block(0, QUAT_INDEX, nx, 4) * proj_q;
     }
 
     return std::make_tuple(lxx, luu, lux);
