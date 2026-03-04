@@ -16,7 +16,7 @@ static py::tuple backward_pass_py(
     const Eigen::Ref<const Eigen::MatrixXd>& S,
     const Eigen::Ref<const Eigen::MatrixXd>& rho,
     const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-    const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
+    const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
     const PlannerSettings& settings
 )
 {
@@ -87,6 +87,7 @@ ok : bool
 K : ndarray (N-1, control_dim, state_dim)
 d : ndarray (control_dim, N-1)
 deltaV : ndarray (2,)
+attitude_target : ndarray (4, N)
 )doc"
     );
 }

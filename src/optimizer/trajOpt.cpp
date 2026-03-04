@@ -79,7 +79,7 @@ bool trajOpt(
 
 	int state_dim,
 	int input_dim,
-	int N
+	int& N
 ) {
 	std::string error_msg;
 	if (!validation::validatetrajOpt(settings, satellite, x0, r0, v0, jtime, q_goal, boresight, state_dim, input_dim, N, error_msg)) {
@@ -131,7 +131,10 @@ bool trajOpt(
 		throw std::runtime_error("trajOpt failed to warm-start trajectory");
 	}
 
-	// Update N to reflect the resampled grid
+	// Update N to reflect the resampled grid and ensure provided buffers are large enough
+	if (N_fixed > X.cols() || N_fixed > U.cols()) {
+		throw std::runtime_error("trajOpt resampled length exceeds provided X/U column capacity; allocate at least N_fixed columns");
+	}
 	N = N_fixed;
 
 	return true;

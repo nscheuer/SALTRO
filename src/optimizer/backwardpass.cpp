@@ -65,7 +65,7 @@ bool backwardPass(
 	const Eigen::Ref<const Eigen::MatrixXd>& S,
 	const Eigen::Ref<const Eigen::MatrixXd>& rho,
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-	const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
 	const PlannerSettings& settings,
 	std::vector<Eigen::MatrixXd>& K,
 	std::vector<Eigen::VectorXd>& d,
@@ -83,9 +83,10 @@ bool backwardPass(
 	Eigen::VectorXd x_final = X.col(N - 1);
 	Eigen::Vector3d boresight_final = boresight.col(N - 1);
 	Eigen::Vector3d B_final = B.col(N - 1);
+	const Eigen::Vector4d attitude_target_final = attitude_target.col(N - 1);
 
-	auto [p_N, p_unused1, p_unused2] = satellite.terminalCostJacobians(x_final, boresight_final, attitude_target, B_final, cost_cfg);
-	auto [P_N, P_unused1, P_unused2] = satellite.terminalCostHessians(x_final, boresight_final, attitude_target, B_final, cost_cfg);
+	auto [p_N, p_unused1, p_unused2] = satellite.terminalCostJacobians(x_final, boresight_final, attitude_target_final, B_final, cost_cfg);
+	auto [P_N, P_unused1, P_unused2] = satellite.terminalCostHessians(x_final, boresight_final, attitude_target_final, B_final, cost_cfg);
 
 	// Initialize value function at terminal time
 	Eigen::VectorXd p_k = p_N;
@@ -104,10 +105,11 @@ bool backwardPass(
 		const Eigen::Vector3d R_k = R.col(k);
 		const Eigen::Vector3d V_k = V.col(k);
 		const Eigen::Vector3d S_k = S.col(k);
+		const Eigen::Vector4d attitude_target_k = attitude_target.col(k);
 		
 		// Step 1: Compute stage cost Jacobians and Hessians
-		auto [lx, lu_mat, lux_grad] = satellite.stageCostJacobians(k, N, x_k, u_k, boresight_k, attitude_target, B_k, cost_cfg);
-		auto [lxx, luu, lux_hess] = satellite.stageCostHessians(k, N, x_k, u_k, boresight_k, attitude_target, B_k, cost_cfg);
+		auto [lx, lu_mat, lux_grad] = satellite.stageCostJacobians(k, N, x_k, u_k, boresight_k, attitude_target_k, B_k, cost_cfg);
+		auto [lxx, luu, lux_hess] = satellite.stageCostHessians(k, N, x_k, u_k, boresight_k, attitude_target_k, B_k, cost_cfg);
 		
 		// Reshape lu from 1×nu matrix to nu vector
 		Eigen::VectorXd lu = lu_mat.row(0);

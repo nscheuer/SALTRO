@@ -1378,9 +1378,10 @@ class TestECITargetDualFormat:
         cost_cfg.control_mult = 0.0
 
         attitude_target = np.array([np.nan, 1.0, 0.0, 0.0])
+        attitude_target_traj = np.tile(attitude_target.reshape(4, 1), (1, N))
 
-        J_aligned = fixture.sat.totalCost(X, U, B, boresight_aligned, attitude_target, cost_cfg)
-        J_switched = fixture.sat.totalCost(X, U, B, boresight_switched, attitude_target, cost_cfg)
+        J_aligned = fixture.sat.totalCost(X, U, B, boresight_aligned, attitude_target_traj, cost_cfg)
+        J_switched = fixture.sat.totalCost(X, U, B, boresight_switched, attitude_target_traj, cost_cfg)
 
         assert np.isfinite(J_aligned)
         assert np.isfinite(J_switched)

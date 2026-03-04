@@ -1493,7 +1493,7 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
                             const Eigen::Ref<const Eigen::MatrixXd>& U,
                             const Eigen::Ref<const Eigen::MatrixXd>& B,
                             const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-                            const Vec4& attitude_target,
+                            const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
                             const CostConfig& cost_cfg) const {
     const int nx = stateDim();
     const int nu = controlDim();
@@ -1534,6 +1534,16 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
             "totalCost: boresight has " + std::to_string(boresight.rows()) +
             " rows, expected 3");
     }
+    if (attitude_target.rows() != 4) {
+        throw std::invalid_argument(
+            "totalCost: attitude_target has " + std::to_string(attitude_target.rows()) +
+            " rows, expected 4");
+    }
+    if (attitude_target.cols() != N) {
+        throw std::invalid_argument(
+            "totalCost: attitude_target has " + std::to_string(attitude_target.cols()) +
+            " columns, expected " + std::to_string(N));
+    }
     
     double J_total = 0.0;
     // Sum stage costs for k = 0 to N-2
@@ -1542,8 +1552,9 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
         VecX u_k = U.col(k);
         Vec3 B_k = B.col(k);
         Vec3 boresight_k = boresight.col(k);
+        Vec4 attitude_target_k = attitude_target.col(k);
 
-        double stage_cost = stageCost(k, N, x_k, u_k, boresight_k, attitude_target, B_k, cost_cfg);
+        double stage_cost = stageCost(k, N, x_k, u_k, boresight_k, attitude_target_k, B_k, cost_cfg);
         J_total += stage_cost;
     }
 
@@ -1551,8 +1562,9 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
     VecX x_final = X.col(N - 1);
     Vec3 B_final = B.col(N - 1);
     Vec3 boresight_final = boresight.col(N - 1);
+    Vec4 attitude_target_final = attitude_target.col(N - 1);
 
-    double terminal_cost = terminalCost(x_final, boresight_final, attitude_target, B_final, cost_cfg);
+    double terminal_cost = terminalCost(x_final, boresight_final, attitude_target_final, B_final, cost_cfg);
     J_total += terminal_cost;
     
     return J_total;

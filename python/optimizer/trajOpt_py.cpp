@@ -3,6 +3,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 
+#include <algorithm>
 #include <stdexcept>
 
 #include <saltro/limits.h>
@@ -56,9 +57,10 @@ py::tuple trajOpt_py(
 	Satellite::VecX x0(state_dim);
 	x0 = x0_in;
 
-	Eigen::MatrixXd X(state_dim, N);
-	Eigen::MatrixXd U(input_dim, N);
-	Eigen::MatrixXd K(input_dim, state_dim * N);
+	Eigen::MatrixXd X(state_dim, saltro::limits::MAX_LENGTH_TRAJ);
+	Eigen::MatrixXd U(input_dim, saltro::limits::MAX_LENGTH_TRAJ);
+	Eigen::MatrixXd K(input_dim, state_dim * saltro::limits::MAX_LENGTH_TRAJ);
+	int N_out = N;
 
 	const bool ok = saltro::optimizer::trajOpt(
 		settings,
@@ -74,10 +76,16 @@ py::tuple trajOpt_py(
 		K,
 		state_dim,
 		input_dim,
-		N
+		N_out
 	);
 
-	return py::make_tuple(ok, X, U, K);
+	const int N_cols = std::max(0, std::min(N_out, saltro::limits::MAX_LENGTH_TRAJ));
+	return py::make_tuple(
+		ok,
+		X.leftCols(N_cols),
+		U.leftCols(N_cols),
+		K.leftCols(state_dim * N_cols)
+	);
 }
 
 void bind_trajOpt(py::module_& m)

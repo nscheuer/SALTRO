@@ -491,7 +491,7 @@ public:
      * @param U Control trajectory matrix ((N-1) × control_dim). Each row k is control from k to k+1.
      * @param B Magnetic field at each step (3 × N).
     * @param boresight Boresight history in body frame (3 × N), column k used at step k.
-    * @param attitude_target Attitude target (quaternion or [NaN, ECI direction]).
+    * @param attitude_target Attitude target trajectory (4 × N), column k used at step k.
      * @param cost_cfg Cost configuration.
      * @return Total trajectory cost J = Σ_k c(x_k, u_k) + c_terminal(x_N).
      */
@@ -499,7 +499,7 @@ public:
                     const Eigen::Ref<const Eigen::MatrixXd>& U,
                     const Eigen::Ref<const Eigen::MatrixXd>& B,
                 const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-                    const Vec4& attitude_target,
+                    const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
                     const CostConfig& cost_cfg) const;
 
     /**

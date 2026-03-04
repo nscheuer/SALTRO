@@ -18,6 +18,14 @@ SEC_PER_CENTURY = 36525.0 * 86400.0
 MAX_LENGTH_TRAJ = 1000  # From limits.h
 
 
+def make_attitude_traj(att, N_cols):
+    """Create attitude target trajectory by repeating a single target."""
+    traj = np.zeros((4, N_cols))
+    for k in range(N_cols):
+        traj[:, k] = att
+    return traj
+
+
 class BackwardPassFixture:
     """Fixture for backward pass tests with satellite setup."""
 
@@ -47,7 +55,8 @@ class BackwardPassFixture:
         self.x0[3:7] = np.array([1.0, 0.0, 0.0, 0.0])   # Identity quaternion
         
         # Goal: identity quaternion (ECI format with NaN q0)
-        self.attitude_target = np.array([np.nan, 0.0, 0.0, 0.0])
+        attitude_target = np.array([np.nan, 0.0, 0.0, 0.0])
+        self.attitude_target_traj = make_attitude_traj(attitude_target, self.N)
         
         # Time setup: 2 timesteps with dt=0.5 seconds
         dt_seconds = 0.5
@@ -138,6 +147,7 @@ class TestBackwardPass:
         boresight_test[:, 0] = np.array([1.0, 0.0, 0.0])
         
         attitude_target_test = np.array([np.nan, 0.0, 0.0, 0.0])
+        attitude_target_test_traj = make_attitude_traj(attitude_target_test, N_test)
         
         settings_test.num_passes = 1
         settings_test.passes[0].dt = 0.5
@@ -147,7 +157,7 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
-            boresight_test, attitude_target_test, settings_test
+            boresight_test, attitude_target_test_traj, settings_test
         )
         
         assert ok
@@ -200,6 +210,7 @@ class TestBackwardPass:
             boresight_test[:, k] = np.array([1.0, 0.0, 0.0])
         
         attitude_target_test = np.array([np.nan, 0.0, 0.0, 0.0])
+        attitude_target_test_traj = make_attitude_traj(attitude_target_test, N_test)
         
         settings_test.num_passes = 1
         settings_test.passes[0].dt = 0.5
@@ -209,7 +220,7 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
-            boresight_test, attitude_target_test, settings_test
+            boresight_test, attitude_target_test_traj, settings_test
         )
         
         assert ok
@@ -240,7 +251,7 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
-            fixture.rho, fixture.boresight, fixture.attitude_target, fixture.settings
+            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings
         )
         
         assert ok
@@ -264,7 +275,7 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
-            fixture.rho, fixture.boresight, fixture.attitude_target, fixture.settings
+            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings
         )
         
         assert ok
@@ -288,7 +299,7 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
-            fixture.rho, fixture.boresight, fixture.attitude_target, fixture.settings
+            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings
         )
         
         assert ok
@@ -311,7 +322,7 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
-            fixture.rho, fixture.boresight, fixture.attitude_target, fixture.settings
+            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings
         )
         
         # Should succeed (regularization loop finds positive definite Q_uu)
@@ -365,6 +376,7 @@ class TestBackwardPass:
             boresight_test[:, k] = np.array([1.0, 0.0, 0.0])
         
         attitude_target_test = np.array([np.nan, 0.0, 0.0, 0.0])
+        attitude_target_test_traj = make_attitude_traj(attitude_target_test, N_test)
         
         settings_test.num_passes = 1
         settings_test.passes[0].dt = 0.5
@@ -374,7 +386,7 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
-            boresight_test, attitude_target_test, settings_test
+            boresight_test, attitude_target_test_traj, settings_test
         )
         
         assert ok
@@ -430,6 +442,7 @@ class TestBackwardPass:
             boresight_test[:, k] = np.array([1.0, 0.0, 0.0])
         
         attitude_target_test = np.array([np.nan, 0.0, 0.0, 0.0])
+        attitude_target_test_traj = make_attitude_traj(attitude_target_test, N_test)
         
         settings_test.num_passes = 1
         settings_test.passes[0].dt = 0.5
@@ -439,7 +452,7 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
-            boresight_test, attitude_target_test, settings_test
+            boresight_test, attitude_target_test_traj, settings_test
         )
         
         assert ok

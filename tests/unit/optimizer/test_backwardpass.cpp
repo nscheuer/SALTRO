@@ -17,6 +17,14 @@ namespace {
 constexpr double PI = 3.14159265358979323846;
 constexpr double SEC_PER_CENTURY = 36525.0 * 86400.0;
 
+Eigen::MatrixXd makeAttitudeTraj(const Eigen::Vector4d& att, int N_cols) {
+	Eigen::MatrixXd traj(4, N_cols);
+	for (int k = 0; k < N_cols; ++k) {
+		traj.col(k) = att;
+	}
+	return traj;
+}
+
 class BackwardPassFixture {
 public:
 	static constexpr int N = 2;  // Minimal case: 2 timesteps, 1 backward iteration
@@ -27,6 +35,7 @@ public:
 	Satellite::VecX x0;
 	Eigen::VectorXd jtime;
 	Eigen::Vector4d attitude_target;
+	Eigen::MatrixXd attitude_target_traj;
 	Eigen::MatrixXd boresight;
 
 	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> R;
@@ -57,6 +66,7 @@ public:
 
 		// Goal: identity quaternion (ECI format)
 		attitude_target << std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0, 0.0;
+		attitude_target_traj = makeAttitudeTraj(attitude_target, N);
 
 		// Time setup: 2 timesteps with dt=0.5 seconds
 		const double dt_seconds = 0.5;
@@ -97,6 +107,7 @@ private:
 		J(2, 2) = 0.069;
 		return J;
 	}
+
 };
 
 }  // namespace
@@ -135,13 +146,14 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass N=1 edge case (no backward 
 	rho_test(0, 0) = 0.0;
 	boresight_test.col(0) = Eigen::Vector3d::UnitX();
 	attitude_target_test << std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0, 0.0;
+	Eigen::MatrixXd attitude_target_test_traj = makeAttitudeTraj(attitude_target_test, N_test);
 
 	std::vector<Eigen::MatrixXd> K(0);
 	std::vector<Eigen::VectorXd> d(0);
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test, settings_test, K, d, deltaV
+		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -194,6 +206,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass N=2 hand-verified computati
 	}
 
 	attitude_target_test << std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0, 0.0;
+	Eigen::MatrixXd attitude_target_test_traj = makeAttitudeTraj(attitude_target_test, N_test);
 
 	int nu_test = satellite_test.controlDim();
 	int nx_test = satellite_test.stateDim();
@@ -206,7 +219,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass N=2 hand-verified computati
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test, settings_test, K, d, deltaV
+		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -301,7 +314,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass returns correct output dime
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite, X, U, R, V, B, S, rho, boresight, attitude_target, settings, K, d, deltaV
+		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -333,7 +346,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass computes terminal cost-to-g
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite, X, U, R, V, B, S, rho, boresight, attitude_target, settings, K, d, deltaV
+		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -368,7 +381,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass accumulates cost reduction 
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite, X, U, R, V, B, S, rho, boresight, attitude_target, settings, K, d, deltaV
+		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -401,7 +414,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass regularization loop converg
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite, X, U, R, V, B, S, rho, boresight, attitude_target, settings, K, d, deltaV
+		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, K, d, deltaV
 	);
 
 	// Should succeed (regularization loop finds positive definite Q_uu)
@@ -452,6 +465,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass handles longer trajectory N
 	}
 
 	attitude_target_test << std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0, 0.0;
+	Eigen::MatrixXd attitude_target_test_traj = makeAttitudeTraj(attitude_target_test, N_test);
 
 	std::vector<Eigen::MatrixXd> K(N_test - 1);
 	std::vector<Eigen::VectorXd> d(N_test - 1);
@@ -464,7 +478,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass handles longer trajectory N
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test, settings_test, K, d, deltaV
+		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -515,6 +529,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass K and d have consistent nor
 	}
 
 	attitude_target_test << std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0, 0.0;
+	Eigen::MatrixXd attitude_target_test_traj = makeAttitudeTraj(attitude_target_test, N_test);
 
 	std::vector<Eigen::MatrixXd> K(N_test - 1);
 	std::vector<Eigen::VectorXd> d(N_test - 1);
@@ -527,7 +542,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass K and d have consistent nor
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test, settings_test, K, d, deltaV
+		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, K, d, deltaV
 	);
 
 	REQUIRE(ok);

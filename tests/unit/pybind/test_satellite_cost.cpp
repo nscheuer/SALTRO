@@ -1516,7 +1516,11 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     cost_cfg.ang_vel_err_dir_N = 0.0;
     cost_cfg.control_mult = 0.0;
 
-    Eigen::Vector4d attitude_target(std::nan(""), 1.0, 0.0, 0.0);
+    Eigen::Vector4d attitude_target_single(std::nan(""), 1.0, 0.0, 0.0);
+    Eigen::MatrixXd attitude_target = Eigen::MatrixXd::Zero(4, N);
+    for (int k = 0; k < N; ++k) {
+        attitude_target.col(k) = attitude_target_single;
+    }
 
     const double J_aligned = sat.totalCost(X, U, B_hist, boresight_aligned, attitude_target, cost_cfg);
     const double J_switched = sat.totalCost(X, U, B_hist, boresight_switched, attitude_target, cost_cfg);

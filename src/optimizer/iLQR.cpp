@@ -19,7 +19,7 @@ bool iLQR(
 	const Eigen::Ref<const Eigen::MatrixXd>& rho,
 	const Eigen::Ref<const Eigen::VectorXd>& jtime,
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-	const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
 	double& J
 ) {
 	const CostConfig& cost_cfg = settings.passes[0].cost;
@@ -43,6 +43,7 @@ bool iLQR(
 
 	while (std::abs(J_prev - J) > ilqr_cfg.cost_tol && iter < ilqr_cfg.max_iters) {
 		J_prev = J;
+		deltaV.setZero();
 		bool bp_success = backwardPass(satellite, X, U, R, V, B, S, rho, boresight, attitude_target, settings, K, d, deltaV);
 		
 		if (!bp_success) {
@@ -50,7 +51,7 @@ bool iLQR(
 			return false;
 		}
 
-		forwardPass(
+		bool fp_success = forwardPass(
 			satellite,
 			X,
 			U,
@@ -69,6 +70,11 @@ bool iLQR(
 			J_prev,
 			J
 		);
+		if (!fp_success) {
+			// Forward rollout or line search failed
+			return false;
+		}
+
 		++iter;
 	}
 

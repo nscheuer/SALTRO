@@ -45,7 +45,7 @@ bool backwardPass(
 	const Eigen::Ref<const Eigen::MatrixXd>& S,  // sun direction trajectory (3 x N)
 	const Eigen::Ref<const Eigen::MatrixXd>& rho,  // density trajectory (1 x N)
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-	const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,  // attitude target trajectory (4 x N)
 	const PlannerSettings& settings,
 	std::vector<Eigen::MatrixXd>& K,
 	std::vector<Eigen::VectorXd>& d,

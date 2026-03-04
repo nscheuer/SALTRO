@@ -25,7 +25,7 @@ bool trajOpt(
 
 	int state_dim,
 	int input_dim,
-	int N
+	int& N
 );
 
 }

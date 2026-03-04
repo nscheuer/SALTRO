@@ -39,7 +39,7 @@ bool iLQR(
 	const Eigen::Ref<const Eigen::MatrixXd>& rho,  // density trajectory (1 x N)
 	const Eigen::Ref<const Eigen::VectorXd>& jtime, // julian centuries times (N)
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-	const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
 	double& J
 );
 

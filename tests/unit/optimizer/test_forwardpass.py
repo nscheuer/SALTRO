@@ -53,7 +53,7 @@ class ForwardPassFixture:
         self.q_goal[0, :] = 1.0
         self.boresight = np.zeros((3, self.N))
         self.boresight[0, :] = 1.0
-        self.attitude_target = self.q_goal[:, -1]
+        self.attitude_target_traj = self.q_goal
 
         r0 = np.array([7000e3, 0.0, 0.0])
         v0 = np.array([0.0, 7500.0, 0.0])
@@ -122,7 +122,7 @@ class ForwardPassFixture:
 
             X[:, k + 1] = rk4_step(f, X[:, k], dt)
 
-        J = self.satellite.totalCost(X, U, self.B, self.boresight, self.attitude_target, cost_cfg)
+        J = self.satellite.totalCost(X, U, self.B, self.boresight, self.attitude_target_traj, cost_cfg)
         return X, U, J
 
 
@@ -146,13 +146,13 @@ def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
         fixture.S,
         fixture.rho,
         fixture.boresight,
-        fixture.attitude_target,
+        fixture.attitude_target_traj,
         fixture.settings
     )
     assert ok
 
     cost_cfg = fixture.settings.passes[0].cost
-    J_prev = fixture.satellite.totalCost(X, U_trim, fixture.B, fixture.boresight, fixture.attitude_target, cost_cfg)
+    J_prev = fixture.satellite.totalCost(X, U_trim, fixture.B, fixture.boresight, fixture.attitude_target_traj, cost_cfg)
 
     K_list = [K[k] for k in range(K.shape[0])]
     d_list = [d[:, k] for k in range(d.shape[1])]
@@ -170,7 +170,7 @@ def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
         fixture.S,
         fixture.rho,
         fixture.boresight,
-        fixture.attitude_target,
+        fixture.attitude_target_traj,
         fixture.settings,
         fixture.jtime,
         J_prev
@@ -211,13 +211,13 @@ def test_forward_pass_line_search_backtracks(fixture):
         fixture.S,
         fixture.rho,
         fixture.boresight,
-        fixture.attitude_target,
+        fixture.attitude_target_traj,
         fixture.settings
     )
     assert ok
 
     cost_cfg = fixture.settings.passes[0].cost
-    J_prev = fixture.satellite.totalCost(X_base, U_trim, fixture.B, fixture.boresight, fixture.attitude_target, cost_cfg)
+    J_prev = fixture.satellite.totalCost(X_base, U_trim, fixture.B, fixture.boresight, fixture.attitude_target_traj, cost_cfg)
 
     scales = [2.0, 4.0, 6.0, 8.0]
     chosen_scale = None
@@ -262,7 +262,7 @@ def test_forward_pass_line_search_backtracks(fixture):
         fixture.S,
         fixture.rho,
         fixture.boresight,
-        fixture.attitude_target,
+        fixture.attitude_target_traj,
         settings_ls,
         fixture.jtime,
         J_prev

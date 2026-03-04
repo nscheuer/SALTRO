@@ -51,7 +51,7 @@ public:
 	Eigen::VectorXd jtime;
 	Eigen::MatrixXd q_goal;
 	Eigen::MatrixXd boresight;
-	Eigen::Vector4d attitude_target;
+	Eigen::MatrixXd attitude_target_traj;
 
 	Eigen::Matrix<double, 1, limits::MAX_LENGTH_TRAJ> jtime_full;
 	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> R_full;
@@ -68,7 +68,8 @@ public:
 		  x0(Satellite::VecX::Zero(satellite.stateDim())),
 		  jtime(Eigen::VectorXd::Zero(N)),
 		  q_goal(Eigen::MatrixXd::Zero(4, N)),
-		  boresight(Eigen::MatrixXd::Zero(3, N))
+		  boresight(Eigen::MatrixXd::Zero(3, N)),
+		  attitude_target_traj(Eigen::MatrixXd::Zero(4, N))
 	{
 		configureSettings();
 		configureSatellite();
@@ -168,7 +169,7 @@ public:
 			result.X.col(k + 1) = x_next;
 		}
 
-		result.cost = satellite.totalCost(result.X, result.U, env.B, boresight, attitude_target, cost_cfg);
+		result.cost = satellite.totalCost(result.X, result.U, env.B, boresight, attitude_target_traj, cost_cfg);
 		return result;
 	}
 
@@ -234,8 +235,8 @@ private:
 		for (int k = 0; k < N; ++k) {
 			q_goal.col(k) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
 			boresight.col(k) = Eigen::Vector3d::UnitX();
+			attitude_target_traj.col(k) = q_goal.col(k);
 		}
-		attitude_target = q_goal.col(N - 1);
 	}
 
 	bool generateOrbit() {
@@ -293,14 +294,14 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass reduces cost and matches dyna
 		env.S,
 		env.rho,
 		boresight,
-		attitude_target,
+		attitude_target_traj,
 		settings,
 		K,
 		d,
 		deltaV
 	));
 
-	double J_prev = satellite.totalCost(X, U_trimmed, env.B, boresight, attitude_target, cost_cfg);
+	double J_prev = satellite.totalCost(X, U_trimmed, env.B, boresight, attitude_target_traj, cost_cfg);
 	double J_new = std::numeric_limits<double>::quiet_NaN();
 	REQUIRE(optimizer::forwardPass(
 		satellite,
@@ -315,7 +316,7 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass reduces cost and matches dyna
 		env.S,
 		env.rho,
 		boresight,
-		attitude_target,
+		attitude_target_traj,
 		settings,
 		jtime,
 		J_prev,
@@ -380,14 +381,14 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass backs off step size when over
 		env.S,
 		env.rho,
 		boresight,
-		attitude_target,
+		attitude_target_traj,
 		settings,
 		K_base,
 		d_base,
 		deltaV_base
 	));
 
-	double J_prev = satellite.totalCost(X_base, U_bp, env.B, boresight, attitude_target, cost_cfg);
+	double J_prev = satellite.totalCost(X_base, U_bp, env.B, boresight, attitude_target_traj, cost_cfg);
 
 	const std::array<double, 4> scales = {2.0, 4.0, 6.0, 8.0};
 	bool found = false;
@@ -441,7 +442,7 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass backs off step size when over
 		env.S,
 		env.rho,
 		boresight,
-		attitude_target,
+		attitude_target_traj,
 		settings_ls,
 		jtime,
 		J_prev,

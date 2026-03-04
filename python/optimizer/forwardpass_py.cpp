@@ -20,7 +20,7 @@ static py::tuple forward_pass_py(
     const Eigen::Ref<const Eigen::MatrixXd>& S,
     const Eigen::Ref<const Eigen::MatrixXd>& rho,
     const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-    const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
+    const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
     const PlannerSettings& settings,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     double J_prev
@@ -42,11 +42,11 @@ static py::tuple forward_pass_py(
     if (static_cast<int>(d.size()) != std::max(0, N - 1)) {
         throw std::runtime_error("d must have size N-1");
     }
-    if (B.cols() != N || R.cols() != N || V.cols() != N || S.cols() != N || rho.cols() != N || boresight.cols() != N) {
+    if (B.cols() != N || R.cols() != N || V.cols() != N || S.cols() != N || rho.cols() != N || boresight.cols() != N || attitude_target.cols() != N) {
         throw std::runtime_error("Environment matrices must have N columns");
     }
-    if (B.rows() != 3 || R.rows() != 3 || V.rows() != 3 || S.rows() != 3 || boresight.rows() != 3 || rho.rows() != 1) {
-        throw std::runtime_error("Environment matrices must have shapes (3,N) and rho (1,N)");
+    if (B.rows() != 3 || R.rows() != 3 || V.rows() != 3 || S.rows() != 3 || boresight.rows() != 3 || rho.rows() != 1 || attitude_target.rows() != 4) {
+        throw std::runtime_error("Environment matrices must have shapes (3,N), rho (1,N), attitude_target (4,N)");
     }
     if (jtime.size() != N) {
         throw std::runtime_error("jtime must have length N");
@@ -114,7 +114,7 @@ deltaV : ndarray (2,) expected cost change terms
 B, R, V, S : ndarray (3, N)
 rho : ndarray (1, N)
 boresight : ndarray (3, N)
-attitude_target : ndarray (4,)
+attitude_target : ndarray (4, N)
 settings : PlannerSettings
 jtime : ndarray (N,)
 J_prev : float previous trajectory cost

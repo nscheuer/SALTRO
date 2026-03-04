@@ -1,6 +1,14 @@
 import sys
 from pathlib import Path
 
+import matplotlib
+try:
+	# Prefer Tk on WSL to avoid Qt/xcb plugin issues; require tkinter to be present.
+	import tkinter  # type: ignore
+	matplotlib.use("TkAgg")
+except Exception as exc:
+	print(f"[warn] Falling back to Agg backend ({exc})")
+	matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 

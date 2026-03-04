@@ -22,7 +22,7 @@ bool forwardPass(
     const Eigen::Ref<const Eigen::MatrixXd>& S,
     const Eigen::Ref<const Eigen::MatrixXd>& rho,
     const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-    const Eigen::Ref<const Eigen::Vector4d>& attitude_target,
+    const Eigen::Ref<const Eigen::MatrixXd>& attitude_target, // attitude target trajectory (4 x N)
     const PlannerSettings& settings,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     double J_prev,
