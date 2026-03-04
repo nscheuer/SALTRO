@@ -91,7 +91,7 @@ def _sanitize_quaternion_state_inplace(X, quat_start=3, eps=1e-10):
 
 def setup_satellite():
     # Quick-tune optimization knobs
-    line_search_max_iters = 20
+    line_search_max_iters = 24
     line_search_beta1 = 1e-10
     line_search_beta2 = 5000.0
     # Angle cost function selection:
@@ -119,10 +119,10 @@ def setup_satellite():
     # Costs (all zero; user can manually increase desired terms)
     cost = settings.passes[0].cost
     cost.angle = 100.0
-    cost.ang_vel = 0.0
+    cost.ang_vel = 100000.0
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
-    cost.control_mult = 0.01
+    cost.control_mult = 1.0
     cost.mtq_control_weight = 1.0
     cost.rw_control_weight = 1000.0
     cost.magic_control_weight = 0.0
@@ -131,8 +131,8 @@ def setup_satellite():
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 100.0
-    cost.ang_vel_N = 0.0
+    cost.angle_N = 1000.0
+    cost.ang_vel_N = 1000000.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
     cost.ang_cost_func_type = ang_cost_func_type
@@ -560,8 +560,9 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
 
 
 def main():
-    N = 20
+    N = 100
     dt = 10.0
+    ilqr_max_iters = 30
 
     satellite, settings = setup_satellite()
     jtime = make_time_grid(N, dt)
@@ -570,7 +571,6 @@ def main():
     x0 = make_initial_state(satellite)
 
     # Warm-start only
-    settings.passes[0].ilqr.max_iters = 0
     X0, U0, ws_time = generate_warmstart(
         satellite, settings, x0, jtime,
         attitude_target_traj, boresight,
@@ -578,7 +578,7 @@ def main():
     )
 
     # Python-controlled iLQR loop with C++ passes
-    settings.passes[0].ilqr.max_iters = 30
+    settings.passes[0].ilqr.max_iters = ilqr_max_iters
     ilqr_t0 = time.time()
     snapshots, transitions, stop_reason = run_ilqr_python_loop(
         satellite,
