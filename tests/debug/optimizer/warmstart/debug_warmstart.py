@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "build"))
 import saltro_py
 
 from plot_warmstart import plot_warmstart
-from plot_cost import plot_cost, plot_cost_component_evolution, plot_rw_cost_surfaces, plot_ilqr_iteration_debug
+from plot_cost import plot_cost, plot_cost_component_evolution, plot_rw_cost_surfaces
 
 
 SEC_PER_CENTURY = 36525.0 * 86400.0
@@ -109,90 +109,6 @@ def generate_warmstart(satellite, settings, x0, jtime, attitude_target_traj, bor
 	return X, U, elapsed
 
 
-def run_ilqr_python_loop(satellite, settings, X_init, U_init, jtime, R, V, B, S, rho, boresight, attitude_target_traj):
-	"""Run iLQR loop in Python using C++ backward/forward pass bindings."""
-	N = X_init.shape[1]
-	cost_cfg = settings.passes[0].cost
-	ilqr_cfg = settings.passes[0].ilqr
-
-	X = X_init.copy()
-	U = U_init.copy()
-	U_trim = U[:, :N - 1]
-
-	J = satellite.totalCost(X, U_trim, B, boresight, attitude_target_traj, cost_cfg)
-	cost_history = [J]
-	predicted_reductions = []
-	actual_reductions = []
-	alphas = []
-
-	iter_count = 0
-	while iter_count < ilqr_cfg.max_iters:
-		ok_bp, K_arr, d_arr, deltaV = saltro_py.backward_pass(
-			satellite,
-			X,
-			U_trim,
-			R,
-			V,
-			B,
-			S,
-			rho,
-			boresight,
-			attitude_target_traj,
-			settings,
-		)
-		if not ok_bp:
-			break
-
-		K_list = [K_arr[k] for k in range(K_arr.shape[0])]
-		d_list = [d_arr[:, k] for k in range(d_arr.shape[1])]
-
-		ok_fp, X_new, U_new, J_new = saltro_py.forward_pass(
-			satellite,
-			X,
-			U,
-			K_list,
-			d_list,
-			deltaV,
-			B,
-			R,
-			V,
-			S,
-			rho,
-			boresight,
-			attitude_target_traj,
-			settings,
-			jtime,
-			J,
-		)
-		if not ok_fp:
-			break
-
-		actual_delta = J - J_new
-		pred_delta = max(0.0, -(deltaV[0] + deltaV[1]))
-		alpha = actual_delta / pred_delta if pred_delta > 1e-16 else 1.0
-
-		predicted_reductions.append(pred_delta)
-		actual_reductions.append(actual_delta)
-		alphas.append(float(np.clip(alpha, 0.0, 1.0)))
-
-		X = X_new
-		U = U_new
-		U_trim = U[:, :N - 1]
-		J = J_new
-		cost_history.append(J)
-
-		iter_count += 1
-		if abs(actual_delta) <= ilqr_cfg.cost_tol:
-			break
-
-	return X, U, {
-		'cost_history': cost_history,
-		'predicted_reductions': predicted_reductions,
-		'actual_reductions': actual_reductions,
-		'alphas': alphas,
-	}
-
-
 def main():
 	"""Main entry point: setup, generate, and analyze."""
 	N = 10
@@ -205,19 +121,11 @@ def main():
 	R, V, B, S, rho = make_environment(jtime)
 	x0 = make_initial_state(satellite)
 	
-	# Generate initial trajectory only (disable C++ iLQR here)
-	settings.passes[0].ilqr.max_iters = 0
+	# Generate warm-start
 	X, U, ws_time = generate_warmstart(
 		satellite, settings, x0, jtime,
 		attitude_target_traj, boresight,
 		R, V, B, S, rho
-	)
-
-	# Run iLQR loop in Python using C++ backward/forward passes
-	settings.passes[0].ilqr.max_iters = 30
-	X, U, loop_stats = run_ilqr_python_loop(
-		satellite, settings, X, U, jtime,
-		R, V, B, S, rho, boresight, attitude_target_traj
 	)
 	print(f"Warm-start calculation time: {ws_time*1000:.2f} ms")
 	print(f"Angular rates final: {X[0:3, -1]}")
@@ -228,14 +136,6 @@ def main():
 	# Plot costs
 	plot_cost(X, U, N, dt, satellite, attitude_target_traj, boresight, B, 
 			  settings.passes[0].cost, x0)
-
-	# Plot Python iLQR iteration diagnostics
-	plot_ilqr_iteration_debug(
-		loop_stats['cost_history'],
-		loop_stats['predicted_reductions'],
-		loop_stats['actual_reductions'],
-		loop_stats['alphas'],
-	)
 	
 	# Plot cost component evolution
 	plot_cost_component_evolution(X, U, N, dt, satellite, attitude_target_traj, 
