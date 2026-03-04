@@ -1,5 +1,6 @@
 #include <saltro/optimizer/backwardpass.h>
 #include <iostream>
+#include <cmath>
 
 #if defined(SALTRO_DEBUG_BUILD)
 #define SALTRO_OPT_DLOG(msg) do { std::cout << msg << std::endl; } while (0)
@@ -81,6 +82,9 @@ bool backwardPass(
 	(void)rho;  // Suppress unused parameter warning
 	const CostConfig& cost_cfg = settings.passes[0].cost;
 	const RegularizationConfig& reg_cfg = settings.passes[0].reg;
+	const double dt = (settings.num_passes > 0 && std::isfinite(settings.passes[0].dt) && settings.passes[0].dt > 0.0)
+		? settings.passes[0].dt
+		: 1.0;
 
 	int N = static_cast<int>(X.cols());   // Number of timesteps
 	int nx = static_cast<int>(X.rows());  // State dimension
@@ -122,7 +126,13 @@ bool backwardPass(
 		Eigen::VectorXd lu = lu_mat.row(0);
 		
 		// Step 2: Compute dynamics Jacobians
-		auto [A_k, B_k_dyn, dyn_unused] = satellite.dynamicsJacobians(x_k, u_k, dist_config, R_k, B_k, S_k, V_k);
+		auto [A_c, B_c, dyn_unused] = satellite.dynamicsJacobians(x_k, u_k, dist_config, R_k, B_k, S_k, V_k);
+
+		// IMPORTANT: dynamicsJacobians() returns continuous-time Jacobians (xdot = f(x,u)).
+		// iLQR Riccati recursion requires discrete-time transition Jacobians.
+		// Use first-order discretization around dt.
+		const Eigen::MatrixXd A_k = Eigen::MatrixXd::Identity(nx, nx) + dt * A_c;
+		const Eigen::MatrixXd B_k_dyn = dt * B_c;
 		
 		// Step 3: Assemble Q matrices
 		Eigen::MatrixXd Q_xx = lxx + A_k.transpose() * P_k * A_k;

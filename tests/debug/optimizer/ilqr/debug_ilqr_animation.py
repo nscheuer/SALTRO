@@ -102,7 +102,7 @@ def setup_satellite():
     settings = saltro_py.PlannerSettings()
     settings.num_passes = 1
     settings.passes[0].dt = 10.0
-    settings.passes[0].ilqr.cost_tol = 1e-2
+    settings.passes[0].ilqr.cost_tol = 1e-5
     settings.init_traj.initcontroller = 2
     settings.passes[0].linesearch.max_iters = line_search_max_iters
     settings.passes[0].linesearch.beta1 = line_search_beta1
@@ -118,7 +118,7 @@ def setup_satellite():
 
     # Costs (all zero; user can manually increase desired terms)
     cost = settings.passes[0].cost
-    cost.angle = 1.0
+    cost.angle = 100.0
     cost.ang_vel = 0.0
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
@@ -131,7 +131,7 @@ def setup_satellite():
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 1.0
+    cost.angle_N = 100.0
     cost.ang_vel_N = 0.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0

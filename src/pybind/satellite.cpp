@@ -1028,35 +1028,43 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
 
     const double qdot = q_goal.dot(q);
     const double abs_qdot = clampUnit(safeAbs(qdot));
+    
+    // ===== CRITICAL FIX: Handle quaternion double-cover =====
+    // Ensure q_goal and q are on the same hemisphere to avoid sign ambiguity
+    Vec4 q_goal_aligned = q_goal;
+    if (qdot < 0.0) {
+        q_goal_aligned = -q_goal;
+    }
+    const double qdot_aligned = safeAbs(q_goal_aligned.dot(q));
 
     double ang_cost = 0.0;
     switch (cost_cfg.ang_cost_func_type) {
         case 0:
-            ang_cost = 1.0 - abs_qdot;
+            ang_cost = 1.0 - qdot_aligned;
             break;
         case 1: {
-            const double err = 1.0 - abs_qdot;
+            const double err = 1.0 - qdot_aligned;
             ang_cost = 0.5 * err * err;
             break;
         }
         case 2:
-            ang_cost = std::acos(abs_qdot);
+            ang_cost = std::acos(qdot_aligned);
             break;
         case 3: {
-            const double phi = std::acos(abs_qdot);
+            const double phi = std::acos(qdot_aligned);
             ang_cost = 0.5 * phi * phi;
             break;
         }
         case 4:
-            ang_cost = 1.0 - abs_qdot * abs_qdot;
+            ang_cost = 1.0 - qdot_aligned * qdot_aligned;
             break;
         default:
-            ang_cost = std::acos(abs_qdot);
+            ang_cost = std::acos(qdot_aligned);
             break;
     }
 
     const Mat43 W = saltro::math::findWMat(q);
-    const double cross_cost = -safeSign(qdot) * (q_goal.transpose() * W * w)(0) * w_avang;
+    const double cross_cost = -safeSign(qdot_aligned) * (q_goal_aligned.transpose() * W * w)(0) * w_avang;
 
     double state_mag_cost = 0.0;
     const double b_norm = safeNorm(B_eci);
@@ -1162,6 +1170,20 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     const double qdot = q_goal.dot(q);
     const double abs_qdot = clampUnit(safeAbs(qdot));
     const double sign_qdot = safeSign(qdot);
+    
+    // ===== CRITICAL FIX: Handle quaternion double-cover =====
+    // Quaternions q and -q represent the same rotation.
+    // Ensure q_goal is on the same hemisphere as q to avoid sign flip issues.
+    // This is essential for proper gradient computation when |qdot| is large.
+    Vec4 q_goal_aligned = q_goal;
+    double qdot_aligned = qdot;
+    if (qdot < 0.0) {
+        // If dot product is negative, q_goal points to the opposite hemisphere
+        // Flip q_goal to the same hemisphere: (-q_goal) · q > 0
+        q_goal_aligned = -q_goal;
+        qdot_aligned = -qdot;
+    }
+    // Now qdot_aligned >= 0 always, and q_goal_aligned is on the same hemisphere as q
 
     // =====================================================================
     // Gradient w.r.t. angular velocity w: ∂L/∂w
@@ -1171,7 +1193,7 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     // From cross_cost = -sign(qdot) * (q_goal^T * W * w) * w_avang
     // ∂cross_cost/∂w = -sign(qdot) * (W^T * q_goal) * w_avang
     const Mat43 W = saltro::math::findWMat(q);
-    lx.segment<3>(AV_INDEX) += -sign_qdot * (W.transpose() * q_goal).head<3>() * w_avang;
+    lx.segment<3>(AV_INDEX) += -safeSign(qdot_aligned) * (W.transpose() * q_goal_aligned).head<3>() * w_avang;
 
     // From state_mag_cost = w_avmag * |w · b_body|
     const double b_norm = safeNorm(B_eci);
@@ -1191,35 +1213,35 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     double d_ang_cost_dqdot = 0.0;  // ∂(ang_cost)/∂(qdot)
     switch (cost_cfg.ang_cost_func_type) {
         case 0:  // ang_cost = 1 - |qdot|
-            d_ang_cost_dqdot = -sign_qdot;
+            d_ang_cost_dqdot = -1.0;  // Always negative since qdot_aligned >= 0
             break;
         case 1: {  // ang_cost = 0.5 * (1 - |qdot|)^2
-            const double err = 1.0 - abs_qdot;
-            d_ang_cost_dqdot = -sign_qdot * err;
+            const double err = 1.0 - qdot_aligned;  // Use aligned value
+            d_ang_cost_dqdot = -err;  // Always negative
             break;
         }
         case 2: {  // ang_cost = acos(|qdot|)
-            const double denom = std::sqrt(1.0 - abs_qdot * abs_qdot + 1e-12);
-            d_ang_cost_dqdot = -sign_qdot / denom;
+            const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
+            d_ang_cost_dqdot = -1.0 / denom;  // Always negative
             break;
         }
         case 3: {  // ang_cost = 0.5 * acos(|qdot|)^2
-            const double phi = std::acos(abs_qdot);
-            const double denom = std::sqrt(1.0 - abs_qdot * abs_qdot + 1e-12);
-            d_ang_cost_dqdot = -sign_qdot * phi / denom;
+            const double phi = std::acos(qdot_aligned);
+            const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
+            d_ang_cost_dqdot = -phi / denom;  // Always negative
             break;
         }
         case 4:  // ang_cost = 1 - |qdot|^2
-            d_ang_cost_dqdot = -2.0 * sign_qdot * abs_qdot;
+            d_ang_cost_dqdot = -2.0 * qdot_aligned;  // Always non-positive
             break;
         default:
-            d_ang_cost_dqdot = -sign_qdot / std::sqrt(1.0 - abs_qdot * abs_qdot + 1e-12);
+            d_ang_cost_dqdot = -1.0 / std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
             break;
     }
 
     // ∂(qdot)/∂q where qdot = q_goal · q
     // = q_goal (as a row vector, or column in Jacobian context)
-    Vec4 dqdot_dq = q_goal;
+    Vec4 dqdot_dq = q_goal_aligned;  // Use aligned quaternion
     
     // ∂L/∂q from attitude cost: w_ang * ∂(ang_cost)/∂(qdot) * ∂(qdot)/∂q
     lx.segment<4>(QUAT_INDEX) = w_ang_eff * d_ang_cost_dqdot * dqdot_dq;
@@ -1249,18 +1271,18 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         // Use numerical differentiation for simplicity and robustness
         const double eps = 1e-8;
         Vec4 q_pert = q;
-        double f0 = (q_goal.transpose() * W * w)(0);
+        double f0 = (q_goal_aligned.transpose() * W * w)(0);
         
         for (int j = 0; j < 4; ++j) {
             q_pert = q;
             q_pert(j) += eps;
             q_pert.normalize();
             const Mat43 W_pert = saltro::math::findWMat(q_pert);
-            const double f_pert = (q_goal.transpose() * W_pert * w)(0);
+            const double f_pert = (q_goal_aligned.transpose() * W_pert * w)(0);
             d_qgoal_W_w_dq(j) = (f_pert - f0) / eps;
         }
     }
-    lx.segment<4>(QUAT_INDEX) += -sign_qdot * w_avang * d_qgoal_W_w_dq;
+    lx.segment<4>(QUAT_INDEX) += -safeSign(qdot_aligned) * w_avang * d_qgoal_W_w_dq;
 
     // ∂(state_mag_cost)/∂q = ∂(w_avmag * |w · b_body|)/∂q
     // = w_avmag * sign(w · b_body) * ∂(w · b_body)/∂q
@@ -1405,6 +1427,26 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     (void)w_avang;
     (void)w;
     (void)B_eci;
+
+    // If cost Hessians are disabled, keep only control quadratic curvature.
+    // This avoids unstable second-order state terms (notably quaternion terms)
+    // while preserving positive curvature in control for backward pass stability.
+    if (!cost_cfg.use_cost_hess) {
+        if (!terminal && w_u_mult > 1e-12) {
+            for (int i = 0; i < num_mtq_; ++i) {
+                const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
+                luu(i, i) += w_u_mult * cost_cfg.mtq_control_weight / (lim * lim);
+            }
+
+            for (int i = 0; i < num_rw_; ++i) {
+                const int ctrl_idx = num_mtq_ + i;
+                const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
+                luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.rw_control_weight / (lim * lim);
+            }
+        }
+
+        return std::make_tuple(lxx, luu, lux);
+    }
 
     // =====================================================================
     // Hessian w.r.t. angular velocity: ∂²L/∂w²
