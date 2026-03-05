@@ -95,13 +95,18 @@ void IntegratedBdotController::autoTuneGains() {
         const double umax = std::max(1e-9, std::abs(mtq.u_max()));
 
         const double m_demand = tau_target / Bref;
-        // Keep command envelope conservative to avoid high-rate limit cycles.
-        const double cmd_fraction = std::clamp(m_demand / umax, 0.05, 0.35);
+        // Use aggressive command fractions to push magnetorquers toward their limits.
+        // Account for low B-field in LEO by tuning against a reduced bdot reference.
+        const double min_cmd_fraction = 0.80;
+        const double max_cmd_fraction = 0.95;
+        const double cmd_fraction = std::clamp(m_demand / umax, min_cmd_fraction, max_cmd_fraction);
         const double cmd_allow = cmd_fraction * umax;
 
-        const double kp = cmd_allow / std::max(1e-12, bdot_ref);
+        // Tune against a much lower effective bdot reference to boost gains given low B-field in LEO.
+        const double bdot_ref_eff = 0.08 * bdot_ref;
+        const double kp = cmd_allow / std::max(1e-12, bdot_ref_eff);
         mtq_kp_[i] = kp;
-        mtq_kd_[i] = 0.15 * kp * dt_tune;
+        mtq_kd_[i] = 0.10 * kp * dt_tune;
     }
 
     for (int i = 0; i < satellite_.numRW(); ++i) {
