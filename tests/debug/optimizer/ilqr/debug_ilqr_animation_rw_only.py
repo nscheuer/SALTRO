@@ -4,6 +4,8 @@ Interactive iLQR debugger with per-iteration visualization.
 This script runs iLQR in Python (loop control), while using C++ bindings for
 backward pass and forward pass. It opens a single interactive window with
 forward/back buttons to inspect warm-start and each iLQR iteration.
+
+REACTION WHEELS ONLY VERSION - No magnetorquers
 """
 
 import sys
@@ -118,11 +120,11 @@ def setup_satellite():
 
     # Costs (all zero; user can manually increase desired terms)
     cost = settings.passes[0].cost
-    cost.angle = 100.0
+    cost.angle = 0.0
     cost.ang_vel = 100000.0
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
-    cost.control_mult = 0.001
+    cost.control_mult = 1.0
     cost.mtq_control_weight = 1.0
     cost.rw_control_weight = 1000.0
     cost.magic_control_weight = 0.0
@@ -131,7 +133,7 @@ def setup_satellite():
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 1000.0
+    cost.angle_N = 0.0
     cost.ang_vel_N = 1000000.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
@@ -148,9 +150,7 @@ def setup_satellite():
     J = np.diag([0.067, 0.071, 0.069])
     satellite = saltro_py.Satellite(J, settings)
 
-    satellite.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
-    satellite.addMTQ(np.array([0.0, 1.0, 0.0]), 0.2)
-    satellite.addMTQ(np.array([0.0, 0.0, 1.0]), 0.2)
+    # Reaction wheels only - no magnetorquers
     satellite.addRW(np.array([1.0, 0.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
     satellite.addRW(np.array([0.0, 1.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
     satellite.addRW(np.array([0.0, 0.0, 1.0]), 0.001, 1e-5, 0.0, 0.02)
@@ -369,12 +369,11 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
     ax_w = fig.add_subplot(gs[0, 1])
     ax_h = fig.add_subplot(gs[1, 0])
     ax_pe = fig.add_subplot(gs[1, 1])
-    ax_u_mtq = fig.add_subplot(gs[2, 0])
-    ax_u_rw = fig.add_subplot(gs[2, 1])
-    ax_cat = fig.add_subplot(gs[3, 0])
-    ax_ind = fig.add_subplot(gs[3, 1])
-    ax_J = fig.add_subplot(gs[4, 0])
-    ax_txt = fig.add_subplot(gs[4, 1])
+    ax_u_rw = fig.add_subplot(gs[2, 0])
+    ax_cat = fig.add_subplot(gs[2, 1])
+    ax_ind = fig.add_subplot(gs[3, 0])
+    ax_J = fig.add_subplot(gs[3, 1])
+    ax_txt = fig.add_subplot(gs[4, :])
 
     idx = {"value": 0}
 
@@ -437,20 +436,10 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         ax_pe.set_ylabel("deg")
         ax_pe.grid(True, alpha=0.3)
 
-        ax_u_mtq.clear()
-        ax_u_mtq.plot(t_control, U[0, :], label="m_x")
-        ax_u_mtq.plot(t_control, U[1, :], label="m_y")
-        ax_u_mtq.plot(t_control, U[2, :], label="m_z")
-        ax_u_mtq.set_title("MTQ Input Time Series")
-        ax_u_mtq.set_xlabel("Time [s]")
-        ax_u_mtq.set_ylabel("Dipole [A·m²]")
-        ax_u_mtq.grid(True, alpha=0.3)
-        ax_u_mtq.legend(fontsize=8)
-
         ax_u_rw.clear()
-        ax_u_rw.plot(t_control, U[3, :], label="τ_rw0")
-        ax_u_rw.plot(t_control, U[4, :], label="τ_rw1")
-        ax_u_rw.plot(t_control, U[5, :], label="τ_rw2")
+        ax_u_rw.plot(t_control, U[0, :], label="τ_rw0")
+        ax_u_rw.plot(t_control, U[1, :], label="τ_rw1")
+        ax_u_rw.plot(t_control, U[2, :], label="τ_rw2")
         ax_u_rw.set_title("RW Input Time Series")
         ax_u_rw.set_xlabel("Time [s]")
         ax_u_rw.set_ylabel("Torque [N·m]")
@@ -523,7 +512,7 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
 
         ax_txt.text(0.01, 0.99, "\n".join(lines), va="top", ha="left", fontsize=8, family="monospace")
 
-        fig.suptitle("iLQR Iteration Debugger (Warm-start + Iterations)", fontsize=14, fontweight="bold")
+        fig.suptitle("iLQR Iteration Debugger - RW Only (Warm-start + Iterations)", fontsize=14, fontweight="bold")
         fig.canvas.draw_idle()
 
     def on_prev(_event):
