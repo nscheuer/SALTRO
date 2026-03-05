@@ -5,7 +5,7 @@ This script runs iLQR in Python (loop control), while using C++ bindings for
 backward pass and forward pass. It opens a single interactive window with
 forward/back buttons to inspect warm-start and each iLQR iteration.
 
-REACTION WHEELS ONLY VERSION - No magnetorquers
+MAGNETORQUERS ONLY VERSION - No reaction wheels
 """
 
 import sys
@@ -151,9 +151,9 @@ def setup_satellite():
     satellite = saltro_py.Satellite(J, settings)
 
     # Reaction wheels only - no magnetorquers
-    satellite.addRW(np.array([1.0, 0.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
-    satellite.addRW(np.array([0.0, 1.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
-    satellite.addRW(np.array([0.0, 0.0, 1.0]), 0.001, 1e-5, 0.0, 0.02)
+    satellite.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+    satellite.addMTQ(np.array([0.0, 1.0, 0.0]), 0.2)
+    satellite.addMTQ(np.array([0.0, 0.0, 1.0]), 0.2)
 
     return satellite, settings
 
@@ -407,7 +407,7 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         t_control = (np.arange(N - 1) * dt if U.shape[1] == N - 1 else np.arange(N) * dt)
         q = X[3:7, :]
         w = X[0:3, :]
-        h = X[7:10, :]
+        h = X[7:, :] if X.shape[0] > 7 else np.zeros((0, N))
         q_goal = snap["q_goal"]
         pe = snap["pointing_err_deg"]
         components = snap["components"]
@@ -439,14 +439,19 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         ax_w.legend(fontsize=8)
 
         ax_h.clear()
-        ax_h.plot(t_state, h[0, :], label="h_rw0")
-        ax_h.plot(t_state, h[1, :], label="h_rw1")
-        ax_h.plot(t_state, h[2, :], label="h_rw2")
-        ax_h.set_title("Wheel Momentum Time Series")
-        ax_h.set_xlabel("Time [s]")
-        ax_h.set_ylabel("N·m·s")
-        ax_h.grid(True, alpha=0.3)
-        ax_h.legend(fontsize=8)
+        if h.shape[0] > 0:
+            for idx_h in range(h.shape[0]):
+                ax_h.plot(t_state, h[idx_h, :], label=f"h_rw{idx_h}")
+            ax_h.set_title("Wheel Momentum Time Series")
+            ax_h.set_xlabel("Time [s]")
+            ax_h.set_ylabel("N·m·s")
+            ax_h.grid(True, alpha=0.3)
+            ax_h.legend(fontsize=8)
+        else:
+            ax_h.set_title("Wheel Momentum")
+            ax_h.text(0.5, 0.5, "No reaction wheel states", ha="center", va="center", transform=ax_h.transAxes)
+            ax_h.set_xticks([])
+            ax_h.set_yticks([])
 
         ax_pe.clear()
         ax_pe.plot(t_state, pe, "o-", color="C3", markersize=3)
@@ -456,12 +461,12 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         ax_pe.grid(True, alpha=0.3)
 
         ax_u_rw.clear()
-        ax_u_rw.plot(t_control, U[0, :], label="τ_rw0")
-        ax_u_rw.plot(t_control, U[1, :], label="τ_rw1")
-        ax_u_rw.plot(t_control, U[2, :], label="τ_rw2")
-        ax_u_rw.set_title("RW Input Time Series")
+        control_prefix = "m_mtq" if h.shape[0] == 0 else "tau_rw"
+        for idx_u in range(U.shape[0]):
+            ax_u_rw.plot(t_control, U[idx_u, :], label=f"{control_prefix}{idx_u}")
+        ax_u_rw.set_title("Control Input Time Series")
         ax_u_rw.set_xlabel("Time [s]")
-        ax_u_rw.set_ylabel("Torque [N·m]")
+        ax_u_rw.set_ylabel("Control")
         ax_u_rw.grid(True, alpha=0.3)
         ax_u_rw.legend(fontsize=8)
 
@@ -561,7 +566,7 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
 
         ax_txt.text(0.01, 0.99, "\n".join(lines), va="top", ha="left", fontsize=8, family="monospace")
 
-        fig.suptitle("iLQR Iteration Debugger - RW Only (Warm-start + Iterations)", fontsize=14, fontweight="bold")
+        fig.suptitle("iLQR Iteration Debugger - MTQ Only (Warm-start + Iterations)", fontsize=14, fontweight="bold")
         fig.canvas.draw_idle()
 
     def on_prev(_event):
