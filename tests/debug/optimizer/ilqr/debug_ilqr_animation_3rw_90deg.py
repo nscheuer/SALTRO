@@ -120,8 +120,8 @@ def setup_satellite():
 
     # Costs (all zero; user can manually increase desired terms)
     cost = settings.passes[0].cost
-    cost.angle = 100.0
-    cost.ang_vel = 10000.0
+    cost.angle = 10000.0
+    cost.ang_vel = 1000.0
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
@@ -133,8 +133,8 @@ def setup_satellite():
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 200.0
-    cost.ang_vel_N = 10000.0
+    cost.angle_N = 100000.0
+    cost.ang_vel_N = 1000000.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
     cost.ang_cost_func_type = ang_cost_func_type
@@ -600,9 +600,9 @@ def launch_iteration_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
 
 
 def main():
-    N = 100
+    N = 20
     dt = 10.0
-    ilqr_max_iters = 20
+    ilqr_max_iters = 30
 
     satellite, settings = setup_satellite()
     jtime = make_time_grid(N, dt)

@@ -128,32 +128,23 @@ bool forwardPass(
             // u_bar(k) = u(k) + K_k(x_bar(k) - x(k)) + alpha * d_k
             Eigen::VectorXd u_bar_k = U.col(k);
             if (k < static_cast<int>(K.size())) {
-                // Compute state error with proper quaternion error metric
+                // Compute state error with projection-based quaternion metric
+                // This matches the linearization used in backward pass Jacobians
                 Eigen::VectorXd state_error = X_bar.col(k) - X.col(k);
                 
-                // For quaternion part, use relative quaternion error
-                // q_err = q_ref^* ⊗ q_new  (relative rotation)
-                // Convert to tangent space: 2 * vec(q_err) when q_err ≈ [1, δθ/2]
+                // For quaternion part, use tangent space projection: (I - q_ref * q_ref^T)
+                // This ensures consistent linearization between backward and forward passes
                 if (state_error.size() >= 7) {
                     const Eigen::Vector4d q_ref = X.col(k).segment<4>(3);      // Nominal trajectory
-                    const Eigen::Vector4d q_new = X_bar.col(k).segment<4>(3);  // Current rollout
                     
-                    // Compute relative quaternion: q_err = q_ref^* ⊗ q_new
-                    // For unit quaternions, q^* = [q0, -q1, -q2, -q3]
-                    // Quaternion multiplication: [s1,v1] ⊗ [s2,v2] = [s1*s2 - v1·v2, s1*v2 + s2*v1 + v1×v2]
-                    const double s_err = q_ref(0) * q_new(0) + q_ref(1) * q_new(1) + q_ref(2) * q_new(2) + q_ref(3) * q_new(3);
-                    Eigen::Vector3d v_err;
-                    v_err(0) = q_ref(0) * q_new(1) - q_ref(1) * q_new(0) - q_ref(2) * q_new(3) + q_ref(3) * q_new(2);
-                    v_err(1) = q_ref(0) * q_new(2) + q_ref(1) * q_new(3) - q_ref(2) * q_new(0) - q_ref(3) * q_new(1);
-                    v_err(2) = q_ref(0) * q_new(3) - q_ref(1) * q_new(2) + q_ref(2) * q_new(1) - q_ref(3) * q_new(0);
+                    // Project quaternion error onto tangent space at q_ref
+                    // proj_q = I - q_ref * q_ref^T projects onto the tangent space
+                    Eigen::Matrix4d proj_q = Eigen::Matrix4d::Identity() - q_ref * q_ref.transpose();
                     
-                    // Convert to 4D tangent space vector: 2 * [s_err, v_err]
-                    // This represents the infinitesimal rotation in the tangent space at q_ref
-                    Eigen::Vector4d delta_q_tangent;
-                    delta_q_tangent(0) = 2.0 * s_err;
-                    delta_q_tangent.segment<3>(1) = 2.0 * v_err;
-                    
-                    state_error.segment<4>(3) = delta_q_tangent;
+                    // Apply projection to quaternion part of state error
+                    Eigen::Vector4d delta_q_raw = state_error.segment<4>(3);
+                    Eigen::Vector4d delta_q_projected = proj_q * delta_q_raw;
+                    state_error.segment<4>(3) = delta_q_projected;
                 }
                 
                 u_bar_k += K[k] * state_error;
