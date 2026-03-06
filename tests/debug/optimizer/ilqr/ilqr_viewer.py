@@ -50,7 +50,7 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
     Parameters
     ----------
     snapshots : list of dict
-        Each: X, U, J, q_goal
+        Each: X, U, J, q_goal, components
     transitions : list of dict
         Each: bp_ok, fp_ok, act_delta, delta_tol_ok
     stop_reason : str
@@ -59,17 +59,21 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
     """
     N = snapshots[0]["X"].shape[1]
     t_state = np.arange(N) * dt
+    component_order = ["attitude", "angular_velocity", "control", "rw_momentum"]
+    component_colors = ["#FF6B6B", "#2A9D8F", "#6D597A", "#FFA07A"]
 
-    fig = plt.figure(figsize=(16, 12), constrained_layout=True)
-    gs = fig.add_gridspec(4, 2, hspace=0.3, wspace=0.25)
+    fig = plt.figure(figsize=(18, 14), constrained_layout=True)
+    gs = fig.add_gridspec(5, 2, hspace=0.35, wspace=0.25)
 
     ax_q = fig.add_subplot(gs[0, 0])
     ax_w = fig.add_subplot(gs[0, 1])
     ax_h = fig.add_subplot(gs[1, 0])
     ax_pe = fig.add_subplot(gs[1, 1])
     ax_u = fig.add_subplot(gs[2, 0])
-    ax_J = fig.add_subplot(gs[2, 1])
-    ax_txt = fig.add_subplot(gs[3, :])
+    ax_cat = fig.add_subplot(gs[2, 1])
+    ax_ind = fig.add_subplot(gs[3, 0])
+    ax_J = fig.add_subplot(gs[3, 1])
+    ax_txt = fig.add_subplot(gs[4, :])
 
     idx = {"value": 0}
 
@@ -82,6 +86,7 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         X = snap["X"]
         U = snap["U"]
         q_goal = snap["q_goal"]
+        components = snap.get("components", None)
         
         q = X[3:7, :]
         w = X[0:3, :]
@@ -150,6 +155,43 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         ax_u.grid(True, alpha=0.3)
         ax_u.legend(fontsize=8)
 
+        # Cost breakdown - stacked bar chart
+        ax_cat.clear()
+        if components is not None:
+            bottom = np.zeros_like(t_state)
+            for name, color in zip(component_order, component_colors):
+                vals = components[name]
+                ax_cat.bar(t_state, vals, width=dt * 0.8, bottom=bottom, 
+                          color=color, alpha=0.85, label=name)
+                bottom += vals
+            ax_cat.set_title("Cost Time Series (Stacked by Category)")
+            ax_cat.set_xlabel("Time [s]")
+            ax_cat.set_ylabel("Cost")
+            ax_cat.grid(True, alpha=0.3, axis="y")
+            _configure_sci_y(ax_cat)
+            ax_cat.legend(fontsize=8)
+        else:
+            ax_cat.text(0.5, 0.5, "Cost breakdown not available", 
+                       ha="center", va="center", transform=ax_cat.transAxes)
+            ax_cat.set_title("Cost Time Series (Stacked by Category)")
+
+        # Cost breakdown - individual components
+        ax_ind.clear()
+        if components is not None:
+            for name, color in zip(component_order, component_colors):
+                ax_ind.plot(t_state, components[name], "o-", linewidth=1.8, 
+                           markersize=3, color=color, label=name)
+            ax_ind.set_title("Individual Cost Components")
+            ax_ind.set_xlabel("Time [s]")
+            ax_ind.set_ylabel("Cost")
+            ax_ind.grid(True, alpha=0.3)
+            _configure_sci_y(ax_ind)
+            ax_ind.legend(fontsize=8)
+        else:
+            ax_ind.text(0.5, 0.5, "Cost breakdown not available", 
+                       ha="center", va="center", transform=ax_ind.transAxes)
+            ax_ind.set_title("Individual Cost Components")
+
         # Total cost
         ax_J.clear()
         J_hist = [s["J"] for s in snapshots]
@@ -198,7 +240,7 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         ax_txt.text(0.01, 0.99, "\n".join(lines), va="top", ha="left", 
                    fontsize=9, family="monospace")
 
-        fig.suptitle("iLQR Iteration Viewer (3-RW 90deg)", fontsize=14, fontweight="bold")
+        fig.suptitle("iLQR Iteration Viewer (3-RW 90deg) with Cost Breakdown", fontsize=14, fontweight="bold")
         fig.canvas.draw_idle()
 
     def on_prev(_event):

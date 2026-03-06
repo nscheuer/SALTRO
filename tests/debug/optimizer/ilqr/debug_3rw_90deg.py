@@ -25,21 +25,21 @@ def create_planner_settings():
 
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
-    cost.angle = 1e5
+    cost.angle = 1e2
     cost.ang_vel = 1e3
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1.0
-    cost.rw_control_weight = 1e7
+    cost.rw_control_weight = 1.0
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 1e6
-    cost.ang_vel_N = 1e6
+    cost.angle_N = 0.0
+    cost.ang_vel_N = 1.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
     cost.ang_cost_func_type = 4
@@ -70,7 +70,7 @@ def main():
     plannersettings = create_planner_settings()
     satellite = create_3rw_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 1000/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 200/(36525 * 86400)])
     qgoal = np.array([
         [np.sqrt(2)/2, np.sqrt(2)/2],
         [0.0, 0.0],           
@@ -83,7 +83,7 @@ def main():
         [0.0, 0.0]
     ])
 
-    w0 = np.array([0.0, 0.0, 0.0])
+    w0 = np.array([0.01, 0.01, 0.01])
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
     h0 = np.array([0.0, 0.0, 0.0])
     x0 = np.hstack((w0, q0, h0))
