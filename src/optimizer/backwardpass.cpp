@@ -1,4 +1,5 @@
 #include <saltro/optimizer/backwardpass.h>
+#include <saltro/math/integrators/rk4.h>
 #include <iostream>
 #include <cmath>
 
@@ -125,14 +126,31 @@ bool backwardPass(
 		// Reshape lu from 1×nu matrix to nu vector
 		Eigen::VectorXd lu = lu_mat.row(0);
 		
-		// Step 2: Compute dynamics Jacobians
-		auto [A_c, B_c, dyn_unused] = satellite.dynamicsJacobians(x_k, u_k, dist_config, R_k, B_k, S_k, V_k);
-
-		// IMPORTANT: dynamicsJacobians() returns continuous-time Jacobians (xdot = f(x,u)).
-		// iLQR Riccati recursion requires discrete-time transition Jacobians.
-		// Use first-order discretization around dt.
-		const Eigen::MatrixXd A_k = Eigen::MatrixXd::Identity(nx, nx) + dt * A_c;
-		const Eigen::MatrixXd B_k_dyn = dt * B_c;
+		// Step 2: Compute exact discrete-time dynamics Jacobians using RK4
+		// This matches the forward pass RK4 integration exactly, providing superior
+		// accuracy compared to Euler discretization (old approach: A = I + dt*A_c).
+		Eigen::MatrixXd A_k = Eigen::MatrixXd::Zero(nx, nx);
+		Eigen::MatrixXd B_k_dyn = Eigen::MatrixXd::Zero(nx, nu);
+		
+		// Lambda wrapper for satellite dynamics Jacobians compatible with rk4_jacobians
+		auto dynamics_jac_wrapper = [&](double t_local, const Eigen::Ref<const Eigen::VectorXd>& x_local,
+		                                  const Eigen::Ref<const Eigen::VectorXd>& u_local,
+		                                  Eigen::Ref<Eigen::MatrixXd> A_c_out,
+		                                  Eigen::Ref<Eigen::MatrixXd> B_c_out,
+		                                  Eigen::Ref<Eigen::VectorXd> k_out) {
+			(void)t_local; // RK4 doesn't need explicit time dependence for our dynamics
+			
+			// Compute continuous Jacobians
+			auto [A_c, B_c, C_unused] = satellite.dynamicsJacobians(x_local, u_local, dist_config, R_k, B_k, S_k, V_k);
+			A_c_out = A_c;
+			B_c_out = B_c;
+			
+			// Also compute k = f(x, u) for RK4 stage evaluation
+			k_out = satellite.dynamics(x_local, u_local, dist_config, R_k, B_k, S_k, V_k, 0);
+		};
+		
+		// Compute exact RK4 discrete Jacobians
+		rk4_jacobians(dynamics_jac_wrapper, x_k, u_k, 0.0, dt, A_k, B_k_dyn);
 		
 		// Step 3: Assemble Q matrices
 		Eigen::MatrixXd Q_xx = lxx + A_k.transpose() * P_k * A_k;
