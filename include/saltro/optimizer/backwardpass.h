@@ -39,14 +39,15 @@ bool backwardPass(
 	const Satellite& satellite,
 	const Eigen::Ref<const Eigen::MatrixXd>& X,
 	const Eigen::Ref<const Eigen::MatrixXd>& U,
-	const Eigen::Ref<const Eigen::MatrixXd>& R,  // position trajectory (3 x N)
-	const Eigen::Ref<const Eigen::MatrixXd>& V,  // velocity trajectory (3 x N)
+	const Eigen::Ref<const Eigen::MatrixXd>& R,
+	const Eigen::Ref<const Eigen::MatrixXd>& V,
 	const Eigen::Ref<const Eigen::MatrixXd>& B,
-	const Eigen::Ref<const Eigen::MatrixXd>& S,  // sun direction trajectory (3 x N)
-	const Eigen::Ref<const Eigen::MatrixXd>& rho,  // density trajectory (1 x N)
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,  // attitude target trajectory (4 x N)
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
 	const PlannerSettings& settings,
+	double reg,
 	std::vector<Eigen::MatrixXd>& K,
 	std::vector<Eigen::VectorXd>& d,
 	Eigen::Ref<Eigen::Vector2d> deltaV

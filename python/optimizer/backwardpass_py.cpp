@@ -17,7 +17,8 @@ static py::tuple backward_pass_py(
     const Eigen::Ref<const Eigen::MatrixXd>& rho,
     const Eigen::Ref<const Eigen::MatrixXd>& boresight,
     const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
-    const PlannerSettings& settings
+    const PlannerSettings& settings,
+    double reg
 )
 {
     const int N = static_cast<int>(X.cols());
@@ -31,7 +32,7 @@ static py::tuple backward_pass_py(
 
     const bool ok = backwardPass(
         satellite, X, U, R, V, B, S, rho, boresight, attitude_target,
-        settings, K, d, deltaV
+        settings, reg, K, d, deltaV
     );
 
     // Stack K into shape (nu, nx, N-1)
@@ -78,6 +79,7 @@ void bind_backwardpass(py::module_& m)
         py::arg("boresight"),
         py::arg("attitude_target"),
         py::arg("settings"),
+        py::arg("reg"),
         R"doc(
 Backward pass for iLQR.
 

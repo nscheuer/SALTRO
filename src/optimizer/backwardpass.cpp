@@ -76,6 +76,7 @@ bool backwardPass(
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
 	const PlannerSettings& settings,
+	double reg,
 	std::vector<Eigen::MatrixXd>& K,
 	std::vector<Eigen::VectorXd>& d,
 	Eigen::Ref<Eigen::Vector2d> deltaV
@@ -159,38 +160,16 @@ bool backwardPass(
 		Eigen::VectorXd Q_x = lx + A_k.transpose() * p_k;
 		Eigen::VectorXd Q_u = lu + B_k_dyn.transpose() * p_k;
 		
-		// Step 4: Regularization loop - increase rho until Q_uu + rho*I is positive definite
-		double rho_reg = reg_cfg.reg_init;
-		bool converged = false;
-		int reg_tries = 0;
+		Eigen::MatrixXd Q_uu_reg = Q_uu + reg * Eigen::MatrixXd::Identity(nu, nu);
+		Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
 		
-		while (rho_reg <= reg_cfg.reg_max) {
-			++reg_tries;
-			Eigen::MatrixXd Q_uu_reg = Q_uu + rho_reg * Eigen::MatrixXd::Identity(nu, nu);
-			Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
-			
-			if (llt.info() == Eigen::Success) {
-				// Q_uu_reg is positive definite - solve for gains
-				solveRiccattiStep(Q_uu_reg, Q_uu, Q_u, Q_ux, Q_xx, Q_x, k, K, d, deltaV, p_k, P_k);
-				SALTRO_OPT_DLOG("[BP] k=" << k
-					<< " rho=" << rho_reg
-					<< " tries=" << reg_tries
-					<< " ||Q_u||=" << Q_u.norm()
-					<< " ||d||=" << d[k].norm()
-					<< " dV1=" << deltaV(0)
-					<< " dV2=" << deltaV(1));
-				converged = true;
-				break;
-			}
-			// Increase regularization and try again
-			rho_reg *= reg_cfg.reg_scale;
-		}
-		
-		if (!converged) {
-			// Regularization failed - return false
-			SALTRO_OPT_DLOG("[BP] FAIL k=" << k << " reg_init=" << reg_cfg.reg_init << " reg_max=" << reg_cfg.reg_max);
+		if (llt.info() != Eigen::Success) {
+			SALTRO_OPT_DLOG("[BP] FAIL k=" << k << " reg=" << reg);
 			return false;
 		}
+		
+		solveRiccattiStep(Q_uu_reg, Q_uu, Q_u, Q_ux, Q_xx, Q_x, k, K, d, deltaV, p_k, P_k);
+		SALTRO_OPT_DLOG("[BP] k=" << k << " reg=" << reg << " ||d||=" << d[k].norm());
 	}
 	SALTRO_OPT_DLOG("[BP] success dV1=" << deltaV(0) << " dV2=" << deltaV(1));
 	
