@@ -37,9 +37,6 @@ def trajOpt(
     dt_sec = plannersettings.passes[0].dt
     jtime_flat, q_goal, boresight = _resample_zero_order_hold(jtime, q_goal, boresight, dt_sec)
     
-    # Reshape jtime to column vector for warm_start
-    jtime_col = jtime_flat.reshape(-1, 1)
-    
     # Generate Orbit
     ok, R, V, B, S, rho = saltro_py.generate_orbit(r0, v0, jtime_flat, 0, 0, 0, 0, 0)
     if not ok:
@@ -55,7 +52,7 @@ def trajOpt(
     rho = rho.reshape(1, -1) if rho.ndim == 1 else rho
 
     # Warm-Start
-    ok, X, U = saltro_py.warm_start(plannersettings, satellite, x0, jtime_col, q_goal, boresight, R, V, B, S, rho)
+    ok, X, U = saltro_py.warm_start(plannersettings, satellite, x0, jtime_flat, q_goal, boresight, R, V, B, S, rho)
     if not ok:
         raise RuntimeError("warm_start failed")
 

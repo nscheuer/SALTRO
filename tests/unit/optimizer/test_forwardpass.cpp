@@ -296,6 +296,7 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass reduces cost and matches dyna
 		boresight,
 		attitude_target_traj,
 		settings,
+		settings.passes[0].reg.reg_init,
 		K,
 		d,
 		deltaV
@@ -383,6 +384,7 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass backs off step size when over
 		boresight,
 		attitude_target_traj,
 		settings,
+		settings.passes[0].reg.reg_init,
 		K_base,
 		d_base,
 		deltaV_base

@@ -153,7 +153,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass N=1 edge case (no backward 
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, K, d, deltaV
+		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, settings_test.passes[0].reg.reg_init, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -219,7 +219,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass N=2 hand-verified computati
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, K, d, deltaV
+		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, settings_test.passes[0].reg.reg_init, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -314,7 +314,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass returns correct output dime
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, K, d, deltaV
+		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, settings.passes[0].reg.reg_init, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -346,7 +346,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass computes terminal cost-to-g
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, K, d, deltaV
+		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, settings.passes[0].reg.reg_init, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -381,7 +381,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass accumulates cost reduction 
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, K, d, deltaV
+		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, settings.passes[0].reg.reg_init, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -414,7 +414,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass regularization loop converg
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, K, d, deltaV
+		satellite, X, U, R, V, B, S, rho, boresight, attitude_target_traj, settings, settings.passes[0].reg.reg_init, K, d, deltaV
 	);
 
 	// Should succeed (regularization loop finds positive definite Q_uu)
@@ -478,7 +478,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass handles longer trajectory N
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, K, d, deltaV
+		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, settings_test.passes[0].reg.reg_init, K, d, deltaV
 	);
 
 	REQUIRE(ok);
@@ -542,7 +542,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass K and d have consistent nor
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	const bool ok = optimizer::backwardPass(
-		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, K, d, deltaV
+		satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, settings_test, settings_test.passes[0].reg.reg_init, K, d, deltaV
 	);
 
 	REQUIRE(ok);

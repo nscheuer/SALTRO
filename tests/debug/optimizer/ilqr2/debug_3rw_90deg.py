@@ -72,13 +72,13 @@ def main():
 
     jtime = np.array([0.22, 0.22 + 1000/(36525 * 86400)])
     qgoal = np.array([
-        [1.0, np.sqrt(2)/2],
+        [np.sqrt(2)/2, np.sqrt(2)/2],
         [0.0, 0.0],           
         [0.0, 0.0],            
-        [0.0, np.sqrt(2)/2]
+        [np.sqrt(2)/2, np.sqrt(2)/2]
     ])
     boresight = np.array([
-        [0.0, 0.0],
+        [1.0, 1.0],
         [0.0, 0.0],
         [0.0, 0.0]
     ])
@@ -86,7 +86,7 @@ def main():
     w0 = np.array([0.0, 0.0, 0.0])
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
     h0 = np.array([0.0, 0.0, 0.0])
-    x0 = np.hstack((q0, w0, h0))
+    x0 = np.hstack((w0, q0, h0))
 
     r0 = np.array([7000e3, 0.0, 0.0])
     v0 = np.array([0.0, 7.5e3, 0.0])

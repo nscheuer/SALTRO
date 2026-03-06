@@ -24,10 +24,7 @@ bool iLQR(
 ) {
 	const CostConfig& cost_cfg = settings.passes[0].cost;
 	const ILQRConfig& ilqr_cfg = settings.passes[0].ilqr;
-	J = satellite.totalCost(X, U, B, boresight, attitude_target, cost_cfg);
-
-	double J_prev = J + 2.0 * ilqr_cfg.cost_tol;
-	int iter = 0;
+	const RegularizationConfig& reg_cfg = settings.passes[0].reg;
 	
 	// Preallocate gain and feedforward term vectors
 	int N = X.cols();   // Number of timesteps
@@ -41,44 +38,70 @@ bool iLQR(
 	}
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
-	while (std::abs(J_prev - J) > ilqr_cfg.cost_tol && iter < ilqr_cfg.max_iters) {
-		J_prev = J;
-		deltaV.setZero();
-		bool bp_success = backwardPass(satellite, X, U, R, V, B, S, rho, boresight, attitude_target, settings, K, d, deltaV);
+	// Main iLQR iteration loop
+	for (int iteration = 0; iteration < ilqr_cfg.max_iters; ++iteration) {
+		// Reset regularization at the start of each iteration
+		double reg = reg_cfg.reg_init;
 		
-		if (!bp_success) {
-			// Backward pass numerical failure
-			return false;
-		}
+		// Regularization retry loop
+		while (reg <= reg_cfg.reg_max) {
+			deltaV.setZero();
+			
+			bool bp_success = backwardPass(
+				satellite, X, U, R, V, B, S, rho, 
+				boresight, attitude_target, settings, reg,
+				K, d, deltaV
+			);
+			
+			if (!bp_success) {
+				reg *= reg_cfg.reg_scale;
+				continue;
+			}
 
-		bool fp_success = forwardPass(
-			satellite,
-			X,
-			U,
-			K,
-			d,
-			deltaV,
-			B,
-			R,
-			V,
-			S,
-			rho,
-			boresight,
-			attitude_target,
-			settings,
-			jtime,
-			J_prev,
-			J
-		);
-		if (!fp_success) {
-			// Forward rollout or line search failed
-			return false;
+			double J_prev = satellite.totalCost(X, U, B, boresight, attitude_target, cost_cfg);
+			
+			bool fp_success = forwardPass(
+				satellite,
+				X,
+				U,
+				K,
+				d,
+				deltaV,
+				B,
+				R,
+				V,
+				S,
+				rho,
+				boresight,
+				attitude_target,
+				settings,
+				jtime,
+				J_prev,
+				J
+			);
+			
+			if (!fp_success) {
+				reg *= reg_cfg.reg_scale;
+				continue;
+			}
+			
+			// Both passes succeeded
+			double delta_J = std::abs(J_prev - J);
+			if (delta_J <= ilqr_cfg.cost_tol) {
+				return true;  // Converged
+			}
+			
+			break;  // Exit regularization loop, continue to next iteration
 		}
-
-		++iter;
+		
+		// Check if regularization exceeded maximum
+		if (reg > reg_cfg.reg_max) {
+			return false;  // Regularization exceeded
+		}
 	}
-
-	return true;
+	
+	// Max iterations reached
+	return false;
 }
 
-} 
+} // namespace saltro::optimizer
