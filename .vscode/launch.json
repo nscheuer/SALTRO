@@ -7,7 +7,7 @@
       "request": "launch",
       "program": "${workspaceFolder}/venv/bin/python",
       "args": [
-        "tests/debug/optimizer/ilqr/debug_ilqr_animation.py"
+        "tests/debug/optimizer/ilqr/debug_3_3_detumble.py"
       ],
       "cwd": "${workspaceFolder}",
       "stopAtEntry": false,

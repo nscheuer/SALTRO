@@ -90,7 +90,9 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         
         q = X[3:7, :]
         w = X[0:3, :]
-        h = X[7:10, :]
+        # RW momentum states are present only on RW-enabled satellites.
+        h = X[7:, :]
+        has_rw_state = h.shape[0] > 0
         
         N_u = U.shape[1]
         t_control = np.arange(N_u) * dt
@@ -127,14 +129,18 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
 
         # Wheel momentum
         ax_h.clear()
-        ax_h.plot(t_state, h[0, :], label="h_rw0")
-        ax_h.plot(t_state, h[1, :], label="h_rw1")
-        ax_h.plot(t_state, h[2, :], label="h_rw2")
-        ax_h.set_title("Wheel Momentum")
+        if has_rw_state:
+            for idx_h in range(h.shape[0]):
+                ax_h.plot(t_state, h[idx_h, :], label=f"h_rw{idx_h}")
+            ax_h.legend(fontsize=8)
+            ax_h.set_title("Wheel Momentum")
+        else:
+            ax_h.text(0.5, 0.5, "No RW momentum states for this satellite", 
+                      ha="center", va="center", transform=ax_h.transAxes)
+            ax_h.set_title("Actuator Internal States")
         ax_h.set_xlabel("Time [s]")
         ax_h.set_ylabel("N·m·s")
         ax_h.grid(True, alpha=0.3)
-        ax_h.legend(fontsize=8)
 
         # Pointing error
         ax_pe.clear()
@@ -146,12 +152,12 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
 
         # Control
         ax_u.clear()
-        ax_u.plot(t_control, U[0, :], label="τ_rw0")
-        ax_u.plot(t_control, U[1, :], label="τ_rw1")
-        ax_u.plot(t_control, U[2, :], label="τ_rw2")
-        ax_u.set_title("RW Control")
+        control_prefix = "tau_rw" if has_rw_state else "m_mtq"
+        for idx_u in range(U.shape[0]):
+            ax_u.plot(t_control, U[idx_u, :], label=f"{control_prefix}{idx_u}")
+        ax_u.set_title("Control Inputs")
         ax_u.set_xlabel("Time [s]")
-        ax_u.set_ylabel("Torque [N·m]")
+        ax_u.set_ylabel("Control")
         ax_u.grid(True, alpha=0.3)
         ax_u.legend(fontsize=8)
 
@@ -240,7 +246,7 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         ax_txt.text(0.01, 0.99, "\n".join(lines), va="top", ha="left", 
                    fontsize=9, family="monospace")
 
-        fig.suptitle("iLQR Iteration Viewer (3-RW 90deg) with Cost Breakdown", fontsize=14, fontweight="bold")
+        fig.suptitle("iLQR Iteration Viewer with Cost Breakdown", fontsize=14, fontweight="bold")
         fig.canvas.draw_idle()
 
     def on_prev(_event):
