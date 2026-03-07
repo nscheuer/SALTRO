@@ -25,13 +25,13 @@ def create_planner_settings():
 
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
-    cost.angle = 1e2
-    cost.ang_vel = 1e3
+    cost.angle = 1.0
+    cost.ang_vel = 1e2
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1.0
-    cost.rw_control_weight = 1e3
+    cost.rw_control_weight = 1.0
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
@@ -42,7 +42,7 @@ def create_planner_settings():
     cost.ang_vel_N = 1.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 4
+    cost.ang_cost_func_type = 2
     cost.use_cost_hess = True
 
     # Pass 0 Disturbance Settings
@@ -70,17 +70,17 @@ def main():
     plannersettings = create_planner_settings()
     satellite = create_3rw_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 200/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 100/(36525 * 86400), 0.22 + 200/(36525 * 86400)])
     qgoal = np.array([
-        [np.sqrt(2)/2, np.sqrt(2)/2],
-        [0.0, 0.0],           
-        [0.0, 0.0],            
-        [np.sqrt(2)/2, np.sqrt(2)/2]
+        [np.sqrt(2)/2, 0.0, 0.0],
+        [0.0, 0.0, 0.0],           
+        [0.0, 0.0, 0.0],            
+        [np.sqrt(2)/2, 1.0, 1.0]
     ])
     boresight = np.array([
-        [1.0, 1.0],
-        [0.0, 0.0],
-        [0.0, 0.0]
+        [1.0, 1.0, 1.0],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0]
     ])
 
     w0 = np.array([0.01, 0.01, 0.01])
