@@ -1,27 +1,28 @@
-"""Simple warm-start controller test (3 MTQ only)."""
+"""Simple warm-start controller test (3 RW only)."""
 
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
-import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ilqr"))
+
 import saltro_py
+from create_3rw_sat import create_3rw_satellite
+from warmstart_viewer import launch_viewer
 
 
 SEC_PER_CENTURY = 36525.0 * 86400.0
 
 
-def setup_satellite(init_controller: int = 2):
-    """Create 3 MTQ only satellite and planner settings."""
+def setup_planner_settings(init_controller: int = 2, dt: float = 10.0):
+    """Create planner settings for warm-start."""
     settings = saltro_py.PlannerSettings()
     settings.num_passes = 1
-    settings.passes[0].dt = 10.0
+    settings.passes[0].dt = dt
     settings.init_traj.initcontroller = init_controller
 
     settings.disturbances.plan_for_aero = False
@@ -31,15 +32,7 @@ def setup_satellite(init_controller: int = 2):
     settings.disturbances.plan_for_gendist = False
     settings.disturbances.plan_for_resdipole = False
 
-    J = np.diag([0.067, 0.071, 0.069])
-    satellite = saltro_py.Satellite(J, settings)
-
-    # MTQ only - no reaction wheels
-    satellite.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
-    satellite.addMTQ(np.array([0.0, 1.0, 0.0]), 0.2)
-    satellite.addMTQ(np.array([0.0, 0.0, 1.0]), 0.2)
-
-    return satellite, settings
+    return settings
 
 
 def make_time_grid(N: int, dt: float):
@@ -71,10 +64,13 @@ def make_environment(jtime: np.ndarray):
 
 
 def make_initial_state(satellite):
-    """Create initial state with non-zero angular velocity."""
+    """Create initial state with non-zero angular velocity and RW momentum states."""
     x0 = np.zeros(satellite.stateDim)
     x0[0:3] = np.array([0.01, -0.01, 0.01])
     x0[3:7] = np.array([1.0, 0.0, 0.0, 0.0])
+    # RW momentum states start at zero
+    if satellite.numRW > 0:
+        x0[7 : 7 + satellite.numRW] = 0.0
     return x0
 
 
@@ -107,7 +103,7 @@ def print_summary(X: np.ndarray, U: np.ndarray, ws_time: float):
     w0 = np.linalg.norm(X[0:3, 0])
     wf = np.linalg.norm(X[0:3, -1])
 
-    mtq_u = U[0:3, :] if U.shape[0] >= 3 else np.zeros((0, U.shape[1]))
+    rw_u = U[0:3, :] if U.shape[0] >= 3 else np.zeros((0, U.shape[1]))
 
     print(f"Warm-start calculation time: {ws_time * 1000:.2f} ms")
     print(f"Trajectory shape: X={X.shape}, U={U.shape}")
@@ -115,76 +111,22 @@ def print_summary(X: np.ndarray, U: np.ndarray, ws_time: float):
     print(f"Final angular rates   [rad/s]: {X[0:3, -1]}")
     print(f"|w| reduction: {w0:.6f} -> {wf:.6f} (x{(w0 / max(wf, 1e-12)):.2f})")
 
-    if mtq_u.size > 0:
-        print("MTQ usage [A m^2] (min / mean / max abs per axis):")
-        for i in range(mtq_u.shape[0]):
-            ua = np.abs(mtq_u[i, :])
-            print(f"  m{i}: {ua.min():.4f} / {ua.mean():.4f} / {ua.max():.4f}")
-
-
-def plot_results(X: np.ndarray, U: np.ndarray, dt: float, satellite=None):
-    """Plot quaternion, angular rates, and MTQ control."""
-    N = X.shape[1]
-    t_state = np.arange(N) * dt
-    t_control = np.arange(U.shape[1]) * dt
-
-    fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
-    ax_q, ax_w, ax_mtq, ax_empty = axes.flatten()
-
-    q = X[3:7, :]
-    w = X[0:3, :]
-
-    for i in range(q.shape[0]):
-        ax_q.plot(t_state, q[i, :], label=f"q{i}")
-    ax_q.set_title("Quaternion")
-    ax_q.set_xlabel("Time [s]")
-    ax_q.set_ylabel("q")
-    ax_q.grid(True, alpha=0.3)
-    ax_q.legend(fontsize=8)
-
-    for i in range(w.shape[0]):
-        ax_w.plot(t_state, w[i, :], label=f"w{i}")
-    ax_w.plot(t_state, np.linalg.norm(w, axis=0), "k--", label="|w|")
-    ax_w.set_title("Angular Rate")
-    ax_w.set_xlabel("Time [s]")
-    ax_w.set_ylabel("rad/s")
-    ax_w.grid(True, alpha=0.3)
-    ax_w.legend(fontsize=8)
-
-    mtq_u = U[0:3, :] if U.shape[0] >= 3 else np.zeros((0, U.shape[1]))
-    if mtq_u.size > 0:
-        for i in range(mtq_u.shape[0]):
-            ax_mtq.plot(t_control, mtq_u[i, :], label=f"m_mtq{i}")
-        
-        # Plot MTQ limits as dotted lines if satellite is provided
-        if satellite is not None:
-            for i in range(min(mtq_u.shape[0], satellite.numMTQ)):
-                mtq = satellite.getMTQ(i)
-                u_max = abs(mtq.u_max)
-                ax_mtq.axhline(y=u_max, color='gray', linestyle=':', linewidth=1, alpha=0.7)
-                ax_mtq.axhline(y=-u_max, color='gray', linestyle=':', linewidth=1, alpha=0.7)
-        
-        ax_mtq.legend(fontsize=8)
-    else:
-        ax_mtq.text(0.5, 0.5, "No MTQ controls", ha="center", va="center", transform=ax_mtq.transAxes)
-    ax_mtq.set_title("MTQ Control")
-    ax_mtq.set_xlabel("Time [s]")
-    ax_mtq.set_ylabel("A m^2")
-    ax_mtq.grid(True, alpha=0.3)
-
-    ax_empty.axis("off")
-
-    fig.suptitle("Warm-start Controller Test (MTQ Only)", fontsize=13)
-    plt.show()
+    if rw_u.size > 0:
+        print("RW usage [N m] (min / mean / max abs per axis):")
+        for i in range(rw_u.shape[0]):
+            ua = np.abs(rw_u[i, :])
+            print(f"  rw{i}: {ua.min():.6f} / {ua.mean():.6f} / {ua.max():.6f}")
 
 
 def main():
-    """Main entry point: run warm-start and print diagnostics only."""
-    N = 100
+    """Main entry point: run warm-start and visualize results."""
+    N = 540
     dt = 10.0
     init_controller = 2
 
-    satellite, settings = setup_satellite(init_controller)
+    settings = setup_planner_settings(init_controller, dt)
+    satellite = create_3rw_satellite(settings)
+
     jtime = make_time_grid(N, dt)
     attitude_target_traj, boresight = make_targets(N)
     R, V, B, S, rho = make_environment(jtime)
@@ -206,7 +148,7 @@ def main():
 
     print(f"initcontroller: {init_controller} (0=zero, 1=excitation, 2=IntegratedBdot)")
     print_summary(X, U, ws_time)
-    plot_results(X, U, dt, satellite)
+    launch_viewer(X, U, dt, satellite, title="Warm-start: 3 RW Detumble")
 
 
 if __name__ == "__main__":

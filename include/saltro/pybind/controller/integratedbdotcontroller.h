@@ -27,9 +27,6 @@ private:
     std::vector<double> mtq_kd_;
     std::vector<double> rw_kp_;
     std::vector<double> rw_kd_;
-
-    mutable std::vector<double> mtq_prev_bdot_;
-    mutable std::vector<double> rw_prev_w_;
 };
 
 }

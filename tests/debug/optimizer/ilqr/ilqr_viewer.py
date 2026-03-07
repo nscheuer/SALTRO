@@ -62,18 +62,19 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
     component_order = ["attitude", "angular_velocity", "control", "rw_momentum"]
     component_colors = ["#FF6B6B", "#2A9D8F", "#6D597A", "#FFA07A"]
 
-    fig = plt.figure(figsize=(18, 14), constrained_layout=True)
+    fig = plt.figure(figsize=(18, 16), constrained_layout=True)
     gs = fig.add_gridspec(5, 2, hspace=0.35, wspace=0.25)
 
     ax_q = fig.add_subplot(gs[0, 0])
     ax_w = fig.add_subplot(gs[0, 1])
     ax_h = fig.add_subplot(gs[1, 0])
     ax_pe = fig.add_subplot(gs[1, 1])
-    ax_u = fig.add_subplot(gs[2, 0])
-    ax_cat = fig.add_subplot(gs[2, 1])
-    ax_ind = fig.add_subplot(gs[3, 0])
-    ax_J = fig.add_subplot(gs[3, 1])
-    ax_txt = fig.add_subplot(gs[4, :])
+    ax_mtq_u = fig.add_subplot(gs[2, 0])
+    ax_rw_u = fig.add_subplot(gs[2, 1])
+    ax_cat = fig.add_subplot(gs[3, 0])
+    ax_ind = fig.add_subplot(gs[3, 1])
+    ax_J = fig.add_subplot(gs[4, 0])
+    ax_txt = fig.add_subplot(gs[4, 1])
 
     idx = {"value": 0}
 
@@ -96,6 +97,13 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         
         N_u = U.shape[1]
         t_control = np.arange(N_u) * dt
+
+        # Control ordering is [MTQ..., RW...]. RW momentum state count equals num_rw.
+        num_rw = h.shape[0] if has_rw_state else 0
+        num_rw = min(num_rw, U.shape[0])
+        num_mtq = max(0, U.shape[0] - num_rw)
+        mtq_u = U[0:num_mtq, :] if num_mtq > 0 else np.zeros((0, N_u))
+        rw_u = U[num_mtq:num_mtq + num_rw, :] if num_rw > 0 else np.zeros((0, N_u))
         
         pe = _compute_pointing_error_deg(q, q_goal)
 
@@ -150,16 +158,33 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         ax_pe.set_ylabel("deg")
         ax_pe.grid(True, alpha=0.3)
 
-        # Control
-        ax_u.clear()
-        control_prefix = "tau_rw" if has_rw_state else "m_mtq"
-        for idx_u in range(U.shape[0]):
-            ax_u.plot(t_control, U[idx_u, :], label=f"{control_prefix}{idx_u}")
-        ax_u.set_title("Control Inputs")
-        ax_u.set_xlabel("Time [s]")
-        ax_u.set_ylabel("Control")
-        ax_u.grid(True, alpha=0.3)
-        ax_u.legend(fontsize=8)
+        # MTQ control
+        ax_mtq_u.clear()
+        if num_mtq > 0:
+            for idx_u in range(mtq_u.shape[0]):
+                ax_mtq_u.plot(t_control, mtq_u[idx_u, :], label=f"m_mtq{idx_u}")
+            ax_mtq_u.legend(fontsize=8)
+            ax_mtq_u.set_ylabel("A m^2")
+        else:
+            ax_mtq_u.text(0.5, 0.5, "No MTQ controls", ha="center", va="center", transform=ax_mtq_u.transAxes)
+            ax_mtq_u.set_ylabel("A m^2")
+        ax_mtq_u.set_title("MTQ Control Inputs")
+        ax_mtq_u.set_xlabel("Time [s]")
+        ax_mtq_u.grid(True, alpha=0.3)
+
+        # RW control
+        ax_rw_u.clear()
+        if num_rw > 0:
+            for idx_u in range(rw_u.shape[0]):
+                ax_rw_u.plot(t_control, rw_u[idx_u, :], label=f"tau_rw{idx_u}")
+            ax_rw_u.legend(fontsize=8)
+            ax_rw_u.set_ylabel("N m")
+        else:
+            ax_rw_u.text(0.5, 0.5, "No RW controls", ha="center", va="center", transform=ax_rw_u.transAxes)
+            ax_rw_u.set_ylabel("N m")
+        ax_rw_u.set_title("RW Control Inputs")
+        ax_rw_u.set_xlabel("Time [s]")
+        ax_rw_u.grid(True, alpha=0.3)
 
         # Cost breakdown - stacked bar chart
         ax_cat.clear()
@@ -244,7 +269,7 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
             lines.append(f"bp_ok={tr['bp_ok']} fp_ok={tr['fp_ok']} tol_ok={tr['delta_tol_ok']}")
 
         ax_txt.text(0.01, 0.99, "\n".join(lines), va="top", ha="left", 
-                   fontsize=9, family="monospace")
+               fontsize=8.5, family="monospace")
 
         fig.suptitle("iLQR Iteration Viewer with Cost Breakdown", fontsize=14, fontweight="bold")
         fig.canvas.draw_idle()

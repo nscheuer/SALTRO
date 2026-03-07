@@ -142,12 +142,24 @@ void Satellite::updateInertiaNoRW() {
 std::pair<Satellite::Vec4, bool> Satellite::processAttitudeTarget(
     const Vec4& attitude_target, const Vec3& boresight_body, const Vec4& q_current_unused) const {
     (void)q_current_unused;  // Not used in current implementation
+
+    // "No goal" sentinels:
+    // 1) ECI sentinel [nan, 0, 0, 0]
+    // 2) Quaternion sentinel [0, 0, 0, 0]
+    // Return identity quaternion and mark as special-target mode so downstream
+    // cost code can disable attitude terms.
+    if (attitude_target.allFinite() && attitude_target.squaredNorm() < 1e-18) {
+        return std::make_pair(Vec4(1.0, 0.0, 0.0, 0.0), true);
+    }
     
     // Check if this is ECI format: first element is NaN
     if (isECIFormat(attitude_target)) {
         // ECI goal vector format: [nan, x, y, z]
         // In this case, we want to align boresight_body with the ECI vector
         Vec3 eci_vec = attitude_target.tail(3);
+        if (!eci_vec.allFinite() || eci_vec.squaredNorm() < 1e-18) {
+            return std::make_pair(Vec4(1.0, 0.0, 0.0, 0.0), true);
+        }
         Vec3 eci_normalized = eci_vec.normalized();
         Vec3 sat_dir_normalized = boresight_body.normalized();
         

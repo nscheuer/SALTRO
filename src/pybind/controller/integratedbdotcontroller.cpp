@@ -10,9 +10,6 @@ namespace saltro::controller {
 IntegratedBdotController::IntegratedBdotController(const Satellite& satellite)
     : Controller(satellite) {
     autoTuneGains();
-
-    mtq_prev_bdot_.assign(satellite_.numMTQ(), 0.0);
-    rw_prev_w_.assign(satellite_.numRW(), 0.0);
 }
 
 Satellite::VecX IntegratedBdotController::find_u(
@@ -43,19 +40,13 @@ Satellite::VecX IntegratedBdotController::find_u(
     const Eigen::Vector3d B_body = R_T * B_eci;
 
     const Eigen::Vector3d bdot_est = -w.cross(B_body);
-    const double dt = std::max(1e-6, dt_seconds());
 
     for (int i = 0; i < satellite_.numMTQ(); ++i) {
         const MTQ& mtq = satellite_.getMTQ(i);
         const Eigen::Vector3d axis = mtq.axis();
         const double bdot_i = axis.dot(bdot_est);
-        const double dbdot_i = (bdot_i - mtq_prev_bdot_[i]) / dt;
 
-        const double raw = -mtq_kp_[i] * bdot_i - mtq_kd_[i] * dbdot_i;
-        const double umax = std::abs(mtq.u_max());
-        u(i) = std::clamp(raw, -umax, umax);
-
-        mtq_prev_bdot_[i] = bdot_i;
+        u(i) = -mtq_kp_[i] * bdot_i;
     }
 
     for (int i = 0; i < satellite_.numRW(); ++i) {
@@ -64,61 +55,37 @@ Satellite::VecX IntegratedBdotController::find_u(
         const Eigen::Vector3d axis = rw.axis();
 
         const double w_i = axis.dot(w);
-        const double dw_i = (w_i - rw_prev_w_[i]) / dt;
 
-        const double raw = -rw_kp_[i] * w_i - rw_kd_[i] * dw_i;
-        const double umax = std::abs(rw.u_max());
-        u(ui) = std::clamp(raw, -umax, umax);
-
-        rw_prev_w_[i] = w_i;
+        u(ui) = -rw_kp_[i] * w_i;
     }
 
     return u;
 }
 
 void IntegratedBdotController::autoTuneGains() {
-    const double Javg = std::max(1e-6, satellite_.inertia().trace() / 3.0);
-    const double wref = std::max(1e-3, max_rate_ref_);
-    const double tau_target = Javg * wref / 25.0;
-    const double dt_tune = std::max(1e-3, dt_seconds());
+    const Eigen::Matrix3d J = satellite_.inertia();
 
     mtq_kp_.assign(satellite_.numMTQ(), 0.0);
     mtq_kd_.assign(satellite_.numMTQ(), 0.0);
     rw_kp_.assign(satellite_.numRW(), 0.0);
     rw_kd_.assign(satellite_.numRW(), 0.0);
 
-    const double Bref = std::max(5e-6, expected_b_field_leo_);
-    const double bdot_ref = wref * Bref;
-
+    // Simple constant gain for MTQ: kp * J_axis
+    const double mtq_gain_const = 1e8;
     for (int i = 0; i < satellite_.numMTQ(); ++i) {
         const MTQ& mtq = satellite_.getMTQ(i);
-        const double umax = std::max(1e-9, std::abs(mtq.u_max()));
-
-        const double m_demand = tau_target / Bref;
-        // Use aggressive command fractions to push magnetorquers toward their limits.
-        // Account for low B-field in LEO by tuning against a reduced bdot reference.
-        const double min_cmd_fraction = 0.80;
-        const double max_cmd_fraction = 0.95;
-        const double cmd_fraction = std::clamp(m_demand / umax, min_cmd_fraction, max_cmd_fraction);
-        const double cmd_allow = cmd_fraction * umax;
-
-        // Tune against a much lower effective bdot reference to boost gains given low B-field in LEO.
-        const double bdot_ref_eff = 0.08 * bdot_ref;
-        const double kp = cmd_allow / std::max(1e-12, bdot_ref_eff);
-        mtq_kp_[i] = kp;
-        mtq_kd_[i] = 0.10 * kp * dt_tune;
+        const Eigen::Vector3d axis = mtq.axis();
+        const double J_axis = (J * axis).dot(axis);
+        mtq_kp_[i] = mtq_gain_const * J_axis;
     }
 
+    // Simple constant gain for RW: kp * J_axis
+    const double rw_gain_const = 1e-1;
     for (int i = 0; i < satellite_.numRW(); ++i) {
         const RW& rw = satellite_.getRW(i);
-        const double umax = std::max(1e-9, std::abs(rw.u_max()));
-
-        const double cmd_fraction = std::clamp(tau_target / umax, 0.05, 0.35);
-        const double cmd_allow = cmd_fraction * umax;
-
-        const double kp = cmd_allow / wref;
-        rw_kp_[i] = kp;
-        rw_kd_[i] = 0.2 * kp * dt_tune;
+        const Eigen::Vector3d axis = rw.axis();
+        const double J_axis = (J * axis).dot(axis);
+        rw_kp_[i] = rw_gain_const * J_axis;
     }
 }
 

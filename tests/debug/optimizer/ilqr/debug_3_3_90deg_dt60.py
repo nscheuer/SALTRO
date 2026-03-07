@@ -25,13 +25,13 @@ def create_planner_settings():
 
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
-    cost.angle = 1.0
-    cost.ang_vel = 1e2
+    cost.angle = 1e-1
+    cost.ang_vel = 1e0
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
-    cost.mtq_control_weight = 1e-3
-    cost.rw_control_weight = 1e3
+    cost.mtq_control_weight = 1e-4
+    cost.rw_control_weight = 1e-1
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
@@ -39,7 +39,7 @@ def create_planner_settings():
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
     cost.angle_N = 0.0
-    cost.ang_vel_N = 1.0
+    cost.ang_vel_N = 0.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
     cost.ang_cost_func_type = 4
@@ -72,10 +72,10 @@ def main():
 
     jtime = np.array([0.22, 0.22 + 5400/(36525 * 86400)])
     qgoal = np.array([
-        [0.0, 0.0],
+        [np.sqrt(2)/2, np.sqrt(2)/2],
         [0.0, 0.0],           
         [0.0, 0.0],            
-        [0.0, 0.0]
+        [np.sqrt(2)/2, np.sqrt(2)/2]
     ])
     boresight = np.array([
         [1.0, 1.0],

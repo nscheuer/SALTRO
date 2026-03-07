@@ -80,8 +80,6 @@ bool warm_start(
             return false;
         }
 
-        active_controller->set_dt(dt);
-
         const Eigen::Vector4d q_goal_k = q_goal.col(k);
         const Eigen::Vector3d boresight_k = boresight.col(k);
         Satellite::VecX uk = active_controller->find_u(xk, B.col(k), q_goal_k, boresight_k);
@@ -90,7 +88,22 @@ bool warm_start(
             return false;
         }
 
-        U.col(k) = uk;
+        // Scale control from 1s nominal timestep to actual timestep
+        // Controller outputs torque-impulse for 1s application; divide by dt to get torque
+        Satellite::VecX uk_scaled = uk / dt;
+
+        // Clamp to actuator limits AFTER scaling
+        for (int i = 0; i < satellite.numMTQ(); ++i) {
+            const double umax = std::abs(satellite.getMTQ(i).u_max());
+            uk_scaled(i) = std::clamp(uk_scaled(i), -umax, umax);
+        }
+        for (int i = 0; i < satellite.numRW(); ++i) {
+            const int ui = satellite.numMTQ() + i;
+            const double umax = std::abs(satellite.getRW(i).u_max());
+            uk_scaled(ui) = std::clamp(uk_scaled(ui), -umax, umax);
+        }
+
+        U.col(k) = uk_scaled;
 
         if (k == N - 1) {
             break;
@@ -103,7 +116,7 @@ bool warm_start(
             [&](double, const Satellite::VecX& x_state, Satellite::VecX& dxdt) {
                 dxdt = satellite.dynamics(
                     x_state,
-                    uk,
+                    uk_scaled,
                     settings.disturbances,
                     R.col(k),
                     B.col(k),
