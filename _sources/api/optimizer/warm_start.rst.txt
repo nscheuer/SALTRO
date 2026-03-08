@@ -1,0 +1,6 @@
+warm_start
+==========
+
+.. doxygenfile:: optimizer/warm_start.h
+   :project: saltro
+   :path: ../include/saltro

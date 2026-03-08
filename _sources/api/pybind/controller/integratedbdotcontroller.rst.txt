@@ -1,0 +1,6 @@
+integratedbdotcontroller
+========================
+
+.. doxygenfile:: pybind/controller/integratedbdotcontroller.h
+   :project: saltro
+   :path: ../include/saltro

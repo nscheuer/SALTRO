@@ -156,18 +156,42 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
     orbit_generation
   </a>
 </li>
 
-
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="../index.html">
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../index.html">
     pybind
   </a>
 </li>
 
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../validation/index.html">
+    validation
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
   </ul>
 </nav></div>
       
@@ -263,6 +287,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
     orbit_generation
   </a>
@@ -272,6 +303,13 @@
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../index.html">
     pybind
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../validation/index.html">
+    validation
   </a>
 </li>
 
@@ -307,6 +345,13 @@
 <li class="toctree-l2"><a class="reference internal" href="../actuators/MTQ.html">MTQ</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../actuators/RW.html">RW</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../actuators/actuator.html">actuator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../controller/index.html">controller</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../controller/controller.html">controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../controller/excitationcontroller.html">excitationcontroller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../controller/integratedbdotcontroller.html">integratedbdotcontroller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../controller/zerocontroller.html">zerocontroller</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
@@ -457,7 +502,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig">
-<span id="_CPPv3NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig"></span><span id="_CPPv2NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig"></span><span id="Disturbance::dtorque_dq__BaseStateCR.DisturbanceConfigCRC"></span><span class="target" id="classDisturbance_1aae862e9eb813f6216cec6069a30fe43f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance5Mat34E" title="Disturbance::Mat34"><span class="n"><span class="pre">Mat34</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dtorque_dq</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance9BaseStateE" title="Disturbance::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../plannersettings.html#_CPPv417DisturbanceConfig" title="DisturbanceConfig"><span class="n"><span class="pre">DisturbanceConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dist_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv3NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig"></span><span id="_CPPv2NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig"></span><span id="Disturbance::dtorque_dq__BaseStateCR.DisturbanceConfigCRC"></span><span class="target" id="classDisturbance_1a4f562935c5eba43c8d8def9d42d4f88d"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance5Mat34E" title="Disturbance::Mat34"><span class="n"><span class="pre">Mat34</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dtorque_dq</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance9BaseStateE" title="Disturbance::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="p"><span class="pre">&amp;</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../plannersettings.html#_CPPv417DisturbanceConfig" title="DisturbanceConfig"><span class="n"><span class="pre">DisturbanceConfig</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK11Disturbance10dtorque_dqERK9BaseStateRK17DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
 <dd><p>Jacobian of disturbance torque with respect to quaternion. </p>
 <p>Computes <span class="math notranslate nohighlight">\(\frac{\partial \boldsymbol{\tau}}{\partial \mathbf{q}}\)</span> as a 3×4 matrix. Default implementation returns zero (for disturbances independent of attitude).</p>
 <dl class="field-list simple">
@@ -475,7 +520,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig">
-<span id="_CPPv3NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig"></span><span id="_CPPv2NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig"></span><span id="Disturbance::ddtorque_dqdq__BaseStateCR.DisturbanceConfigCRC"></span><span class="target" id="classDisturbance_1addcfb3c1b436399da97222b7c0164935"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance4T443E" title="Disturbance::T443"><span class="n"><span class="pre">T443</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorque_dqdq</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance9BaseStateE" title="Disturbance::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../plannersettings.html#_CPPv417DisturbanceConfig" title="DisturbanceConfig"><span class="n"><span class="pre">DisturbanceConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dist_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv3NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig"></span><span id="_CPPv2NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig"></span><span id="Disturbance::ddtorque_dqdq__BaseStateCR.DisturbanceConfigCRC"></span><span class="target" id="classDisturbance_1ae5f43b4411c85b3acffbf1cd2a886ed3"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance4T443E" title="Disturbance::T443"><span class="n"><span class="pre">T443</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorque_dqdq</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N11Disturbance9BaseStateE" title="Disturbance::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="p"><span class="pre">&amp;</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../plannersettings.html#_CPPv417DisturbanceConfig" title="DisturbanceConfig"><span class="n"><span class="pre">DisturbanceConfig</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK11Disturbance13ddtorque_dqdqERK9BaseStateRK17DisturbanceConfig" title="Link to this definition">#</a><br /></dt>
 <dd><p>Hessian of disturbance torque with respect to quaternion. </p>
 <p>Computes second derivatives <span class="math notranslate nohighlight">\(\frac{\partial^2 \tau_i}{\partial q_j \partial q_k}\)</span> as a 3-slice tensor of 4×4 matrices. Default implementation returns zero.</p>
 <dl class="field-list simple">

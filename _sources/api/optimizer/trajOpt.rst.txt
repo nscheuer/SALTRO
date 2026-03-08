@@ -1,0 +1,6 @@
+trajOpt
+=======
+
+.. doxygenfile:: optimizer/trajOpt.h
+   :project: saltro
+   :path: ../include/saltro

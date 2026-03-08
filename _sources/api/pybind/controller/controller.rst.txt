@@ -1,0 +1,6 @@
+controller
+==========
+
+.. doxygenfile:: pybind/controller/controller.h
+   :project: saltro
+   :path: ../include/saltro

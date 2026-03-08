@@ -1,0 +1,6 @@
+validate_plannersettings
+========================
+
+.. doxygenfile:: validation/validate_plannersettings.h
+   :project: saltro
+   :path: ../include/saltro

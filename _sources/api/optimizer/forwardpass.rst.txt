@@ -1,0 +1,6 @@
+forwardpass
+===========
+
+.. doxygenfile:: optimizer/forwardpass.h
+   :project: saltro
+   :path: ../include/saltro

@@ -1,0 +1,6 @@
+validate_satellite
+==================
+
+.. doxygenfile:: validation/validate_satellite.h
+   :project: saltro
+   :path: ../include/saltro

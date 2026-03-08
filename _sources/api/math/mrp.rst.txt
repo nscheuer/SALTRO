@@ -1,0 +1,6 @@
+mrp
+===
+
+.. doxygenfile:: math/mrp.h
+   :project: saltro
+   :path: ../include/saltro

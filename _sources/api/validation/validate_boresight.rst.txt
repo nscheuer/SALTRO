@@ -1,0 +1,6 @@
+validate_boresight
+==================
+
+.. doxygenfile:: validation/validate_boresight.h
+   :project: saltro
+   :path: ../include/saltro

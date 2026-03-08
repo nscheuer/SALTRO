@@ -1,0 +1,6 @@
+validate_initialstate
+=====================
+
+.. doxygenfile:: validation/validate_initialstate.h
+   :project: saltro
+   :path: ../include/saltro

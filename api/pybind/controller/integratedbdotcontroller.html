@@ -1,0 +1,681 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>integratedbdotcontroller &#8212; SALTRO 0.0.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=7026087e"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/controller/integratedbdotcontroller';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="zerocontroller" href="zerocontroller.html" />
+    <link rel="prev" title="excitationcontroller" href="excitationcontroller.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/rexlab.png" class="logo__image only-light" alt=""/>
+    <img src="../../../_static/rexlab.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">SALTRO</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../index.html">
+    pybind
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../validation/index.html">
+    validation
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../limits.html">
+    limits
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../constants/index.html">
+    constants
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    pybind
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../validation/index.html">
+    validation
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../actuators/index.html">actuators</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/MTQ.html">MTQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/RW.html">RW</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../actuators/actuator.html">actuator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">controller</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="controller.html">controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="excitationcontroller.html">excitationcontroller</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">integratedbdotcontroller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="zerocontroller.html">zerocontroller</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../disturbances/index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/disturbance.html">disturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/dragdisturbance.html">dragdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/geometryconfig.html">geometryconfig</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/ggdisturbance.html">ggdisturbance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../disturbances/srpdisturbance.html">srpdisturbance</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../plannersettings.html">plannersettings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../satellite.html">satellite</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">pybind</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">controller</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">integratedbdotcontroller</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="integratedbdotcontroller">
+<h1>integratedbdotcontroller<a class="headerlink" href="#integratedbdotcontroller" title="Link to this heading">#</a></h1>
+<p>B-dot detumbling and PD attitude control law with integrated magnetic derivatives. </p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv46saltro">
+<span id="_CPPv36saltro"></span><span id="_CPPv26saltro"></span><span id="saltro"></span><span class="target" id="namespacesaltro"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">saltro</span></span></span><br /></dt>
+<dd><dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controllerE">
+<span id="_CPPv3N6saltro10controllerE"></span><span id="_CPPv2N6saltro10controllerE"></span><span id="saltro::controller"></span><span class="target" id="namespacesaltro_1_1controller"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">controller</span></span></span><br /></dt>
+<dd><dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller24IntegratedBdotControllerE">
+<span id="_CPPv3N6saltro10controller24IntegratedBdotControllerE"></span><span id="_CPPv2N6saltro10controller24IntegratedBdotControllerE"></span><span id="saltro::controller::IntegratedBdotController"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IntegratedBdotController</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="../../constants/constants.html#_CPPv46saltro" title="saltro"><span class="n"><span class="pre">saltro</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="controller.html#_CPPv4N6saltro10controllerE" title="saltro::controller"><span class="n"><span class="pre">controller</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="controller.html#_CPPv4N6saltro10controller10ControllerE" title="saltro::controller::Controller"><span class="n"><span class="pre">Controller</span></span></a><a class="headerlink" href="#_CPPv4N6saltro10controller24IntegratedBdotControllerE" title="Link to this definition">#</a><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;integratedbdotcontroller.h&gt;</em></div>
+<p>Integrated B-dot controller for satellite detumbling and attitude control. </p>
+<p>Implements a dual-mode control law combining:<ol class="upperalpha simple">
+<li><p><strong>Magnetorquer B-dot control</strong>: Opposes the time rate of change of the magnetic field to dissipate rotational energy. Uses integrated magnetic field derivative approximation.</p></li>
+<li><p><strong>Reaction wheel PD control</strong>: Provides precise attitude tracking after initial detumbling.</p></li>
+</ol>
+</p>
+<p>The magnetorquer control law is:  <div class="math notranslate nohighlight">
+\[
+\mathbf{m}_{\text{mtq}} = -k_p \mathbf{C}(\mathbf{q})^T \mathbf{B}_{\text{ECI}} 
+- k_d \frac{d}{dt}[\mathbf{C}(\mathbf{q})^T \mathbf{B}_{\text{ECI}}]
+\]</div>
+ where the derivative is approximated using integrated (accumulated) magnetic field changes.</p>
+<p>The reaction wheel control law uses quaternion-based PD feedback:  <div class="math notranslate nohighlight">
+\[
+\boldsymbol{\tau}_{\text{rw}} = -k_p \mathbf{q}_{\text{err,vec}} - k_d \boldsymbol{\omega}
+\]</div>
+ where <span class="math notranslate nohighlight">\(\mathbf{q}_{\text{err,vec}}\)</span> is the vector part of the quaternion error <span class="math notranslate nohighlight">\(\mathbf{q}_{\text{goal}}^{-1} \otimes \mathbf{q}\)</span>.</p>
+<p>The controller automatically tunes gains based on satellite inertia and expected magnetic field strength in LEO (35 µT nominal). </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller24IntegratedBdotController24IntegratedBdotControllerERK9Satellite">
+<span id="_CPPv3N6saltro10controller24IntegratedBdotController24IntegratedBdotControllerERK9Satellite"></span><span id="_CPPv2N6saltro10controller24IntegratedBdotController24IntegratedBdotControllerERK9Satellite"></span><span id="saltro::controller::IntegratedBdotController::IntegratedBdotController__SatelliteCR"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController_1a79903f286caed2f2e861413460c25d8f"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IntegratedBdotController</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">satellite</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro10controller24IntegratedBdotController24IntegratedBdotControllerERK9Satellite" title="Link to this definition">#</a><br /></dt>
+<dd><p>Construct an integrated B-dot controller with auto-tuned gains. </p>
+<p>Initializes the controller and automatically computes proportional and derivative gains for both magnetorquers and reaction wheels based on satellite properties.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>satellite</strong> – <a class="reference internal" href="../satellite.html#classSatellite"><span class="std std-ref">Satellite</span></a> model with actuator configuration and inertia tensor </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6saltro10controller24IntegratedBdotController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE">
+<span id="_CPPv3NK6saltro10controller24IntegratedBdotController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"></span><span id="_CPPv2NK6saltro10controller24IntegratedBdotController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"></span><span id="saltro::controller::IntegratedBdotController::find_u__Satellite::VecXCR.Eigen::Vector3dCR.Eigen::Vector4dCR.Eigen::Vector3dCRC"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController_1ad737a8344d7ad43d1e889fbbda322ad8"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../satellite.html#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">find_u</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../satellite.html#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">q_goal</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK6saltro10controller24IntegratedBdotController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute control input using B-dot and PD feedback. </p>
+<p>Implements the dual-mode control law combining magnetorquer B-dot damping with reaction wheel PD attitude control. The control is saturated by actuator limits defined in the satellite model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Attitude state vector (7+nRW × 1): [ω(3), q(4), h_rw(nRW)] </p></li>
+<li><p><strong>B_eci</strong> – Magnetic field vector in ECI frame (3 × 1), Tesla </p></li>
+<li><p><strong>q_goal</strong> – Goal quaternion (4 × 1), unit quaternion </p></li>
+<li><p><strong>boresight_body</strong> – Desired boresight direction in body frame (3 × 1), unit vector </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Control vector (nu × 1): [m_mtq, τ_rw, τ_magic] </p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-protected-functions">Protected Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller24IntegratedBdotController13autoTuneGainsEv">
+<span id="_CPPv3N6saltro10controller24IntegratedBdotController13autoTuneGainsEv"></span><span id="_CPPv2N6saltro10controller24IntegratedBdotController13autoTuneGainsEv"></span><span id="saltro::controller::IntegratedBdotController::autoTuneGains"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController_1a702ac399eeb8223bc5dd392238f704dc"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">autoTuneGains</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller24IntegratedBdotController13autoTuneGainsEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Automatically tune controller gains based on satellite properties. </p>
+<p>Computes proportional and derivative gains for magnetorquers and reaction wheels using scaling laws based on inertia eigenvalues, actuator capabilities, and expected magnetic field strength. Uses damping ratio ζ ≈ 0.7 for critically damped response. </p>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-private-members">Private Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller24IntegratedBdotController13max_rate_ref_E">
+<span id="_CPPv3N6saltro10controller24IntegratedBdotController13max_rate_ref_E"></span><span id="_CPPv2N6saltro10controller24IntegratedBdotController13max_rate_ref_E"></span><span id="saltro::controller::IntegratedBdotController::max_rate_ref___double"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController_1a01649cd901a909f9971c4d0678949ca7"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">max_rate_ref_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">5.0</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><span class="m"><span class="pre">3.14159265358979323846</span></span><span class="w"> </span><span class="o"><span class="pre">/</span></span><span class="w"> </span><span class="m"><span class="pre">180.0</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller24IntegratedBdotController13max_rate_ref_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Maximum reference angular rate for gain normalization (rad/s) </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller24IntegratedBdotController7mtq_kp_E">
+<span id="_CPPv3N6saltro10controller24IntegratedBdotController7mtq_kp_E"></span><span id="_CPPv2N6saltro10controller24IntegratedBdotController7mtq_kp_E"></span><span id="saltro::controller::IntegratedBdotController::mtq_kp___std::vector:double:"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController_1af8789e6a26ab1ca8ea921f1c5d30c614"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">mtq_kp_</span></span></span><a class="headerlink" href="#_CPPv4N6saltro10controller24IntegratedBdotController7mtq_kp_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Proportional gains for each magnetorquer axis (A·m²/T) </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller24IntegratedBdotController7mtq_kd_E">
+<span id="_CPPv3N6saltro10controller24IntegratedBdotController7mtq_kd_E"></span><span id="_CPPv2N6saltro10controller24IntegratedBdotController7mtq_kd_E"></span><span id="saltro::controller::IntegratedBdotController::mtq_kd___std::vector:double:"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController_1ab868769d1056fa61d3a329c77a3adc44"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">mtq_kd_</span></span></span><a class="headerlink" href="#_CPPv4N6saltro10controller24IntegratedBdotController7mtq_kd_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Derivative gains for each magnetorquer axis (A·m²·s/T) </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller24IntegratedBdotController6rw_kp_E">
+<span id="_CPPv3N6saltro10controller24IntegratedBdotController6rw_kp_E"></span><span id="_CPPv2N6saltro10controller24IntegratedBdotController6rw_kp_E"></span><span id="saltro::controller::IntegratedBdotController::rw_kp___std::vector:double:"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController_1a070eced1424930df99c1370cebc6e971"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_kp_</span></span></span><a class="headerlink" href="#_CPPv4N6saltro10controller24IntegratedBdotController6rw_kp_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Proportional gains for each reaction wheel (N·m/rad) </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller24IntegratedBdotController6rw_kd_E">
+<span id="_CPPv3N6saltro10controller24IntegratedBdotController6rw_kd_E"></span><span id="_CPPv2N6saltro10controller24IntegratedBdotController6rw_kd_E"></span><span id="saltro::controller::IntegratedBdotController::rw_kd___std::vector:double:"></span><span class="target" id="classsaltro_1_1controller_1_1IntegratedBdotController_1abe501388be45d77b09f0c44c382fa20c"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_kd_</span></span></span><a class="headerlink" href="#_CPPv4N6saltro10controller24IntegratedBdotController6rw_kd_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Derivative gains for each reaction wheel (N·m·s/rad) </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="excitationcontroller.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">excitationcontroller</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="zerocontroller.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">zerocontroller</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv46saltro"><code class="docutils literal notranslate"><span class="pre">saltro</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controllerE"><code class="docutils literal notranslate"><span class="pre">saltro::controller</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller24IntegratedBdotControllerE"><code class="docutils literal notranslate"><span class="pre">saltro::controller::IntegratedBdotController</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller24IntegratedBdotController24IntegratedBdotControllerERK9Satellite"><code class="docutils literal notranslate"><span class="pre">IntegratedBdotController()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller24IntegratedBdotController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"><code class="docutils literal notranslate"><span class="pre">find_u()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller24IntegratedBdotController13autoTuneGainsEv"><code class="docutils literal notranslate"><span class="pre">autoTuneGains()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller24IntegratedBdotController13max_rate_ref_E"><code class="docutils literal notranslate"><span class="pre">max_rate_ref_</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller24IntegratedBdotController7mtq_kp_E"><code class="docutils literal notranslate"><span class="pre">mtq_kp_</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller24IntegratedBdotController7mtq_kd_E"><code class="docutils literal notranslate"><span class="pre">mtq_kd_</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller24IntegratedBdotController6rw_kp_E"><code class="docutils literal notranslate"><span class="pre">rw_kp_</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller24IntegratedBdotController6rw_kd_E"><code class="docutils literal notranslate"><span class="pre">rw_kd_</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/api/pybind/controller/integratedbdotcontroller.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Niclas Scheuer, Patrick McKeen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

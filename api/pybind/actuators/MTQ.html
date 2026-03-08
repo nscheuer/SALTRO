@@ -156,18 +156,42 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
     orbit_generation
   </a>
 </li>
 
-
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="../index.html">
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../index.html">
     pybind
   </a>
 </li>
 
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../validation/index.html">
+    validation
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
   </ul>
 </nav></div>
       
@@ -263,6 +287,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
     orbit_generation
   </a>
@@ -272,6 +303,13 @@
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../index.html">
     pybind
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../validation/index.html">
+    validation
   </a>
 </li>
 
@@ -307,6 +345,13 @@
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">MTQ</a></li>
 <li class="toctree-l2"><a class="reference internal" href="RW.html">RW</a></li>
 <li class="toctree-l2"><a class="reference internal" href="actuator.html">actuator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../controller/index.html">controller</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../controller/controller.html">controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../controller/excitationcontroller.html">excitationcontroller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../controller/integratedbdotcontroller.html">integratedbdotcontroller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../controller/zerocontroller.html">zerocontroller</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../disturbances/index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -572,6 +617,114 @@
 </dl>
 </dd></dl>
 
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3MTQ6torqueEdRK9BaseState">
+<span id="_CPPv3NK3MTQ6torqueEdRK9BaseState"></span><span id="_CPPv2NK3MTQ6torqueEdRK9BaseState"></span><span id="MTQ::torque__double.BaseStateCRC"></span><span class="target" id="classMTQ_1aa52af55f8d4c1e10e4925e9ce009155d"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ4Vec3E" title="MTQ::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">torque</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ9BaseStateE" title="MTQ::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK3MTQ6torqueEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute the torque vector produced by this actuator. </p>
+<p>Returns the torque vector as a function of control input and spacecraft state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input (typically in [-u_max, u_max]). </p></li>
+<li><p><strong>x</strong> – Base state vector (7D: [av; q; …]). </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>3D torque vector in body frame (Newton-meters). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3MTQ8dtorq_duEdRK9BaseState">
+<span id="_CPPv3NK3MTQ8dtorq_duEdRK9BaseState"></span><span id="_CPPv2NK3MTQ8dtorq_duEdRK9BaseState"></span><span id="MTQ::dtorq_du__double.BaseStateCRC"></span><span class="target" id="classMTQ_1a7ac5334edab1ee83cc84755024edd799"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ5Mat13E" title="MTQ::Mat13"><span class="n"><span class="pre">Mat13</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dtorq_du</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ9BaseStateE" title="MTQ::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK3MTQ8dtorq_duEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Jacobian of torque with respect to control input. </p>
+<p>Returns <span class="math notranslate nohighlight">\(\frac{\partial \boldsymbol{\tau}}{\partial u}\)</span> as a 1×3 row vector.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>1×3 Jacobian matrix. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3MTQ16dtorq_dbasestateEdRK9BaseState">
+<span id="_CPPv3NK3MTQ16dtorq_dbasestateEdRK9BaseState"></span><span id="_CPPv2NK3MTQ16dtorq_dbasestateEdRK9BaseState"></span><span id="MTQ::dtorq_dbasestate__double.BaseStateCRC"></span><span class="target" id="classMTQ_1a6c7d738a3031b3444ad5b843dec4ed0d"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ5Mat73E" title="MTQ::Mat73"><span class="n"><span class="pre">Mat73</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dtorq_dbasestate</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ9BaseStateE" title="MTQ::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK3MTQ16dtorq_dbasestateEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Jacobian of torque with respect to base state. </p>
+<p>Returns <span class="math notranslate nohighlight">\(\frac{\partial \boldsymbol{\tau}}{\partial \mathbf{x}}\)</span> as a 7×3 matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state (7D). </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>7×3 Jacobian matrix. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3MTQ11ddtorq_duduEdRK9BaseState">
+<span id="_CPPv3NK3MTQ11ddtorq_duduEdRK9BaseState"></span><span id="_CPPv2NK3MTQ11ddtorq_duduEdRK9BaseState"></span><span id="MTQ::ddtorq_dudu__double.BaseStateCRC"></span><span class="target" id="classMTQ_1afd38d582684d146a45781206a417ace7"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ4T113E" title="MTQ::T113"><span class="n"><span class="pre">T113</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorq_dudu</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ9BaseStateE" title="MTQ::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK3MTQ11ddtorq_duduEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Hessian of torque with respect to control input (second derivatives). </p>
+<p>Returns a 3-slice tensor of <span class="math notranslate nohighlight">\(\frac{\partial^2 \tau_i}{\partial u^2}\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tensor3 with 3 slices of 1×1 matrices (one per torque component). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3MTQ19ddtorq_dudbasestateEdRK9BaseState">
+<span id="_CPPv3NK3MTQ19ddtorq_dudbasestateEdRK9BaseState"></span><span id="_CPPv2NK3MTQ19ddtorq_dudbasestateEdRK9BaseState"></span><span id="MTQ::ddtorq_dudbasestate__double.BaseStateCRC"></span><span class="target" id="classMTQ_1a1bf1a763d21ac96d8dbb2eb39df7c6bc"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ4T173E" title="MTQ::T173"><span class="n"><span class="pre">T173</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorq_dudbasestate</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ9BaseStateE" title="MTQ::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK3MTQ19ddtorq_dudbasestateEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Hessian of torque with respect to control input and base state. </p>
+<p>Returns mixed partial derivatives <span class="math notranslate nohighlight">\(\frac{\partial^2 \tau_i}{\partial u \partial x_j}\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tensor3 with 3 slices of 1×7 matrices. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3MTQ27ddtorq_dbasestatedbasestateEdRK9BaseState">
+<span id="_CPPv3NK3MTQ27ddtorq_dbasestatedbasestateEdRK9BaseState"></span><span id="_CPPv2NK3MTQ27ddtorq_dbasestatedbasestateEdRK9BaseState"></span><span id="MTQ::ddtorq_dbasestatedbasestate__double.BaseStateCRC"></span><span class="target" id="classMTQ_1a3b6160760975fbb3e41393a639d2863c"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ4T773E" title="MTQ::T773"><span class="n"><span class="pre">T773</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ddtorq_dbasestatedbasestate</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N3MTQ9BaseStateE" title="MTQ::BaseState"><span class="n"><span class="pre">BaseState</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK3MTQ27ddtorq_dbasestatedbasestateEdRK9BaseState" title="Link to this definition">#</a><br /></dt>
+<dd><p>Hessian of torque with respect to base state (full second derivatives). </p>
+<p>Returns <span class="math notranslate nohighlight">\(\frac{\partial^2 \tau_i}{\partial x_j \partial x_k}\)</span> for each component i.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>u</strong> – Control input. </p></li>
+<li><p><strong>x</strong> – Base state. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tensor3 with 3 slices of 7×7 matrices. </p>
+</dd>
+</dl>
+</dd></dl>
+
 </div>
 </dd></dl>
 
@@ -639,6 +792,12 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ11ddtorq_duduEdRK9BaseStateRK4Vec3"><code class="docutils literal notranslate"><span class="pre">ddtorq_dudu()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ19ddtorq_dudbasestateEdRK9BaseStateRK4Vec3RKN5Eigen6MatrixIdXL4EEXL3EEEE"><code class="docutils literal notranslate"><span class="pre">ddtorq_dudbasestate()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ27ddtorq_dbasestatedbasestateEdRK9BaseStateRKN5Eigen6MatrixIdXL4EEXL3EEEERKNSt5arrayIN5Eigen6MatrixIdXL4EEXL4EEEEXL3EEEE"><code class="docutils literal notranslate"><span class="pre">ddtorq_dbasestatedbasestate()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ6torqueEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">torque()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ8dtorq_duEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">dtorq_du()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ16dtorq_dbasestateEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">dtorq_dbasestate()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ11ddtorq_duduEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">ddtorq_dudu()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ19ddtorq_dudbasestateEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">ddtorq_dudbasestate()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK3MTQ27ddtorq_dbasestatedbasestateEdRK9BaseState"><code class="docutils literal notranslate"><span class="pre">ddtorq_dbasestatedbasestate()</span></code></a></li>
 </ul>
 </li>
 </ul>

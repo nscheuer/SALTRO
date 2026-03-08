@@ -46,6 +46,7 @@
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/satellite';</script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="validation" href="../validation/index.html" />
     <link rel="prev" title="plannersettings" href="plannersettings.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -155,18 +156,42 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../orbit_generation/index.html">
     orbit_generation
   </a>
 </li>
 
-
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="index.html">
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="index.html">
     pybind
   </a>
 </li>
 
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../validation/index.html">
+    validation
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
   </ul>
 </nav></div>
       
@@ -262,6 +287,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../orbit_generation/index.html">
     orbit_generation
   </a>
@@ -271,6 +303,13 @@
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="index.html">
     pybind
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../validation/index.html">
+    validation
   </a>
 </li>
 
@@ -306,6 +345,13 @@
 <li class="toctree-l2"><a class="reference internal" href="actuators/MTQ.html">MTQ</a></li>
 <li class="toctree-l2"><a class="reference internal" href="actuators/RW.html">RW</a></li>
 <li class="toctree-l2"><a class="reference internal" href="actuators/actuator.html">actuator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="controller/index.html">controller</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="controller/controller.html">controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controller/excitationcontroller.html">excitationcontroller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controller/integratedbdotcontroller.html">integratedbdotcontroller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="controller/zerocontroller.html">zerocontroller</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="disturbances/index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -910,12 +956,12 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK9Satellite9stageCostEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig">
-<span id="_CPPv3NK9Satellite9stageCostEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite9stageCostEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::stageCost__i.i.VecXCR.VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a62680d5abb12ff4e835798d33f616262"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stageCost</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">k</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">N</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sat_direction</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">eci_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite9stageCostEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv3NK9Satellite9stageCostEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite9stageCostEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::stageCost__i.i.VecXCR.VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a849d752035923f615c29f407e674f324"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stageCost</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">k</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">N</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">attitude_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite9stageCostEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
 <dd><p>Compute stage cost (intermediate time step). </p>
 <p>Evaluates the cost function at time step k:  <div class="math notranslate nohighlight">
 \[
-J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
-\]</div>
+ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
+ \]</div>
 </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -924,8 +970,8 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 <li><p><strong>N</strong> – Total time steps. </p></li>
 <li><p><strong>x</strong> – State at step k. </p></li>
 <li><p><strong>u</strong> – Control at step k. </p></li>
-<li><p><strong>sat_direction</strong> – Target direction for satellite (body frame). </p></li>
-<li><p><strong>eci_target</strong> – Target quaternion in ECI frame. </p></li>
+<li><p><strong>boresight_body</strong> – Boresight direction in body frame. </p></li>
+<li><p><strong>attitude_target</strong> – Attitude target (quaternion or [NaN, ECI direction]). </p></li>
 <li><p><strong>B_eci</strong> – Magnetic field (ECI). </p></li>
 <li><p><strong>cost_cfg</strong> – Cost configuration. </p></li>
 </ul>
@@ -938,14 +984,14 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK9Satellite12terminalCostERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig">
-<span id="_CPPv3NK9Satellite12terminalCostERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite12terminalCostERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::terminalCost__VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a1360e3329549d26ad92b8894d50e80c3"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">terminalCost</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sat_direction</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">eci_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite12terminalCostERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv3NK9Satellite12terminalCostERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite12terminalCostERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::terminalCost__VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a348ba053f2c19612bce946a1470b0b46"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">terminalCost</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">attitude_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite12terminalCostERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
 <dd><p>Compute terminal cost (final time step). </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>x</strong> – Final state. </p></li>
-<li><p><strong>sat_direction</strong> – Target satellite direction. </p></li>
-<li><p><strong>eci_target</strong> – Target quaternion. </p></li>
+<li><p><strong>boresight_body</strong> – Boresight direction in body frame. </p></li>
+<li><p><strong>attitude_target</strong> – Attitude target (quaternion or [NaN, ECI direction]). </p></li>
 <li><p><strong>B_eci</strong> – Magnetic field. </p></li>
 <li><p><strong>cost_cfg</strong> – Cost configuration. </p></li>
 </ul>
@@ -958,7 +1004,7 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK9Satellite18stageCostJacobiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig">
-<span id="_CPPv3NK9Satellite18stageCostJacobiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite18stageCostJacobiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::stageCostJacobians__i.i.VecXCR.VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a94d2f1442cba2f20fd9d2a2e97174b7b"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stageCostJacobians</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">k</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">N</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sat_direction</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">eci_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite18stageCostJacobiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv3NK9Satellite18stageCostJacobiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite18stageCostJacobiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::stageCostJacobians__i.i.VecXCR.VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a1ef0f2c0e54e5160105af7cfefa3ebb8"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stageCostJacobians</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">k</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">N</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">attitude_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite18stageCostJacobiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
 <dd><p>Compute stage cost Jacobians. </p>
 <p>Returns gradients of cost: <div class="math notranslate nohighlight">
 \[\frac{\partial J_k}{\partial \mathbf{x}}, \quad \frac{\partial J_k}{\partial \mathbf{u}}\]</div>
@@ -970,8 +1016,29 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 <li><p><strong>N</strong> – Total steps. </p></li>
 <li><p><strong>x</strong> – State. </p></li>
 <li><p><strong>u</strong> – Control. </p></li>
-<li><p><strong>sat_direction</strong> – Target direction. </p></li>
-<li><p><strong>eci_target</strong> – Target quaternion. </p></li>
+<li><p><strong>boresight_body</strong> – Boresight direction in body frame. </p></li>
+<li><p><strong>attitude_target</strong> – Attitude target (quaternion or [NaN, ECI direction]). </p></li>
+<li><p><strong>B_eci</strong> – Magnetic field. </p></li>
+<li><p><strong>cost_cfg</strong> – Cost configuration. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tuple of (∇_x J, ∇_u J). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK9Satellite21terminalCostJacobiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig">
+<span id="_CPPv3NK9Satellite21terminalCostJacobiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite21terminalCostJacobiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::terminalCostJacobians__VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1aa691dc37e8ad36b2b4fc62af781ea3f0"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">terminalCostJacobians</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">attitude_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite21terminalCostJacobiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute terminal cost Jacobians. </p>
+<p>Delegates to stageCostJacobians with k=0, N=1 to apply terminal weights.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – State. </p></li>
+<li><p><strong>boresight_body</strong> – Boresight direction in body frame. </p></li>
+<li><p><strong>attitude_target</strong> – Attitude target (quaternion or [NaN, ECI direction]). </p></li>
 <li><p><strong>B_eci</strong> – Magnetic field. </p></li>
 <li><p><strong>cost_cfg</strong> – Cost configuration. </p></li>
 </ul>
@@ -984,7 +1051,7 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK9Satellite17stageCostHessiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig">
-<span id="_CPPv3NK9Satellite17stageCostHessiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite17stageCostHessiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::stageCostHessians__i.i.VecXCR.VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a225aeac263b7e11a038be89a0a32071f"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stageCostHessians</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">k</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">N</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sat_direction</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">eci_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite17stageCostHessiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv3NK9Satellite17stageCostHessiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite17stageCostHessiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::stageCostHessians__i.i.VecXCR.VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a177476d1f352a01a934f5c52014bd50f"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stageCostHessians</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">k</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">N</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">attitude_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite17stageCostHessiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
 <dd><p>Compute stage cost Hessians. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -993,14 +1060,57 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 <li><p><strong>N</strong> – Total steps. </p></li>
 <li><p><strong>x</strong> – State. </p></li>
 <li><p><strong>u</strong> – Control. </p></li>
-<li><p><strong>sat_direction</strong> – Target direction. </p></li>
-<li><p><strong>eci_target</strong> – Target quaternion. </p></li>
+<li><p><strong>boresight_body</strong> – Boresight direction in body frame. </p></li>
+<li><p><strong>attitude_target</strong> – Attitude target (quaternion or [NaN, ECI direction]). </p></li>
 <li><p><strong>B_eci</strong> – Magnetic field. </p></li>
 <li><p><strong>cost_cfg</strong> – Cost configuration. </p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>Tuple of Hessian matrices (Hxx, Huu, Hxu). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK9Satellite20terminalCostHessiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig">
+<span id="_CPPv3NK9Satellite20terminalCostHessiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="_CPPv2NK9Satellite20terminalCostHessiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"></span><span id="Satellite::terminalCostHessians__VecXCR.Vec3CR.Vec4CR.Vec3CR.CostConfigCRC"></span><span class="target" id="classSatellite_1a21d241a215dda710b759e82526fd956c"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">tuple</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4MatXE" title="Satellite::MatX"><span class="n"><span class="pre">MatX</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">terminalCostHessians</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">attitude_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite20terminalCostHessiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute terminal cost Hessians. </p>
+<p>Delegates to stageCostHessians with k=0, N=1 to apply terminal weights.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – State. </p></li>
+<li><p><strong>boresight_body</strong> – Boresight direction in body frame. </p></li>
+<li><p><strong>attitude_target</strong> – Attitude target (quaternion or [NaN, ECI direction]). </p></li>
+<li><p><strong>B_eci</strong> – Magnetic field. </p></li>
+<li><p><strong>cost_cfg</strong> – Cost configuration. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tuple of Hessian matrices (Hxx, Huu, Hxu). </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK9Satellite9totalCostERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERK10CostConfig">
+<span id="_CPPv3NK9Satellite9totalCostERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERK10CostConfig"></span><span id="_CPPv2NK9Satellite9totalCostERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERK10CostConfig"></span><span id="Satellite::totalCost__Eigen::Ref:Eigen::MatrixXdC:CR.Eigen::Ref:Eigen::MatrixXdC:CR.Eigen::Ref:Eigen::MatrixXdC:CR.Eigen::Ref:Eigen::MatrixXdC:CR.Eigen::Ref:Eigen::MatrixXdC:CR.CostConfigCRC"></span><span class="target" id="classSatellite_1adf27217d7ebac2457f622b8f145a0e67"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">totalCost</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">X</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">U</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">attitude_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="plannersettings.html#_CPPv410CostConfig" title="CostConfig"><span class="n"><span class="pre">CostConfig</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cost_cfg</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite9totalCostERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERK10CostConfig" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute total trajectory cost. </p>
+<p>Sums stage costs for all intermediate steps and terminal cost at final step.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>X</strong> – State trajectory matrix (N × state_dim). Each row is state at step k. </p></li>
+<li><p><strong>U</strong> – Control trajectory matrix ((N-1) × control_dim). Each row k is control from k to k+1. </p></li>
+<li><p><strong>B</strong> – Magnetic field at each step (3 × N). </p></li>
+<li><p><strong>boresight</strong> – Boresight history in body frame (3 × N), column k used at step k. </p></li>
+<li><p><strong>attitude_target</strong> – Attitude target trajectory (4 × N), column k used at step k. </p></li>
+<li><p><strong>cost_cfg</strong> – Cost configuration. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Total trajectory cost J = Σ_k c(x_k, u_k) + c_terminal(x_N). </p>
 </dd>
 </dl>
 </dd></dl>
@@ -1115,6 +1225,29 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 <dd><p>Recompute inertia with and without <a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> contributions. </p>
 </dd></dl>
 
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK9Satellite21processAttitudeTargetERK4Vec4RK4Vec3RK4Vec4">
+<span id="_CPPv3NK9Satellite21processAttitudeTargetERK4Vec4RK4Vec3RK4Vec4"></span><span id="_CPPv2NK9Satellite21processAttitudeTargetERK4Vec4RK4Vec3RK4Vec4"></span><span id="Satellite::processAttitudeTarget__Vec4CR.Vec3CR.Vec4CRC"></span><span class="target" id="classSatellite_1ac676507beea3255f126699ad5ab32b1e"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">pair</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">processAttitudeTarget</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">attitude_target</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec4E" title="Satellite::Vec4"><span class="n"><span class="pre">Vec4</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">q_current</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite21processAttitudeTargetERK4Vec4RK4Vec3RK4Vec4" title="Link to this definition">#</a><br /></dt>
+<dd><p>Helper to handle dual format of attitude_target parameter. </p>
+<p>attitude_target can be in two formats:<ol class="lowerroman simple">
+<li><p>ECI goal vector: [nan, x, y, z] - position vector with NaN in first element</p></li>
+<li><p>Quaternion goal vector: [q0, qx, qy, qz] - valid quaternion</p></li>
+</ol>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>attitude_target</strong> – The target vector (4D) </p></li>
+<li><p><strong>boresight_body</strong> – Boresight direction in body frame (used only for ECI vector format) </p></li>
+<li><p><strong>q_current</strong> – Current quaternion state </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Pair&lt;q_goal_quaternion, is_eci_format&gt; </p>
+</dd>
+</dl>
+</dd></dl>
+
 </div>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-private-members">Private Members</p>
@@ -1192,6 +1325,15 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
         <p class="prev-next-title">plannersettings</p>
       </div>
     </a>
+    <a class="right-next"
+       href="../validation/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">validation</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
 </div>
                 </footer>
               
@@ -1261,7 +1403,10 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite9stageCostEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"><code class="docutils literal notranslate"><span class="pre">stageCost()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite12terminalCostERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"><code class="docutils literal notranslate"><span class="pre">terminalCost()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite18stageCostJacobiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"><code class="docutils literal notranslate"><span class="pre">stageCostJacobians()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite21terminalCostJacobiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"><code class="docutils literal notranslate"><span class="pre">terminalCostJacobians()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite17stageCostHessiansEiiRK4VecXRK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"><code class="docutils literal notranslate"><span class="pre">stageCostHessians()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite20terminalCostHessiansERK4VecXRK4Vec3RK4Vec4RK4Vec3RK10CostConfig"><code class="docutils literal notranslate"><span class="pre">terminalCostHessians()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite9totalCostERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERKN5Eigen3RefIKN5Eigen8MatrixXdEEERK10CostConfig"><code class="docutils literal notranslate"><span class="pre">totalCost()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite11constraintsEiiRK4VecXRK4VecXRK4Vec3RK16ConstraintConfig"><code class="docutils literal notranslate"><span class="pre">constraints()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite19constraintJacobiansEiiRK4VecXRK4VecXRK4Vec3RK16ConstraintConfig"><code class="docutils literal notranslate"><span class="pre">constraintJacobians()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite18constraintHessiansEiiRK4VecXRK4VecXRK4Vec3RK16ConstraintConfig"><code class="docutils literal notranslate"><span class="pre">constraintHessians()</span></code></a></li>
@@ -1270,6 +1415,7 @@ J_k = c(\mathbf{x}_k, \mathbf{u}_k, k)
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite10QUAT_INDEXE"><code class="docutils literal notranslate"><span class="pre">QUAT_INDEX</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite17RW_MOMENTUM_INDEXE"><code class="docutils literal notranslate"><span class="pre">RW_MOMENTUM_INDEX</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite17updateInertiaNoRWEv"><code class="docutils literal notranslate"><span class="pre">updateInertiaNoRW()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite21processAttitudeTargetERK4Vec4RK4Vec3RK4Vec4"><code class="docutils literal notranslate"><span class="pre">processAttitudeTarget()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite5Jcom_E"><code class="docutils literal notranslate"><span class="pre">Jcom_</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite8invJcom_E"><code class="docutils literal notranslate"><span class="pre">invJcom_</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite10Jcom_noRW_E"><code class="docutils literal notranslate"><span class="pre">Jcom_noRW_</span></code></a></li>

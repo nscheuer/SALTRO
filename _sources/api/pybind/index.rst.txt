@@ -5,6 +5,7 @@ pybind
    :maxdepth: 1
 
    actuators/index
+   controller/index
    disturbances/index
    plannersettings
    satellite

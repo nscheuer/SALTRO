@@ -1,0 +1,6 @@
+excitationcontroller
+====================
+
+.. doxygenfile:: pybind/controller/excitationcontroller.h
+   :project: saltro
+   :path: ../include/saltro

@@ -156,18 +156,42 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
-    orbit_generation
+  <a class="nav-link nav-internal" href="../../optimizer/index.html">
+    optimizer
   </a>
 </li>
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../pybind/index.html">
+  <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../pybind/index.html">
     pybind
   </a>
 </li>
 
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../validation/index.html">
+    validation
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
   </ul>
 </nav></div>
       
@@ -263,6 +287,13 @@
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../orbit_generation/index.html">
     orbit_generation
   </a>
@@ -272,6 +303,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../pybind/index.html">
     pybind
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../validation/index.html">
+    validation
   </a>
 </li>
 
@@ -310,6 +348,7 @@
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="../angles.html">angles</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../frames.html">frames</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mrp.html">mrp</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quaternion.html">quaternion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tensor.html">tensor</a></li>
 </ul>
@@ -417,6 +456,43 @@
 </dl>
 </dd></dl>
 
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0E13rk4_jacobiansvRR15DynamicsJacFuncRKN5Eigen3RefIKN5Eigen8VectorXdEEERKN5Eigen3RefIKN5Eigen8VectorXdEEEddN5Eigen3RefIN5Eigen8MatrixXdEEEN5Eigen3RefIN5Eigen8MatrixXdEEE">
+<span id="_CPPv3I0E13rk4_jacobiansRR15DynamicsJacFuncRKN5Eigen3RefIKN5Eigen8VectorXdEEERKN5Eigen3RefIKN5Eigen8VectorXdEEEddN5Eigen3RefIN5Eigen8MatrixXdEEEN5Eigen3RefIN5Eigen8MatrixXdEEE"></span><span id="_CPPv2I0E13rk4_jacobiansRR15DynamicsJacFuncRKN5Eigen3RefIKN5Eigen8VectorXdEEERKN5Eigen3RefIKN5Eigen8VectorXdEEEddN5Eigen3RefIN5Eigen8MatrixXdEEEN5Eigen3RefIN5Eigen8MatrixXdEEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DynamicsJacFunc</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="rk4_8h_1a381e89bfaaaf1bc74df7eb8cb5a594bb"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rk4_jacobians</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4I0E13rk4_jacobiansvRR15DynamicsJacFuncRKN5Eigen3RefIKN5Eigen8VectorXdEEERKN5Eigen3RefIKN5Eigen8VectorXdEEEddN5Eigen3RefIN5Eigen8MatrixXdEEEN5Eigen3RefIN5Eigen8MatrixXdEEE" title="rk4_jacobians::DynamicsJacFunc"><span class="n"><span class="pre">DynamicsJacFunc</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">dynamics_jac</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">u</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">dt</span></span>, <span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">A_discrete</span></span>, <span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Ref</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">B_discrete</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0E13rk4_jacobiansvRR15DynamicsJacFuncRKN5Eigen3RefIKN5Eigen8VectorXdEEERKN5Eigen3RefIKN5Eigen8VectorXdEEEddN5Eigen3RefIN5Eigen8MatrixXdEEEN5Eigen3RefIN5Eigen8MatrixXdEEE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute exact discrete-time Jacobians for RK4 integration. </p>
+<p>This function computes the first-order sensitivities of the RK4 integrator, providing exact discrete-time Jacobians A and B such that:  <div class="math notranslate nohighlight">
+\[
+\mathbf{x}_{k+1} \approx \mathbf{x}_k + \mathbf{A}(\mathbf{x}_k - \mathbf{x}_{\text{ref}}) 
+                  + \mathbf{B}(\mathbf{u}_k - \mathbf{u}_{\text{ref}})
+\]</div>
+ where A = ∂x_{k+1}/∂x_k and B = ∂x_{k+1}/∂u_k are evaluated at the linearization point.</p>
+<p>The computation uses the chain rule through all four RK4 stages:<ul class="simple">
+<li><p>∂k_1/∂x = f_x(t, x, u)</p></li>
+<li><p>∂k_2/∂x = f_x(…) · (I + dt/2 · ∂k_1/∂x)</p></li>
+<li><p>∂k_3/∂x = f_x(…) · (I + dt/2 · ∂k_2/∂x)</p></li>
+<li><p>∂k_4/∂x = f_x(…) · (I + dt · ∂k_3/∂x)</p></li>
+<li><p>A = I + (dt/6)(∂k_1/∂x + 2·∂k_2/∂x + 2·∂k_3/∂x + ∂k_4/∂x)</p></li>
+</ul>
+</p>
+<p>This is significantly more accurate than first-order Euler discretization for iLQR, as it ensures the backward pass linearization exactly matches the forward pass integration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dynamics_jac</strong> – Function that computes continuous-time Jacobians f_x and f_u. Signature: void(double t, const VecX&amp; x, const VecX&amp; u, MatXX&amp; A_c, MatXU&amp; B_c) </p></li>
+<li><p><strong>x</strong> – Current state vector (n × 1) </p></li>
+<li><p><strong>u</strong> – Current control vector (m × 1) </p></li>
+<li><p><strong>t</strong> – Current time </p></li>
+<li><p><strong>dt</strong> – Time step size </p></li>
+<li><p><strong>A_discrete</strong> – Output: discrete-time state Jacobian ∂x_{k+1}/∂x_k (n × n) </p></li>
+<li><p><strong>B_discrete</strong> – Output: discrete-time control Jacobian ∂x_{k+1}/∂u_k (n × m)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>DynamicsJacFunc</strong> – Function type for computing continuous Jacobians </p>
+</dd>
+</dl>
+</dd></dl>
+
 </div>
 </section>
 
@@ -468,6 +544,7 @@
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I00E8rk4_stepvRR9DerivFuncRK5StateddR5State"><code class="docutils literal notranslate"><span class="pre">rk4_step()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0E13rk4_jacobiansvRR15DynamicsJacFuncRKN5Eigen3RefIKN5Eigen8VectorXdEEERKN5Eigen3RefIKN5Eigen8VectorXdEEEddN5Eigen3RefIN5Eigen8MatrixXdEEEN5Eigen3RefIN5Eigen8MatrixXdEEE"><code class="docutils literal notranslate"><span class="pre">rk4_jacobians()</span></code></a></li>
 </ul>
   </nav></div>
 

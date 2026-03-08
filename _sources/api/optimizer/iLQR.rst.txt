@@ -1,0 +1,6 @@
+iLQR
+====
+
+.. doxygenfile:: optimizer/iLQR.h
+   :project: saltro
+   :path: ../include/saltro

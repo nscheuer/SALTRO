@@ -12,6 +12,8 @@ documentation for details.
    api/limits
    api/constants/index
    api/math/index
+   api/optimizer/index
    api/orbit_generation/index
    api/pybind/index
+   api/validation/index
 

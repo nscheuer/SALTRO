@@ -1,0 +1,6 @@
+validate_qgoal
+==============
+
+.. doxygenfile:: validation/validate_qgoal.h
+   :project: saltro
+   :path: ../include/saltro
