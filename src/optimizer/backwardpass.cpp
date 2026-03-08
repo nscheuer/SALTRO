@@ -43,21 +43,24 @@ void solveRiccattiStep(
 	Eigen::VectorXd d_k = -llt.solve(Q_u);
 	d[k] = d_k;
 	
-	// Riccati update for value function Hessian
-	// P_k = Q_xx + K_k^T * Q_uu * K_k + K_k^T * Q_ux + Q_ux^T * K_k
+	// CRITICAL FIX: Use Q_uu_reg (regularized) consistently in Riccati updates
+	// This ensures P_k remains positive definite even with large regularization
+	// Traditional form: P_k = Q_xx - Q_ux^T * (Q_uu + ρI)^{-1} * Q_ux
+	// Equivalent form with K_k = -(Q_uu + ρI)^{-1} * Q_ux:
+	// P_k = Q_xx + K_k^T * (Q_uu + ρI) * K_k + K_k^T * Q_ux + Q_ux^T * K_k
 	P_k = Q_xx 
-	  + K_k.transpose() * Q_uu * K_k 
+	  + K_k.transpose() * Q_uu_reg * K_k 
 	  + K_k.transpose() * Q_ux 
 	  + Q_ux.transpose() * K_k;
 	
-	// Riccati update for value function gradient
-	// p_k = Q_x + K_k^T * Q_uu * d_k + K_k^T * Q_u + Q_ux^T * d_k
+	// Riccati update for value function gradient (also use Q_uu_reg)
+	// p_k = Q_x + K_k^T * (Q_uu + ρI) * d_k + K_k^T * Q_u + Q_ux^T * d_k
 	p_k = Q_x 
-	  + K_k.transpose() * Q_uu * d_k 
+	  + K_k.transpose() * Q_uu_reg * d_k 
 	  + K_k.transpose() * Q_u 
 	  + Q_ux.transpose() * d_k;
 	
-	// Accumulate expected cost reduction
+	// Accumulate expected cost reduction (use unregularized Q_uu for accurate prediction)
 	// V_1k = d_k^T * Q_u
 	// V_2k = 1/2 * d_k^T * Q_uu * d_k
 	deltaV(0) += d_k.dot(Q_u);
@@ -126,6 +129,15 @@ bool backwardPass(
 		
 		// Reshape lu from 1×nu matrix to nu vector
 		Eigen::VectorXd lu = lu_mat.row(0);
+		
+		// CRITICAL: Scale stage cost derivatives by dt for proper discrete-time formulation
+		// Continuous cost: J = ∫[l(x,u)]dt → Discrete: J ≈ Σ(l × dt)
+		// This ensures numerical stability across different timestep sizes
+		lx = dt * lx;
+		lu = dt * lu;
+		lxx = dt * lxx;
+		luu = dt * luu;
+		lux_hess = dt * lux_hess;
 		
 		// Step 2: Compute exact discrete-time dynamics Jacobians using RK4
 		// This matches the forward pass RK4 integration exactly, providing superior

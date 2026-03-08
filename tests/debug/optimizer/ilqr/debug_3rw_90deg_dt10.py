@@ -25,13 +25,13 @@ def create_planner_settings():
 
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
-    cost.angle = 1e2
-    cost.ang_vel = 1e3
+    cost.angle = 1.0
+    cost.ang_vel = 1e2
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1.0
-    cost.rw_control_weight = 1e3
+    cost.rw_control_weight = 1e1
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
@@ -57,6 +57,8 @@ def create_planner_settings():
     plannersettings.passes[0].reg.reg_init = 1e-6
     plannersettings.passes[0].reg.reg_max = 1e10
     plannersettings.passes[0].reg.reg_scale = 10.0
+    plannersettings.passes[0].reg.use_dynamics_hess = True
+    plannersettings.passes[0].reg.use_constraint_hess = False
 
     # Pass 0 Line Search Settings
     plannersettings.passes[0].linesearch.max_iters = 24
@@ -83,7 +85,7 @@ def main():
         [0.0, 0.0]
     ])
 
-    w0 = np.array([0.01, 0.01, 0.01])
+    w0 = np.array([-0.01, 0.02, 0.03])
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
     h0 = np.array([0.0, 0.0, 0.0])
     x0 = np.hstack((w0, q0, h0))
