@@ -5,9 +5,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "configs"))
 
 import saltro_py
-from create_3rw_sat import create_3rw_satellite
+from sat_3_1_hybrid import create_satellite
 from trajOpt import trajOpt
 from ilqr_viewer import launch_viewer
 
@@ -25,12 +26,12 @@ def create_planner_settings():
 
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
-    cost.angle = 1.0
+    cost.angle = 1e2
     cost.ang_vel = 1e1
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
-    cost.mtq_control_weight = 1e-2
+    cost.mtq_control_weight = 1e-1
     cost.rw_control_weight = 1.0
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
@@ -38,8 +39,8 @@ def create_planner_settings():
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 0.0
-    cost.ang_vel_N = 0.0
+    cost.angle_N = 1e2
+    cost.ang_vel_N = 1e1
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
     cost.ang_cost_func_type = 3
@@ -70,35 +71,36 @@ def create_planner_settings():
 
 def main():
     plannersettings = create_planner_settings()
-    satellite = create_3rw_satellite(plannersettings)
+    satellite = create_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 100/(36525 * 86400), 0.22 + 200/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 1000/(36525 * 86400)])
     qgoal = np.array([
-        [np.sqrt(2)/2, 0.0, 0.0],
-        [0.0, 0.0, 0.0],           
-        [0.0, 0.0, 0.0],            
-        [np.sqrt(2)/2, 1.0, 1.0]
+        [np.sqrt(2)/2, np.sqrt(2)/2],
+        [0.0, 0.0],           
+        [0.0, 0.0],            
+        [np.sqrt(2)/2, np.sqrt(2)/2]
     ])
     boresight = np.array([
-        [1.0, 1.0, 1.0],
-        [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0]
+        [1.0, 1.0],
+        [0.0, 0.0],
+        [0.0, 0.0]
     ])
 
     w0 = np.array([0.01, 0.01, 0.01])
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
-    h0 = np.array([0.0, 0.0, 0.0])
+    h0 = np.array([0.0])
     x0 = np.hstack((w0, q0, h0))
 
     r0 = np.array([7000e3, 0.0, 0.0])
     v0 = np.array([0.0, 7.5e3, 0.0])
 
-    X, U, stop_reason, snapshots, transitions, dt, cost_tol = trajOpt(
+    X, U, stop_reason, snapshots, transitions, dt, cost_tol, elapsed_time = trajOpt(
         plannersettings, satellite, x0, r0, v0, jtime, qgoal, boresight, debug=True
     )
     
     print(f"iLQR finished: {stop_reason}")
     print(f"Final cost: {snapshots[-1]['J']:.6e}")
+    print(f"Elapsed time: {elapsed_time:.3f} seconds")
     
     launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol)
 

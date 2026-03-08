@@ -5,9 +5,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "configs"))
 
 import saltro_py
-from create_3rw_sat import create_3rw_satellite
+from sat_3_3_hybrid import create_satellite
 from trajOpt import trajOpt
 from ilqr_viewer import launch_viewer
 
@@ -55,9 +56,9 @@ def create_planner_settings():
 
     # Pass 0 Regularization Settings
     plannersettings.passes[0].reg.reg_init = 1e-6
-    plannersettings.passes[0].reg.reg_max = 1e30
+    plannersettings.passes[0].reg.reg_max = 1e10
     plannersettings.passes[0].reg.reg_scale = 10.0
-    plannersettings.passes[0].reg.use_dynamics_hess = True
+    plannersettings.passes[0].reg.use_dynamics_hess = False
     plannersettings.passes[0].reg.use_constraint_hess = False
 
     # Pass 0 Line Search Settings
@@ -70,9 +71,9 @@ def create_planner_settings():
 
 def main():
     plannersettings = create_planner_settings()
-    satellite = create_3rw_satellite(plannersettings)
+    satellite = create_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 1000/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 400/(36525 * 86400)])
     qgoal = np.array([
         [np.sqrt(2)/2, np.sqrt(2)/2],
         [0.0, 0.0],           
@@ -85,7 +86,7 @@ def main():
         [0.0, 0.0]
     ])
 
-    w0 = np.array([0.0, 0.0, 0.0])
+    w0 = np.array([0.01, 0.01, 0.01])
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
     h0 = np.array([0.0, 0.0, 0.0])
     x0 = np.hstack((w0, q0, h0))
@@ -93,12 +94,13 @@ def main():
     r0 = np.array([7000e3, 0.0, 0.0])
     v0 = np.array([0.0, 7.5e3, 0.0])
 
-    X, U, stop_reason, snapshots, transitions, dt, cost_tol = trajOpt(
+    X, U, stop_reason, snapshots, transitions, dt, cost_tol, elapsed_time = trajOpt(
         plannersettings, satellite, x0, r0, v0, jtime, qgoal, boresight, debug=True
     )
     
     print(f"iLQR finished: {stop_reason}")
     print(f"Final cost: {snapshots[-1]['J']:.6e}")
+    print(f"Elapsed time: {elapsed_time:.3f} seconds")
     
     launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol)
 

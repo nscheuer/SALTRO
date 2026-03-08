@@ -6,7 +6,8 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
 import saltro_py
 
-def create_3mtq_satellite(plannersettings: saltro_py.PlannerSettings) -> saltro_py.Satellite:
+def create_satellite(plannersettings: saltro_py.PlannerSettings) -> saltro_py.Satellite:
+    """3 MTQ + 0 RW satellite configuration"""
     J = np.diag([0.067, 0.071, 0.069])
 
     satellite = saltro_py.Satellite(J, plannersettings)

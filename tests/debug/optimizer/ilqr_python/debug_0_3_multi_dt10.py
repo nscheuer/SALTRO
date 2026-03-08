@@ -5,9 +5,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "configs"))
 
 import saltro_py
-from create_3rw_sat import create_3rw_satellite
+from sat_0_3_rw import create_satellite
 from trajOpt import trajOpt
 from ilqr_viewer import launch_viewer
 
@@ -70,7 +71,7 @@ def create_planner_settings():
 
 def main():
     plannersettings = create_planner_settings()
-    satellite = create_3rw_satellite(plannersettings)
+    satellite = create_satellite(plannersettings)
 
     jtime = np.array([0.22, 0.22 + 100/(36525 * 86400), 0.22 + 200/(36525 * 86400), 0.22 + 300/(36525 * 86400)])
     qgoal = np.array([
@@ -93,12 +94,13 @@ def main():
     r0 = np.array([7000e3, 0.0, 0.0])
     v0 = np.array([0.0, 7.5e3, 0.0])
 
-    X, U, stop_reason, snapshots, transitions, dt, cost_tol = trajOpt(
+    X, U, stop_reason, snapshots, transitions, dt, cost_tol, elapsed_time = trajOpt(
         plannersettings, satellite, x0, r0, v0, jtime, qgoal, boresight, debug=True
     )
     
     print(f"iLQR finished: {stop_reason}")
     print(f"Final cost: {snapshots[-1]['J']:.6e}")
+    print(f"Elapsed time: {elapsed_time:.3f} seconds")
     
     launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol)
 

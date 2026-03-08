@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 from pathlib import Path
+import time
 
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
@@ -61,6 +62,7 @@ def trajOpt(
     transitions = []
     stop_reason = "not_run"
     
+    start_time = time.time()
     for pass_idx in range(plannersettings.num_passes):
         X, U, stop_reason, snaps, trans = ilqr(
             plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho, 
@@ -69,8 +71,9 @@ def trajOpt(
         if debug:
             snapshots.extend(snaps)
             transitions.extend(trans)
+    elapsed_time = time.time() - start_time
     
     if debug:
-        return X, U, stop_reason, snapshots, transitions, dt_sec, plannersettings.passes[0].ilqr.cost_tol
+        return X, U, stop_reason, snapshots, transitions, dt_sec, plannersettings.passes[0].ilqr.cost_tol, elapsed_time
     else:
         return X, U, stop_reason
