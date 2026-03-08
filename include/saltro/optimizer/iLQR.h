@@ -13,31 +13,45 @@ namespace saltro::optimizer {
  * Takes an initial trajectory (X, U) and iteratively improves it by solving
  * local linear quadratic approximations of the optimal control problem.
  *
+ * The algorithm alternates between:
+ * 1. **Backward pass**: Compute optimal feedback gains K and feedforward terms d
+ * 2. **Forward pass**: Rollout new trajectory using gains with line search
+ *
+ * Convergence is determined by gradient norm, cost improvement, or stagnation.
+ * The algorithm respects settings for maximum iterations, convergence tolerances,
+ * and regularization strategies.
+ *
  * @param settings PlannerSettings containing algorithm parameters and cost weights
  * @param satellite Satellite model with dynamics and cost functions
- * @param X Input trajectory (state matrix, N x state_dim). Modified in-place with optimized trajectory.
- * @param U Input control sequence (N-1 x control_dim). Modified in-place with optimized controls.
- * @param B Input magnetic field trajectory (3 x N)
- * @param boresight Input boresight trajectory (3 x N)
- * @param attitude_target Attitude goal in quaternion mode [q0,qx,qy,qz] or ECI mode [nan,x,y,z]
- * @param J Output total trajectory cost for the current rollout.
+ * @param X State trajectory (N × state_dim). Modified in-place with optimized trajectory.
+ * @param U Control trajectory (N-1 × control_dim). Modified in-place with optimized controls.
+ * @param R Position trajectory in ECI frame (3 × N), meters
+ * @param V Velocity trajectory in ECI frame (3 × N), m/s
+ * @param B Magnetic field trajectory in ECI frame (3 × N), Tesla
+ * @param S Sun direction trajectory in ECI frame (3 × N), unit vectors
+ * @param rho Atmospheric density trajectory (1 × N), kg/m³
+ * @param jtime Mission time vector in Julian centuries (N × 1)
+ * @param boresight Boresight constraint trajectory (3 × N)
+ * @param attitude_target Attitude goal trajectory (4 × N): quaternions or [NaN, x, y, z] for ECI vector
+ * @param J Output: total trajectory cost for the optimized trajectory
  *
- * @return true if optimization succeeded, false if convergence or numerical issues occurred
+ * @return true if optimization succeeded (converged or reached max iterations),
+ *         false if numerical issues occurred
  *
- * @note Algorithm runs for settings.ilqr_iterations with convergence tolerance settings.ilqr_tol
- * @note Modifies X, U, and J in-place
+ * @note Algorithm modifies X, U, and J in-place
+ * @note Convergence determined by settings.ilqr.grad_tol and settings.ilqr.cost_tol
  */
 bool iLQR(
 	const PlannerSettings& settings,
 	const Satellite& satellite,
 	Eigen::Ref<Eigen::MatrixXd> X,
 	Eigen::Ref<Eigen::MatrixXd> U,
-	const Eigen::Ref<const Eigen::MatrixXd>& R,  // position trajectory (3 x N)
-	const Eigen::Ref<const Eigen::MatrixXd>& V,  // velocity trajectory (3 x N)
+	const Eigen::Ref<const Eigen::MatrixXd>& R,
+	const Eigen::Ref<const Eigen::MatrixXd>& V,
 	const Eigen::Ref<const Eigen::MatrixXd>& B,
-	const Eigen::Ref<const Eigen::MatrixXd>& S,  // sun direction trajectory (3 x N)
-	const Eigen::Ref<const Eigen::MatrixXd>& rho,  // density trajectory (1 x N)
-	const Eigen::Ref<const Eigen::VectorXd>& jtime, // julian centuries times (N)
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,
+	const Eigen::Ref<const Eigen::VectorXd>& jtime,
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
 	double& J

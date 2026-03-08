@@ -601,6 +601,7 @@ class TestCostHessians:
         cost_cfg.ang_vel = 1e4
         cost_cfg.control_mult = 0.0  # Skip control costs
         cost_cfg.angle = 0.0
+        cost_cfg.use_cost_hess = True
         
         sat_direction = np.zeros(3)
         eci_target = np.array([1.0, 0.0, 0.0, 0.0])
@@ -638,6 +639,7 @@ class TestCostHessians:
         cost_cfg.rw_control_weight = 1e8
         cost_cfg.ang_vel = 0.0
         cost_cfg.angle = 0.0
+        cost_cfg.use_cost_hess = True
         
         sat_direction = np.zeros(3)
         eci_target = np.array([1.0, 0.0, 0.0, 0.0])
@@ -781,6 +783,7 @@ class TestCostHessians:
         cost_cfg.mtq_control_weight = 1.0
         cost_cfg.rw_control_weight = 1e3
         cost_cfg.ang_cost_func_type = 4
+        cost_cfg.use_cost_hess = True
         
         boresight = np.array([1.0, 0.0, 0.0])
         eci_target = np.array([1.0, 0.0, 0.0, 0.0])
@@ -806,6 +809,29 @@ class TestCostHessians:
                 assert error <= threshold, \
                     f"Hessian[{i},{j}] mismatch: analytical={lxx_analytical[i, j]:.6e}, " \
                     f"fd={lxx_fd[i, j]:.6e}, error={error:.6e}"
+
+    def test_state_hessian_disabled_when_use_cost_hess_false(self, fixture):
+        """State Hessian should be zeroed when use_cost_hess is disabled."""
+        x = np.zeros(fixture.sat.stateDim)
+        x[fixture.sat.AV_INDEX:fixture.sat.AV_INDEX+3] = [0.05, 0.02, 0.01]
+        x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = [1, 0, 0, 0]
+        u = np.zeros(fixture.sat.controlDim)
+
+        cost_cfg = saltro.CostConfig()
+        cost_cfg.ang_vel = 1e4
+        cost_cfg.control_mult = 1.0
+        cost_cfg.use_cost_hess = False
+
+        sat_direction = np.zeros(3)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.zeros(3)
+
+        lxx, luu, lux = fixture.sat.stageCostHessians(
+            0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg)
+
+        assert np.linalg.norm(lxx) == 0.0
+        assert np.linalg.norm(lux) == 0.0
+        assert np.max(np.diag(luu)) > 0.0
 
 
 # ============================================================================

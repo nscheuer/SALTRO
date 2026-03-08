@@ -533,6 +533,7 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Hessian w.r.t. state matches finite
     CostConfig cost_cfg;
     cost_cfg.ang_vel = 1e4;
     cost_cfg.control_mult = 0.0;  // Skip control costs for clarity
+    cost_cfg.use_cost_hess = true;
     
     Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
     Eigen::Vector4d eci_target(1, 0, 0, 0);
@@ -572,6 +573,7 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Hessian w.r.t. control matches fini
     cost_cfg.rw_control_weight = 1e8;
     cost_cfg.ang_vel = 0.0;  // Skip angular velocity costs
     cost_cfg.angle = 0.0;
+    cost_cfg.use_cost_hess = true;
     
     Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
     Eigen::Vector4d eci_target(1, 0, 0, 0);
@@ -641,6 +643,32 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Hessian w.r.t. RW momentum",
         int h_idx = Satellite::RW_MOMENTUM_INDEX + i;
         REQUIRE(lxx_analytical(h_idx, h_idx) >= -1e-10);
     }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+                 "State Hessian disabled when use_cost_hess is false",
+                 "[hessians][feature][use_cost_hess]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+
+    CostConfig cost_cfg;
+    cost_cfg.ang_vel = 1e4;
+    cost_cfg.control_mult = 1.0;
+    cost_cfg.use_cost_hess = false;
+
+    Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
+    Eigen::Vector4d eci_target(1, 0, 0, 0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+
+    auto [lxx, luu, lux] = sat.stageCostHessians(
+        0, 10, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+
+    REQUIRE(lxx.norm() == 0.0);
+    REQUIRE(lux.norm() == 0.0);
+    REQUIRE(luu.diagonal().maxCoeff() > 0.0);
 }
 
 // ============================================================================
@@ -1704,6 +1732,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     cost_cfg.mtq_control_weight = 1.0;
     cost_cfg.rw_control_weight = 1e3;
     cost_cfg.ang_cost_func_type = 4;
+    cost_cfg.use_cost_hess = true;
     
     Eigen::Vector3d boresight(1.0, 0.0, 0.0);
     Eigen::Vector4d attitude_target(1.0, 0.0, 0.0, 0.0);

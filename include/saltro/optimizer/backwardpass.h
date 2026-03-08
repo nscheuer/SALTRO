@@ -28,7 +28,8 @@ namespace saltro::optimizer {
  * @param boresight Boresight vector trajectory (3 x N)
  * @param attitude_target Goal orientation (quaternion or ECI vector format)
  * @param settings Planner settings (contains cost, regularization config)
- * @param K Output feedback gains (std::vector where K[k] is nu × nx for each timestep)
+ * @param reg Regularization parameter added to Q_uu diagonal for numerical stability
+ * @param K Output feedback gains (std::vector where K[k] is nu × nxr for each timestep)
  * @param d Output feedforward terms (std::vector where d[k] is nu × 1 for each timestep)
  * @param deltaV Output expected cost change coefficients (2x1)
  *               deltaV(0) = first-order term (accumulated across all timesteps)

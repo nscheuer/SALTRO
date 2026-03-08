@@ -27,6 +27,7 @@ class ForwardPassFixture:
         self.settings.disturbances.plan_for_prop = False
         self.settings.disturbances.plan_for_gendist = False
         self.settings.disturbances.plan_for_resdipole = False
+        self.settings.passes[0].reg.reg_init = 1e-2
 
         J = np.diag([0.067, 0.071, 0.069])
         self.satellite = saltro_py.Satellite(J, self.settings)
@@ -104,7 +105,19 @@ class ForwardPassFixture:
         for k in range(self.N - 1):
             dt = (self.jtime[k + 1] - self.jtime[k]) * SEC_PER_CENTURY
             u_bar = U_ref[:, k].copy()
-            u_bar += K[k] @ (X[:, k] - X_ref[:, k])
+            # Match C++ forward pass reduced-state error construction.
+            xerr = np.zeros(self.satellite.reducedStateDim)
+            xerr[0:3] = X[0:3, k] - X_ref[0:3, k]
+            # Small-angle approximation for attitude error in reduced coordinates.
+            xerr[3:6] = (
+                X[self.satellite.QUAT_INDEX+1:self.satellite.QUAT_INDEX+4, k]
+                - X_ref[self.satellite.QUAT_INDEX+1:self.satellite.QUAT_INDEX+4, k]
+            )
+            rw_idx = self.satellite.RW_MOMENTUM_INDEX
+            n_rw = self.satellite.numRW
+            xerr[6:6+n_rw] = X[rw_idx:rw_idx+n_rw, k] - X_ref[rw_idx:rw_idx+n_rw, k]
+
+            u_bar += K[k] @ xerr
             u_bar += alpha * d[k]
             U[:, k] = u_bar
 
@@ -147,7 +160,8 @@ def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
         fixture.rho,
         fixture.boresight,
         fixture.attitude_target_traj,
-        fixture.settings
+        fixture.settings,
+        fixture.settings.passes[0].reg.reg_init
     )
     assert ok
 
@@ -212,7 +226,8 @@ def test_forward_pass_line_search_backtracks(fixture):
         fixture.rho,
         fixture.boresight,
         fixture.attitude_target_traj,
-        fixture.settings
+        fixture.settings,
+        fixture.settings.passes[0].reg.reg_init
     )
     assert ok
 

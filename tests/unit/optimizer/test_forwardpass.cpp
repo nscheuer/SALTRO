@@ -13,6 +13,7 @@
 #include <Eigen/Dense>
 
 #include <saltro/limits.h>
+#include <saltro/math/mrp.h>
 #include <saltro/math/integrators/rk4.h>
 #include <saltro/optimizer/backwardpass.h>
 #include <saltro/optimizer/forwardpass.h>
@@ -139,7 +140,20 @@ public:
 			double dt = timestepSeconds(k, settings_in);
 			Eigen::VectorXd u_bar = U_ref.col(k);
 			if (k < static_cast<int>(K.size())) {
-				u_bar += K[k] * (result.X.col(k) - X_ref.col(k));
+				// Match optimizer::forwardPass reduced-state feedback error.
+				Eigen::VectorXd state_error_reduced(satellite.reducedStateDim());
+				state_error_reduced.head<3>() = result.X.col(k).head<3>() - X_ref.col(k).head<3>();
+
+				const Eigen::Vector4d q_ref = X_ref.col(k).segment<4>(Satellite::QUAT_INDEX);
+				const Eigen::Vector4d q_bar = result.X.col(k).segment<4>(Satellite::QUAT_INDEX);
+				const Eigen::Vector4d q_err = saltro::math::quatError(q_ref, q_bar);
+				state_error_reduced.segment<3>(3) = saltro::math::quatToMRP(q_err);
+
+				for (int i = 0; i < satellite.numRW(); ++i) {
+					state_error_reduced(6 + i) = result.X(7 + i, k) - X_ref(7 + i, k);
+				}
+
+				u_bar += K[k] * state_error_reduced;
 			}
 			if (k < static_cast<int>(d.size())) {
 				u_bar += alpha * d[k];
