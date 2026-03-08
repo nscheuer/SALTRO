@@ -52,6 +52,8 @@ void solveRiccattiStep(
 	  + K_k.transpose() * Q_uu_reg * K_k 
 	  + K_k.transpose() * Q_ux 
 	  + Q_ux.transpose() * K_k;
+
+	P_k = 0.5 * (P_k + Eigen::MatrixXd(P_k.transpose()));
 	
 	// Riccati update for value function gradient (also use Q_uu_reg)
 	// p_k = Q_x + K_k^T * (Q_uu + ρI) * d_k + K_k^T * Q_u + Q_ux^T * d_k
