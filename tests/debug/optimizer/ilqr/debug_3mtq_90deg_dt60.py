@@ -26,12 +26,12 @@ def create_planner_settings():
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
     cost.angle = 1.0
-    cost.ang_vel = 1e2
+    cost.ang_vel = 1e1
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
-    cost.mtq_control_weight = 1e-3
-    cost.rw_control_weight = 1e3
+    cost.mtq_control_weight = 1e-2
+    cost.rw_control_weight = 1.0
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
@@ -39,10 +39,10 @@ def create_planner_settings():
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
     cost.angle_N = 0.0
-    cost.ang_vel_N = 1.0
+    cost.ang_vel_N = 0.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 4
+    cost.ang_cost_func_type = 3
     cost.use_cost_hess = True
 
     # Pass 0 Disturbance Settings

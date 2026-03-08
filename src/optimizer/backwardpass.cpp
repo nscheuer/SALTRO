@@ -159,14 +159,14 @@ bool backwardPass(
 		// Clamp lxx to PSD: non-convex cost functions (e.g. ang_cost_func_type=4)
 		// can produce indefinite Hessians whose negative eigenvalues compound
 		// through the Riccati recursion, making P_k and then Q_uu indefinite.
-		{
-			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(lxx);
-			Eigen::VectorXd eigvals = eig.eigenvalues();
-			if (eigvals(0) < 0.0) {
-				eigvals = eigvals.cwiseMax(0.0);
-				lxx = eig.eigenvectors() * eigvals.asDiagonal() * eig.eigenvectors().transpose();
-			}
-		}
+		// {
+		// 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(lxx);
+		// 	Eigen::VectorXd eigvals = eig.eigenvalues();
+		// 	if (eigvals(0) < 0.0) {
+		// 		eigvals = eigvals.cwiseMax(0.0);
+		// 		lxx = eig.eigenvectors() * eigvals.asDiagonal() * eig.eigenvectors().transpose();
+		// 	}
+		// }
 		
 		// Step 3: Compute exact discrete-time dynamics Jacobians using RK4 (full state)
 		Eigen::MatrixXd A_k_full = Eigen::MatrixXd::Zero(nx, nx);
