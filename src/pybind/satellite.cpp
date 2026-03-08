@@ -592,8 +592,7 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
                                                                  const Vec3& R_eci, const Vec3& B_eci,
                                                                  const Vec3& S_eci, const Vec3& V_eci) const {
     const int nx = stateDim();
-    const int nu = controlDim();
-    
+
     DynHessXX hess_xx;  // (state, state, state) - indexed by output equation
     DynHessUX hess_ux;  // (control, state, state) - indexed by output equation
     DynHessUU hess_uu;  // (control, control, state) - indexed by output equation
@@ -623,9 +622,7 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
             h_rw += h_i * getRW(i).axis();
         }
     }
-    
-    Vec3 angular_mom = Jcom_ * w + h_rw;
-    
+
     // =========================================================================
     // Angular velocity Hessian: ∂²wdot_i/∂x_j∂x_k (indexed by output i = 0,1,2)
     // =========================================================================
@@ -814,8 +811,6 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     // qdot = 0.5 * W(q) * w where W depends on q
     // ∂qdot_i/∂w_j = 0.5 * W_ij
     // ∂qdot_i/∂q_j involves ∂W/∂q_j
-    
-    Mat43 W = saltro::math::findWMat(q);
     
     // ∂²qdot/∂w∂w = 0 (qdot is linear in w)
     // ∂²qdot/∂q∂q = 0 (W is linear in q, so second q-derivatives vanish)
@@ -1039,8 +1034,7 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
     }
 
     const double qdot = q_goal.dot(q);
-    const double abs_qdot = clampUnit(safeAbs(qdot));
-    
+
     // ===== CRITICAL FIX: Handle quaternion double-cover =====
     // Ensure q_goal and q are on the same hemisphere to avoid sign ambiguity
     Vec4 q_goal_aligned = q_goal;
@@ -1180,9 +1174,7 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     }
 
     const double qdot = q_goal.dot(q);
-    const double abs_qdot = clampUnit(safeAbs(qdot));
-    const double sign_qdot = safeSign(qdot);
-    
+
     // ===== CRITICAL FIX: Handle quaternion double-cover =====
     // Quaternions q and -q represent the same rotation.
     // Ensure q_goal is on the same hemisphere as q to avoid sign flip issues.
@@ -1496,19 +1488,16 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     for (int i = 0; i < num_rw_; ++i) {
         const double h = x(RW_MOMENTUM_INDEX + i);
         const double z = std::abs(h);
-        const double sign_h = safeSign(h);
         const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
 
         // Angular momentum saturation penalty
         const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
         const double denom_high = std::max(1e-9, h_max - h_thresh);
         if (z > h_thresh) {
-            const double over = (z - h_thresh) / denom_high;
             const double d2_over_dz2 = 1.0 / (denom_high * denom_high);
             lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
                 cost_cfg.rw_AM_weight * d2_over_dz2;
         } else {
-            const double scaled = z / h_max;
             const double d2_scaled_dz2 = 1.0 / (h_max * h_max);
             lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
                 cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * d2_scaled_dz2;
@@ -1517,7 +1506,6 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         // Stiction penalty second derivative
         const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
         if (h_stic > 1e-12 && z < h_stic) {
-            const double near_zero = (h_stic - z) / h_stic;
             const double d2_near_zero_dz2 = 1.0 / (h_stic * h_stic);
             lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
                 cost_cfg.rw_stic_weight * d2_near_zero_dz2;
@@ -1575,7 +1563,7 @@ double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
                             const CostConfig& cost_cfg) const {
     const int nx = stateDim();
     const int nu = controlDim();
-    const int N = X.cols();
+    const int N = static_cast<int>(X.cols());
 
     if (X.rows() != nx) {
         throw std::invalid_argument(

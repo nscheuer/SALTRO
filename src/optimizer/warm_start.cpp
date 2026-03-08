@@ -27,7 +27,6 @@ bool warm_start(
     Eigen::Ref<Eigen::MatrixXd> X,
     Eigen::Ref<Eigen::MatrixXd> U
 ) {
-    const int nx = satellite.stateDim();
     const int nu = satellite.controlDim();
 
     if (q_goal.rows() != 4 || q_goal.cols() != N) {

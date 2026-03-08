@@ -3,10 +3,13 @@
 MTQ::MTQ(const Vec3 &axis, double max_dipole) : Actuator(axis, max_dipole) {}
 
 MTQ::Vec3 MTQ::torque(double u, const BaseState& x, const Vec3& B_body) const {
+    (void)x;
     return -(B_body.cross(axis_)) * u;
 }
 
 MTQ::Mat13 MTQ::dtorq_du(double u, const BaseState& x, const Vec3& B_body) const {
+    (void)u;
+    (void)x;
     Mat13 J;
     J = -(B_body.cross(axis_)).transpose();
     return J;

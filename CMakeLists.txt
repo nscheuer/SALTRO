@@ -8,6 +8,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(SALTRO_BUILD_PYTHON "Build python bindings" ON)
 option(SALTRO_BUILD_MANUAL_DEBUG "Build manual debug executables" ON)
 option(SALTRO_BUILD_TESTS "Build unit tests" ON)
+option(SALTRO_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
 include(FetchContent)
 
@@ -312,5 +313,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(saltro PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow
         -Wconversion -Wdouble-promotion
+        $<$<BOOL:${SALTRO_WARNINGS_AS_ERRORS}>:-Werror>
     )
 endif()

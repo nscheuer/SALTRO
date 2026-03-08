@@ -27,10 +27,9 @@ bool iLQR(
 	const RegularizationConfig& reg_cfg = settings.passes[0].reg;
 	
 	// Preallocate gain and feedforward term vectors
-	int N = X.cols();   // Number of timesteps
-	int nx = X.rows();  // Full state dimension
-	int nu = U.rows();  // Control dimension
-	int nxr = satellite.reducedStateDim(); // Reduced state dimension (6 + nRW)
+	const int N = static_cast<int>(X.cols());   // Number of timesteps
+	const int nu = static_cast<int>(U.rows());  // Control dimension
+	const int nxr = satellite.reducedStateDim(); // Reduced state dimension (6 + nRW)
 	std::vector<Eigen::MatrixXd> K(N - 1);
 	std::vector<Eigen::VectorXd> d(N - 1);
 	for (int k = 0; k < N - 1; ++k) {

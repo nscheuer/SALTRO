@@ -81,6 +81,8 @@ bool trajOpt(
 	int input_dim,
 	int& N
 ) {
+	(void)K;
+
 	std::string error_msg;
 	if (!validation::validatetrajOpt(settings, satellite, x0, r0, v0, jtime, q_goal, boresight, state_dim, input_dim, N, error_msg)) {
 		throw std::runtime_error("trajOpt input validation failed: " + error_msg);

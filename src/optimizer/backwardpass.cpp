@@ -89,7 +89,6 @@ bool backwardPass(
 ) {
 	(void)rho;  // Suppress unused parameter warning
 	const CostConfig& cost_cfg = settings.passes[0].cost;
-	const RegularizationConfig& reg_cfg = settings.passes[0].reg;
 	const double dt = (settings.num_passes > 0 && std::isfinite(settings.passes[0].dt) && settings.passes[0].dt > 0.0)
 		? settings.passes[0].dt
 		: 1.0;
@@ -98,7 +97,6 @@ bool backwardPass(
 	int nx = static_cast<int>(X.rows());  // Full state dimension (7 + nRW)
 	int nu = static_cast<int>(U.rows()); // Control dimension
 	int nRW = satellite.numRW();
-	int nxr = satellite.reducedStateDim(); // Reduced state dimension (6 + nRW)
 
 	// Initialize terminal cost-to-go: p_N and P_N (in full state space)
 	Eigen::VectorXd x_final = X.col(N - 1);

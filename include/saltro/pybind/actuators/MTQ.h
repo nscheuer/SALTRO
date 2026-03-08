@@ -31,6 +31,14 @@ public:
     using T173 = Actuator::T173;
     using T773 = Actuator::T773;
 
+    // Keep base overloads visible to avoid hiding virtual interface methods.
+    using Actuator::torque;
+    using Actuator::dtorq_du;
+    using Actuator::dtorq_dbasestate;
+    using Actuator::ddtorq_dudu;
+    using Actuator::ddtorq_dudbasestate;
+    using Actuator::ddtorq_dbasestatedbasestate;
+
     /**
      * @brief Construct a magnetorquer with specified parameters.
      * 

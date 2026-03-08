@@ -12,6 +12,8 @@ bool compute_eclipse(
 
     Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ>& S
 ) {
+    (void)jtime;
+
     switch (eclipse_model) {
         case 0: // Cylindrical shadow model
             return compute_eclipse_cylinder(R, jtime_length, S);
