@@ -56,6 +56,10 @@ void solveRiccattiStep(
 	  + K_k.transpose() * Q_ux 
 	  + Q_ux.transpose() * K_k;
 	
+	// Enforce exact symmetry to prevent numerical asymmetry from accumulating
+	// across many backward steps (critical for long horizons).
+	P_k = 0.5 * (P_k + Eigen::MatrixXd(P_k.transpose()));
+	
 	p_k = Q_x 
 	  + K_k.transpose() * Q_uu * d_k 
 	  + K_k.transpose() * Q_u 
@@ -151,6 +155,18 @@ bool backwardPass(
 		Eigen::VectorXd lx = G_k * lx_full;
 		Eigen::MatrixXd lxx = G_k * lxx_full * G_k.transpose();
 		Eigen::MatrixXd lux_hess = lux_hess_full * G_k.transpose();
+		
+		// Clamp lxx to PSD: non-convex cost functions (e.g. ang_cost_func_type=4)
+		// can produce indefinite Hessians whose negative eigenvalues compound
+		// through the Riccati recursion, making P_k and then Q_uu indefinite.
+		{
+			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(lxx);
+			Eigen::VectorXd eigvals = eig.eigenvalues();
+			if (eigvals(0) < 0.0) {
+				eigvals = eigvals.cwiseMax(0.0);
+				lxx = eig.eigenvectors() * eigvals.asDiagonal() * eig.eigenvectors().transpose();
+			}
+		}
 		
 		// Step 3: Compute exact discrete-time dynamics Jacobians using RK4 (full state)
 		Eigen::MatrixXd A_k_full = Eigen::MatrixXd::Zero(nx, nx);

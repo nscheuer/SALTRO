@@ -19,9 +19,9 @@ def create_planner_settings():
     
     # Pass 0 Settings
     plannersettings.num_passes = 1
-    plannersettings.passes[0].dt = 10.0
+    plannersettings.passes[0].dt = 50.0
     plannersettings.passes[0].ilqr.cost_tol = 1e-5
-    plannersettings.passes[0].ilqr.max_iters = 20
+    plannersettings.passes[0].ilqr.max_iters = 40
 
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
@@ -72,7 +72,7 @@ def main():
     plannersettings = create_planner_settings()
     satellite = create_3rw_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 200/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 1000/(36525 * 86400)])
     qgoal = np.array([
         [np.sqrt(2)/2, np.sqrt(2)/2],
         [0.0, 0.0],           
@@ -85,7 +85,7 @@ def main():
         [0.0, 0.0]
     ])
 
-    w0 = np.array([-0.01, 0.02, 0.03])
+    w0 = np.array([0.0, 0.0, 0.0])
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
     h0 = np.array([0.0, 0.0, 0.0])
     x0 = np.hstack((w0, q0, h0))
