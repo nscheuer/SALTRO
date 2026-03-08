@@ -188,7 +188,6 @@ SRPDisturbance::Mat34 SRPDisturbance::dtorque_dq(const BaseState& /*x*/, const D
 
         const double proj_area = face.area * incidence;
         const double m_s = proj_area * (face.eta_a + face.eta_d);
-        const double m_n = proj_area * (2.0 * face.eta_s * incidence + (2.0 / 3.0) * face.eta_d);
 
         const Eigen::RowVector4d dm_s_dq = face.area * (face.eta_a + face.eta_d) * dcos_dq;
         const Eigen::RowVector4d dm_n_dq = face.area * (4.0 * face.eta_s * incidence + (2.0 / 3.0) * face.eta_d) * dcos_dq;
@@ -258,9 +257,6 @@ SRPDisturbance::T443 SRPDisturbance::ddtorque_dqdq(const BaseState& /*x*/, const
         const Eigen::RowVector4d dm_s_dq = dproj_area_dq * (face.eta_a + face.eta_d);
         const Mat44 ddm_s_dq2 = ddproj_area_dq2 * (face.eta_a + face.eta_d);
 
-        const double m_n = proj_area * (2.0 * face.eta_s * incidence + (2.0 / 3.0) * face.eta_d);
-        const Eigen::RowVector4d dm_n_dq = dproj_area_dq * (2.0 * face.eta_s * incidence + (2.0 / 3.0) * face.eta_d)
-                                         + proj_area * (2.0 * face.eta_s * dcos_dq);
         const Mat44 tmp = dproj_area_dq.transpose() * (2.0 * face.eta_s * dcos_dq);
         const Mat44 ddm_n_dq2 = ddproj_area_dq2 * (2.0 * face.eta_s * incidence + (2.0 / 3.0) * face.eta_d)
                               + tmp + tmp.transpose()

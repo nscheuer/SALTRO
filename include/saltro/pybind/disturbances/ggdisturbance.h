@@ -35,6 +35,9 @@ public:
     using Mat44 = ::Disturbance::Mat44;
     using T443 = ::Disturbance::T443;
 
+    using ::Disturbance::dtorque_dq;
+    using ::Disturbance::ddtorque_dqdq;
+
     /**
      * @brief Default constructor; initializes with identity inertia.
      */

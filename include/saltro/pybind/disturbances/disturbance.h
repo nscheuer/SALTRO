@@ -48,7 +48,7 @@ public:
      * @param dist_cfg Disturbance configuration.
      * @return 3×4 Jacobian matrix (zero by default).
      */
-    virtual Mat34 dtorque_dq(const BaseState& x, const DisturbanceConfig& dist_cfg) const {
+    virtual Mat34 dtorque_dq(const BaseState&, const DisturbanceConfig&) const {
         return Mat34::Zero();
     }
 
@@ -63,7 +63,7 @@ public:
      * @param dist_cfg Disturbance configuration.
      * @return Tensor3 with 3 slices of 4×4 matrices (zero by default).
      */
-    virtual T443 ddtorque_dqdq(const BaseState& x, const DisturbanceConfig& dist_cfg) const {
+    virtual T443 ddtorque_dqdq(const BaseState&, const DisturbanceConfig&) const {
         return T443::Zero();
     }
 

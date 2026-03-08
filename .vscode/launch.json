@@ -1,0 +1,50 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Python calling C++",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/venv/bin/python",
+      "args": [
+        "tests/debug/optimizer/ilqr/debug_3_3_detumble.py"
+      ],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty printing",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Readable GDB values",
+          "text": "-interpreter-exec console \"set print pretty on\"",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Do not truncate arrays/matrices",
+          "text": "-interpreter-exec console \"set print elements 0\"",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Allow large debug values",
+          "text": "-interpreter-exec console \"set max-value-size unlimited\"",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Load Eigen pretty printers",
+          "text": "-interpreter-exec console \"python import sys; sys.path.insert(0, '${workspaceFolder}/external/eigen/debug/gdb'); from printers import register_eigen_printers; register_eigen_printers(None)\"",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Break on C++ exceptions",
+          "text": "catch throw"
+        }
+      ]
+    }
+  ]
+}

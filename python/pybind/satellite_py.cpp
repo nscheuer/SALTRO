@@ -453,6 +453,290 @@ tuple[Tensor3, Tensor3, Tensor3]
     (H_uu, H_ux, H_xx) Hessian tensors for each constraint
 )doc")
         
+        // Cost function methods
+        .def("stageCost", &Satellite::stageCost,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("boresight"),
+             py::arg("attitude_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Evaluate stage cost at time step k.
+
+The cost combines:
+- Attitude error: how well quaternion aligns with target
+- Angular velocity penalty: low spin rate is preferred
+- Magnetic alignment: optional penalty for alignment with B-field
+- Control effort: penalizes actuator usage
+- RW momentum management: penalties for high or low momentum
+
+Parameters
+----------
+k : int
+    Current time step (0-based)
+N : int
+    Total number of time steps in trajectory
+x : ndarray
+    State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
+u : ndarray
+    Control vector: [MTQ_controls (numMTQ), RW_controls (numRW)]
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
+B_eci : ndarray (3,)
+    Magnetic field vector in ECI frame (Tesla)
+cost_cfg : CostConfig
+    Cost weighting configuration
+
+Returns
+-------
+float
+    Stage cost (non-negative scalar)
+)doc")
+        .def("terminalCost", &Satellite::terminalCost,
+             py::arg("x"),
+             py::arg("boresight"),
+             py::arg("attitude_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Evaluate terminal cost.
+
+Uses terminal-specific cost weights (typically higher) to enforce end-of-horizon
+constraints. Mathematically equivalent to stageCost(0, 1, x, u_zero, ...).
+
+Parameters
+----------
+x : ndarray
+    State vector: [angular_velocity (3), quaternion (4), RW_momenta (numRW)]
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
+B_eci : ndarray (3,)
+    Magnetic field vector in ECI frame (Tesla)
+cost_cfg : CostConfig
+    Cost weighting configuration (uses angle_N, ang_vel_N, etc.)
+
+Returns
+-------
+float
+    Terminal cost (non-negative scalar)
+)doc")
+        .def("stageCostJacobians", &Satellite::stageCostJacobians,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("boresight"),
+             py::arg("attitude_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute stage cost first-order partial derivatives.
+
+Computes ∂L/∂x, ∂L/∂u, and ∂²L/∂u∂x where L is the stage cost function.
+
+Parameters
+----------
+k : int
+    Current time step
+N : int
+    Total number of time steps
+x : ndarray
+    State vector (size: stateDim)
+u : ndarray
+    Control vector (size: controlDim)
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+cost_cfg : CostConfig
+    Cost weighting configuration
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (lx, lu, lux) where:
+    - lx: Gradient w.r.t. state (size: stateDim)
+    - lu: Gradient w.r.t. control as 1×controlDim matrix
+    - lux: Mixed Hessian (controlDim × stateDim) - typically zero for separable costs
+)doc")
+        .def("terminalCostJacobians", &Satellite::terminalCostJacobians,
+             py::arg("x"),
+             py::arg("boresight"),
+             py::arg("attitude_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute terminal cost first-order partial derivatives.
+
+Parameters
+----------
+x : ndarray
+    State vector (size: stateDim)
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+cost_cfg : CostConfig
+    Cost weighting configuration (uses terminal weights)
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (lx, lu, lux) - Jacobians w.r.t. state, control, and mixed
+)doc")
+        .def("stageCostHessians", &Satellite::stageCostHessians,
+             py::arg("k"),
+             py::arg("N"),
+             py::arg("x"),
+             py::arg("u"),
+             py::arg("boresight"),
+             py::arg("attitude_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute stage cost second-order partial derivatives.
+
+Computes the Hessian matrices ∂²L/∂x², ∂²L/∂u², and ∂²L/∂u∂x of the stage cost.
+These are used by second-order optimization algorithms (Newton's method, iLQR).
+
+Parameters
+----------
+k : int
+    Current time step
+N : int
+    Total number of time steps
+x : ndarray
+    State vector (size: stateDim)
+u : ndarray
+    Control vector (size: controlDim)
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+cost_cfg : CostConfig
+    Cost weighting configuration
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (lxx, luu, lux) where:
+    - lxx: Hessian w.r.t. state (stateDim × stateDim)
+    - luu: Hessian w.r.t. control (controlDim × controlDim)
+    - lux: Mixed Hessian (controlDim × stateDim) - typically zero
+    
+Notes
+-----
+- lxx is symmetric (Schwarz's theorem applies to smooth functions)
+- luu is symmetric and positive semi-definite (cost is convex in u)
+- These Hessians may use finite differences for some complex terms
+)doc")
+        .def("terminalCostHessians", &Satellite::terminalCostHessians,
+             py::arg("x"),
+             py::arg("boresight"),
+             py::arg("attitude_target"),
+             py::arg("B_eci"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute terminal cost second-order partial derivatives.
+
+Parameters
+----------
+x : ndarray
+    State vector (size: stateDim)
+boresight : ndarray (3,)
+    Boresight direction in body frame used for ECI-vector targets
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z]
+B_eci : ndarray (3,)
+    Magnetic field in ECI frame
+cost_cfg : CostConfig
+    Cost weighting configuration (uses terminal weights)
+
+Returns
+-------
+tuple[ndarray, ndarray, ndarray]
+    (lxx, luu, lux) - Hessian matrices w.r.t. state and control
+)doc")
+        .def("totalCost", &Satellite::totalCost,
+             py::arg("X"),
+             py::arg("U"),
+             py::arg("B"),
+             py::arg("boresight"),
+             py::arg("attitude_target"),
+             py::arg("cost_cfg"),
+             R"doc(
+Compute total trajectory cost.
+
+Sums stage costs for all intermediate steps and terminal cost at the final step.
+This is a convenience function for evaluating the complete trajectory cost:
+
+    J_total = Σ_{k=0}^{N-2} c_k(x_k, u_k) + c_N(x_{N-1})
+
+where c_k is stageCost and c_N is terminalCost.
+
+Parameters
+----------
+X : ndarray (N, state_dim)
+    State trajectory matrix where row k is the state at time step k.
+    Must have exactly stateDim columns.
+U : ndarray ((N-1), control_dim)
+    Control trajectory matrix where row k is the control applied from step k to k+1.
+    Must have N-1 rows and exactly controlDim columns.
+B : ndarray (3, N)
+    Magnetic field vector at each time step.
+    Must have 3 rows (x, y, z components) and N columns.
+boresight : ndarray (3, N)
+    Boresight history in body frame, column k used at step k.
+    Must have 3 rows and N columns.
+attitude_target : ndarray (4,)
+    Attitude target: quaternion [q0,qx,qy,qz] or ECI direction [nan,x,y,z].
+    Used for all stage and terminal cost evaluations.
+cost_cfg : CostConfig
+    Cost weighting configuration specifying:
+    - attitude/angular velocity weights (stage and terminal)
+    - control effort weights
+    - RW momentum management weights
+    - magnetic alignment weights
+    - cost function type (linear, quadratic, arccos, etc.)
+
+Returns
+-------
+float
+    Total trajectory cost J_total (non-negative scalar).
+    Lower values indicate better trajectories.
+
+Raises
+------
+ValueError
+    If dimensions of X, U, or B do not match trajectory size
+    
+Examples
+--------
+>>> import saltro
+>>> sat = saltro.Satellite(J, settings)
+>>> # X: (100, 10), U: (99, 6), B: (3, 100)
+>>> J = sat.totalCost(X, U, B, boresight, q_target, cost_cfg)
+>>> print(f"Trajectory cost: {J}")
+
+Notes
+-----
+- For large trajectories, this is more efficient than summing individual
+  stageCost calls in Python, as it avoids Python-C++ overhead.
+)doc")
+        
         // State index constants
         .def_readonly_static("AV_INDEX", &Satellite::AV_INDEX,
                              "Index of angular velocity in state vector")

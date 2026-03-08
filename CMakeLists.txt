@@ -8,6 +8,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(SALTRO_BUILD_PYTHON "Build python bindings" ON)
 option(SALTRO_BUILD_MANUAL_DEBUG "Build manual debug executables" ON)
 option(SALTRO_BUILD_TESTS "Build unit tests" ON)
+option(SALTRO_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
 include(FetchContent)
 
@@ -44,6 +45,10 @@ endif()
 
 add_library(saltro STATIC ${SALTRO_SOURCES})
 
+target_compile_definitions(saltro PUBLIC
+    $<$<CONFIG:Debug>:SALTRO_DEBUG_BUILD=1>
+)
+
 target_include_directories(saltro PUBLIC
     ${CMAKE_SOURCE_DIR}/include
 )
@@ -52,7 +57,7 @@ target_link_libraries(saltro PUBLIC Eigen3::Eigen)
 
 if(SALTRO_BUILD_PYTHON)
 
-    file(GLOB_RECURSE PYTHON_BINDING_SOURCES_TEMP
+    file(GLOB_RECURSE PYTHON_BINDING_SOURCES_TEMP CONFIGURE_DEPENDS
         ${CMAKE_SOURCE_DIR}/python/*_py.cpp
     )
 
@@ -92,24 +97,51 @@ if(SALTRO_BUILD_PYTHON)
         list(APPEND PROCESSED ${base})
     endforeach()
     
-    # Add files with dependencies (simple one-level resolution)
-    foreach(binding ${BINDINGS_WITH_DEPS})
-        get_filename_component(fname ${binding} NAME_WE)
-        string(REPLACE "_py" "" base ${fname})
+    # Add files with dependencies (iterative topological sort)
+    set(REMAINING ${BINDINGS_WITH_DEPS})
+    set(MAX_ITERATIONS 100)
+    set(iteration 0)
+    
+    while(REMAINING AND iteration LESS MAX_ITERATIONS)
+        set(ADDED_THIS_ITERATION FALSE)
+        set(NEW_REMAINING "")
         
-        # Check if dependencies are satisfied
-        set(deps_satisfied TRUE)
-        foreach(dep ${DEPS_${base}})
-            list(FIND PROCESSED ${dep} dep_idx)
-            if(dep_idx EQUAL -1)
-                set(deps_satisfied FALSE)
-                message(WARNING "Dependency '${dep}' for '${base}' not yet processed")
+        foreach(binding ${REMAINING})
+            get_filename_component(fname ${binding} NAME_WE)
+            string(REPLACE "_py" "" base ${fname})
+            
+            # Check if all dependencies are satisfied
+            set(deps_satisfied TRUE)
+            foreach(dep ${DEPS_${base}})
+                list(FIND PROCESSED ${dep} dep_idx)
+                if(dep_idx EQUAL -1)
+                    set(deps_satisfied FALSE)
+                    break()
+                endif()
+            endforeach()
+            
+            if(deps_satisfied)
+                list(APPEND PYTHON_BINDING_SOURCES ${binding})
+                list(APPEND PROCESSED ${base})
+                set(ADDED_THIS_ITERATION TRUE)
+            else()
+                list(APPEND NEW_REMAINING ${binding})
             endif()
         endforeach()
         
-        list(APPEND PYTHON_BINDING_SOURCES ${binding})
-        list(APPEND PROCESSED ${base})
-    endforeach()
+        set(REMAINING ${NEW_REMAINING})
+        
+        if(NOT ADDED_THIS_ITERATION AND REMAINING)
+            # Circular dependency or missing dependency
+            message(FATAL_ERROR "Cannot resolve dependencies for Python bindings. Remaining: ${REMAINING}")
+        endif()
+        
+        math(EXPR iteration "${iteration} + 1")
+    endwhile()
+    
+    if(iteration EQUAL MAX_ITERATIONS)
+        message(FATAL_ERROR "Dependency resolution exceeded maximum iterations")
+    endif()
 
     if(NOT PYTHON_BINDING_SOURCES)
         message(WARNING "No Python binding sources found in python/")
@@ -281,5 +313,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(saltro PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow
         -Wconversion -Wdouble-promotion
+        $<$<BOOL:${SALTRO_WARNINGS_AS_ERRORS}>:-Werror>
     )
 endif()

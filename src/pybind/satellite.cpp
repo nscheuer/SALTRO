@@ -6,9 +6,48 @@
 #include <stdexcept>
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 using std::invalid_argument;
 using std::out_of_range;
+
+namespace {
+
+inline double safeAbs(double x) {
+    return std::abs(x);
+}
+
+inline double safeSign(double x) {
+    return (x >= 0.0) ? 1.0 : -1.0;
+}
+
+inline double clampUnit(double x) {
+    return std::clamp(x, -1.0, 1.0);
+}
+
+inline double safeNorm(const Eigen::Vector3d& v) {
+    const double n = v.norm();
+    return std::isfinite(n) ? n : 0.0;
+}
+
+inline bool safeUnitQuat(const Eigen::Vector4d& q_raw, Eigen::Vector4d& q_unit) {
+    const double n = q_raw.norm();
+    if (!std::isfinite(n) || n < 1e-12) {
+        q_unit = Eigen::Vector4d::Zero();
+        return false;
+    }
+    q_unit = q_raw / n;
+    return true;
+}
+
+/**
+ * @brief Helper to check if first element is NaN (indicating ECI format).
+ */
+inline bool isECIFormat(const Eigen::Vector4d& vec) {
+    return std::isnan(vec(0));
+}
+
+}
 
 Satellite::Satellite() {
     Jcom_.setIdentity();
@@ -100,11 +139,75 @@ void Satellite::updateInertiaNoRW() {
     invJcom_noRW_ = Jcom_noRW_.inverse();
 }
 
+std::pair<Satellite::Vec4, bool> Satellite::processAttitudeTarget(
+    const Vec4& attitude_target, const Vec3& boresight_body, const Vec4& q_current_unused) const {
+    (void)q_current_unused;  // Not used in current implementation
+
+    // "No goal" sentinels:
+    // 1) ECI sentinel [nan, 0, 0, 0]
+    // 2) Quaternion sentinel [0, 0, 0, 0]
+    // Return identity quaternion and mark as special-target mode so downstream
+    // cost code can disable attitude terms.
+    if (attitude_target.allFinite() && attitude_target.squaredNorm() < 1e-18) {
+        return std::make_pair(Vec4(1.0, 0.0, 0.0, 0.0), true);
+    }
+    
+    // Check if this is ECI format: first element is NaN
+    if (isECIFormat(attitude_target)) {
+        // ECI goal vector format: [nan, x, y, z]
+        // In this case, we want to align boresight_body with the ECI vector
+        Vec3 eci_vec = attitude_target.tail(3);
+        if (!eci_vec.allFinite() || eci_vec.squaredNorm() < 1e-18) {
+            return std::make_pair(Vec4(1.0, 0.0, 0.0, 0.0), true);
+        }
+        Vec3 eci_normalized = eci_vec.normalized();
+        Vec3 sat_dir_normalized = boresight_body.normalized();
+        
+        // Compute the rotation from sat_direction to eci_vec
+        // For simplicity, return a quaternion that represents this alignment
+        // The quaternion is used to compute alignment cost
+        Vec3 axis = sat_dir_normalized.cross(eci_normalized);
+        double axis_norm = axis.norm();
+        
+        if (axis_norm < 1e-8) {
+            // Vectors are parallel
+            double dot_prod = sat_dir_normalized.dot(eci_normalized);
+            if (dot_prod > 0) {
+                // Already aligned
+                return std::make_pair(Vec4(1.0, 0.0, 0.0, 0.0), true);
+            } else {
+                // Opposite direction - need 180 degree rotation around arbitrary perpendicular
+                Vec3 perp = (std::abs(sat_dir_normalized(0)) < 0.9) 
+                    ? Vec3(1.0, 0.0, 0.0) 
+                    : Vec3(0.0, 1.0, 0.0);
+                perp = perp - (perp.dot(sat_dir_normalized)) * sat_dir_normalized;
+                perp = perp.normalized();
+                return std::make_pair(Vec4(0.0, perp(0), perp(1), perp(2)), true);
+            }
+        } else {
+            // General case: compute quaternion for rotation
+            axis = axis.normalized();
+            double angle = std::acos(std::clamp(sat_dir_normalized.dot(eci_normalized), -1.0, 1.0));
+            double half_angle = angle / 2.0;
+            Vec4 q_goal;
+            q_goal(0) = std::cos(half_angle);
+            q_goal.tail(3) = std::sin(half_angle) * axis;
+            return std::make_pair(q_goal.normalized(), true);
+        }
+    } else {
+        // Quaternion goal vector format: [q0, qx, qy, qz]
+        return std::make_pair(attitude_target.normalized(), false);
+    }
+}
+
 Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Vec3& B_eci) const {
     Vec3 torque = Vec3::Zero();
     
     // Extract base state (first 7 elements: w + q)
-    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    Vec4 q;
+    if (!safeUnitQuat(x.segment<4>(QUAT_INDEX), q)) {
+        return Vec3::Zero();
+    }
     Vec7 x_base = x.head<7>();
     x_base.segment<4>(QUAT_INDEX) = q;
 
@@ -133,7 +236,10 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
 
 Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceConfig& dist, const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 torque = Vec3::Zero();
-    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    Vec4 q;
+    if (!safeUnitQuat(x.segment<4>(QUAT_INDEX), q)) {
+        return Vec3::Zero();
+    }
     Vec7 x_base = x.head<7>();
     x_base.segment<4>(QUAT_INDEX) = q;
 
@@ -169,7 +275,11 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
 
 Satellite::VecX Satellite::dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci, const Vec3& V_eci, const int rho) const {
     Vec3 w = x.segment<3>(AV_INDEX);
-    Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    Vec4 q;
+    if (!safeUnitQuat(x.segment<4>(QUAT_INDEX), q)) {
+        return VecX::Constant(stateDim(), std::numeric_limits<double>::quiet_NaN());
+    }
+    
     Vec3 tau_act = actuatorTorque(x, u, B_eci);
     Vec3 tau_dist = disturbanceTorque(x, dist, R_eci, B_eci, S_eci, V_eci, rho);
     Vec3 h_rw = Vec3::Zero();
@@ -482,8 +592,7 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
                                                                  const Vec3& R_eci, const Vec3& B_eci,
                                                                  const Vec3& S_eci, const Vec3& V_eci) const {
     const int nx = stateDim();
-    const int nu = controlDim();
-    
+
     DynHessXX hess_xx;  // (state, state, state) - indexed by output equation
     DynHessUX hess_ux;  // (control, state, state) - indexed by output equation
     DynHessUU hess_uu;  // (control, control, state) - indexed by output equation
@@ -513,9 +622,7 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
             h_rw += h_i * getRW(i).axis();
         }
     }
-    
-    Vec3 angular_mom = Jcom_ * w + h_rw;
-    
+
     // =========================================================================
     // Angular velocity Hessian: ∂²wdot_i/∂x_j∂x_k (indexed by output i = 0,1,2)
     // =========================================================================
@@ -705,8 +812,6 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     // ∂qdot_i/∂w_j = 0.5 * W_ij
     // ∂qdot_i/∂q_j involves ∂W/∂q_j
     
-    Mat43 W = saltro::math::findWMat(q);
-    
     // ∂²qdot/∂w∂w = 0 (qdot is linear in w)
     // ∂²qdot/∂q∂q = 0 (W is linear in q, so second q-derivatives vanish)
     //
@@ -891,6 +996,644 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     }
 
     return std::make_tuple(hess_xx, hess_ux, hess_uu);
+}
+
+double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
+                            const Vec3& boresight_body, const Vec4& attitude_target,
+                            const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    if (N <= 0) {
+        throw invalid_argument("N must be positive in stageCost().");
+    }
+    if (k < 0 || k >= N) {
+        throw out_of_range("Time index k out of range in stageCost().");
+    }
+    if (x.size() < stateDim()) {
+        throw invalid_argument("State vector has insufficient dimension in stageCost().");
+    }
+    if (u.size() < controlDim()) {
+        throw invalid_argument("Control vector has insufficient dimension in stageCost().");
+    }
+
+    const bool terminal = (k >= N - 1);
+    const double w_ang = terminal ? cost_cfg.angle_N : cost_cfg.angle;
+    const double w_av = terminal ? cost_cfg.ang_vel_N : cost_cfg.ang_vel;
+    const double w_avmag = terminal ? cost_cfg.ang_vel_mag_N : cost_cfg.ang_vel_mag;
+    const double w_avang = terminal ? cost_cfg.ang_vel_err_dir_N : cost_cfg.ang_vel_err_dir;
+    const double w_u_mult = terminal ? 0.0 : cost_cfg.control_mult;
+
+    const Vec3 w = x.segment<3>(AV_INDEX);
+    const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    
+    // Process attitude_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body, q);
+    
+    // Disable angle cost if ECI target is invalid
+    double w_ang_eff = w_ang;
+    if (is_eci_format && attitude_target.tail(3).norm() < 1e-9) {
+        w_ang_eff = 0.0;
+    }
+
+    const double qdot = q_goal.dot(q);
+
+    // ===== CRITICAL FIX: Handle quaternion double-cover =====
+    // Ensure q_goal and q are on the same hemisphere to avoid sign ambiguity
+    Vec4 q_goal_aligned = q_goal;
+    if (qdot < 0.0) {
+        q_goal_aligned = -q_goal;
+    }
+    const double qdot_aligned = safeAbs(q_goal_aligned.dot(q));
+
+    double ang_cost = 0.0;
+    switch (cost_cfg.ang_cost_func_type) {
+        case 0:
+            ang_cost = 1.0 - qdot_aligned;
+            break;
+        case 1: {
+            const double err = 1.0 - qdot_aligned;
+            ang_cost = 0.5 * err * err;
+            break;
+        }
+        case 2:
+            ang_cost = std::acos(qdot_aligned);
+            break;
+        case 3: {
+            const double phi = std::acos(qdot_aligned);
+            ang_cost = 0.5 * phi * phi;
+            break;
+        }
+        case 4:
+            ang_cost = 1.0 - qdot_aligned * qdot_aligned;
+            break;
+        default:
+            ang_cost = std::acos(qdot_aligned);
+            break;
+    }
+
+    const Mat43 W = saltro::math::findWMat(q);
+    const double cross_cost = -safeSign(qdot_aligned) * (q_goal_aligned.transpose() * W * w)(0) * w_avang;
+
+    double state_mag_cost = 0.0;
+    const double b_norm = safeNorm(B_eci);
+    if (b_norm > 1e-12) {
+        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+        const Vec3 b_body = R_T * (B_eci / b_norm);
+        state_mag_cost = w_avmag * std::abs(w.dot(b_body));
+    }
+
+    double control_cost = 0.0;
+    if (!terminal && controlDim() > 0) {
+        for (int i = 0; i < num_mtq_; ++i) {
+            const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
+            const double normalized = u(i) / lim;
+            control_cost += 0.5 * w_u_mult * cost_cfg.mtq_control_weight * normalized * normalized;
+        }
+        for (int i = 0; i < num_rw_; ++i) {
+            const int ctrl_idx = num_mtq_ + i;
+            const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
+            const double normalized = u(ctrl_idx) / lim;
+            control_cost += 0.5 * w_u_mult * cost_cfg.rw_control_weight * normalized * normalized;
+        }
+    }
+
+    double rw_momentum_cost = 0.0;
+    double rw_stiction_cost = 0.0;
+    for (int i = 0; i < num_rw_; ++i) {
+        const double h = x(RW_MOMENTUM_INDEX + i);
+        const double z = std::abs(h);
+        const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+
+        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - h_thresh);
+        if (z > h_thresh) {
+            const double over = (z - h_thresh) / denom_high;
+            rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * over * over;
+        } else {
+            const double scaled = z / h_max;
+            rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * scaled * scaled;
+        }
+
+        const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
+        if (h_stic > 1e-12 && z < h_stic) {
+            const double near_zero = (h_stic - z) / h_stic;
+            rw_stiction_cost += 0.5 * cost_cfg.rw_stic_weight * near_zero * near_zero;
+        }
+    }
+
+    const double state_cost = 0.5 * w_av * w.squaredNorm() + w_ang_eff * ang_cost;
+    return state_cost + cross_cost + state_mag_cost + control_cost + rw_momentum_cost + rw_stiction_cost;
+}
+
+double Satellite::terminalCost(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
+                               const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    const VecX u_zero = VecX::Zero(controlDim());
+    return stageCost(0, 1, x, u_zero, boresight_body, attitude_target, B_eci, cost_cfg);
+}
+
+std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCostJacobians(
+    int k, int N, const VecX& x, const VecX& u,
+    const Vec3& boresight_body, const Vec4& attitude_target,
+    const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    
+    if (N <= 0) {
+        throw invalid_argument("N must be positive in stageCostJacobians().");
+    }
+    if (k < 0 || k >= N) {
+        throw out_of_range("Time index k out of range in stageCostJacobians().");
+    }
+    if (x.size() < stateDim()) {
+        throw invalid_argument("State vector has insufficient dimension in stageCostJacobians().");
+    }
+    if (u.size() < controlDim()) {
+        throw invalid_argument("Control vector has insufficient dimension in stageCostJacobians().");
+    }
+
+    const int nx = stateDim();
+    const int nu = controlDim();
+    
+    VecX lx = VecX::Zero(nx);
+    VecX lu = VecX::Zero(nu);
+    MatX lux = MatX::Zero(nu, nx);
+
+    const bool terminal = (k >= N - 1);
+    const double w_ang = terminal ? cost_cfg.angle_N : cost_cfg.angle;
+    const double w_av = terminal ? cost_cfg.ang_vel_N : cost_cfg.ang_vel;
+    const double w_avmag = terminal ? cost_cfg.ang_vel_mag_N : cost_cfg.ang_vel_mag;
+    const double w_avang = terminal ? cost_cfg.ang_vel_err_dir_N : cost_cfg.ang_vel_err_dir;
+    const double w_u_mult = terminal ? 0.0 : cost_cfg.control_mult;
+
+    const Vec3 w = x.segment<3>(AV_INDEX);
+    const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+    
+    // Process attitude_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body, q);
+    
+    // Disable angle cost if ECI target is invalid
+    double w_ang_eff = w_ang;
+    if (is_eci_format && attitude_target.tail(3).norm() < 1e-9) {
+        w_ang_eff = 0.0;
+    }
+
+    const double qdot = q_goal.dot(q);
+
+    // ===== CRITICAL FIX: Handle quaternion double-cover =====
+    // Quaternions q and -q represent the same rotation.
+    // Ensure q_goal is on the same hemisphere as q to avoid sign flip issues.
+    // This is essential for proper gradient computation when |qdot| is large.
+    Vec4 q_goal_aligned = q_goal;
+    double qdot_aligned = qdot;
+    if (qdot < 0.0) {
+        // If dot product is negative, q_goal points to the opposite hemisphere
+        // Flip q_goal to the same hemisphere: (-q_goal) · q > 0
+        q_goal_aligned = -q_goal;
+        qdot_aligned = -qdot;
+    }
+    // Now qdot_aligned >= 0 always, and q_goal_aligned is on the same hemisphere as q
+
+    // =====================================================================
+    // Gradient w.r.t. angular velocity w: ∂L/∂w
+    // =====================================================================
+    lx.segment<3>(AV_INDEX) = w_av * w;
+
+    // From cross_cost = -sign(qdot) * (q_goal^T * W * w) * w_avang
+    // ∂cross_cost/∂w = -sign(qdot) * (W^T * q_goal) * w_avang
+    const Mat43 W = saltro::math::findWMat(q);
+    lx.segment<3>(AV_INDEX) += -safeSign(qdot_aligned) * (W.transpose() * q_goal_aligned).head<3>() * w_avang;
+
+    // From state_mag_cost = w_avmag * |w · b_body|
+    const double b_norm = safeNorm(B_eci);
+    if (b_norm > 1e-12) {
+        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+        const Vec3 b_body = R_T * (B_eci / b_norm);
+        const double w_dot_b = w.dot(b_body);
+        const double sign_w_dot_b = safeSign(w_dot_b);
+        lx.segment<3>(AV_INDEX) += w_avmag * sign_w_dot_b * b_body;
+    }
+
+    // =====================================================================
+    // Gradient w.r.t. quaternion q: ∂L/∂q
+    // =====================================================================
+    
+    // Compute derivative of attitude cost w.r.t. q
+    double d_ang_cost_dqdot = 0.0;  // ∂(ang_cost)/∂(qdot)
+    switch (cost_cfg.ang_cost_func_type) {
+        case 0:  // ang_cost = 1 - |qdot|
+            d_ang_cost_dqdot = -1.0;  // Always negative since qdot_aligned >= 0
+            break;
+        case 1: {  // ang_cost = 0.5 * (1 - |qdot|)^2
+            const double err = 1.0 - qdot_aligned;  // Use aligned value
+            d_ang_cost_dqdot = -err;  // Always negative
+            break;
+        }
+        case 2: {  // ang_cost = acos(|qdot|)
+            const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
+            d_ang_cost_dqdot = -1.0 / denom;  // Always negative
+            break;
+        }
+        case 3: {  // ang_cost = 0.5 * acos(|qdot|)^2
+            const double phi = std::acos(qdot_aligned);
+            const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
+            d_ang_cost_dqdot = -phi / denom;  // Always negative
+            break;
+        }
+        case 4:  // ang_cost = 1 - |qdot|^2
+            d_ang_cost_dqdot = -2.0 * qdot_aligned;  // Always non-positive
+            break;
+        default:
+            d_ang_cost_dqdot = -1.0 / std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
+            break;
+    }
+
+    // ∂(qdot)/∂q where qdot = q_goal · q
+    // = q_goal (as a row vector, or column in Jacobian context)
+    Vec4 dqdot_dq = q_goal_aligned;  // Use aligned quaternion
+    
+    // ∂L/∂q from attitude cost: w_ang * ∂(ang_cost)/∂(qdot) * ∂(qdot)/∂q
+    lx.segment<4>(QUAT_INDEX) = w_ang_eff * d_ang_cost_dqdot * dqdot_dq;
+
+    // ∂(cross_cost)/∂q = ∂/∂q[-sign(qdot) * (q_goal^T * W * w) * w_avang]
+    // = -sign(qdot)*w_avang * ∂(q_goal^T * W * w)/∂q
+    // where W depends on q
+    // W = 0.5*[[-q1, -q2, -q3], [q0, -q3, q2], [q3, q0, -q1], [-q2, q1, q0]]^T (4x3)
+    // ∂(W^T * q_goal)/∂q_j is a 3D vector
+    // For each component j, compute ∂(W^T * q_goal)/∂q_j · w
+    // This is complex, so use finite difference approach or compute analytically
+    // Let me compute it analytically by noting:
+    // (q_goal^T * W * w) = sum_i (q_goal_i * W_i,: * w) where W_i,: is i-th row of W
+    // For W matrix structure:
+    Vec4 d_qgoal_W_w_dq = Vec4::Zero();
+    {
+        // The W matrix is 4x3. We compute how (q_goal^T * W * w) changes with each q component.
+        // W(q) is linear in q, so we can compute its derivatives directly.
+        // W = 0.5 * [[-q(1), -q(2), -q(3)],
+        //            [q(0), -q(3), q(2)],
+        //            [q(3), q(0), -q(1)],
+        //            [-q(2), q(1), q(0)]]  (in quaternion [q0, q1, q2, q3] form)
+        // Each row i of W depends on q as: W_i = 0.5 * (linear combination of q components)
+        // ∂(W^T * q_goal)/∂q_j gives a 3D vector
+        // We need to compute how (q_goal^T * W * w) changes
+        
+        // Use numerical differentiation for simplicity and robustness
+        const double eps = 1e-8;
+        Vec4 q_pert = q;
+        double f0 = (q_goal_aligned.transpose() * W * w)(0);
+        
+        for (int j = 0; j < 4; ++j) {
+            q_pert = q;
+            q_pert(j) += eps;
+            q_pert.normalize();
+            const Mat43 W_pert = saltro::math::findWMat(q_pert);
+            const double f_pert = (q_goal_aligned.transpose() * W_pert * w)(0);
+            d_qgoal_W_w_dq(j) = (f_pert - f0) / eps;
+        }
+    }
+    lx.segment<4>(QUAT_INDEX) += -safeSign(qdot_aligned) * w_avang * d_qgoal_W_w_dq;
+
+    // ∂(state_mag_cost)/∂q = ∂(w_avmag * |w · b_body|)/∂q
+    // = w_avmag * sign(w · b_body) * ∂(w · b_body)/∂q
+    // where b_body = R^T * (B_eci / |B_eci|)
+    // ∂b_body/∂q = ∂(R^T * b_unit)/∂q
+    if (b_norm > 1e-12) {
+        const Vec3 b_unit = B_eci / b_norm;
+        const Mat43 db_body_dq = saltro::math::drotmatTvecdq(q, b_unit);
+        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+        const Vec3 b_body = R_T * b_unit;
+        const double w_dot_b = w.dot(b_body);
+        const double sign_w_dot_b = safeSign(w_dot_b);
+        
+        // ∂(w · b_body)/∂q = J * w (as a 4D vector)
+        // where J is 4x3 (quaternion rows, vector cols)
+        Vec4 dw_dot_b_dq = db_body_dq * w;
+        lx.segment<4>(QUAT_INDEX) += w_avmag * sign_w_dot_b * dw_dot_b_dq;
+    }
+
+    // NOTE: Quaternion projection is applied at the END (see below), not here.
+    // Applying it twice would corrupt the Hessian finite difference computation.
+
+    // =====================================================================
+    // Gradient w.r.t. RW momentum h: ∂L/∂h
+    // =====================================================================
+    for (int i = 0; i < num_rw_; ++i) {
+        const double h = x(RW_MOMENTUM_INDEX + i);
+        const double z = std::abs(h);
+        const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+
+        // RW momentum penalty: soft penalty in saturation and stiction regions
+        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - h_thresh);
+        const double sign_h = safeSign(h);
+        
+        if (z > h_thresh) {
+            const double over = (z - h_thresh) / denom_high;
+            lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * sign_h * over / denom_high;
+        } else {
+            const double scaled = z / h_max;
+            lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * sign_h * scaled / h_max;
+        }
+
+        // Stiction penalty
+        const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
+        if (h_stic > 1e-12 && z < h_stic) {
+            const double near_zero = (h_stic - z) / h_stic;
+            lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_stic_weight * (-sign_h) * near_zero / h_stic;
+        }
+    }
+
+    // =====================================================================
+    // Gradient w.r.t. control u: ∂L/∂u
+    // =====================================================================
+    if (!terminal && w_u_mult > 1e-12) {
+        // MTQ control costs
+        for (int i = 0; i < num_mtq_; ++i) {
+            const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
+            const double normalized = u(i) / lim;
+            lu(i) = w_u_mult * cost_cfg.mtq_control_weight * normalized / lim;
+        }
+        
+        // RW control costs
+        for (int i = 0; i < num_rw_; ++i) {
+            const int ctrl_idx = num_mtq_ + i;
+            const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
+            const double normalized = u(ctrl_idx) / lim;
+            lu(ctrl_idx) = w_u_mult * cost_cfg.rw_control_weight * normalized / lim;
+        }
+    }
+
+    // =========================================================================
+    // Apply Quaternion Normalization Projection to Gradient
+    // =========================================================================
+    // Since cost function normalizes q, gradient must lie in tangent space
+    // grad_projected = (I - q*q^T) * grad_raw
+    {
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+        const Mat44 proj_q = Mat44::Identity() - q * q.transpose();
+        lx.segment<4>(QUAT_INDEX) = proj_q * lx.segment<4>(QUAT_INDEX);
+    }
+
+    // Reshape lu as a 1 × nu matrix for return type compatibility
+    MatX Lu_mat = lu.transpose();
+    
+    return std::make_tuple(lx, Lu_mat, lux);
+}
+
+std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::terminalCostJacobians(
+    const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
+    const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    const VecX u_zero = VecX::Zero(controlDim());
+    return stageCostJacobians(0, 1, x, u_zero, boresight_body, attitude_target, B_eci, cost_cfg);
+}
+
+std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCostHessians(
+    int k, int N, const VecX& x, const VecX& u,
+    const Vec3& boresight_body, const Vec4& attitude_target,
+    const Vec3& B_eci, const CostConfig& cost_cfg) const {
+
+    if (N <= 0) {
+        throw invalid_argument("N must be positive in stageCostHessians().");
+    }
+    if (k < 0 || k >= N) {
+        throw out_of_range("Time index k out of range in stageCostHessians().");
+    }
+    if (x.size() < stateDim()) {
+        throw invalid_argument("State vector has insufficient dimension in stageCostHessians().");
+    }
+    if (u.size() < controlDim()) {
+        throw invalid_argument("Control vector has insufficient dimension in stageCostHessians().");
+    }
+
+    const int nx = stateDim();
+    const int nu = controlDim();
+    
+    MatX lxx = MatX::Zero(nx, nx);
+    MatX luu = MatX::Zero(nu, nu);
+    MatX lux = MatX::Zero(nu, nx);
+
+    const bool terminal = (k >= N - 1);
+    const double w_ang = terminal ? cost_cfg.angle_N : cost_cfg.angle;
+    const double w_av = terminal ? cost_cfg.ang_vel_N : cost_cfg.ang_vel;
+    const double w_avmag = terminal ? cost_cfg.ang_vel_mag_N : cost_cfg.ang_vel_mag;
+    const double w_avang = terminal ? cost_cfg.ang_vel_err_dir_N : cost_cfg.ang_vel_err_dir;
+    const double w_u_mult = terminal ? 0.0 : cost_cfg.control_mult;
+
+    const Vec3 w = x.segment<3>(AV_INDEX);
+    const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
+
+    // Process attitude_target to handle both ECI vector and quaternion formats
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body, q);
+    
+    // Disable angle cost if ECI target is invalid
+    double w_ang_eff = w_ang;
+    if (is_eci_format && attitude_target.tail(3).norm() < 1e-9) {
+        w_ang_eff = 0.0;
+    }
+
+    (void)w_ang_eff;  // Used in numerical differentiation
+    (void)w_avmag;
+    (void)w_avang;
+    (void)w;
+    (void)B_eci;
+
+    // If cost Hessians are disabled, keep only control quadratic curvature.
+    // This avoids unstable second-order state terms (notably quaternion terms)
+    // while preserving positive curvature in control for backward pass stability.
+    if (!cost_cfg.use_cost_hess) {
+        if (!terminal && w_u_mult > 1e-12) {
+            for (int i = 0; i < num_mtq_; ++i) {
+                const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
+                luu(i, i) += w_u_mult * cost_cfg.mtq_control_weight / (lim * lim);
+            }
+
+            for (int i = 0; i < num_rw_; ++i) {
+                const int ctrl_idx = num_mtq_ + i;
+                const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
+                luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.rw_control_weight / (lim * lim);
+            }
+        }
+
+        return std::make_tuple(lxx, luu, lux);
+    }
+
+    // =====================================================================
+    // Hessian w.r.t. angular velocity: ∂²L/∂w²
+    // =====================================================================
+    // From 0.5 * w_av * ‖w‖² → ∂²L/∂w² = w_av * I_3
+    lxx.block<3, 3>(AV_INDEX, AV_INDEX) += w_av * Mat33::Identity();
+
+    // =====================================================================
+    // Hessian w.r.t. quaternion: ∂²L/∂q² (attitude terms)
+    // =====================================================================
+    // This is complex and depends on ang_cost_func_type. 
+    // For robustness, use numerical differentiation of the gradient.
+    {
+        const double eps = 1e-8;
+        VecX x_pert = x;
+        auto lx_base = stageCostJacobians(k, N, x, u, boresight_body, attitude_target, B_eci, cost_cfg);
+        VecX grad_base = std::get<0>(lx_base);
+
+        for (int j = 0; j < 4; ++j) {
+            x_pert = x;
+            x_pert(QUAT_INDEX + j) += eps;
+            // CRITICAL: Normalize the perturbed quaternion before computing gradient
+            x_pert.segment<4>(QUAT_INDEX).normalize();
+            auto lx_pert = stageCostJacobians(k, N, x_pert, u, boresight_body, attitude_target, B_eci, cost_cfg);
+            VecX grad_pert = std::get<0>(lx_pert);
+
+            VecX d_grad = (grad_pert - grad_base) / eps;
+            lxx.col(QUAT_INDEX + j) += d_grad;
+        }
+    }
+
+    // =====================================================================
+    // Hessian w.r.t. RW momentum: ∂²L/∂h²
+    // =====================================================================
+    for (int i = 0; i < num_rw_; ++i) {
+        const double h = x(RW_MOMENTUM_INDEX + i);
+        const double z = std::abs(h);
+        const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+
+        // Angular momentum saturation penalty
+        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - h_thresh);
+        if (z > h_thresh) {
+            const double d2_over_dz2 = 1.0 / (denom_high * denom_high);
+            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
+                cost_cfg.rw_AM_weight * d2_over_dz2;
+        } else {
+            const double d2_scaled_dz2 = 1.0 / (h_max * h_max);
+            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
+                cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * d2_scaled_dz2;
+        }
+
+        // Stiction penalty second derivative
+        const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
+        if (h_stic > 1e-12 && z < h_stic) {
+            const double d2_near_zero_dz2 = 1.0 / (h_stic * h_stic);
+            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
+                cost_cfg.rw_stic_weight * d2_near_zero_dz2;
+        }
+    }
+
+    // =====================================================================
+    // Hessian w.r.t. control: ∂²L/∂u²
+    // =====================================================================
+    if (!terminal && w_u_mult > 1e-12) {
+        // MTQ control costs: diagonal contributions
+        for (int i = 0; i < num_mtq_; ++i) {
+            const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
+            luu(i, i) += w_u_mult * cost_cfg.mtq_control_weight / (lim * lim);
+        }
+        
+        // RW control costs: diagonal contributions
+        for (int i = 0; i < num_rw_; ++i) {
+            const int ctrl_idx = num_mtq_ + i;
+            const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
+            luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.rw_control_weight / (lim * lim);
+        }
+    }
+
+    // =====================================================================
+    // Apply Quaternion Normalization Projection
+    // =====================================================================
+    // For normalized quaternions, gradients lie in the constraint manifold.
+    // Hessians must be projected: H_proj = (I - q·q^T) H (I - q·q^T)
+    // Note: q is already normalized (line 1388), so q_norm = 1
+    {
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+        const Mat44 proj_q = Mat44::Identity() - q * q.transpose();
+        // Left projection
+        lxx.block(QUAT_INDEX, 0, 4, nx) = proj_q * lxx.block(QUAT_INDEX, 0, 4, nx);
+        // Right projection
+        lxx.block(0, QUAT_INDEX, nx, 4) = lxx.block(0, QUAT_INDEX, nx, 4) * proj_q;
+    }
+
+    return std::make_tuple(lxx, luu, lux);
+}
+
+std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::terminalCostHessians(
+    const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
+    const Vec3& B_eci, const CostConfig& cost_cfg) const {
+    const VecX u_zero = VecX::Zero(controlDim());
+    return stageCostHessians(0, 1, x, u_zero, boresight_body, attitude_target, B_eci, cost_cfg);
+}
+
+double Satellite::totalCost(const Eigen::Ref<const Eigen::MatrixXd>& X,
+                            const Eigen::Ref<const Eigen::MatrixXd>& U,
+                            const Eigen::Ref<const Eigen::MatrixXd>& B,
+                            const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+                            const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+                            const CostConfig& cost_cfg) const {
+    const int nx = stateDim();
+    const int nu = controlDim();
+    const int N = static_cast<int>(X.cols());
+
+    if (X.rows() != nx) {
+        throw std::invalid_argument(
+            "totalCost: X has " + std::to_string(X.rows()) +
+            " rows, expected " + std::to_string(nx) + " (nx x N layout)");
+    }
+    if (U.rows() != nu) {
+        throw std::invalid_argument(
+            "totalCost: U has " + std::to_string(U.rows()) +
+            " rows, expected " + std::to_string(nu) + " (nu x N-1 layout)");
+    }
+    if (U.cols() != N - 1) {
+        throw std::invalid_argument(
+            "totalCost: U has " + std::to_string(U.cols()) +
+            " columns, expected " + std::to_string(N - 1));
+    }
+    if (B.rows() != 3) {
+        throw std::invalid_argument(
+            "totalCost: B has " + std::to_string(B.rows()) +
+            " rows, expected 3");
+    }
+    if (B.cols() != N) {
+        throw std::invalid_argument(
+            "totalCost: B has " + std::to_string(B.cols()) +
+            " columns, expected " + std::to_string(N));
+    }
+    if (boresight.cols() != N) {
+        throw std::invalid_argument(
+            "totalCost: boresight has " + std::to_string(boresight.cols()) +
+            " columns, expected " + std::to_string(N));
+    }
+    if (boresight.rows() != 3) {
+        throw std::invalid_argument(
+            "totalCost: boresight has " + std::to_string(boresight.rows()) +
+            " rows, expected 3");
+    }
+    if (attitude_target.rows() != 4) {
+        throw std::invalid_argument(
+            "totalCost: attitude_target has " + std::to_string(attitude_target.rows()) +
+            " rows, expected 4");
+    }
+    if (attitude_target.cols() != N) {
+        throw std::invalid_argument(
+            "totalCost: attitude_target has " + std::to_string(attitude_target.cols()) +
+            " columns, expected " + std::to_string(N));
+    }
+    
+    double J_total = 0.0;
+    // Sum stage costs for k = 0 to N-2
+    for (int k = 0; k < N - 1; ++k) {
+        VecX x_k = X.col(k);
+        VecX u_k = U.col(k);
+        Vec3 B_k = B.col(k);
+        Vec3 boresight_k = boresight.col(k);
+        Vec4 attitude_target_k = attitude_target.col(k);
+
+        double stage_cost = stageCost(k, N, x_k, u_k, boresight_k, attitude_target_k, B_k, cost_cfg);
+        J_total += stage_cost;
+    }
+
+    // Terminal cost at k = N-1
+    VecX x_final = X.col(N - 1);
+    Vec3 B_final = B.col(N - 1);
+    Vec3 boresight_final = boresight.col(N - 1);
+    Vec4 attitude_target_final = attitude_target.col(N - 1);
+
+    double terminal_cost = terminalCost(x_final, boresight_final, attitude_target_final, B_final, cost_cfg);
+    J_total += terminal_cost;
+    
+    return J_total;
 }
 
 Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& u,
