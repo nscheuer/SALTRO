@@ -42,7 +42,7 @@ def create_planner_settings():
     cost.ang_vel_N = 1.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 4
+    cost.ang_cost_func_type = 3
     cost.use_cost_hess = True
 
     # Pass 0 Disturbance Settings
@@ -55,7 +55,7 @@ def create_planner_settings():
 
     # Pass 0 Regularization Settings
     plannersettings.passes[0].reg.reg_init = 1e-6
-    plannersettings.passes[0].reg.reg_max = 1e10
+    plannersettings.passes[0].reg.reg_max = 1e30
     plannersettings.passes[0].reg.reg_scale = 10.0
     plannersettings.passes[0].reg.use_dynamics_hess = True
     plannersettings.passes[0].reg.use_constraint_hess = False
