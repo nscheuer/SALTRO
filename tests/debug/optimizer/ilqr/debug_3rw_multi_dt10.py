@@ -26,7 +26,7 @@ def create_planner_settings():
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
     cost.angle = 1.0
-    cost.ang_vel = 1e2
+    cost.ang_vel = 1e1
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
@@ -39,10 +39,10 @@ def create_planner_settings():
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
     cost.angle_N = 0.0
-    cost.ang_vel_N = 1.0
+    cost.ang_vel_N = 0.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 2
+    cost.ang_cost_func_type = 3
     cost.use_cost_hess = True
 
     # Pass 0 Disturbance Settings
