@@ -214,6 +214,8 @@ bool forwardPass(
         }
 
         if (!rollout_ok) {
+            (void)fail_k;  // Used only in debug logging macro
+            (void)fail_reason;  // Used only in debug logging macro
             SALTRO_OPT_DLOG("[FP] reject alpha=" << alpha << " k=" << fail_k << " reason=" << fail_reason);
             continue;
         }
@@ -227,6 +229,7 @@ bool forwardPass(
         const double z = (std::isfinite(delta_V_alpha) && std::abs(delta_V_alpha) >= 1e-16)
             ? (J_minus - J_new) / (-delta_V_alpha)
             : std::numeric_limits<double>::quiet_NaN();
+        (void)z;  // Used only in debug logging macro
         SALTRO_OPT_DLOG("[FP] alpha=" << alpha << " J_new=" << J_new << " z=" << z << " ls_ok=" << static_cast<int>(ls_ok));
         if (ls_ok) {
             // Overwrite outputs with the new trajectory/control
