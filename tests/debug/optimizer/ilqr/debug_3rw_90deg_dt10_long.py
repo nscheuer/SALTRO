@@ -55,7 +55,7 @@ def create_planner_settings():
 
     # Pass 0 Regularization Settings
     plannersettings.passes[0].reg.reg_init = 1e-6
-    plannersettings.passes[0].reg.reg_max = 1e10
+    plannersettings.passes[0].reg.reg_max = 1e30
     plannersettings.passes[0].reg.reg_scale = 10.0
     plannersettings.passes[0].reg.use_dynamics_hess = True
     plannersettings.passes[0].reg.use_constraint_hess = False
@@ -72,7 +72,7 @@ def main():
     plannersettings = create_planner_settings()
     satellite = create_3rw_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 210/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 1000/(36525 * 86400)])
     qgoal = np.array([
         [np.sqrt(2)/2, np.sqrt(2)/2],
         [0.0, 0.0],           
