@@ -72,7 +72,7 @@ def main():
     plannersettings = create_planner_settings()
     satellite = create_3rw_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 210/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 200/(36525 * 86400)])
     qgoal = np.array([
         [np.sqrt(2)/2, np.sqrt(2)/2],
         [0.0, 0.0],           

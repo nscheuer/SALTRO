@@ -1,6 +1,7 @@
 #include <saltro/optimizer/forwardpass.h>
 
 #include <saltro/math/integrators/rk4.h>
+#include <saltro/math/mrp.h>
 #include <algorithm>
 #include <cmath>
 #include <exception>
@@ -125,29 +126,31 @@ bool forwardPass(
                 break;
             }
 
-            // u_bar(k) = u(k) + K_k(x_bar(k) - x(k)) + alpha * d_k
+            // u_bar(k) = u(k) + K_k(δz_k) + alpha * d_k
+            // where δz_k is the reduced-state error using MRP for attitude
             Eigen::VectorXd u_bar_k = U.col(k);
             if (k < static_cast<int>(K.size())) {
-                // Compute state error with projection-based quaternion metric
-                // This matches the linearization used in backward pass Jacobians
-                Eigen::VectorXd state_error = X_bar.col(k) - X.col(k);
+                // Compute reduced-state error δz = [δω, δθ_MRP, δh_rw]
+                const int nRW = satellite.numRW();
+                const int nxr = satellite.reducedStateDim(); // 6 + nRW
+                Eigen::VectorXd state_error_reduced(nxr);
                 
-                // For quaternion part, use tangent space projection: (I - q_ref * q_ref^T)
-                // This ensures consistent linearization between backward and forward passes
-                if (state_error.size() >= 7) {
-                    const Eigen::Vector4d q_ref = X.col(k).segment<4>(3);      // Nominal trajectory
-                    
-                    // Project quaternion error onto tangent space at q_ref
-                    // proj_q = I - q_ref * q_ref^T projects onto the tangent space
-                    Eigen::Matrix4d proj_q = Eigen::Matrix4d::Identity() - q_ref * q_ref.transpose();
-                    
-                    // Apply projection to quaternion part of state error
-                    Eigen::Vector4d delta_q_raw = state_error.segment<4>(3);
-                    Eigen::Vector4d delta_q_projected = proj_q * delta_q_raw;
-                    state_error.segment<4>(3) = delta_q_projected;
+                // Angular velocity error (direct difference)
+                state_error_reduced.head<3>() = X_bar.col(k).head<3>() - X.col(k).head<3>();
+                
+                // Attitude error using MRP: q_err = q_ref^{-1} ⊗ q_bar, then MRP
+                const Eigen::Vector4d q_ref = X.col(k).segment<4>(3);
+                const Eigen::Vector4d q_bar = X_bar.col(k).segment<4>(3);
+                Eigen::Vector4d q_err = saltro::math::quatError(q_ref, q_bar);
+                Eigen::Vector3d mrp_err = saltro::math::quatToMRP(q_err);
+                state_error_reduced.segment<3>(3) = mrp_err;
+                
+                // RW momentum error (direct difference)
+                for (int i = 0; i < nRW; ++i) {
+                    state_error_reduced(6 + i) = X_bar.col(k)(7 + i) - X.col(k)(7 + i);
                 }
                 
-                u_bar_k += K[k] * state_error;
+                u_bar_k += K[k] * state_error_reduced;
             }
             if (k < static_cast<int>(d.size())) {
                 u_bar_k += alpha * d[k];

@@ -28,12 +28,13 @@ bool iLQR(
 	
 	// Preallocate gain and feedforward term vectors
 	int N = X.cols();   // Number of timesteps
-	int nx = X.rows();  // State dimension
+	int nx = X.rows();  // Full state dimension
 	int nu = U.rows();  // Control dimension
+	int nxr = satellite.reducedStateDim(); // Reduced state dimension (6 + nRW)
 	std::vector<Eigen::MatrixXd> K(N - 1);
 	std::vector<Eigen::VectorXd> d(N - 1);
 	for (int k = 0; k < N - 1; ++k) {
-		K[k] = Eigen::MatrixXd::Zero(nu, nx);
+		K[k] = Eigen::MatrixXd::Zero(nu, nxr);
 		d[k] = Eigen::VectorXd::Zero(nu);
 	}
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();

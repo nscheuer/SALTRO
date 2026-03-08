@@ -59,7 +59,8 @@ py::tuple trajOpt_py(
 
 	Eigen::MatrixXd X(state_dim, saltro::limits::MAX_LENGTH_TRAJ);
 	Eigen::MatrixXd U(input_dim, saltro::limits::MAX_LENGTH_TRAJ);
-	Eigen::MatrixXd K(input_dim, state_dim * saltro::limits::MAX_LENGTH_TRAJ);
+	const int reduced_state_dim = satellite.reducedStateDim();
+	Eigen::MatrixXd K(input_dim, reduced_state_dim * saltro::limits::MAX_LENGTH_TRAJ);
 	int N_out = N;
 
 	const bool ok = saltro::optimizer::trajOpt(
@@ -84,7 +85,7 @@ py::tuple trajOpt_py(
 		ok,
 		X.leftCols(N_cols),
 		U.leftCols(N_cols),
-		K.leftCols(state_dim * N_cols)
+		K.leftCols(reduced_state_dim * N_cols)
 	);
 }
 

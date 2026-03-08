@@ -1,5 +1,6 @@
 #include <saltro/optimizer/backwardpass.h>
 #include <saltro/math/integrators/rk4.h>
+#include <saltro/math/mrp.h>
 #include <iostream>
 #include <cmath>
 
@@ -12,11 +13,15 @@
 namespace saltro::optimizer {
 
 /**
- * @brief Solve a single Riccati step.
+ * @brief Solve a single Riccati step in reduced state space.
  *
- * Given the regularized control cost Hessian Q_uu_reg and related Q-matrices,
- * computes the feedback gain K and feedforward term d, then propagates
- * the value function (P, p) backward one timestep using Riccati equations.
+ * Given the regularized control cost Hessian Q_uu_reg and related Q-matrices
+ * (all in reduced state space), computes the feedback gain K and feedforward
+ * term d, then propagates the value function (P, p) backward one timestep.
+ *
+ * CRITICAL: P_k/p_k use UNREGULARIZED Q_uu to prevent regularization from
+ * inflating the value function and creating positive feedback in the Riccati
+ * recursion. Only K and d use the regularized version.
  */
 void solveRiccattiStep(
 	const Eigen::Ref<const Eigen::MatrixXd>& Q_uu_reg,
@@ -43,26 +48,20 @@ void solveRiccattiStep(
 	Eigen::VectorXd d_k = -llt.solve(Q_u);
 	d[k] = d_k;
 	
-	// CRITICAL FIX: Use Q_uu_reg (regularized) consistently in Riccati updates
-	// This ensures P_k remains positive definite even with large regularization
-	// Traditional form: P_k = Q_xx - Q_ux^T * (Q_uu + ρI)^{-1} * Q_ux
-	// Equivalent form with K_k = -(Q_uu + ρI)^{-1} * Q_ux:
-	// P_k = Q_xx + K_k^T * (Q_uu + ρI) * K_k + K_k^T * Q_ux + Q_ux^T * K_k
+	// Use UNREGULARIZED Q_uu for Riccati value function propagation.
+	// Using Q_uu_reg here inflates P_k by the regularization amount at each
+	// backward step, causing exponential growth that makes backward pass fail.
 	P_k = Q_xx 
-	  + K_k.transpose() * Q_uu_reg * K_k 
+	  + K_k.transpose() * Q_uu * K_k 
 	  + K_k.transpose() * Q_ux 
 	  + Q_ux.transpose() * K_k;
 	
-	// Riccati update for value function gradient (also use Q_uu_reg)
-	// p_k = Q_x + K_k^T * (Q_uu + ρI) * d_k + K_k^T * Q_u + Q_ux^T * d_k
 	p_k = Q_x 
-	  + K_k.transpose() * Q_uu_reg * d_k 
+	  + K_k.transpose() * Q_uu * d_k 
 	  + K_k.transpose() * Q_u 
 	  + Q_ux.transpose() * d_k;
 	
-	// Accumulate expected cost reduction (use unregularized Q_uu for accurate prediction)
-	// V_1k = d_k^T * Q_u
-	// V_2k = 1/2 * d_k^T * Q_uu * d_k
+	// Accumulate expected cost reduction
 	deltaV(0) += d_k.dot(Q_u);
 	deltaV(1) += 0.5 * d_k.dot(Q_uu * d_k);
 }
@@ -92,21 +91,26 @@ bool backwardPass(
 		: 1.0;
 
 	int N = static_cast<int>(X.cols());   // Number of timesteps
-	int nx = static_cast<int>(X.rows());  // State dimension
+	int nx = static_cast<int>(X.rows());  // Full state dimension (7 + nRW)
 	int nu = static_cast<int>(U.rows()); // Control dimension
+	int nRW = satellite.numRW();
+	int nxr = satellite.reducedStateDim(); // Reduced state dimension (6 + nRW)
 
-	// Initialize terminal cost-to-go: p_N and P_N
+	// Initialize terminal cost-to-go: p_N and P_N (in full state space)
 	Eigen::VectorXd x_final = X.col(N - 1);
 	Eigen::Vector3d boresight_final = boresight.col(N - 1);
 	Eigen::Vector3d B_final = B.col(N - 1);
 	const Eigen::Vector4d attitude_target_final = attitude_target.col(N - 1);
 
-	auto [p_N, p_unused1, p_unused2] = satellite.terminalCostJacobians(x_final, boresight_final, attitude_target_final, B_final, cost_cfg);
-	auto [P_N, P_unused1, P_unused2] = satellite.terminalCostHessians(x_final, boresight_final, attitude_target_final, B_final, cost_cfg);
+	auto [p_N_full, p_unused1, p_unused2] = satellite.terminalCostJacobians(x_final, boresight_final, attitude_target_final, B_final, cost_cfg);
+	auto [P_N_full, P_unused1, P_unused2] = satellite.terminalCostHessians(x_final, boresight_final, attitude_target_final, B_final, cost_cfg);
 
-	// Initialize value function at terminal time
-	Eigen::VectorXd p_k = p_N;
-	Eigen::MatrixXd P_k = P_N;
+	// Project terminal cost Jacobian/Hessian to reduced state using G_N
+	Eigen::Vector4d q_final = x_final.segment<4>(3);
+	Eigen::MatrixXd G_N = saltro::math::findGMat(q_final, nRW);
+	
+	Eigen::VectorXd p_k = G_N * p_N_full;
+	Eigen::MatrixXd P_k = G_N * P_N_full * G_N.transpose();
 	
 	// Minimal disturbance config for linearization
 	DisturbanceConfig dist_config;
@@ -123,49 +127,56 @@ bool backwardPass(
 		const Eigen::Vector3d S_k = S.col(k);
 		const Eigen::Vector4d attitude_target_k = attitude_target.col(k);
 		
-		// Step 1: Compute stage cost Jacobians and Hessians
-		auto [lx, lu_mat, lux_grad] = satellite.stageCostJacobians(k, N, x_k, u_k, boresight_k, attitude_target_k, B_k, cost_cfg);
-		auto [lxx, luu, lux_hess] = satellite.stageCostHessians(k, N, x_k, u_k, boresight_k, attitude_target_k, B_k, cost_cfg);
+		// Step 1: Compute stage cost Jacobians and Hessians (full state)
+		auto [lx_full, lu_mat, lux_grad] = satellite.stageCostJacobians(k, N, x_k, u_k, boresight_k, attitude_target_k, B_k, cost_cfg);
+		auto [lxx_full, luu, lux_hess_full] = satellite.stageCostHessians(k, N, x_k, u_k, boresight_k, attitude_target_k, B_k, cost_cfg);
 		
 		// Reshape lu from 1×nu matrix to nu vector
 		Eigen::VectorXd lu = lu_mat.row(0);
 		
-		// CRITICAL: Scale stage cost derivatives by dt for proper discrete-time formulation
-		// Continuous cost: J = ∫[l(x,u)]dt → Discrete: J ≈ Σ(l × dt)
-		// This ensures numerical stability across different timestep sizes
-		lx = dt * lx;
+		// Scale stage cost derivatives by dt
+		lx_full = dt * lx_full;
 		lu = dt * lu;
-		lxx = dt * lxx;
+		lxx_full = dt * lxx_full;
 		luu = dt * luu;
-		lux_hess = dt * lux_hess;
+		lux_hess_full = dt * lux_hess_full;
 		
-		// Step 2: Compute exact discrete-time dynamics Jacobians using RK4
-		// This matches the forward pass RK4 integration exactly, providing superior
-		// accuracy compared to Euler discretization (old approach: A = I + dt*A_c).
-		Eigen::MatrixXd A_k = Eigen::MatrixXd::Zero(nx, nx);
-		Eigen::MatrixXd B_k_dyn = Eigen::MatrixXd::Zero(nx, nu);
+		// Step 2: Build G matrices for projection
+		Eigen::Vector4d q_k = x_k.segment<4>(3);
+		Eigen::Vector4d q_kp1 = X.col(k + 1).segment<4>(3);
+		Eigen::MatrixXd G_k = saltro::math::findGMat(q_k, nRW);
+		Eigen::MatrixXd G_kp1 = saltro::math::findGMat(q_kp1, nRW);
 		
-		// Lambda wrapper for satellite dynamics Jacobians compatible with rk4_jacobians
+		// Project stage cost to reduced state
+		Eigen::VectorXd lx = G_k * lx_full;
+		Eigen::MatrixXd lxx = G_k * lxx_full * G_k.transpose();
+		Eigen::MatrixXd lux_hess = lux_hess_full * G_k.transpose();
+		
+		// Step 3: Compute exact discrete-time dynamics Jacobians using RK4 (full state)
+		Eigen::MatrixXd A_k_full = Eigen::MatrixXd::Zero(nx, nx);
+		Eigen::MatrixXd B_k_dyn_full = Eigen::MatrixXd::Zero(nx, nu);
+		
 		auto dynamics_jac_wrapper = [&](double t_local, const Eigen::Ref<const Eigen::VectorXd>& x_local,
 		                                  const Eigen::Ref<const Eigen::VectorXd>& u_local,
 		                                  Eigen::Ref<Eigen::MatrixXd> A_c_out,
 		                                  Eigen::Ref<Eigen::MatrixXd> B_c_out,
 		                                  Eigen::Ref<Eigen::VectorXd> k_out) {
-			(void)t_local; // RK4 doesn't need explicit time dependence for our dynamics
-			
-			// Compute continuous Jacobians
+			(void)t_local;
 			auto [A_c, B_c, C_unused] = satellite.dynamicsJacobians(x_local, u_local, dist_config, R_k, B_k, S_k, V_k);
 			A_c_out = A_c;
 			B_c_out = B_c;
-			
-			// Also compute k = f(x, u) for RK4 stage evaluation
 			k_out = satellite.dynamics(x_local, u_local, dist_config, R_k, B_k, S_k, V_k, 0);
 		};
 		
-		// Compute exact RK4 discrete Jacobians
-		rk4_jacobians(dynamics_jac_wrapper, x_k, u_k, 0.0, dt, A_k, B_k_dyn);
+		rk4_jacobians(dynamics_jac_wrapper, x_k, u_k, 0.0, dt, A_k_full, B_k_dyn_full);
 		
-		// Step 3: Assemble Q matrices
+		// Step 4: Project dynamics Jacobians to reduced state space
+		// A_reduced = G_{k+1} * A_full * G_k^T
+		// B_reduced = G_{k+1} * B_full
+		Eigen::MatrixXd A_k = G_kp1 * A_k_full * G_k.transpose();
+		Eigen::MatrixXd B_k_dyn = G_kp1 * B_k_dyn_full;
+		
+		// Step 5: Assemble Q matrices (all in reduced state space now)
 		Eigen::MatrixXd Q_xx = lxx + A_k.transpose() * P_k * A_k;
 		Eigen::MatrixXd Q_uu = luu + B_k_dyn.transpose() * P_k * B_k_dyn;
 		Eigen::MatrixXd Q_ux = lux_hess + B_k_dyn.transpose() * P_k * A_k;

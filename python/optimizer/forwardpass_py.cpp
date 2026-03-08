@@ -102,13 +102,14 @@ void bind_forwardpass(py::module_& m)
         py::arg("J_prev"),
         R"doc(
 Forward pass for iLQR with backtracking line search.
+Uses MRP (Modified Rodrigues Parameters) for attitude error computation.
 
 Parameters
 ----------
 satellite : Satellite
 X : ndarray (nx, N)
 U : ndarray (nu, N) or (nu, N-1)
-K : list/array of (nu x nx) gains, length N-1
+K : list/array of (nu x nxr) gains in reduced state space, length N-1
 d : list/array of (nu,) feedforward terms, length N-1
 deltaV : ndarray (2,) expected cost change terms
 B, R, V, S : ndarray (3, N)
