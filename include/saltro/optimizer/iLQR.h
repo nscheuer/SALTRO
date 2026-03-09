@@ -1,10 +1,17 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <vector>
 #include <saltro/pybind/satellite.h>
 #include <saltro/limits.h>
 
 namespace saltro::optimizer {
+
+enum class ILQRStatus {
+	Converged,
+	MaxIterations,
+	RegularizationExceeded,
+};
 
 /**
  * @brief Iterative Linear Quadratic Regulator (iLQR) trajectory optimization.
@@ -41,6 +48,26 @@ namespace saltro::optimizer {
  * @note Algorithm modifies X, U, and J in-place
  * @note Convergence determined by settings.ilqr.grad_tol and settings.ilqr.cost_tol
  */
+bool iLQR(
+	const PlannerSettings& settings,
+	const Satellite& satellite,
+	Eigen::Ref<Eigen::MatrixXd> X,
+	Eigen::Ref<Eigen::MatrixXd> U,
+	const Eigen::Ref<const Eigen::MatrixXd>& R,
+	const Eigen::Ref<const Eigen::MatrixXd>& V,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,
+	const Eigen::Ref<const Eigen::VectorXd>& jtime,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+	int pass_idx,
+	const std::vector<Eigen::VectorXd>& lambda_aug,
+	const std::vector<Eigen::VectorXd>& mu_aug,
+	ILQRStatus& status,
+	double& J
+);
+
 bool iLQR(
 	const PlannerSettings& settings,
 	const Satellite& satellite,
