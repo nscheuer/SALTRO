@@ -51,7 +51,47 @@ bool backwardPass(
 	double reg,
 	std::vector<Eigen::MatrixXd>& K,
 	std::vector<Eigen::VectorXd>& d,
-	Eigen::Ref<Eigen::Vector2d> deltaV
+	Eigen::Ref<Eigen::Vector2d> deltaV,
+	const std::vector<Eigen::VectorXd>& lambda_aug,
+	const std::vector<Eigen::VectorXd>& mu_aug
 );
+
+inline bool backwardPass(
+	const Satellite& satellite,
+	const Eigen::Ref<const Eigen::MatrixXd>& X,
+	const Eigen::Ref<const Eigen::MatrixXd>& U,
+	const Eigen::Ref<const Eigen::MatrixXd>& R,
+	const Eigen::Ref<const Eigen::MatrixXd>& V,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+	const PlannerSettings& settings,
+	double reg,
+	std::vector<Eigen::MatrixXd>& K,
+	std::vector<Eigen::VectorXd>& d,
+	Eigen::Ref<Eigen::Vector2d> deltaV
+) {
+	return backwardPass(
+		satellite,
+		X,
+		U,
+		R,
+		V,
+		B,
+		S,
+		rho,
+		boresight,
+		attitude_target,
+		settings,
+		reg,
+		K,
+		d,
+		deltaV,
+		std::vector<Eigen::VectorXd>{},
+		std::vector<Eigen::VectorXd>{}
+	);
+}
 
 } // namespace saltro::optimizer

@@ -69,9 +69,53 @@ bool forwardPass(
     const Eigen::Ref<const Eigen::MatrixXd>& boresight,
     const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
     const PlannerSettings& settings,
+    const std::vector<Eigen::VectorXd>& lambda_aug,
+    const std::vector<Eigen::VectorXd>& mu_aug,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     double J_prev,
     double& J_new
 );
+
+inline bool forwardPass(
+    const Satellite& satellite,
+    Eigen::Ref<Eigen::MatrixXd> X,
+    Eigen::Ref<Eigen::MatrixXd> U,
+    const std::vector<Eigen::MatrixXd>& K,
+    const std::vector<Eigen::VectorXd>& d,
+    const Eigen::Ref<const Eigen::Vector2d>& deltaV,
+    const Eigen::Ref<const Eigen::MatrixXd>& B,
+    const Eigen::Ref<const Eigen::MatrixXd>& R,
+    const Eigen::Ref<const Eigen::MatrixXd>& V,
+    const Eigen::Ref<const Eigen::MatrixXd>& S,
+    const Eigen::Ref<const Eigen::MatrixXd>& rho,
+    const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+    const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+    const PlannerSettings& settings,
+    const Eigen::Ref<const Eigen::VectorXd>& jtime,
+    double J_prev,
+    double& J_new
+) {
+    return forwardPass(
+        satellite,
+        X,
+        U,
+        K,
+        d,
+        deltaV,
+        B,
+        R,
+        V,
+        S,
+        rho,
+        boresight,
+        attitude_target,
+        settings,
+        std::vector<Eigen::VectorXd>{},
+        std::vector<Eigen::VectorXd>{},
+        jtime,
+        J_prev,
+        J_new
+    );
+}
 
 }

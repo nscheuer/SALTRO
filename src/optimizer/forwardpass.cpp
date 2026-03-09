@@ -57,6 +57,8 @@ bool forwardPass(
     const Eigen::Ref<const Eigen::MatrixXd>& boresight,
     const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
     const PlannerSettings& settings,
+    const std::vector<Eigen::VectorXd>& lambda_aug,
+    const std::vector<Eigen::VectorXd>& mu_aug,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     double J_prev,
     double& J_new
@@ -72,6 +74,7 @@ bool forwardPass(
 
     const auto& dist_cfg = settings.disturbances;
     const CostConfig& cost_cfg = settings.passes[0].cost;
+    const ConstraintConfig& cnst_cfg = settings.constraints;
     const LineSearchConfig& ls_cfg = settings.passes[0].linesearch;
     const double J_minus = J_prev;
 
@@ -220,8 +223,37 @@ bool forwardPass(
             continue;
         }
 
-        // Compute new trajectory cost with rollout
+        // Compute new trajectory nominal cost with rollout
         J_new = satellite.totalCost(X_bar, U_bar, B, boresight, attitude_target, cost_cfg);
+
+        // Add augmented Lagrangian penalty terms when provided.
+        if (!lambda_aug.empty() && !mu_aug.empty()) {
+            const int n_lam = static_cast<int>(lambda_aug.size());
+            const int n_mu = static_cast<int>(mu_aug.size());
+            const int n_steps = std::min(N, std::min(n_lam, n_mu));
+            for (int k = 0; k < n_steps; ++k) {
+                const Eigen::VectorXd x_k = X_bar.col(k);
+                Eigen::VectorXd u_k = Eigen::VectorXd::Zero(nu);
+                if (k < U_bar.cols()) {
+                    u_k = U_bar.col(k);
+                }
+                const Eigen::VectorXd c_k = satellite.constraints(k, N, x_k, u_k, S.col(k), cnst_cfg);
+                if (lambda_aug[k].size() != c_k.size() || mu_aug[k].size() != c_k.size()) {
+                    J_new = J_prev;
+                    return false;
+                }
+
+                for (int i = 0; i < c_k.size(); ++i) {
+                    if (c_k(i) <= 0.0) {
+                        continue;
+                    }
+                    const double ci = c_k(i);
+                    const double li = lambda_aug[k](i);
+                    const double mi = mu_aug[k](i);
+                    J_new += li * ci + 0.5 * mi * ci * ci;
+                }
+            }
+        }
 
         // Line search check
         const bool ls_ok = linesearch(J_minus, J_new, X, U, X_bar, U_bar, alpha, deltaV, ls_cfg);

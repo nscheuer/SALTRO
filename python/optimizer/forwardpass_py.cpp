@@ -22,6 +22,8 @@ static py::tuple forward_pass_py(
     const Eigen::Ref<const Eigen::MatrixXd>& boresight,
     const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
     const PlannerSettings& settings,
+    const std::vector<Eigen::VectorXd>& lambda_aug,
+    const std::vector<Eigen::VectorXd>& mu_aug,
     const Eigen::Ref<const Eigen::VectorXd>& jtime,
     double J_prev
 )
@@ -71,6 +73,8 @@ static py::tuple forward_pass_py(
         boresight,
         attitude_target,
         settings,
+        lambda_aug,
+        mu_aug,
         jtime,
         J_prev,
         J_new
@@ -98,6 +102,8 @@ void bind_forwardpass(py::module_& m)
         py::arg("boresight"),
         py::arg("attitude_target"),
         py::arg("settings"),
+        py::arg("lambda_aug"),
+        py::arg("mu_aug"),
         py::arg("jtime"),
         py::arg("J_prev"),
         R"doc(

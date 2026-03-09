@@ -85,10 +85,13 @@ bool backwardPass(
 	double reg,
 	std::vector<Eigen::MatrixXd>& K,
 	std::vector<Eigen::VectorXd>& d,
-	Eigen::Ref<Eigen::Vector2d> deltaV
+	Eigen::Ref<Eigen::Vector2d> deltaV,
+	const std::vector<Eigen::VectorXd>& lambda_aug,
+	const std::vector<Eigen::VectorXd>& mu_aug
 ) {
 	(void)rho;  // Suppress unused parameter warning
 	const CostConfig& cost_cfg = settings.passes[0].cost;
+	const ConstraintConfig& cnst_cfg = settings.constraints;
 	const double dt = (settings.num_passes > 0 && std::isfinite(settings.passes[0].dt) && settings.passes[0].dt > 0.0)
 		? settings.passes[0].dt
 		: 1.0;
@@ -153,6 +156,40 @@ bool backwardPass(
 		Eigen::VectorXd lx = G_k * lx_full;
 		Eigen::MatrixXd lxx = G_k * lxx_full * G_k.transpose();
 		Eigen::MatrixXd lux_hess = lux_hess_full * G_k.transpose();
+
+		// Augmented Lagrangian terms: l += lambda^T c+ + 0.5 * c+^T diag(mu) c+
+		if (!lambda_aug.empty() && !mu_aug.empty() && k < static_cast<int>(lambda_aug.size()) && k < static_cast<int>(mu_aug.size())) {
+			const Eigen::VectorXd c_k = satellite.constraints(k, N, x_k, u_k, S_k, cnst_cfg);
+			auto [c_u, c_x_full] = satellite.constraintJacobians(k, N, x_k, u_k, S_k, cnst_cfg);
+			if (lambda_aug[k].size() == c_k.size() && mu_aug[k].size() == c_k.size()) {
+				const Eigen::MatrixXd c_x = c_x_full * G_k.transpose();
+
+				Eigen::VectorXd w = Eigen::VectorXd::Zero(c_k.size());
+				for (int i = 0; i < c_k.size(); ++i) {
+					if (c_k(i) > 0.0) {
+						w(i) = lambda_aug[k](i) + mu_aug[k](i) * c_k(i);
+					}
+				}
+
+				lx.noalias() += c_x.transpose() * w;
+				lu.noalias() += c_u.transpose() * w;
+
+				for (int i = 0; i < c_k.size(); ++i) {
+					if (c_k(i) <= 0.0) {
+						continue;
+					}
+					const double mu_i = mu_aug[k](i);
+					if (!std::isfinite(mu_i) || mu_i <= 0.0) {
+						continue;
+					}
+					const Eigen::VectorXd cx_i = c_x.row(i).transpose();
+					const Eigen::VectorXd cu_i = c_u.row(i).transpose();
+					lxx.noalias() += mu_i * (cx_i * cx_i.transpose());
+					luu.noalias() += mu_i * (cu_i * cu_i.transpose());
+					lux_hess.noalias() += mu_i * (cu_i * cx_i.transpose());
+				}
+			}
+		}
 		
 		// Clamp lxx to PSD: non-convex cost functions (e.g. ang_cost_func_type=4)
 		// can produce indefinite Hessians whose negative eigenvalues compound
