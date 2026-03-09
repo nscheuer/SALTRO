@@ -110,7 +110,7 @@ def main():
     print(f"trajOpt completed in {elapsed:.3f} seconds")
     print(f"Trajectory shape: X={X.shape}, U={U.shape}")
 
-    plot_final_trajectory(X, U, plannersettings.passes[0].dt, satellite=satellite)
+    plot_final_trajectory(X, U, plannersettings.passes[0].dt, satellite=satellite, q_goal=qgoal)
 
 
 if __name__ == "__main__":

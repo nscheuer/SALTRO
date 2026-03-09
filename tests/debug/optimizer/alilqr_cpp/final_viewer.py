@@ -4,61 +4,220 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 
-def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=None, title: str = "AL-iLQR C++ Final Trajectory"):
+def _quat_inverse(q):
+    return np.array([q[0], -q[1], -q[2], -q[3]])
+
+
+def _quat_multiply(q1, q2):
+    w1, x1, y1, z1 = q1
+    w2, x2, y2, z2 = q2
+    return np.array([
+        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+    ])
+
+
+def _compute_pointing_error_deg(q, q_goal):
+    n = q.shape[1]
+    err_deg = np.zeros(n)
+    for k in range(n):
+        q_err = _quat_multiply(_quat_inverse(q_goal[:, k]), q[:, k])
+        err_deg[k] = 2.0 * np.arctan2(np.linalg.norm(q_err[1:]), abs(q_err[0])) * 180.0 / np.pi
+    return err_deg
+
+
+def _normalize_quat(q):
+    nrm = np.linalg.norm(q)
+    if nrm <= 0.0:
+        return q
+    return q / nrm
+
+
+def _slerp_quat(q0, q1, t):
+    q0 = _normalize_quat(q0)
+    q1 = _normalize_quat(q1)
+    dot = float(np.dot(q0, q1))
+
+    # Flip sign to always take shortest path on S3.
+    if dot < 0.0:
+        q1 = -q1
+        dot = -dot
+
+    # Near-parallel fallback to lerp for numerical stability.
+    if dot > 0.9995:
+        return _normalize_quat((1.0 - t) * q0 + t * q1)
+
+    theta_0 = np.arccos(np.clip(dot, -1.0, 1.0))
+    sin_theta_0 = np.sin(theta_0)
+    theta = theta_0 * t
+    s0 = np.sin(theta_0 - theta) / sin_theta_0
+    s1 = np.sin(theta) / sin_theta_0
+    return _normalize_quat(s0 * q0 + s1 * q1)
+
+
+def _expand_q_goal(q_goal, n):
+    """Expand compact goal quaternion inputs to a full N-step trajectory."""
+    if q_goal is None:
+        return None
+    if q_goal.ndim != 2 or q_goal.shape[0] != 4:
+        return None
+    m = q_goal.shape[1]
+    if m == n:
+        out = np.zeros_like(q_goal)
+        for k in range(n):
+            out[:, k] = _normalize_quat(q_goal[:, k])
+        return out
+    if m == 1:
+        q = _normalize_quat(q_goal[:, 0])
+        return np.repeat(q.reshape(4, 1), n, axis=1)
+    if m == 2 and n >= 2:
+        q0 = q_goal[:, 0]
+        q1 = q_goal[:, 1]
+        out = np.zeros((4, n))
+        for k in range(n):
+            tau = k / float(n - 1)
+            out[:, k] = _slerp_quat(q0, q1, tau)
+        return out
+    return None
+
+
+def _read_u_max(actuator):
+    """Read actuator limit from either a pybind property or method."""
+    limit = getattr(actuator, "u_max", None)
+    if limit is None:
+        return None
+    return float(limit() if callable(limit) else limit)
+
+
+def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=None, q_goal=None, title: str = "AL-iLQR C++ Final Trajectory"):
     n = X.shape[1]
     t_state = np.arange(n) * dt
     n_u = min(U.shape[1], max(0, n - 1))
     t_control = np.arange(n_u) * dt
     U_use = U[:, :n_u]
+    q_goal_full = _expand_q_goal(q_goal, n)
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
-    ax_q, ax_w, ax_mtq, ax_rw = axes.flatten()
+    fig, axes = plt.subplots(3, 2, figsize=(14, 12), constrained_layout=True)
+    ax_q = axes[0, 0]
+    ax_w = axes[0, 1]
+    ax_h = axes[1, 0]
+    ax_pe = axes[1, 1]
+    ax_mtq = axes[2, 0]
+    ax_rw = axes[2, 1]
 
     q = X[3:7, :]
-    for i in range(q.shape[0]):
-        ax_q.plot(t_state, q[i, :], label=f"q{i}")
+    w = X[0:3, :]
+    h = X[7:, :]
+    has_rw_state = h.shape[0] > 0
+
+    num_mtq = satellite.numMTQ if satellite is not None else 0
+    num_rw = satellite.numRW if satellite is not None else 0
+
+    # Quaternion with goal
+    ax_q.plot(t_state, q[0, :], label="q0", linewidth=1.5)
+    ax_q.plot(t_state, q[1, :], label="q1", linewidth=1.5)
+    ax_q.plot(t_state, q[2, :], label="q2", linewidth=1.5)
+    ax_q.plot(t_state, q[3, :], label="q3", linewidth=1.5)
+    if q_goal_full is not None:
+        ax_q.plot(t_state, q_goal_full[0, :], "--", alpha=0.6, linewidth=1.2, label="q0 goal")
+        ax_q.plot(t_state, q_goal_full[1, :], "--", alpha=0.6, linewidth=1.2, label="q1 goal")
+        ax_q.plot(t_state, q_goal_full[2, :], "--", alpha=0.6, linewidth=1.2, label="q2 goal")
+        ax_q.plot(t_state, q_goal_full[3, :], "--", alpha=0.6, linewidth=1.2, label="q3 goal")
     ax_q.set_title("Quaternion")
     ax_q.set_xlabel("Time [s]")
     ax_q.set_ylabel("q")
     ax_q.grid(True, alpha=0.3)
-    ax_q.legend(fontsize=8)
+    ax_q.legend(fontsize=7, ncol=2)
 
-    w = X[0:3, :]
-    for i in range(w.shape[0]):
-        ax_w.plot(t_state, w[i, :], label=f"w{i}")
-    ax_w.plot(t_state, np.linalg.norm(w, axis=0), "k--", label="|w|")
-    ax_w.set_title("Angular Rate")
+    # Angular velocity with magnitude
+    ax_w.plot(t_state, w[0, :], label="wx", linewidth=1.5)
+    ax_w.plot(t_state, w[1, :], label="wy", linewidth=1.5)
+    ax_w.plot(t_state, w[2, :], label="wz", linewidth=1.5)
+    ax_w.plot(t_state, np.linalg.norm(w, axis=0), "k--", linewidth=2, label="||w||")
+    ax_w.set_title("Angular Velocity")
     ax_w.set_xlabel("Time [s]")
     ax_w.set_ylabel("rad/s")
     ax_w.grid(True, alpha=0.3)
     ax_w.legend(fontsize=8)
 
-    num_mtq = satellite.numMTQ if satellite is not None else 0
-    num_rw = satellite.numRW if satellite is not None else 0
+    # Wheel momentum
+    ax_h.clear()
+    if has_rw_state and num_rw > 0:
+        for j in range(min(h.shape[0], num_rw)):
+            ax_h.plot(t_state, h[j, :], linewidth=1.5, label=f"h_rw{j}")
+        ax_h.set_title("Wheel Momentum")
+        ax_h.set_xlabel("Time [s]")
+        ax_h.set_ylabel("N m s")
+        ax_h.legend(fontsize=8)
+    else:
+        ax_h.text(0.5, 0.5, "No RW momentum states", ha="center", va="center", transform=ax_h.transAxes)
+        ax_h.set_title("Wheel Momentum")
+        ax_h.set_xlabel("Time [s]")
+        ax_h.set_ylabel("N m s")
+    ax_h.grid(True, alpha=0.3)
 
+    # Pointing error
+    ax_pe.clear()
+    if q_goal_full is not None:
+        pe = _compute_pointing_error_deg(q, q_goal_full)
+        ax_pe.plot(t_state, pe, "o-", color="C3", markersize=3, linewidth=1.5)
+        ax_pe.set_title("Pointing Error")
+        ax_pe.set_xlabel("Time [s]")
+        ax_pe.set_ylabel("deg")
+    else:
+        ax_pe.text(0.5, 0.5, "No goal quaternion provided", ha="center", va="center", transform=ax_pe.transAxes)
+        ax_pe.set_title("Pointing Error")
+        ax_pe.set_xlabel("Time [s]")
+        ax_pe.set_ylabel("deg")
+    ax_pe.grid(True, alpha=0.3)
+
+    # MTQ control with limits
+    ax_mtq.clear()
     if num_mtq > 0 and n_u > 0:
         mtq_u = U_use[0:num_mtq, :]
         for i in range(mtq_u.shape[0]):
-            ax_mtq.plot(t_control, mtq_u[i, :], label=f"m_mtq{i}")
+            ax_mtq.plot(t_control, mtq_u[i, :], linewidth=1.5, label=f"m_mtq{i}")
+        # Add limits if available
+        if satellite is not None:
+            for i in range(num_mtq):
+                u_max = _read_u_max(satellite.getMTQ(i))
+                if u_max is None:
+                    continue
+                u_max = abs(u_max)
+                ax_mtq.axhline(u_max, color="r", linestyle="--", alpha=0.5, linewidth=1)
+                ax_mtq.axhline(-u_max, color="r", linestyle="--", alpha=0.5, linewidth=1)
         ax_mtq.legend(fontsize=8)
     else:
         ax_mtq.text(0.5, 0.5, "No MTQ controls", ha="center", va="center", transform=ax_mtq.transAxes)
-    ax_mtq.set_title("MTQ Control")
+    ax_mtq.set_title("MTQ Control Inputs")
     ax_mtq.set_xlabel("Time [s]")
-    ax_mtq.set_ylabel("A m^2")
+    ax_mtq.set_ylabel("A m²")
     ax_mtq.grid(True, alpha=0.3)
 
+    # RW control with limits
+    ax_rw.clear()
     if num_rw > 0 and n_u > 0:
         rw_u = U_use[num_mtq:num_mtq + num_rw, :]
         for i in range(rw_u.shape[0]):
-            ax_rw.plot(t_control, rw_u[i, :], label=f"tau_rw{i}")
+            ax_rw.plot(t_control, rw_u[i, :], linewidth=1.5, label=f"tau_rw{i}")
+        # Add limits if available
+        if satellite is not None:
+            for i in range(num_rw):
+                u_max = _read_u_max(satellite.getRW(i))
+                if u_max is None:
+                    continue
+                u_max = abs(u_max)
+                ax_rw.axhline(u_max, color="r", linestyle="--", alpha=0.5, linewidth=1)
+                ax_rw.axhline(-u_max, color="r", linestyle="--", alpha=0.5, linewidth=1)
         ax_rw.legend(fontsize=8)
     else:
         ax_rw.text(0.5, 0.5, "No RW controls", ha="center", va="center", transform=ax_rw.transAxes)
-    ax_rw.set_title("RW Control")
+    ax_rw.set_title("RW Control Inputs")
     ax_rw.set_xlabel("Time [s]")
     ax_rw.set_ylabel("N m")
     ax_rw.grid(True, alpha=0.3)
 
-    fig.suptitle(title, fontsize=13)
+    fig.suptitle(title, fontsize=14, fontweight="bold")
     plt.show()

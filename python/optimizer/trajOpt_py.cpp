@@ -60,11 +60,14 @@ py::tuple trajOpt_py(
 	);
 
 	const int N_cols = std::max(0, std::min(N_out, saltro::limits::MAX_LENGTH_TRAJ));
+	Eigen::MatrixXd X_out = X.leftCols(N_cols);
+	Eigen::MatrixXd U_out = U.leftCols(N_cols);
+	Eigen::MatrixXd K_out = K.leftCols(reduced_state_dim * N_cols);
 	return py::make_tuple(
 		ok,
-		X.leftCols(N_cols),
-		U.leftCols(N_cols),
-		K.leftCols(reduced_state_dim * N_cols)
+		X_out,
+		U_out,
+		K_out
 	);
 }
 
