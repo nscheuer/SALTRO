@@ -39,7 +39,12 @@ static bool resample_zero_order_hold(
 		if (t > tN + 1e-12) {
 			break;
 		}
-		while (idx_coarse + 1 < jtime_coarse.size() && t > jtime_coarse(idx_coarse + 1)) {
+		// Match numpy.searchsorted(..., side='right'): when t lands exactly on
+		// a coarse knot, switch to the next segment's held value.
+		while (
+			idx_coarse + 1 < jtime_coarse.size()
+			&& t >= jtime_coarse(idx_coarse + 1)
+		) {
 			++idx_coarse;
 		}
 		jtime_fine(0, k) = t;

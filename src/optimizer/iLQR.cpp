@@ -117,13 +117,14 @@ bool iLQR(
 	for (int iteration = 0; iteration < ilqr_cfg.max_iters; ++iteration) {
 		// Reset regularization at the start of each iteration
 		double reg = reg_cfg.reg_init;
+		const int N_u = std::max(0, N - 1);
 		
 		// Regularization retry loop
 		while (reg <= reg_cfg.reg_max) {
 			deltaV.setZero();
 			
 			bool bp_success = backwardPass(
-				satellite, X, U, R, V, B, S, rho, 
+				satellite, X, U.leftCols(N_u), R, V, B, S, rho, 
 				boresight, attitude_target, pass_settings, reg,
 				K, d, deltaV, lambda_aug, mu_aug
 			);
@@ -133,7 +134,6 @@ bool iLQR(
 				continue;
 			}
 
-			const int N_u = std::max(0, N - 1);
 			double J_prev = satellite.totalCost(X, U.leftCols(N_u), B, boresight, attitude_target, cost_cfg);
 			J_prev += augmented_penalty_total(satellite, cnst_cfg, X, U, S, lambda_aug, mu_aug);
 			

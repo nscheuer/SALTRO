@@ -56,7 +56,7 @@ def create_planner_settings():
     plannersettings.passes[0].reg.reg_init = 1e-6
     plannersettings.passes[0].reg.reg_max = 1e10
     plannersettings.passes[0].reg.reg_scale = 10.0
-    plannersettings.passes[0].reg.use_dynamics_hess = True
+    plannersettings.passes[0].reg.use_dynamics_hess = False
     plannersettings.passes[0].reg.use_constraint_hess = False
 
     plannersettings.passes[0].linesearch.max_iters = 24
@@ -115,3 +115,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

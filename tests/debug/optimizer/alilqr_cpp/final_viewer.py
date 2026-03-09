@@ -35,50 +35,58 @@ def _normalize_quat(q):
     return q / nrm
 
 
-def _slerp_quat(q0, q1, t):
-    q0 = _normalize_quat(q0)
-    q1 = _normalize_quat(q1)
-    dot = float(np.dot(q0, q1))
-
-    # Flip sign to always take shortest path on S3.
-    if dot < 0.0:
-        q1 = -q1
-        dot = -dot
-
-    # Near-parallel fallback to lerp for numerical stability.
-    if dot > 0.9995:
-        return _normalize_quat((1.0 - t) * q0 + t * q1)
-
-    theta_0 = np.arccos(np.clip(dot, -1.0, 1.0))
-    sin_theta_0 = np.sin(theta_0)
-    theta = theta_0 * t
-    s0 = np.sin(theta_0 - theta) / sin_theta_0
-    s1 = np.sin(theta) / sin_theta_0
-    return _normalize_quat(s0 * q0 + s1 * q1)
+def _resample_zero_order_hold(jtime_coarse, q_goal_coarse, dt_seconds):
+    """Resample goal quaternion using zero-order hold, matching optimizer behavior."""
+    dt_cent = dt_seconds / (36525.0 * 86400.0)
+    t0, tN = jtime_coarse[0], jtime_coarse[-1]
+    jtime_fine = np.arange(t0, tN + dt_cent/2, dt_cent)
+    if abs(jtime_fine[-1] - tN) > 1e-12:
+        jtime_fine = np.append(jtime_fine, tN)
+    
+    # Match numpy.searchsorted(..., side='right') semantics
+    idx = np.searchsorted(jtime_coarse[1:], jtime_fine, side='right')
+    q_goal_fine = q_goal_coarse[:, idx]
+    
+    return q_goal_fine
 
 
-def _expand_q_goal(q_goal, n):
-    """Expand compact goal quaternion inputs to a full N-step trajectory."""
+def _expand_q_goal(q_goal, n, jtime=None, dt=None):
+    """Expand compact goal quaternion inputs to a full N-step trajectory using zero-order hold.
+    
+    If jtime and dt are provided, uses proper resampling matching optimizer behavior.
+    Otherwise falls back to index-based expansion.
+    """
     if q_goal is None:
         return None
     if q_goal.ndim != 2 or q_goal.shape[0] != 4:
         return None
     m = q_goal.shape[1]
+    if n <= 0:
+        return None
     if m == n:
         out = np.zeros_like(q_goal)
         for k in range(n):
             out[:, k] = _normalize_quat(q_goal[:, k])
         return out
+    if n == 1 and m >= 1:
+        return _normalize_quat(q_goal[:, 0]).reshape(4, 1)
     if m == 1:
         q = _normalize_quat(q_goal[:, 0])
         return np.repeat(q.reshape(4, 1), n, axis=1)
-    if m == 2 and n >= 2:
-        q0 = q_goal[:, 0]
-        q1 = q_goal[:, 1]
+    
+    # Use proper time-based resampling if jtime provided
+    if jtime is not None and dt is not None:
+        return _resample_zero_order_hold(jtime, q_goal, dt)
+    
+    # Fallback to index-based expansion
+    if m >= 2 and n >= 2:
         out = np.zeros((4, n))
         for k in range(n):
-            tau = k / float(n - 1)
-            out[:, k] = _slerp_quat(q0, q1, tau)
+            s = k * (m - 1) / float(n - 1)
+            seg = int(np.floor(s))
+            if seg >= m - 1:
+                seg = m - 1
+            out[:, k] = _normalize_quat(q_goal[:, seg])
         return out
     return None
 
@@ -91,13 +99,13 @@ def _read_u_max(actuator):
     return float(limit() if callable(limit) else limit)
 
 
-def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=None, q_goal=None, title: str = "AL-iLQR C++ Final Trajectory"):
+def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=None, q_goal=None, jtime=None, title: str = "AL-iLQR C++ Final Trajectory"):
     n = X.shape[1]
     t_state = np.arange(n) * dt
     n_u = min(U.shape[1], max(0, n - 1))
     t_control = np.arange(n_u) * dt
     U_use = U[:, :n_u]
-    q_goal_full = _expand_q_goal(q_goal, n)
+    q_goal_full = _expand_q_goal(q_goal, n, jtime, dt)
 
     fig, axes = plt.subplots(3, 2, figsize=(14, 12), constrained_layout=True)
     ax_q = axes[0, 0]

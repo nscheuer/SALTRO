@@ -123,9 +123,9 @@ bool alilqr(
         );
 
         if (!ilqr_ok && ilqr_status == ILQRStatus::RegularizationExceeded) {
-            max_constraint_violation_out = max_constraint_violation(settings, satellite, X, U, S);
-            status = ALILQRStatus::InnerFailed;
-            return false;
+            // Match Python AL-iLQR behavior: do not abort the outer loop when an
+            // inner iLQR solve hits regularization limit. Keep current X/U,
+            // update multipliers, and continue outer iterations.
         }
 
         const double max_c = max_constraint_violation(settings, satellite, X, U, S);

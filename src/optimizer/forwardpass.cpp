@@ -4,6 +4,7 @@
 #include <saltro/math/mrp.h>
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <iostream>
 #include <limits>
 
@@ -66,6 +67,10 @@ bool forwardPass(
     const int N = static_cast<int>(X.cols());
     const int nx = static_cast<int>(X.rows());
     const int nu = static_cast<int>(U.rows());
+    if (N <= 0 || nx <= 0 || nu <= 0) {
+        J_new = J_prev;
+        return false;
+    }
 
     const auto& dist_cfg = settings.disturbances;
     const CostConfig& cost_cfg = settings.passes[0].cost;
@@ -84,9 +89,45 @@ bool forwardPass(
         U_bar.setZero();
         X_bar.col(0) = X.col(0);
 
+        bool rollout_ok = true;
+        int fail_k = -1;
+        const char* fail_reason = "none";
+        auto valid_state_quat = [&](const Eigen::VectorXd& x_state) {
+            if (!x_state.allFinite()) {
+                return false;
+            }
+            if (x_state.size() >= 7) {
+                const Eigen::Vector4d q = x_state.segment<4>(3);
+                const double qn = q.norm();
+                if (!std::isfinite(qn) || qn < 1e-10) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        if (!valid_state_quat(X_bar.col(0))) {
+            SALTRO_OPT_DLOG("[FP] reject alpha=" << alpha << " reason=invalid_initial_state");
+            continue;
+        }
+
         for (int k = 0; k < N - 1; ++k) {
-            const double dt_centuries = jtime(k + 1) - jtime(k);
-            const double dt = dt_centuries * 36525.0 * 86400.0;
+            double dt = 0.0;
+            if (jtime.size() > k + 1) {
+                const double dt_centuries = jtime(k + 1) - jtime(k);
+                if (std::isfinite(dt_centuries) && dt_centuries > 0.0) {
+                    dt = dt_centuries * 36525.0 * 86400.0;
+                }
+            }
+            if ((!std::isfinite(dt) || dt <= 0.0) && settings.num_passes > 0 && std::isfinite(settings.passes[0].dt) && settings.passes[0].dt > 0.0) {
+                dt = settings.passes[0].dt;
+            }
+            if (!std::isfinite(dt) || dt <= 0.0) {
+                rollout_ok = false;
+                fail_k = k;
+                fail_reason = "invalid_dt";
+                break;
+            }
 
             // u_bar(k) = u(k) + K_k(δz_k) + alpha * d_k
             // where δz_k is the reduced-state error using MRP for attitude
@@ -122,33 +163,64 @@ bool forwardPass(
 
             // Integrate dynamics with RK4 to get x_bar(k+1)
             Eigen::VectorXd x_next;
-            rk4_step<Eigen::VectorXd>(
-                [&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
-                    const Eigen::Vector3d R_k = R.col(k);
-                    const Eigen::Vector3d V_k = V.col(k);
-                    const Eigen::Vector3d S_k = S.col(k);
-                    const int rho_k = static_cast<int>(std::max(0.0, std::round(rho(0, k))));
-                    dxdt = satellite.dynamics(
-                        x_state,
-                        u_bar_k,
-                        dist_cfg,
-                        R_k,
-                        B.col(k),
-                        S_k,
-                        V_k,
-                        rho_k
-                    );
-                },
-                X_bar.col(k),
-                0.0,
-                dt,
-                x_next
-            );
+            try {
+                rk4_step<Eigen::VectorXd>(
+                    [&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
+                        const Eigen::Vector3d R_k = (R.cols() > k) ? Eigen::Vector3d(R.col(k)) : Eigen::Vector3d::Zero();
+                        const Eigen::Vector3d V_k = (V.cols() > k) ? Eigen::Vector3d(V.col(k)) : Eigen::Vector3d::Zero();
+                        const Eigen::Vector3d S_k = (S.cols() > k) ? Eigen::Vector3d(S.col(k)) : Eigen::Vector3d::Zero();
+                        const int rho_k = (rho.cols() > k) ? static_cast<int>(std::max(0.0, std::round(rho(0, k)))) : 0;
+                        dxdt = satellite.dynamics(
+                            x_state,
+                            u_bar_k,
+                            dist_cfg,
+                            R_k,
+                            B.col(k),
+                            S_k,
+                            V_k,
+                            rho_k
+                        );
+                    },
+                    X_bar.col(k),
+                    0.0,
+                    dt,
+                    x_next
+                );
+            } catch (const std::exception&) {
+                rollout_ok = false;
+                fail_k = k;
+                fail_reason = "dynamics_exception";
+                break;
+            }
 
-            Eigen::Vector4d q = x_next.segment<4>(3);
-            q.normalize();
-            x_next.segment<4>(3) = q;
-            X_bar.col(k + 1) = x_next;
+            if (x_next.size() == nx && valid_state_quat(x_next)) {
+                // CRITICAL: Normalize quaternion after integration to prevent drift
+                if (x_next.size() >= 7) {
+                    Eigen::Vector4d q = x_next.segment<4>(3);
+                    double qn = q.norm();
+                    if (qn > 1e-10 && std::isfinite(qn)) {
+                        x_next.segment<4>(3) = q / qn;
+                    } else {
+                        rollout_ok = false;
+                        fail_k = k;
+                        fail_reason = "quaternion_normalization_failed";
+                        break;
+                    }
+                }
+                X_bar.col(k + 1) = x_next;
+            } else {
+                rollout_ok = false;
+                fail_k = k;
+                fail_reason = "invalid_next_state";
+                break;
+            }
+        }
+
+        if (!rollout_ok) {
+            (void)fail_k;  // Used only in debug logging macro
+            (void)fail_reason;  // Used only in debug logging macro
+            SALTRO_OPT_DLOG("[FP] reject alpha=" << alpha << " k=" << fail_k << " reason=" << fail_reason);
+            continue;
         }
 
         // Compute new trajectory nominal cost with rollout
@@ -166,6 +238,10 @@ bool forwardPass(
                     u_k = U_bar.col(k);
                 }
                 const Eigen::VectorXd c_k = satellite.constraints(k, N, x_k, u_k, S.col(k), cnst_cfg);
+                if (lambda_aug[k].size() != c_k.size() || mu_aug[k].size() != c_k.size()) {
+                    J_new = J_prev;
+                    return false;
+                }
 
                 for (int i = 0; i < c_k.size(); ++i) {
                     if (c_k(i) <= 0.0) {
