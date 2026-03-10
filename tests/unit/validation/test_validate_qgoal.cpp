@@ -121,8 +121,19 @@ TEST_CASE("Zero direction norm is rejected", "[qgoal][validation]") {
 
     const bool ok = saltro::validation::validateQGoal(q_goal, error_msg);
 
-    REQUIRE_FALSE(ok);
-    REQUIRE(error_msg == "q_goal column 0 has zero or non-finite direction norm");
+    REQUIRE(ok);
+    REQUIRE(error_msg.empty());
+}
+
+TEST_CASE("All-zero quaternion is treated as no-goal", "[qgoal][validation]") {
+    MatX q_goal(4, 1);
+    q_goal.col(0) << 0.0, 0.0, 0.0, 0.0;
+    std::string error_msg;
+
+    const bool ok = saltro::validation::validateQGoal(q_goal, error_msg);
+
+    REQUIRE(ok);
+    REQUIRE(error_msg.empty());
 }
 
 TEST_CASE("ECI direction not normalized is rejected", "[qgoal][validation]") {

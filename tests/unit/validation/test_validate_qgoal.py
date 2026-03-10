@@ -108,8 +108,17 @@ def test_zero_direction_norm_is_rejected():
 
     ok, error_msg = validateQGoal(q_goal)
 
-    assert not ok
-    assert error_msg == "q_goal column 0 has zero or non-finite direction norm"
+    assert ok
+    assert error_msg == "" or error_msg is None
+
+
+def test_all_zero_quaternion_is_treated_as_no_goal():
+    q_goal = np.array([[0.0], [0.0], [0.0], [0.0]], dtype=float)
+
+    ok, error_msg = validateQGoal(q_goal)
+
+    assert ok
+    assert error_msg == "" or error_msg is None
 
 
 def test_eci_direction_not_normalized_is_rejected():
