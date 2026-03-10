@@ -21,7 +21,7 @@ def create_planner_settings():
     # Pass 0 Settings
     plannersettings.num_passes = 1
     plannersettings.passes[0].dt = 10.0
-    plannersettings.passes[0].ilqr.cost_tol = 1e-5
+    plannersettings.passes[0].ilqr.cost_tol = 1e-3
     plannersettings.passes[0].ilqr.max_iters = 20
 
     # Pass 0 AL-iLQR Settings

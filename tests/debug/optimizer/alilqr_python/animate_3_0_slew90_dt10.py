@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "configs"))
 import saltro_py
 from sat_3_0_mtq import create_satellite
 from trajOpt import trajOpt
-from ilqr_viewer import launch_viewer
+from ilqr_animator import launch_animator
 
 def create_planner_settings():
     plannersettings = saltro_py.PlannerSettings()
@@ -90,7 +90,7 @@ def main():
         [0.0, 0.0]
     ])
 
-    w0 = np.array([0.001, 0.001, 0.0])
+    w0 = np.array([0.0, 0.0, 0.0])
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
     x0 = np.hstack((w0, q0))
 
@@ -105,7 +105,8 @@ def main():
     print(f"Final cost: {snapshots[-1]['J']:.6e}")
     print(f"Elapsed time: {elapsed_time:.3f} seconds")
     
-    launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol)
+    gif_out = Path(__file__).resolve().parent / "animate_3_0_slew90_dt60.gif"
+    launch_animator(snapshots, transitions, stop_reason, dt, cost_tol, gif_path=gif_out)
 
 if __name__ == "__main__":
     main()
