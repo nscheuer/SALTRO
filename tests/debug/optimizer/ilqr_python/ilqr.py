@@ -6,6 +6,9 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
 import saltro_py
 
+LAMBDA_AUG_ZERO = [np.array([0.0])]
+MU_AUG_ZERO = [np.array([0.0])]
+
 def compute_cost_components(X, U, satellite, attitude_target_traj, boresight, B, cost_cfg):
     """Compute cost breakdown by component at each timestep."""
     N = X.shape[1]
@@ -86,7 +89,22 @@ def ilqr(
 
         while reg <= passsettings.reg.reg_max:
             U_trim = U[:, :X.shape[1] - 1]
-            ok_bp, K, d, deltaV = saltro_py.backward_pass(satellite, X, U_trim, R, V, B, S, rho, boresight, q_goal, plannersettings, reg)
+            ok_bp, K, d, deltaV = saltro_py.backward_pass(
+                satellite,
+                X,
+                U_trim,
+                R,
+                V,
+                B,
+                S,
+                rho,
+                boresight,
+                q_goal,
+                plannersettings,
+                LAMBDA_AUG_ZERO,
+                MU_AUG_ZERO,
+                reg,
+            )
             if not ok_bp:
                 reg *= passsettings.reg.reg_scale
                 continue
