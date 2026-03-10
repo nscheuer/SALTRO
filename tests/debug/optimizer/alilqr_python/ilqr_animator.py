@@ -86,6 +86,7 @@ def launch_animator(
     dt,
     cost_tol,
     mtq_limits=None,
+    rw_limits=5.7e-6,
     gif_path=None,
     fps=6,
 ):
@@ -103,13 +104,51 @@ def launch_animator(
     first_num_rw = min(first_h.shape[0], n_u)
     n_mtq = max(0, n_u - first_num_rw)
 
-    lims_all = _derive_mtq_limits(mtq_limits, snapshots)
-    if lims_all.size >= n_mtq:
-        lims_mtq = lims_all[:n_mtq]
+    if mtq_limits is None:
+        lims_mtq = np.full(n_mtq, 0.20, dtype=float)
     else:
-        lims_mtq = np.zeros(n_mtq, dtype=float)
-        if lims_all.size > 0:
-            lims_mtq[: lims_all.size] = lims_all
+        lims_all = np.abs(np.asarray(mtq_limits, dtype=float).reshape(-1))
+        if lims_all.size == 1:
+            lims_mtq = np.full(n_mtq, float(lims_all[0]), dtype=float)
+        elif lims_all.size >= n_mtq:
+            lims_mtq = lims_all[:n_mtq]
+        else:
+            lims_mtq = np.zeros(n_mtq, dtype=float)
+            if lims_all.size > 0:
+                lims_mtq[: lims_all.size] = lims_all
+
+    lims_rw_all = np.abs(np.asarray(rw_limits, dtype=float).reshape(-1))
+
+    max_abs_mtq = 0.0
+    max_abs_rw = 0.0
+    max_u_len = 0
+    for s in snapshots:
+        U_s = s["U"]
+        X_s = s["X"]
+        max_u_len = max(max_u_len, U_s.shape[1])
+        h_s = X_s[7:, :]
+        num_rw_s = min(h_s.shape[0], U_s.shape[0])
+        num_mtq_s = max(0, U_s.shape[0] - num_rw_s)
+        if num_mtq_s > 0:
+            max_abs_mtq = max(max_abs_mtq, float(np.max(np.abs(U_s[0:num_mtq_s, :]))))
+        if num_rw_s > 0:
+            max_abs_rw = max(max_abs_rw, float(np.max(np.abs(U_s[num_mtq_s:num_mtq_s + num_rw_s, :]))))
+
+    lim_mtq_max = float(np.max(lims_mtq)) if lims_mtq.size > 0 else 0.20
+    lim_rw_max = float(np.max(lims_rw_all)) if lims_rw_all.size > 0 else 5.7e-6
+    y_mtq_max = max(max_abs_mtq, lim_mtq_max)
+    y_rw_max = max(max_abs_rw, lim_rw_max)
+    y_mtq_lim = 1.15 * y_mtq_max if y_mtq_max > 0.0 else 1.0
+    y_rw_lim = 1.15 * y_rw_max if y_rw_max > 0.0 else 1.0
+
+    if lims_rw_all.size == 1:
+        lims_rw = np.full(max(1, first_num_rw), float(lims_rw_all[0]), dtype=float)
+    elif lims_rw_all.size > 1:
+        lims_rw = lims_rw_all
+    else:
+        lims_rw = np.full(max(1, first_num_rw), 5.7e-6, dtype=float)
+
+    t_u_full = np.arange(max_u_len, dtype=float) * dt
 
     j_hist = np.asarray([float(s["J"]) for s in snapshots], dtype=float)
 
@@ -161,14 +200,18 @@ def launch_animator(
                 mtq_labels.append(f"mtq{i}")
                 lim = lims_mtq[i] if i < lims_mtq.size else 0.0
                 if lim > 0.0:
-                    ax_mtq.axhline(lim, color=f"C{i}", linestyle="--", linewidth=0.9, alpha=0.6)
-                    ax_mtq.axhline(-lim, color=f"C{i}", linestyle="--", linewidth=0.9, alpha=0.6)
+                    ax_mtq.axhline(lim, color="tab:red", linestyle="--", linewidth=1.0, alpha=0.9, zorder=1)
+                    ax_mtq.axhline(-lim, color="tab:red", linestyle="--", linewidth=1.0, alpha=0.9, zorder=1)
 
         if num_rw > 0:
             for i in range(rw_u.shape[0]):
-                line, = ax_rw.plot(t_u, rw_u[i, :], "--", linewidth=1.8, label=f"rw{i}")
+                line, = ax_rw.plot(t_u, rw_u[i, :], "-", color="purple", linewidth=1.8, label=f"rw{i}")
                 rw_handles.append(line)
                 rw_labels.append(f"rw{i}")
+                rw_lim = lims_rw[i] if i < lims_rw.size else lim_rw_max
+                if rw_lim > 0.0:
+                    ax_rw.axhline(rw_lim, color="tab:orange", linestyle="--", linewidth=1.0, alpha=0.9, zorder=1)
+                    ax_rw.axhline(-rw_lim, color="tab:orange", linestyle="--", linewidth=1.0, alpha=0.9, zorder=1)
 
         if not mtq_handles and not rw_handles:
             ax_mtq.text(0.5, 0.5, "No controls", transform=ax_mtq.transAxes, ha="center", va="center")
@@ -183,6 +226,13 @@ def launch_animator(
         ax_mtq.tick_params(axis="y", colors="C0")
         ax_rw.tick_params(axis="y", colors="C1")
         ax_mtq.grid(True, alpha=0.3)
+
+        if t_u_full.size > 0:
+            ax_mtq.set_xlim(t_u_full[0], t_u_full[-1])
+            ax_rw.set_xlim(t_u_full[0], t_u_full[-1])
+        mtq_zoom_lim = max(y_mtq_lim / 4.0, 1e-12)
+        ax_mtq.set_ylim(-mtq_zoom_lim, mtq_zoom_lim)
+        ax_rw.set_ylim(-y_rw_lim, y_rw_lim)
 
         ax_pe.clear()
         ax_pe.plot(t_state, pe, "o-", markersize=2.5, linewidth=1.8, color="C3")
