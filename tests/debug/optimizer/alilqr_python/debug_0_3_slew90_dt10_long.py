@@ -13,7 +13,7 @@ from trajOpt import trajOpt
 from ilqr_viewer import launch_viewer
 
 def create_planner_settings():
-    plannersettings = saltro_py.PlannerSettings()
+    plannersettings = saltro_py.PlannerSettings() 
 
     # Warm-Start
     plannersettings.init_traj.initcontroller = 2
