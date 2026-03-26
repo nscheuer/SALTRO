@@ -2,7 +2,7 @@ Installation
 ============
 
 System Setup
------------
+------------
 
 Install required system packages:
 
