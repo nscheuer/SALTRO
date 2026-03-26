@@ -18,7 +18,7 @@ def create_planner_settings():
     plannersettings.init_traj.initcontroller = 2
 
     plannersettings.num_passes = 1
-    plannersettings.passes[0].dt = 60.0
+    plannersettings.passes[0].dt = 10.0
     plannersettings.passes[0].ilqr.cost_tol = 1e-5
     plannersettings.passes[0].ilqr.max_iters = 20
 

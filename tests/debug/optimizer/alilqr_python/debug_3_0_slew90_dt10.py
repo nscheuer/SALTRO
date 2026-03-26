@@ -77,7 +77,7 @@ def main():
     plannersettings = create_planner_settings()
     satellite = create_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 2000/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 5400/(36525 * 86400)])
     qgoal = np.array([
         [np.sqrt(2)/2, np.sqrt(2)/2],
         [0.0, 0.0],           
@@ -90,7 +90,7 @@ def main():
         [0.0, 0.0]
     ])
 
-    w0 = np.array([0.001, 0.001, 0.0])
+    w0 = np.array([0.0, 0.0, 0.0])
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
     x0 = np.hstack((w0, q0))
 

@@ -7,9 +7,9 @@ SALTRO is a high-performance trajectory optimizer for satellite attitude control
    :alt: Demo animation
    :align: center
 
-Using trajectory planning and advance knowledge of the magnetic field, it is for instance able to slew a MTQ-only satellite within one orbit, a task that usually takes multiple.
+Using trajectory planning and advance knowledge of the magnetic field, it is for instance **able to slew a MTQ-only satellite within one orbit**, a task that usually takes multiple.
 
-SALTRO's predecessor flew on the MIT STAR Lab "BeaverCube 1" mission. SALTRO has a performance improvement of approximately 50x compared to the previous version.
+SALTRO's predecessor flew on the MIT STAR Lab "BeaverCube 1" mission. SALTRO has a performance improvement of approximately 50x compared to the previous version and is intended for **onboard computation**.
 
 .. list-table:: Compute times for a 3 MTQ satellite over 5400 seconds, 10 second timestep
    :header-rows: 1
@@ -20,10 +20,28 @@ SALTRO's predecessor flew on the MIT STAR Lab "BeaverCube 1" mission. SALTRO has
      - Compute Time
    * - i9-13900K
      - BC2 SALTRO
-     - 1.3 s
+     - 0.782 s
    * - i9-13900K
      - BC1 trajectory optimizer
-     - 50 s
+     - 50+ s
+
+Furthermore, SALTRO **supports hybrid magnetorquer + reaction wheel architectures**, with interesting results like the below pointing maneuver that uses three magnetorquers and one reaction wheel:
+
+.. image:: _static/animate_3_1_slew90_dt10.gif
+   :alt: Demo animation
+   :align: center
+
+Links
+-----
+.. toctree::
+   :maxdepth: 1
+
+   The working principle behind SALTRO <datasheets/ALTRO>
+   OBC (FC) usage guide <datasheets/FC>
+
+Documentation
+-------------
+
 
 .. toctree::
    :maxdepth: 1
