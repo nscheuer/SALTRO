@@ -4,6 +4,7 @@ optimizer
 .. toctree::
    :maxdepth: 1
 
+   alilqr
    backwardpass
    forwardpass
    iLQR

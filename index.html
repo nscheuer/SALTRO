@@ -45,7 +45,7 @@
     <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="limits" href="api/limits.html" />
+    <link rel="next" title="The working principle behind SALTRO" href="datasheets/ALTRO.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -133,6 +133,27 @@
   <ul class="bd-navbar-elements navbar-nav">
     
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/ALTRO.html">
+    The working principle behind SALTRO
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/Installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/FC.html">
+    OBC (FC) usage guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="api/limits.html">
     limits
   </a>
@@ -145,27 +166,6 @@
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="api/math/index.html">
-    math
-  </a>
-</li>
-
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="api/optimizer/index.html">
-    optimizer
-  </a>
-</li>
-
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="api/orbit_generation/index.html">
-    orbit_generation
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -174,6 +174,27 @@
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="api/math/index.html">
+    math
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="api/optimizer/index.html">
+    optimizer
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="api/orbit_generation/index.html">
+    orbit_generation
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="api/pybind/index.html">
     pybind
@@ -265,6 +286,27 @@
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/ALTRO.html">
+    The working principle behind SALTRO
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/Installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/FC.html">
+    OBC (FC) usage guide
+  </a>
+</li>
+
+
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="api/limits.html">
     limits
@@ -365,9 +407,49 @@
                   
   <section id="satellite-augmented-lagrangian-trajectory-optimization-saltro">
 <h1>Satellite Augmented Lagrangian Trajectory Optimization (SALTRO)<a class="headerlink" href="#satellite-augmented-lagrangian-trajectory-optimization-saltro" title="Link to this heading">#</a></h1>
-<p>Add your content using <code class="docutils literal notranslate"><span class="pre">reStructuredText</span></code> syntax. See the
-<a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html">reStructuredText</a>
-documentation for details.</p>
+<p>SALTRO is a high-performance trajectory optimizer for satellite attitude control.</p>
+<img alt="Demo animation" class="align-center" src="_images/animate_3_0_slew90_dt10.gif" />
+<p>Using trajectory planning and advance knowledge of the magnetic field, it is for instance <strong>able to slew a MTQ-only satellite within one orbit</strong>, a task that usually takes multiple.</p>
+<p>SALTRO’s predecessor flew on the MIT STAR Lab “BeaverCube 1” mission. SALTRO has a performance improvement of approximately 50x compared to the previous version and is intended for <strong>onboard computation</strong>.</p>
+<div class="pst-scrollable-table-container"><table class="table" id="id1">
+<caption><span class="caption-text">Compute times for a 3 MTQ satellite over 5400 seconds, 10 second timestep</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 30.0%" />
+<col style="width: 30.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>CPU</p></th>
+<th class="head"><p>Algorithm</p></th>
+<th class="head"><p>Compute Time</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>i9-13900K</p></td>
+<td><p>BC2 SALTRO</p></td>
+<td><p>0.782 s</p></td>
+</tr>
+<tr class="row-odd"><td><p>i9-13900K</p></td>
+<td><p>BC1 trajectory optimizer</p></td>
+<td><p>50+ s</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Furthermore, SALTRO <strong>supports hybrid magnetorquer + reaction wheel architectures</strong>, with interesting results like the below pointing maneuver that uses three magnetorquers and one reaction wheel:</p>
+<img alt="Demo animation" class="align-center" src="_images/animate_3_1_slew90_dt10.gif" />
+<section id="links">
+<h2>Links<a class="headerlink" href="#links" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="datasheets/ALTRO.html">The working principle behind SALTRO</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datasheets/Installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datasheets/FC.html">OBC (FC) usage guide</a></li>
+</ul>
+</div>
+</section>
+<section id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">#</a></h2>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api/limits.html">limits</a></li>
@@ -379,6 +461,7 @@ documentation for details.</p>
 <li class="toctree-l1"><a class="reference internal" href="api/validation/index.html">validation</a></li>
 </ul>
 </div>
+</section>
 </section>
 
 
@@ -392,11 +475,11 @@ documentation for details.</p>
                   
 <div class="prev-next-area">
     <a class="right-next"
-       href="api/limits.html"
+       href="datasheets/ALTRO.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">limits</p>
+        <p class="prev-next-title">The working principle behind SALTRO</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -410,6 +493,19 @@ documentation for details.</p>
                 <dialog id="pst-secondary-sidebar-modal"></dialog>
                 <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
 
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#links">Links</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation">Documentation</a></li>
+</ul>
+  </nav></div>
 
   <div class="sidebar-secondary-item">
   <div role="note" aria-label="source link">
