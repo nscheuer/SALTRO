@@ -37,6 +37,7 @@ Links
    :maxdepth: 1
 
    The working principle behind SALTRO <datasheets/ALTRO>
+   Installation <datasheets/Installation>
    OBC (FC) usage guide <datasheets/FC>
 
 Documentation
