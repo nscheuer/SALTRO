@@ -117,7 +117,17 @@ def ilqr(
         J_nom = satellite.totalCost(X, U_trim, B, boresight, q_goal, passsettings.cost)
         J = J_nom + _augmented_penalty_total(plannersettings, satellite, X, U, S, lambda_aug, mu_aug)
         components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
-        snapshots.append({"X": X.copy(), "U": U.copy(), "J": J, "q_goal": q_goal.copy(), "components": components})
+        snapshots.append(
+            {
+                "X": X.copy(),
+                "U": U.copy(),
+                "J": J,
+                "q_goal": q_goal.copy(),
+                "components": components,
+                "R": R.copy(),
+                "B": B.copy(),
+            }
+        )
 
     for iteration in range(passsettings.ilqr.max_iters):
         reg = passsettings.reg.reg_init
@@ -182,7 +192,17 @@ def ilqr(
             
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
-                snapshots.append({"X": X.copy(), "U": U.copy(), "J": J_new, "q_goal": q_goal.copy(), "components": components})
+                snapshots.append(
+                    {
+                        "X": X.copy(),
+                        "U": U.copy(),
+                        "J": J_new,
+                        "q_goal": q_goal.copy(),
+                        "components": components,
+                        "R": R.copy(),
+                        "B": B.copy(),
+                    }
+                )
                 transitions.append({
                     "bp_ok": True,
                     "fp_ok": True,

@@ -20,6 +20,7 @@ else:
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.lines import Line2D
 from matplotlib.widgets import Button
 from matplotlib.ticker import ScalarFormatter
 
@@ -79,6 +80,141 @@ def _derive_mtq_limits(mtq_limits, snapshots):
     return inferred
 
 
+def _safe_normalize(v):
+    arr = np.asarray(v, dtype=float).reshape(-1)
+    if arr.size == 0:
+        return np.zeros(3, dtype=float)
+    if arr.size < 3:
+        out = np.zeros(3, dtype=float)
+        out[: arr.size] = arr
+        arr = out
+    elif arr.size > 3:
+        arr = arr[:3]
+    nrm = np.linalg.norm(arr)
+    if nrm <= 1e-14:
+        return np.zeros(3, dtype=float)
+    return arr / nrm
+
+
+def _quat_to_rotmat(q):
+    q = np.asarray(q, dtype=float).reshape(4)
+    nrm = np.linalg.norm(q)
+    if nrm <= 1e-14:
+        return np.eye(3)
+    q = q / nrm
+    w, x, y, z = q
+    return np.array(
+        [
+            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+        ],
+        dtype=float,
+    )
+
+
+def _state_index_for_frame(frame_idx, n_frames, n_state):
+    if n_state <= 1:
+        return 0
+    if n_frames <= 1:
+        return n_state - 1
+    frac = frame_idx / float(max(1, n_frames - 1))
+    return int(round(frac * (n_state - 1)))
+
+
+def _control_index_for_state(state_idx, n_u):
+    if n_u <= 0:
+        return 0
+    return min(state_idx, n_u - 1)
+
+
+def _to_rgb_image(img):
+    arr = np.asarray(img)
+    if arr.ndim == 2:
+        arr = np.repeat(arr[..., None], 3, axis=2)
+    if arr.shape[2] == 4:
+        arr = arr[:, :, :3]
+    arr = arr.astype(float)
+    if arr.max() > 1.0:
+        arr = arr / 255.0
+    return np.clip(arr, 0.0, 1.0)
+
+
+def _build_earth_surface(re_km, texture_path=None, nu=96, nv=48):
+    u = np.linspace(0.0, 2.0 * np.pi, nu)
+    v = np.linspace(0.0, np.pi, nv)
+    uu, vv = np.meshgrid(u, v, indexing="ij")
+
+    xs = re_km * np.cos(uu) * np.sin(vv)
+    ys = re_km * np.sin(uu) * np.sin(vv)
+    zs = re_km * np.cos(vv)
+
+    facecolors = None
+    texture_loaded = False
+    if texture_path:
+        texture_file = Path(texture_path)
+        if texture_file.exists():
+            try:
+                tex = _to_rgb_image(plt.imread(str(texture_file)))
+                h, w, _ = tex.shape
+                tx = np.mod(uu / (2.0 * np.pi), 1.0) * (w - 1)
+                ty = np.clip(vv / np.pi, 0.0, 1.0) * (h - 1)
+                txi = tx.astype(int)
+                tyi = ty.astype(int)
+                facecolors = tex[tyi, txi, :]
+                texture_loaded = True
+            except Exception:
+                facecolors = None
+
+    return {
+        "x": xs,
+        "y": ys,
+        "z": zs,
+        "facecolors": facecolors,
+        "texture_loaded": texture_loaded,
+    }
+
+
+def _build_dipole_lines(re_km):
+    lines = []
+    thetas = np.linspace(0.20, np.pi - 0.20, 160)
+    longitudes = np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False)
+    l_shells = [1.25, 1.65, 2.10, 2.80]
+
+    for l_shell in l_shells:
+        r = l_shell * re_km * (np.sin(thetas) ** 2)
+        for lon in longitudes:
+            x0 = r * np.sin(thetas)
+            y0 = np.zeros_like(x0)
+            z0 = r * np.cos(thetas)
+
+            x = x0 * np.cos(lon) - y0 * np.sin(lon)
+            y = x0 * np.sin(lon) + y0 * np.cos(lon)
+            z = z0
+            lines.append((x, y, z))
+
+    return lines
+
+
+def _set_equal_3d_axes(ax, lim):
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
+    ax.set_zlim(-lim, lim)
+    ax.set_box_aspect((1.0, 1.0, 1.0))
+
+
+def _rw_to_body_vector(rw_cmd):
+    rw_cmd = np.asarray(rw_cmd, dtype=float).reshape(-1)
+    out = np.zeros(3, dtype=float)
+    if rw_cmd.size >= 3:
+        out[:] = rw_cmd[:3]
+    elif rw_cmd.size == 2:
+        out[0:2] = rw_cmd
+    elif rw_cmd.size == 1:
+        out[2] = rw_cmd[0]
+    return out
+
+
 def launch_animator(
     snapshots,
     transitions,
@@ -89,6 +225,7 @@ def launch_animator(
     rw_limits=5.7e-6,
     gif_path=None,
     fps=6,
+    earth_texture_path=None,
 ):
     if not snapshots:
         raise ValueError("No snapshots available for animator")
@@ -152,18 +289,160 @@ def launch_animator(
 
     j_hist = np.asarray([float(s["J"]) for s in snapshots], dtype=float)
 
-    fig = plt.figure(figsize=(14, 9), constrained_layout=True)
-    gs = fig.add_gridspec(3, 2, hspace=0.18, wspace=0.12)
+    fig = plt.figure(figsize=(18, 10), constrained_layout=True)
+    gs = fig.add_gridspec(3, 3, hspace=0.18, wspace=0.12)
 
     ax_mtq = fig.add_subplot(gs[0, 0])
     ax_rw = ax_mtq.twinx()
     ax_pe = fig.add_subplot(gs[0, 1])
     ax_cost_t = fig.add_subplot(gs[1, 0])
     ax_cnst_t = fig.add_subplot(gs[1, 1])
-    ax_cost_iter = fig.add_subplot(gs[2, :])
+    ax_cost_iter = fig.add_subplot(gs[2, 0:2])
+    ax_earth = fig.add_subplot(gs[0:2, 2], projection="3d")
+    ax_sat = fig.add_subplot(gs[2, 2], projection="3d")
 
     component_order = ["attitude", "angular_velocity", "control", "rw_momentum"]
     component_colors = ["#FF6B6B", "#2A9D8F", "#6D597A", "#FFA07A"]
+
+    earth_radius_km = 6371.0
+    earth_surface = _build_earth_surface(earth_radius_km, texture_path=earth_texture_path)
+    dipole_lines = _build_dipole_lines(earth_radius_km)
+
+    def _draw_earth_animation(snap, state_idx):
+        ax_earth.clear()
+
+        R = np.asarray(snap.get("R", np.zeros((3, n))), dtype=float)
+        if R.ndim != 2 or R.shape[0] < 3:
+            R = np.zeros((3, n), dtype=float)
+        if R.shape[1] == 0:
+            R = np.zeros((3, 1), dtype=float)
+
+        B = np.asarray(snap.get("B", np.zeros_like(R)), dtype=float)
+        if B.ndim != 2 or B.shape[0] < 3:
+            B = np.zeros_like(R)
+        if B.shape[1] < R.shape[1]:
+            B_pad = np.zeros((3, R.shape[1]), dtype=float)
+            B_pad[:, : B.shape[1]] = B[:, : B.shape[1]]
+            B = B_pad
+
+        r_idx = min(state_idx, R.shape[1] - 1)
+        R_km = R[0:3, :] / 1e3
+        sat_pos = R_km[:, r_idx]
+
+        if earth_surface["facecolors"] is not None:
+            ax_earth.plot_surface(
+                earth_surface["x"],
+                earth_surface["y"],
+                earth_surface["z"],
+                facecolors=earth_surface["facecolors"],
+                rstride=1,
+                cstride=1,
+                linewidth=0,
+                antialiased=False,
+                shade=False,
+                alpha=1.0,
+            )
+        else:
+            ax_earth.plot_surface(
+                earth_surface["x"],
+                earth_surface["y"],
+                earth_surface["z"],
+                color="#6baed6",
+                linewidth=0,
+                antialiased=True,
+                alpha=0.75,
+            )
+
+        for x_line, y_line, z_line in dipole_lines:
+            ax_earth.plot(x_line, y_line, z_line, color="#1f77b4", linewidth=0.7, alpha=0.35)
+
+        ax_earth.plot(R_km[0, :], R_km[1, :], R_km[2, :], color="#f28e2b", linewidth=1.8, alpha=0.95)
+        ax_earth.scatter(sat_pos[0], sat_pos[1], sat_pos[2], color="red", s=30)
+
+        b_vec = B[0:3, r_idx]
+        b_hat = _safe_normalize(b_vec)
+        if np.linalg.norm(b_hat) > 0.0:
+            b_scale = 0.22 * earth_radius_km
+            ax_earth.quiver(
+                sat_pos[0],
+                sat_pos[1],
+                sat_pos[2],
+                b_hat[0],
+                b_hat[1],
+                b_hat[2],
+                length=b_scale,
+                normalize=True,
+                color="#e15759",
+                linewidth=2.0,
+            )
+
+        orb_norm = np.linalg.norm(R_km, axis=0)
+        lim = max(1.25 * earth_radius_km, 1.05 * float(np.max(orb_norm)))
+        _set_equal_3d_axes(ax_earth, lim)
+
+        ax_earth.view_init(elev=24, azim=36)
+        ax_earth.set_xlabel("x [km]")
+        ax_earth.set_ylabel("y [km]")
+        ax_earth.set_zlabel("z [km]")
+        title = "Earth Orbit + Field"
+        if earth_texture_path and not earth_surface["texture_loaded"]:
+            title += " (texture fallback)"
+        ax_earth.set_title(title)
+
+    def _draw_sat_animation(q_curr, q_goal_curr, b_inertial, tau_body):
+        ax_sat.clear()
+
+        C_ib_curr = _quat_to_rotmat(q_curr)
+        C_ib_goal = _quat_to_rotmat(q_goal_curr)
+        C_bi_curr = C_ib_curr.T
+        C_bg = C_bi_curr @ C_ib_goal
+
+        axis_len = 1.0
+        body_axes = np.eye(3)
+        goal_axes = C_bg
+
+        colors = ["#e41a1c", "#4daf4a", "#377eb8"]
+        for i in range(3):
+            b_axis = body_axes[:, i]
+            g_axis = goal_axes[:, i]
+            ax_sat.quiver(0.0, 0.0, 0.0, b_axis[0], b_axis[1], b_axis[2], color=colors[i], length=axis_len, linewidth=2.0)
+            ax_sat.quiver(
+                0.0,
+                0.0,
+                0.0,
+                g_axis[0],
+                g_axis[1],
+                g_axis[2],
+                color=colors[i],
+                length=axis_len,
+                linewidth=1.6,
+                linestyle="--",
+                alpha=0.85,
+            )
+
+        b_body = C_bi_curr @ np.asarray(b_inertial, dtype=float).reshape(3)
+        b_hat = _safe_normalize(b_body)
+        tau_hat = _safe_normalize(tau_body)
+
+        if np.linalg.norm(b_hat) > 0.0:
+            ax_sat.quiver(0.0, 0.0, 0.0, b_hat[0], b_hat[1], b_hat[2], color="#17becf", length=1.2, linewidth=2.4)
+        if np.linalg.norm(tau_hat) > 0.0:
+            ax_sat.quiver(0.0, 0.0, 0.0, tau_hat[0], tau_hat[1], tau_hat[2], color="#ff7f0e", length=1.2, linewidth=2.4)
+
+        legend_handles = [
+            Line2D([0], [0], color="k", linewidth=2.0, label="sat frame (solid xyz)"),
+            Line2D([0], [0], color="k", linewidth=1.6, linestyle="--", label="goal frame (dashed xyz)"),
+            Line2D([0], [0], color="#17becf", linewidth=2.4, label="B direction (normalized)"),
+            Line2D([0], [0], color="#ff7f0e", linewidth=2.4, label="torque direction (normalized)"),
+        ]
+        ax_sat.legend(handles=legend_handles, fontsize=7, loc="upper left")
+
+        _set_equal_3d_axes(ax_sat, 1.35)
+        ax_sat.view_init(elev=20, azim=40)
+        ax_sat.set_xlabel("x_b")
+        ax_sat.set_ylabel("y_b")
+        ax_sat.set_zlabel("z_b")
+        ax_sat.set_title("Satellite Frame vs Goal")
 
     def _draw_frame(frame_idx):
         snap = snapshots[frame_idx]
@@ -279,6 +558,38 @@ def launch_animator(
         ax_cost_iter.set_ylabel("Total cost")
         ax_cost_iter.grid(True, alpha=0.3)
         _configure_sci_y(ax_cost_iter)
+
+        state_idx = _state_index_for_frame(frame_idx, n_frames, X.shape[1])
+        u_idx = _control_index_for_state(state_idx, U.shape[1])
+
+        if num_mtq > 0 and U.shape[1] > 0:
+            mtq_cmd = np.zeros(3, dtype=float)
+            mtq_take = min(3, num_mtq)
+            mtq_cmd[:mtq_take] = mtq_u[:mtq_take, u_idx]
+        else:
+            mtq_cmd = np.zeros(3, dtype=float)
+
+        if num_rw > 0 and U.shape[1] > 0:
+            rw_cmd = rw_u[:, u_idx]
+        else:
+            rw_cmd = np.zeros(0, dtype=float)
+
+        B_snap = np.asarray(snap.get("B", np.zeros((3, X.shape[1]))), dtype=float)
+        if B_snap.ndim != 2 or B_snap.shape[0] < 3 or B_snap.shape[1] == 0:
+            b_inertial = np.zeros(3, dtype=float)
+        else:
+            b_inertial = B_snap[0:3, min(state_idx, B_snap.shape[1] - 1)]
+
+        q_curr = q[:, state_idx]
+        q_goal_curr = q_goal[:, state_idx]
+        C_bi_curr = _quat_to_rotmat(q_curr).T
+        b_body = C_bi_curr @ b_inertial
+        tau_mtq = np.cross(mtq_cmd, b_body)
+        tau_rw = _rw_to_body_vector(rw_cmd)
+        tau_net = tau_mtq + tau_rw
+
+        _draw_earth_animation(snap, state_idx)
+        _draw_sat_animation(q_curr, q_goal_curr, b_inertial, tau_net)
 
         outer_iter = snap.get("outer_iter", "?")
         fig.suptitle(

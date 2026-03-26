@@ -104,9 +104,18 @@ def main():
     print(f"AL-iLQR finished: {stop_reason}")
     print(f"Final cost: {snapshots[-1]['J']:.6e}")
     print(f"Elapsed time: {elapsed_time:.3f} seconds")
-    
+
+    earth_texture = None
     gif_out = Path(__file__).resolve().parent / "animate_3_0_slew90_dt60.gif"
-    launch_animator(snapshots, transitions, stop_reason, dt, cost_tol, gif_path=gif_out)
+    launch_animator(
+        snapshots,
+        transitions,
+        stop_reason,
+        dt,
+        cost_tol,
+        gif_path=gif_out,
+        earth_texture_path=earth_texture,
+    )
 
 if __name__ == "__main__":
     main()
