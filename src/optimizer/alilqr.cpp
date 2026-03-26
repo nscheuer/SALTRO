@@ -9,6 +9,13 @@ namespace saltro::optimizer {
 
 namespace {
 
+bool isRecoverableInnerFailure(const ILQRStatus status)
+{
+    // AL outer loop may still reduce constraint violation after a non-converged
+    // inner solve, so these statuses do not immediately terminate AL.
+    return status == ILQRStatus::MaxIterations || status == ILQRStatus::RegularizationExceeded;
+}
+
 Eigen::VectorXd control_at_k(const Eigen::Ref<const Eigen::MatrixXd>& U, int k, int N, int control_dim)
 {
     if (U.cols() == N - 1 && k < N - 1) {
@@ -122,10 +129,12 @@ bool alilqr(
             J
         );
 
-        if (!ilqr_ok && ilqr_status == ILQRStatus::RegularizationExceeded) {
-            // Match Python AL-iLQR behavior: do not abort the outer loop when an
-            // inner iLQR solve hits regularization limit. Keep current X/U,
-            // update multipliers, and continue outer iterations.
+        if (!ilqr_ok) {
+            if (!isRecoverableInnerFailure(ilqr_status)) {
+                status = ALILQRStatus::InnerFailed;
+                max_constraint_violation_out = max_constraint_violation(settings, satellite, X, U, S);
+                return false;
+            }
         }
 
         const double max_c = max_constraint_violation(settings, satellite, X, U, S);

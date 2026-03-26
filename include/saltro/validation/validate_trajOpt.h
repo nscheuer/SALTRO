@@ -77,4 +77,30 @@ bool validatetrajOpt(
     std::string& error_msg
 );
 
+/**
+ * @brief Validate derived trajectory context after resampling in trajOpt.
+ *
+ * This check is intended to be called explicitly inside trajOpt after time/goal
+ * resampling and before warm-start/optimization. It validates that the derived
+ * horizon and trajectory capacities are internally consistent.
+ *
+ * @param jtime_resampled Resampled mission time buffer (1 × capacity)
+ * @param q_goal_resampled Resampled target attitude buffer (4 × capacity)
+ * @param boresight_resampled Resampled boresight buffer (3 × capacity)
+ * @param N_resampled Active resampled horizon length
+ * @param X_col_capacity Available state trajectory column capacity
+ * @param U_col_capacity Available control trajectory column capacity
+ * @param error_msg Output: detailed error message describing first failure
+ * @return true if resampled context is valid, false otherwise
+ */
+bool validateTrajOptResampledContext(
+    const Eigen::Ref<const Eigen::Matrix<double, 1, Eigen::Dynamic>>& jtime_resampled,
+    const Eigen::Ref<const Eigen::Matrix<double, 4, Eigen::Dynamic>>& q_goal_resampled,
+    const Eigen::Ref<const Eigen::Matrix<double, 3, Eigen::Dynamic>>& boresight_resampled,
+    int N_resampled,
+    int X_col_capacity,
+    int U_col_capacity,
+    std::string& error_msg
+);
+
 }

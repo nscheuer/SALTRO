@@ -8,8 +8,11 @@
 namespace saltro::optimizer {
 
 enum class ILQRStatus {
+	// Cost reduction satisfied (delta_J <= cost_tol).
 	Converged,
+	// Iteration budget exhausted before convergence.
 	MaxIterations,
+	// Regularization retry loop exceeded reg_max.
 	RegularizationExceeded,
 };
 
@@ -42,11 +45,11 @@ enum class ILQRStatus {
  * @param attitude_target Attitude goal trajectory (4 × N): quaternions or [NaN, x, y, z] for ECI vector
  * @param J Output: total trajectory cost for the optimized trajectory
  *
- * @return true if optimization succeeded (converged or reached max iterations),
- *         false if numerical issues occurred
+ * @return true only when convergence is reached,
+ *         false when the solve terminates without convergence
  *
  * @note Algorithm modifies X, U, and J in-place
- * @note Convergence determined by settings.ilqr.grad_tol and settings.ilqr.cost_tol
+ * @note Convergence is currently determined by settings.ilqr.cost_tol
  */
 bool iLQR(
 	const PlannerSettings& settings,

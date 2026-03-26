@@ -118,8 +118,16 @@ bool trajOpt(
 		throw std::runtime_error("trajOpt failed to resample time and goals");
 	}
 
-	if (N_fixed > X.cols() || N_fixed > U.cols()) {
-		throw std::runtime_error("trajOpt resampled length exceeds provided X/U column capacity; allocate at least N_fixed columns");
+	if (!validation::validateTrajOptResampledContext(
+		jtime_fixed,
+		q_goal_fixed,
+		boresight_fixed,
+		N_fixed,
+		static_cast<int>(X.cols()),
+		static_cast<int>(U.cols()),
+		error_msg
+	)) {
+		throw std::runtime_error("trajOpt post-resample validation failed: " + error_msg);
 	}
 
 	Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ> R;

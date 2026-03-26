@@ -67,10 +67,6 @@ bool forwardPass(
     const int N = static_cast<int>(X.cols());
     const int nx = static_cast<int>(X.rows());
     const int nu = static_cast<int>(U.rows());
-    if (N <= 0 || nx <= 0 || nu <= 0) {
-        J_new = J_prev;
-        return false;
-    }
 
     const auto& dist_cfg = settings.disturbances;
     const CostConfig& cost_cfg = settings.passes[0].cost;

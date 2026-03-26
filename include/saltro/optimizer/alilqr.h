@@ -8,8 +8,11 @@
 namespace saltro::optimizer {
 
 enum class ALILQRStatus {
+    // Constraint violation reached configured tolerance.
     Converged,
+    // Outer-iteration budget exhausted before constraint convergence.
     MaxOuterIterations,
+    // Inner iLQR failed with a non-recoverable status.
     InnerFailed,
 };
 
