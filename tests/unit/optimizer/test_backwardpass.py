@@ -16,6 +16,8 @@ import saltro_py
 PI = 3.14159265358979323846
 SEC_PER_CENTURY = 36525.0 * 86400.0
 MAX_LENGTH_TRAJ = 1000  # From limits.h
+LAMBDA_AUG_ZERO = [np.array([0.0])]
+MU_AUG_ZERO = [np.array([0.0])]
 
 
 def make_attitude_traj(att, N_cols):
@@ -158,7 +160,8 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
-            boresight_test, attitude_target_test_traj, settings_test, settings_test.passes[0].reg.reg_init
+            boresight_test, attitude_target_test_traj, settings_test,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, settings_test.passes[0].reg.reg_init
         )
         
         assert ok
@@ -221,7 +224,8 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
-            boresight_test, attitude_target_test_traj, settings_test, settings_test.passes[0].reg.reg_init
+            boresight_test, attitude_target_test_traj, settings_test,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, settings_test.passes[0].reg.reg_init
         )
         
         assert ok
@@ -252,7 +256,8 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
-            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings, fixture.reg
+            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, fixture.reg
         )
         
         assert ok
@@ -276,7 +281,8 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
-            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings, fixture.reg
+            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, fixture.reg
         )
         
         assert ok
@@ -300,7 +306,8 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
-            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings, fixture.reg
+            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, fixture.reg
         )
         
         assert ok
@@ -323,7 +330,8 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
-            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings, fixture.reg
+            fixture.rho, fixture.boresight, fixture.attitude_target_traj, fixture.settings,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, fixture.reg
         )
         
         # Should succeed (regularization loop finds positive definite Q_uu)
@@ -387,7 +395,8 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
-            boresight_test, attitude_target_test_traj, settings_test, settings_test.passes[0].reg.reg_init
+            boresight_test, attitude_target_test_traj, settings_test,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, settings_test.passes[0].reg.reg_init
         )
         
         assert ok
@@ -453,7 +462,8 @@ class TestBackwardPass:
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
-            boresight_test, attitude_target_test_traj, settings_test, settings_test.passes[0].reg.reg_init
+            boresight_test, attitude_target_test_traj, settings_test,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, settings_test.passes[0].reg.reg_init
         )
         
         assert ok

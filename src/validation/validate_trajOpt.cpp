@@ -26,8 +26,8 @@ bool validateTrajOptCrossContext(
     const int N,
     std::string& error_msg
 ) {
-    if (N <= 0) {
-        error_msg = "N must be > 0";
+    if (N <= 1) {
+        error_msg = "N must be > 1";
         return false;
     }
 
@@ -146,6 +146,70 @@ bool validatetrajOpt(
 
     if (!validateTrajOptCrossContext(satellite, x0, jtime, q_goal, boresight, state_dim, input_dim, N, nested_error)) {
         error_msg = "Cross-context validation failed: " + nested_error;
+        return false;
+    }
+
+    return true;
+}
+
+bool validateTrajOptResampledContext(
+    const Eigen::Ref<const Eigen::Matrix<double, 1, Eigen::Dynamic>>& jtime_resampled,
+    const Eigen::Ref<const Eigen::Matrix<double, 4, Eigen::Dynamic>>& q_goal_resampled,
+    const Eigen::Ref<const Eigen::Matrix<double, 3, Eigen::Dynamic>>& boresight_resampled,
+    int N_resampled,
+    int X_col_capacity,
+    int U_col_capacity,
+    std::string& error_msg
+) {
+    if (N_resampled <= 1) {
+        error_msg = "resampled horizon must be > 1";
+        return false;
+    }
+
+    if (N_resampled > saltro::limits::MAX_LENGTH_TRAJ) {
+        error_msg = "resampled horizon exceeds MAX_LENGTH_TRAJ";
+        return false;
+    }
+
+    if (jtime_resampled.cols() < N_resampled) {
+        error_msg = "resampled jtime buffer is smaller than resampled horizon";
+        return false;
+    }
+
+    if (q_goal_resampled.cols() < N_resampled) {
+        error_msg = "resampled q_goal buffer is smaller than resampled horizon";
+        return false;
+    }
+
+    if (boresight_resampled.cols() < N_resampled) {
+        error_msg = "resampled boresight buffer is smaller than resampled horizon";
+        return false;
+    }
+
+    if (X_col_capacity < N_resampled) {
+        error_msg = "state trajectory capacity is smaller than resampled horizon";
+        return false;
+    }
+
+    if (U_col_capacity < N_resampled) {
+        error_msg = "control trajectory capacity is smaller than resampled horizon";
+        return false;
+    }
+
+    std::string nested_error;
+    const Eigen::VectorXd jtime_active = jtime_resampled.leftCols(N_resampled).transpose();
+    if (!validateJulianTime(jtime_active, nested_error)) {
+        error_msg = "resampled jtime validation failed: " + nested_error;
+        return false;
+    }
+
+    if (!validateQGoal(q_goal_resampled.leftCols(N_resampled), nested_error)) {
+        error_msg = "resampled q_goal validation failed: " + nested_error;
+        return false;
+    }
+
+    if (!validateBoresight(boresight_resampled.leftCols(N_resampled), nested_error)) {
+        error_msg = "resampled boresight validation failed: " + nested_error;
         return false;
     }
 

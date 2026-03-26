@@ -1,10 +1,11 @@
 #include <saltro/optimizer/trajOpt.h>
+#include <saltro/optimizer/alilqr.h>
 #include <saltro/optimizer/warm_start.h>
 #include <saltro/orbit_generation/generate_orbit.h>
 #include <saltro/validation/validate_trajOpt.h>
 
 #include <cmath>
-#include <limits>
+#include <stdexcept>
 
 namespace saltro::optimizer {
 
@@ -38,7 +39,12 @@ static bool resample_zero_order_hold(
 		if (t > tN + 1e-12) {
 			break;
 		}
-		while (idx_coarse + 1 < jtime_coarse.size() && t > jtime_coarse(idx_coarse + 1)) {
+		// Match numpy.searchsorted(..., side='right'): when t lands exactly on
+		// a coarse knot, switch to the next segment's held value.
+		while (
+			idx_coarse + 1 < jtime_coarse.size()
+			&& t >= jtime_coarse(idx_coarse + 1)
+		) {
 			++idx_coarse;
 		}
 		jtime_fine(0, k) = t;
@@ -82,26 +88,23 @@ bool trajOpt(
 	int& N
 ) {
 	(void)K;
+	PlannerSettings settings_local = settings;
+	if (settings_local.constraints.u_max.size() == 0) {
+		settings_local.constraints.u_max.resize(input_dim);
+		for (int i = 0; i < satellite.numMTQ(); ++i) {
+			settings_local.constraints.u_max(i) = std::abs(satellite.getMTQ(i).u_max());
+		}
+		for (int i = 0; i < satellite.numRW(); ++i) {
+			settings_local.constraints.u_max(satellite.numMTQ() + i) = std::abs(satellite.getRW(i).u_max());
+		}
+	}
 
 	std::string error_msg;
-	if (!validation::validatetrajOpt(settings, satellite, x0, r0, v0, jtime, q_goal, boresight, state_dim, input_dim, N, error_msg)) {
+	if (!validation::validatetrajOpt(settings_local, satellite, x0, r0, v0, jtime, q_goal, boresight, state_dim, input_dim, N, error_msg)) {
 		throw std::runtime_error("trajOpt input validation failed: " + error_msg);
 	}
 
-	double dt_sec = settings.num_passes > 0 ? settings.passes[0].dt : 0.0;
-	if (dt_sec <= 0.0 && jtime.size() > 1) {
-		// Fallback to minimum coarse spacing if dt not provided
-		dt_sec = std::numeric_limits<double>::infinity();
-		for (Eigen::Index i = 1; i < jtime.size(); ++i) {
-			const double dcent = jtime(i) - jtime(i - 1);
-			if (dcent > 0.0) {
-				dt_sec = std::min(dt_sec, dcent * 36525.0 * 86400.0);
-			}
-		}
-		if (!std::isfinite(dt_sec) || dt_sec <= 0.0) {
-			throw std::runtime_error("trajOpt could not determine a valid dt");
-		}
-	}
+	const double dt_sec = settings_local.passes[0].dt;
 
 	Eigen::Matrix<double, 1, Eigen::Dynamic> jtime_fixed(1, saltro::limits::MAX_LENGTH_TRAJ);
 	Eigen::Matrix<double, 4, Eigen::Dynamic> q_goal_fixed(4, saltro::limits::MAX_LENGTH_TRAJ);
@@ -113,6 +116,18 @@ bool trajOpt(
 
 	if (!resample_zero_order_hold(jtime, q_goal, boresight, dt_sec, jtime_fixed, q_goal_fixed, boresight_fixed, N_fixed)) {
 		throw std::runtime_error("trajOpt failed to resample time and goals");
+	}
+
+	if (!validation::validateTrajOptResampledContext(
+		jtime_fixed,
+		q_goal_fixed,
+		boresight_fixed,
+		N_fixed,
+		static_cast<int>(X.cols()),
+		static_cast<int>(U.cols()),
+		error_msg
+	)) {
+		throw std::runtime_error("trajOpt post-resample validation failed: " + error_msg);
 	}
 
 	Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ> R;
@@ -127,16 +142,44 @@ bool trajOpt(
 		throw std::runtime_error("trajOpt failed to generate orbit");
 	}
 
-	const bool warm_start_ok = warm_start(settings, satellite, x0, jtime_fixed.leftCols(N_fixed).transpose(), q_goal_fixed.leftCols(N_fixed), boresight_fixed.leftCols(N_fixed), N_fixed, R, V, B, S, rho, X, U);
+	const bool warm_start_ok = warm_start(settings_local, satellite, x0, jtime_fixed.leftCols(N_fixed).transpose(), q_goal_fixed.leftCols(N_fixed), boresight_fixed.leftCols(N_fixed), N_fixed, R, V, B, S, rho, X, U);
 
 	if (!warm_start_ok) {
 		throw std::runtime_error("trajOpt failed to warm-start trajectory");
 	}
 
-	// Update N to reflect the resampled grid and ensure provided buffers are large enough
-	if (N_fixed > X.cols() || N_fixed > U.cols()) {
-		throw std::runtime_error("trajOpt resampled length exceeds provided X/U column capacity; allocate at least N_fixed columns");
+	for (int pass_idx = 0; pass_idx < settings_local.num_passes; ++pass_idx) {
+		ALILQRStatus al_status = ALILQRStatus::MaxOuterIterations;
+		double max_c = 0.0;
+		const bool ok = alilqr(
+			settings_local,
+			pass_idx,
+			satellite,
+			X.leftCols(N_fixed),
+			U.leftCols(N_fixed),
+			R.leftCols(N_fixed),
+			V.leftCols(N_fixed),
+			B.leftCols(N_fixed),
+			S.leftCols(N_fixed),
+			rho.leftCols(N_fixed),
+			jtime_fixed.leftCols(N_fixed).transpose(),
+			boresight_fixed.leftCols(N_fixed),
+			q_goal_fixed.leftCols(N_fixed),
+			al_status,
+			max_c
+		);
+		(void)max_c;
+		if (!ok) {
+			if (al_status == ALILQRStatus::InnerFailed) {
+				throw std::runtime_error("trajOpt failed during AL-iLQR inner solve");
+			}
+			if (al_status == ALILQRStatus::MaxOuterIterations) {
+				throw std::runtime_error("trajOpt AL-iLQR did not converge before max outer iterations");
+			}
+			throw std::runtime_error("trajOpt AL-iLQR failed");
+		}
 	}
+
 	N = N_fixed;
 
 	return true;

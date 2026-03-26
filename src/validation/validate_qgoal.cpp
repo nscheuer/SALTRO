@@ -31,6 +31,13 @@ bool validateQGoal(
         const double q0 = q_goal(0, col);
         const Eigen::Vector3d tail = q_goal.col(col).segment<3>(1);
 
+        const bool tail_is_zero = tail.squaredNorm() == 0.0;
+        const bool no_goal_zero_quat = (q0 == 0.0) && tail_is_zero;
+        const bool no_goal_nan_dir = std::isnan(q0) && tail_is_zero;
+        if (no_goal_zero_quat || no_goal_nan_dir) {
+            continue;
+        }
+
         if (!tail.allFinite()) {
             error_msg = "q_goal column " + std::to_string(col) + " has invalid NaN/Inf in rows 2-4";
             return false;

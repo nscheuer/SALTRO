@@ -5,6 +5,22 @@ import saltro_py
 SEC_PER_CENTURY = 36525.0 * 86400.0
 
 
+def make_zero_aug_terms(satellite, settings, X, U, S):
+    N = X.shape[1]
+    nu = satellite.controlDim
+    lambda_aug = []
+    mu_aug = []
+    for k in range(N):
+        uk = U[:, k] if k < U.shape[1] else np.zeros(nu)
+        ck = np.asarray(
+            satellite.constraints(k, N, X[:, k], uk, S[:, k], settings.constraints),
+            dtype=float,
+        )
+        lambda_aug.append(np.zeros_like(ck))
+        mu_aug.append(np.zeros_like(ck))
+    return lambda_aug, mu_aug
+
+
 def rk4_step(f, x, dt):
     k1 = f(x)
     k2 = f(x + 0.5 * dt * k1)
@@ -149,6 +165,7 @@ def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
 
     # Backward pass to get K, d, deltaV
     U_trim = U[:, : fixture.N - 1]
+    lambda_aug, mu_aug = make_zero_aug_terms(fixture.satellite, fixture.settings, X, U_trim, fixture.S)
     ok, K, d, deltaV = saltro_py.backward_pass(
         fixture.satellite,
         X,
@@ -161,6 +178,8 @@ def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
         fixture.boresight,
         fixture.attitude_target_traj,
         fixture.settings,
+        lambda_aug,
+        mu_aug,
         fixture.settings.passes[0].reg.reg_init
     )
     assert ok
@@ -186,6 +205,8 @@ def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
         fixture.boresight,
         fixture.attitude_target_traj,
         fixture.settings,
+        lambda_aug,
+        mu_aug,
         fixture.jtime,
         J_prev
     )
@@ -215,6 +236,7 @@ def test_forward_pass_line_search_backtracks(fixture):
     X_base, U_base = fixture.warm_start()
 
     U_trim = U_base[:, : fixture.N - 1]
+    lambda_aug, mu_aug = make_zero_aug_terms(fixture.satellite, fixture.settings, X_base, U_trim, fixture.S)
     ok, K, d, deltaV = saltro_py.backward_pass(
         fixture.satellite,
         X_base,
@@ -227,6 +249,8 @@ def test_forward_pass_line_search_backtracks(fixture):
         fixture.boresight,
         fixture.attitude_target_traj,
         fixture.settings,
+        lambda_aug,
+        mu_aug,
         fixture.settings.passes[0].reg.reg_init
     )
     assert ok
@@ -279,6 +303,8 @@ def test_forward_pass_line_search_backtracks(fixture):
         fixture.boresight,
         fixture.attitude_target_traj,
         settings_ls,
+        lambda_aug,
+        mu_aug,
         fixture.jtime,
         J_prev
     )

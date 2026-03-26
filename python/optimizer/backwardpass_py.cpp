@@ -18,6 +18,8 @@ static py::tuple backward_pass_py(
     const Eigen::Ref<const Eigen::MatrixXd>& boresight,
     const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
     const PlannerSettings& settings,
+    const std::vector<Eigen::VectorXd>& lambda_aug,
+    const std::vector<Eigen::VectorXd>& mu_aug,
     double reg
 )
 {
@@ -33,7 +35,7 @@ static py::tuple backward_pass_py(
 
     const bool ok = backwardPass(
         satellite, X, U, R, V, B, S, rho, boresight, attitude_target,
-        settings, reg, K, d, deltaV
+        settings, reg, K, d, deltaV, lambda_aug, mu_aug
     );
 
     // Stack K into shape (N-1, nu, nxr) — reduced state columns
@@ -80,6 +82,8 @@ void bind_backwardpass(py::module_& m)
         py::arg("boresight"),
         py::arg("attitude_target"),
         py::arg("settings"),
+        py::arg("lambda_aug"),
+        py::arg("mu_aug"),
         py::arg("reg"),
         R"doc(
 Backward pass for iLQR using reduced state (MRP) representation.

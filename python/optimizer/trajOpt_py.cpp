@@ -24,38 +24,17 @@ py::tuple trajOpt_py(
 {
 	const int N = static_cast<int>(jtime.size());
 
-	if (N <= 0)
-		throw std::runtime_error("jtime must have length > 0");
-
-	if (N > saltro::limits::MAX_LENGTH_TRAJ)
-		throw std::runtime_error("Trajectory exceeds MAX_LENGTH_TRAJ");
-
-	if (q_goal.cols() != N)
-		throw std::runtime_error("q_goal must have N columns matching jtime length");
-
-	if (q_goal.rows() != 4)
-		throw std::runtime_error("q_goal must have shape (4, N)");
-
-	if (boresight.cols() != N)
-		throw std::runtime_error("boresight must have N columns matching jtime length");
-
-	if (boresight.rows() != 3)
-		throw std::runtime_error("boresight must have shape (3, N)");
-
 	const int state_dim = satellite.stateDim();
 	const int input_dim = satellite.controlDim();
 
-	if (x0_in.size() != state_dim)
-		throw std::runtime_error("x0 must have size satellite.stateDim()");
-
-	if (state_dim > saltro::limits::MAX_STATE_DIM)
-		throw std::runtime_error("state_dim exceeds MAX_STATE_DIM");
-
-	if (input_dim > saltro::limits::MAX_CTRL_DIM)
-		throw std::runtime_error("input_dim exceeds MAX_CTRL_DIM");
-
 	Satellite::VecX x0(state_dim);
-	x0 = x0_in;
+	if (x0_in.size() == state_dim) {
+		x0 = x0_in;
+	} else {
+		x0.setZero();
+		const int n_copy = std::min(state_dim, static_cast<int>(x0_in.size()));
+		x0.head(n_copy) = x0_in.head(n_copy);
+	}
 
 	Eigen::MatrixXd X(state_dim, saltro::limits::MAX_LENGTH_TRAJ);
 	Eigen::MatrixXd U(input_dim, saltro::limits::MAX_LENGTH_TRAJ);
@@ -81,11 +60,14 @@ py::tuple trajOpt_py(
 	);
 
 	const int N_cols = std::max(0, std::min(N_out, saltro::limits::MAX_LENGTH_TRAJ));
+	Eigen::MatrixXd X_out = X.leftCols(N_cols);
+	Eigen::MatrixXd U_out = U.leftCols(N_cols);
+	Eigen::MatrixXd K_out = K.leftCols(reduced_state_dim * N_cols);
 	return py::make_tuple(
 		ok,
-		X.leftCols(N_cols),
-		U.leftCols(N_cols),
-		K.leftCols(reduced_state_dim * N_cols)
+		X_out,
+		U_out,
+		K_out
 	);
 }
 

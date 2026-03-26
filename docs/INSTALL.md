@@ -16,7 +16,7 @@ pip install -r requirements.txt
 
 # Compile
 ```bash
-cmake -S . -B build -DSALTRO_BUILD_PYTHON=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSALTRO_BUILD_PYTHON=ON
 cmake --build build -j
 ```
 
