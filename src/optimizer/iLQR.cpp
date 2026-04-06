@@ -163,7 +163,7 @@ bool iLQR(
 				reg *= reg_cfg.reg_scale;
 				continue;
 			}
-			
+
 			// Both passes succeeded
 			double delta_J = std::abs(J_prev - J);
 			if (delta_J <= ilqr_cfg.cost_tol) {

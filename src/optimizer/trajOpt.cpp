@@ -1,5 +1,6 @@
 #include <saltro/optimizer/trajOpt.h>
 #include <saltro/optimizer/alilqr.h>
+#include <saltro/optimizer/backwardpass.h>
 #include <saltro/optimizer/warm_start.h>
 #include <saltro/orbit_generation/generate_orbit.h>
 #include <saltro/validation/validate_trajOpt.h>
@@ -87,7 +88,6 @@ bool trajOpt(
 	int input_dim,
 	int& N
 ) {
-	(void)K;
 	PlannerSettings settings_local = settings;
 	if (settings_local.constraints.u_max.size() == 0) {
 		settings_local.constraints.u_max.resize(input_dim);
@@ -177,6 +177,58 @@ bool trajOpt(
 				throw std::runtime_error("trajOpt AL-iLQR did not converge before max outer iterations");
 			}
 			throw std::runtime_error("trajOpt AL-iLQR failed");
+		}
+
+	}
+
+	// Final pass for gains: compute K on converged trajectory.
+	K.setZero();
+	if (N_fixed > 1) {
+		std::vector<Eigen::MatrixXd> K_bp(static_cast<size_t>(N_fixed - 1));
+		std::vector<Eigen::VectorXd> d_bp(static_cast<size_t>(N_fixed - 1));
+		const int n_red = satellite.reducedStateDim();
+		for (int k = 0; k < N_fixed - 1; ++k) {
+			K_bp[static_cast<size_t>(k)] = Eigen::MatrixXd::Zero(input_dim, n_red);
+			d_bp[static_cast<size_t>(k)] = Eigen::VectorXd::Zero(input_dim);
+		}
+
+		Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
+		const auto& reg_cfg = settings_local.passes[std::max(0, settings_local.num_passes - 1)].reg;
+		double reg = std::max(reg_cfg.reg_min, reg_cfg.reg_init);
+		bool bp_ok = false;
+		while (reg <= reg_cfg.reg_max) {
+			deltaV.setZero();
+			bp_ok = backwardPass(
+				satellite,
+				X.leftCols(N_fixed),
+				U.leftCols(N_fixed),
+				R.leftCols(N_fixed),
+				V.leftCols(N_fixed),
+				B.leftCols(N_fixed),
+				S.leftCols(N_fixed),
+				rho.leftCols(N_fixed),
+				boresight_fixed.leftCols(N_fixed),
+				q_goal_fixed.leftCols(N_fixed),
+				settings_local,
+				reg,
+				K_bp,
+				d_bp,
+				deltaV
+			);
+			if (bp_ok) {
+				break;
+			}
+			reg *= reg_cfg.reg_scale;
+		}
+
+		if (bp_ok) {
+			for (int k = 0; k < N_fixed - 1; ++k) {
+				const int col0 = k * n_red;
+				if (col0 + n_red > K.cols()) {
+					break;
+				}
+				K.middleCols(col0, n_red) = K_bp[static_cast<size_t>(k)];
+			}
 		}
 	}
 
