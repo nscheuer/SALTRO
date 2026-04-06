@@ -64,11 +64,11 @@ def test_highly_elliptical_orbit_fails():
     ok, error_msg = validateOrbitState(r0, v0)
 
     assert not ok
-    assert error_msg == "orbit is too elliptical for LEO use (eccentricity > 0.2)"
+    assert error_msg == "orbit is too elliptical for LEO use (eccentricity > 0.3)"
 
 
 def test_bound_orbit_above_leo_ceiling_fails():
-    r0, v0 = make_circular_leo(3000e3)
+    r0, v0 = make_circular_leo(3500e3)
 
     ok, error_msg = validateOrbitState(r0, v0)
 
