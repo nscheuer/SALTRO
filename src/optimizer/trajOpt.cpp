@@ -4,6 +4,7 @@
 #include <saltro/optimizer/warm_start.h>
 #include <saltro/orbit_generation/generate_orbit.h>
 #include <saltro/validation/validate_trajOpt.h>
+#include <saltro/math/integrators/rk4.h>
 
 #include <algorithm>
 #include <cmath>
@@ -302,18 +303,146 @@ bool trajOpt(
 			tracking_settings.passes[0].dt = dt_tracking;
 		}
 
+		int N_tracking = N_fixed;
+		Eigen::MatrixXd X_tracking = X.leftCols(N_fixed);
+		Eigen::MatrixXd U_tracking = U.leftCols(N_fixed);
+
+		Eigen::Matrix<double, 1, Eigen::Dynamic> jtime_tracking(1, saltro::limits::MAX_LENGTH_TRAJ);
+		Eigen::Matrix<double, 4, Eigen::Dynamic> q_goal_tracking(4, saltro::limits::MAX_LENGTH_TRAJ);
+		Eigen::Matrix<double, 3, Eigen::Dynamic> boresight_tracking(3, saltro::limits::MAX_LENGTH_TRAJ);
+		jtime_tracking.setZero();
+		q_goal_tracking.setZero();
+		boresight_tracking.setZero();
+
+		Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ> R_tracking;
+		Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ> V_tracking;
+		Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ> B_tracking;
+		Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ> S_tracking;
+		Eigen::Matrix<double, 1, saltro::limits::MAX_LENGTH_TRAJ> rho_tracking;
+		R_tracking.setZero();
+		V_tracking.setZero();
+		B_tracking.setZero();
+		S_tracking.setZero();
+		rho_tracking.setZero();
+
+		const bool build_dense_tracking = (dt_tracking > 0.0 && dt_tracking + 1e-12 < dt_sec);
+		if (build_dense_tracking) {
+			const Eigen::VectorXd jtime_coarse = jtime_fixed.leftCols(N_fixed).transpose();
+			if (!resample_zero_order_hold(
+				jtime_coarse,
+				q_goal_fixed.leftCols(N_fixed),
+				boresight_fixed.leftCols(N_fixed),
+				dt_tracking,
+				jtime_tracking,
+				q_goal_tracking,
+				boresight_tracking,
+				N_tracking
+			)) {
+				throw std::runtime_error("trajOpt failed to build dense tracking grid");
+			}
+
+			if (!orbits::generate_orbit(
+				r0,
+				v0,
+				jtime_tracking,
+				N_tracking,
+				1,
+				2,
+				0,
+				0,
+				0,
+				R_tracking,
+				V_tracking,
+				B_tracking,
+				S_tracking,
+				rho_tracking
+			)) {
+				throw std::runtime_error("trajOpt failed to generate dense tracking orbit");
+			}
+
+			X_tracking = Eigen::MatrixXd::Zero(state_dim, N_tracking);
+			U_tracking = Eigen::MatrixXd::Zero(input_dim, N_tracking);
+			X_tracking.col(0) = X.col(0);
+
+			const int coarse_u_cols = std::max(0, N_fixed - 1);
+			int coarse_idx = 0;
+			for (int k = 0; k < N_tracking; ++k) {
+				while (coarse_idx + 1 < N_fixed && jtime_tracking(0, k) >= jtime_fixed(0, coarse_idx + 1)) {
+					++coarse_idx;
+				}
+				if (coarse_u_cols > 0) {
+					const int u_idx = std::min(std::max(coarse_idx, 0), coarse_u_cols - 1);
+					U_tracking.col(k) = U.col(u_idx);
+				}
+			}
+
+			for (int k = 0; k < N_tracking - 1; ++k) {
+				const double dt_centuries = jtime_tracking(0, k + 1) - jtime_tracking(0, k);
+				const double dt_step = dt_centuries * 36525.0 * 86400.0;
+				if (!std::isfinite(dt_step) || dt_step <= 0.0) {
+					throw std::runtime_error("trajOpt invalid dense tracking timestep");
+				}
+
+				const Eigen::VectorXd u_k = U_tracking.col(k);
+				Eigen::VectorXd x_next;
+				rk4_step<Eigen::VectorXd>(
+					[&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
+						dxdt = satellite.dynamics(
+							x_state,
+							u_k,
+							tracking_settings.disturbances,
+							R_tracking.col(k),
+							B_tracking.col(k),
+							S_tracking.col(k),
+							V_tracking.col(k),
+							static_cast<int>(std::max(0.0, std::round(rho_tracking(0, k))))
+						);
+					},
+					X_tracking.col(k),
+					0.0,
+					dt_step,
+					x_next
+				);
+
+				if (!x_next.allFinite()) {
+					throw std::runtime_error("trajOpt dense tracking rollout produced invalid state");
+				}
+				if (x_next.size() >= 7) {
+					Eigen::Vector4d q = x_next.segment<4>(3);
+					const double qn = q.norm();
+					if (!std::isfinite(qn) || qn <= 1e-10) {
+						throw std::runtime_error("trajOpt dense tracking rollout quaternion invalid");
+					}
+					x_next.segment<4>(3) = q / qn;
+				}
+				X_tracking.col(k + 1) = x_next;
+			}
+
+			X.leftCols(N_tracking) = X_tracking;
+			U.leftCols(N_tracking) = U_tracking;
+		} else {
+			jtime_tracking.leftCols(N_fixed) = jtime_fixed.leftCols(N_fixed);
+			q_goal_tracking.leftCols(N_fixed) = q_goal_fixed.leftCols(N_fixed);
+			boresight_tracking.leftCols(N_fixed) = boresight_fixed.leftCols(N_fixed);
+			R_tracking.leftCols(N_fixed) = R.leftCols(N_fixed);
+			V_tracking.leftCols(N_fixed) = V.leftCols(N_fixed);
+			B_tracking.leftCols(N_fixed) = B.leftCols(N_fixed);
+			S_tracking.leftCols(N_fixed) = S.leftCols(N_fixed);
+			rho_tracking.leftCols(N_fixed) = rho.leftCols(N_fixed);
+		}
+
 		std::vector<Eigen::MatrixXd> K_gains = compute_gains_chunked(
 			tracking_settings,
 			satellite,
-			X.leftCols(N_fixed),
-			U.leftCols(N_fixed),
-			R.leftCols(N_fixed),
-			V.leftCols(N_fixed),
-			B.leftCols(N_fixed),
-			S.leftCols(N_fixed),
-			rho.leftCols(N_fixed),
-			boresight_fixed.leftCols(N_fixed),
-			q_goal_fixed.leftCols(N_fixed),
+			X_tracking.leftCols(N_tracking),
+			U_tracking.leftCols(N_tracking),
+			R_tracking.leftCols(N_tracking),
+			V_tracking.leftCols(N_tracking),
+			B_tracking.leftCols(N_tracking),
+			S_tracking.leftCols(N_tracking),
+			rho_tracking.leftCols(N_tracking),
+			boresight_tracking.leftCols(N_tracking),
+			q_goal_tracking.leftCols(N_tracking),
 			input_dim,
 			dt_tracking,
 			settings_local.tvlqr.tvlqr_len,
@@ -321,7 +450,7 @@ bool trajOpt(
 		);
 
 		const int n_red = satellite.reducedStateDim();
-		const int gain_count = std::min(N_fixed - 1, static_cast<int>(K_gains.size()));
+		const int gain_count = std::min(N_tracking - 1, static_cast<int>(K_gains.size()));
 		for (int k = 0; k < gain_count; ++k) {
 			const int col0 = k * n_red;
 			if (col0 + n_red > K.cols()) {
@@ -329,6 +458,8 @@ bool trajOpt(
 			}
 			K.middleCols(col0, n_red) = K_gains[static_cast<size_t>(k)];
 		}
+
+		N_fixed = N_tracking;
 	}
 
 	N = N_fixed;
