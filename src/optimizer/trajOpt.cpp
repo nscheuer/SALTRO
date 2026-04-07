@@ -5,10 +5,117 @@
 #include <saltro/orbit_generation/generate_orbit.h>
 #include <saltro/validation/validate_trajOpt.h>
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
 namespace saltro::optimizer {
+
+static std::vector<Eigen::MatrixXd> compute_gains_chunked(
+	const PlannerSettings& settings,
+	const Satellite& satellite,
+	const Eigen::Ref<const Eigen::MatrixXd>& X,
+	const Eigen::Ref<const Eigen::MatrixXd>& U,
+	const Eigen::Ref<const Eigen::MatrixXd>& R,
+	const Eigen::Ref<const Eigen::MatrixXd>& V,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
+	const int input_dim,
+	const double dt_tvlqr,
+	const double tvlqr_len,
+	const double tvlqr_overlap
+) {
+	const int total_gain_steps = std::max(0, static_cast<int>(X.cols()) - 1);
+	const int n_red = satellite.reducedStateDim();
+	if (total_gain_steps == 0) {
+		return {};
+	}
+
+	int len_steps = static_cast<int>(std::floor(tvlqr_len / dt_tvlqr));
+	int overlap_steps = static_cast<int>(std::floor(tvlqr_overlap / dt_tvlqr));
+	len_steps = std::max(1, len_steps);
+	overlap_steps = std::max(0, overlap_steps);
+	if (overlap_steps >= len_steps) {
+		overlap_steps = len_steps - 1;
+	}
+
+	std::vector<Eigen::MatrixXd> K_stitched;
+	int start_k = 0;
+
+	while (start_k < total_gain_steps) {
+		const int end_k = std::min(total_gain_steps - 1, start_k + len_steps - 1);
+		const int chunk_gain_steps = end_k - start_k + 1;
+		const int x_col_start = start_k;
+		const int x_col_end = end_k + 1;
+		const int x_cols = x_col_end - x_col_start + 1;
+
+		std::vector<Eigen::MatrixXd> K_chunk(static_cast<size_t>(chunk_gain_steps));
+		std::vector<Eigen::VectorXd> d_chunk(static_cast<size_t>(chunk_gain_steps));
+		for (int k = 0; k < chunk_gain_steps; ++k) {
+			K_chunk[static_cast<size_t>(k)] = Eigen::MatrixXd::Zero(input_dim, n_red);
+			d_chunk[static_cast<size_t>(k)] = Eigen::VectorXd::Zero(input_dim);
+		}
+
+		Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
+		const auto& reg_cfg = settings.passes[std::max(0, settings.num_passes - 1)].reg;
+		double reg = std::max(reg_cfg.reg_min, reg_cfg.reg_init);
+		bool bp_ok = false;
+		while (reg <= reg_cfg.reg_max) {
+			deltaV.setZero();
+			bp_ok = backwardPass(
+				satellite,
+				X.middleCols(x_col_start, x_cols),
+				U.middleCols(x_col_start, x_cols),
+				R.middleCols(x_col_start, x_cols),
+				V.middleCols(x_col_start, x_cols),
+				B.middleCols(x_col_start, x_cols),
+				S.middleCols(x_col_start, x_cols),
+				rho.middleCols(x_col_start, x_cols),
+				boresight.middleCols(x_col_start, x_cols),
+				q_goal.middleCols(x_col_start, x_cols),
+				settings,
+				reg,
+				K_chunk,
+				d_chunk,
+				deltaV
+			);
+			if (bp_ok) {
+				break;
+			}
+			reg *= reg_cfg.reg_scale;
+		}
+
+		if (!bp_ok) {
+			K_chunk.assign(static_cast<size_t>(chunk_gain_steps), Eigen::MatrixXd::Zero(input_dim, n_red));
+		}
+
+		if (K_stitched.empty()) {
+			K_stitched.insert(K_stitched.end(), K_chunk.begin(), K_chunk.end());
+		} else {
+			const int drop = std::min(overlap_steps, static_cast<int>(K_stitched.size()));
+			K_stitched.resize(static_cast<size_t>(static_cast<int>(K_stitched.size()) - drop));
+			K_stitched.insert(K_stitched.end(), K_chunk.begin(), K_chunk.end());
+		}
+
+		int next_start = end_k + 1 - overlap_steps;
+		if (next_start <= start_k) {
+			next_start = start_k + 1;
+		}
+		start_k = next_start;
+	}
+
+	if (static_cast<int>(K_stitched.size()) > total_gain_steps) {
+		K_stitched.resize(static_cast<size_t>(total_gain_steps));
+	}
+	if (static_cast<int>(K_stitched.size()) < total_gain_steps) {
+		K_stitched.resize(static_cast<size_t>(total_gain_steps), Eigen::MatrixXd::Zero(input_dim, n_red));
+	}
+
+	return K_stitched;
+}
 
 static bool resample_zero_order_hold(
 	const Eigen::Ref<const Eigen::VectorXd>& jtime_coarse,
@@ -136,7 +243,7 @@ bool trajOpt(
 	Eigen::Matrix<double, 3, saltro::limits::MAX_LENGTH_TRAJ> S;
 	Eigen::Matrix<double, 1, saltro::limits::MAX_LENGTH_TRAJ> rho;
 
-	const bool orbit_ok = orbits::generate_orbit(r0, v0, jtime_fixed, N_fixed, 0, 0, 0, 0, 0, R, V, B, S, rho);
+	const bool orbit_ok = orbits::generate_orbit(r0, v0, jtime_fixed, N_fixed, 1, 2, 0, 0, 0, R, V, B, S, rho);
 
 	if (!orbit_ok) {
 		throw std::runtime_error("trajOpt failed to generate orbit");
@@ -184,51 +291,43 @@ bool trajOpt(
 	// Final pass for gains: compute K on converged trajectory.
 	K.setZero();
 	if (N_fixed > 1) {
-		std::vector<Eigen::MatrixXd> K_bp(static_cast<size_t>(N_fixed - 1));
-		std::vector<Eigen::VectorXd> d_bp(static_cast<size_t>(N_fixed - 1));
-		const int n_red = satellite.reducedStateDim();
-		for (int k = 0; k < N_fixed - 1; ++k) {
-			K_bp[static_cast<size_t>(k)] = Eigen::MatrixXd::Zero(input_dim, n_red);
-			d_bp[static_cast<size_t>(k)] = Eigen::VectorXd::Zero(input_dim);
+		PlannerSettings tracking_settings = settings_local;
+		tracking_settings.num_passes = 1;
+		tracking_settings.passes[0] = settings_local.passes[std::max(0, settings_local.num_passes - 1)];
+
+		const double dt_tracking = (settings_local.tvlqr.dt_tvlqr > 0.0)
+			? settings_local.tvlqr.dt_tvlqr
+			: tracking_settings.passes[0].dt;
+		if (dt_tracking > 0.0) {
+			tracking_settings.passes[0].dt = dt_tracking;
 		}
 
-		Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
-		const auto& reg_cfg = settings_local.passes[std::max(0, settings_local.num_passes - 1)].reg;
-		double reg = std::max(reg_cfg.reg_min, reg_cfg.reg_init);
-		bool bp_ok = false;
-		while (reg <= reg_cfg.reg_max) {
-			deltaV.setZero();
-			bp_ok = backwardPass(
-				satellite,
-				X.leftCols(N_fixed),
-				U.leftCols(N_fixed),
-				R.leftCols(N_fixed),
-				V.leftCols(N_fixed),
-				B.leftCols(N_fixed),
-				S.leftCols(N_fixed),
-				rho.leftCols(N_fixed),
-				boresight_fixed.leftCols(N_fixed),
-				q_goal_fixed.leftCols(N_fixed),
-				settings_local,
-				reg,
-				K_bp,
-				d_bp,
-				deltaV
-			);
-			if (bp_ok) {
+		std::vector<Eigen::MatrixXd> K_gains = compute_gains_chunked(
+			tracking_settings,
+			satellite,
+			X.leftCols(N_fixed),
+			U.leftCols(N_fixed),
+			R.leftCols(N_fixed),
+			V.leftCols(N_fixed),
+			B.leftCols(N_fixed),
+			S.leftCols(N_fixed),
+			rho.leftCols(N_fixed),
+			boresight_fixed.leftCols(N_fixed),
+			q_goal_fixed.leftCols(N_fixed),
+			input_dim,
+			dt_tracking,
+			settings_local.tvlqr.tvlqr_len,
+			settings_local.tvlqr.tvlqr_overlap
+		);
+
+		const int n_red = satellite.reducedStateDim();
+		const int gain_count = std::min(N_fixed - 1, static_cast<int>(K_gains.size()));
+		for (int k = 0; k < gain_count; ++k) {
+			const int col0 = k * n_red;
+			if (col0 + n_red > K.cols()) {
 				break;
 			}
-			reg *= reg_cfg.reg_scale;
-		}
-
-		if (bp_ok) {
-			for (int k = 0; k < N_fixed - 1; ++k) {
-				const int col0 = k * n_red;
-				if (col0 + n_red > K.cols()) {
-					break;
-				}
-				K.middleCols(col0, n_red) = K_bp[static_cast<size_t>(k)];
-			}
+			K.middleCols(col0, n_red) = K_gains[static_cast<size_t>(k)];
 		}
 	}
 

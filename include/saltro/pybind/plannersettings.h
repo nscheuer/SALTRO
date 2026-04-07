@@ -316,6 +316,23 @@ struct PassConfig {
 };
 
 /**
+ * @brief TVLQR gain-generation configuration.
+ *
+ * Controls the backward-pass discretization and chunking window used when
+ * generating tracking gains from an optimized trajectory.
+ *
+ * @param dt_tvlqr Discretization step for TVLQR gain generation. If <= 0,
+ *                 planner pass dt is used.
+ * @param tvlqr_len Chunk duration in seconds for gain computation.
+ * @param tvlqr_overlap Overlap duration in seconds between consecutive chunks.
+ */
+struct TVLQRSettings {
+    double dt_tvlqr = 0.0;
+    double tvlqr_len = 60.0;
+    double tvlqr_overlap = 15.0;
+};
+
+/**
  * @brief Top-level planner settings.
  *
  * Aggregates all configuration parameters required by the ALTRO optimizer.
@@ -338,6 +355,7 @@ struct PlannerSettings {
     ConstraintConfig constraints;
     DisturbanceConfig disturbances;
     InitTrajConfig init_traj;
+    TVLQRSettings tvlqr;
 
     int num_passes = 0;
     std::array<PassConfig, MAX_OUTER_PASSES> passes;

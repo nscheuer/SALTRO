@@ -22,7 +22,7 @@ def create_planner_settings():
     plannersettings.passes[0].ilqr.cost_tol = 1e-5
     plannersettings.passes[0].ilqr.max_iters = 20
 
-    plannersettings.passes[0].auglag.max_outer_iters = 10
+    plannersettings.passes[0].auglag.max_outer_iters = 20
     plannersettings.passes[0].auglag.constraint_tol = 1e-3
 
     cost = plannersettings.passes[0].cost
@@ -43,7 +43,7 @@ def create_planner_settings():
     cost.ang_vel_N = 1e1
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 3
+    cost.ang_cost_func_type = 0
     cost.use_cost_hess = True
 
     plannersettings.disturbances.plan_for_aero = False
