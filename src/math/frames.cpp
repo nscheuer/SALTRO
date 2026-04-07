@@ -20,7 +20,7 @@ double gmst_rad(double jcentury) {
 }
 
 Eigen::Matrix3d eci_to_ecef_dcm(double jcentury) {
-    return rot_z(gmst_rad(jcentury));
+    return rot_z(-gmst_rad(jcentury));
 }
 
 Eigen::Matrix3d ecef_to_eci_dcm(double jcentury) {
