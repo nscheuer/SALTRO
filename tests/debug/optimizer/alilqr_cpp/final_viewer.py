@@ -28,6 +28,71 @@ def _compute_pointing_error_deg(q, q_goal):
     return err_deg
 
 
+def _boresight_eci(q_b2i: np.ndarray, bore_body_unit: np.ndarray) -> np.ndarray:
+    q0, q1, q2, q3 = q_b2i
+    r = np.array(
+        [
+            [q0**2 + q1**2 - q2**2 - q3**2, 2 * (q1 * q2 - q0 * q3), 2 * (q1 * q3 + q0 * q2)],
+            [2 * (q1 * q2 + q0 * q3), q0**2 - q1**2 + q2**2 - q3**2, 2 * (q2 * q3 - q0 * q1)],
+            [2 * (q1 * q3 - q0 * q2), 2 * (q2 * q3 + q0 * q1), q0**2 - q1**2 - q2**2 + q3**2],
+        ],
+        dtype=float,
+    )
+    out = r @ bore_body_unit
+    nrm = np.linalg.norm(out)
+    return out / max(nrm, 1e-15)
+
+
+def _vec_angle_deg(u: np.ndarray, v: np.ndarray) -> float:
+    u = np.asarray(u, dtype=float).reshape(3)
+    v = np.asarray(v, dtype=float).reshape(3)
+    u = u / max(np.linalg.norm(u), 1e-15)
+    v = v / max(np.linalg.norm(v), 1e-15)
+    d = float(np.clip(np.dot(u, v), -1.0, 1.0))
+    return float(np.degrees(np.arccos(d)))
+
+
+def _compute_pointing_error_deg_mixed(q, q_goal, boresight_body=None):
+    """Compute pointing error for mixed target encoding used in Generalized_ADCS.
+
+    - Quaternion goal row: [q0, q1, q2, q3]
+    - Vector goal row: [nan, tx, ty, tz]
+    """
+    n = q.shape[1]
+    err_deg = np.full(n, np.nan, dtype=float)
+    if q_goal is None:
+        return err_deg
+
+    for k in range(n):
+        row = q_goal[:, k]
+        if not np.isnan(row[0]):
+            q_err = _quat_multiply(_quat_inverse(row), q[:, k])
+            err_deg[k] = 2.0 * np.arctan2(np.linalg.norm(q_err[1:]), abs(q_err[0])) * 180.0 / np.pi
+            continue
+
+        if boresight_body is None:
+            continue
+
+        target_vec = np.asarray(row[1:4], dtype=float)
+        if np.linalg.norm(target_vec) <= 0.0:
+            continue
+
+        if boresight_body.ndim == 1:
+            bore_body = boresight_body
+        else:
+            bore_body = boresight_body[:, k]
+
+        if np.linalg.norm(bore_body) <= 0.0:
+            continue
+
+        bore_unit = bore_body / np.linalg.norm(bore_body)
+        target_unit = target_vec / np.linalg.norm(target_vec)
+        bore_inertial = _boresight_eci(q[:, k], bore_unit)
+        err_deg[k] = _vec_angle_deg(bore_inertial, target_unit)
+
+    return err_deg
+
+
 def _normalize_quat(q):
     nrm = np.linalg.norm(q)
     if nrm <= 0.0:
@@ -60,17 +125,26 @@ def _expand_q_goal(q_goal, n, jtime=None, dt=None):
         return None
     if q_goal.ndim != 2 or q_goal.shape[0] != 4:
         return None
+    # ADCS vector-goal encoding uses [nan, x, y, z]. Those rows are not
+    # quaternions and must never be normalized.
+    is_vector_goal = np.any(np.isnan(q_goal[0, :]))
     m = q_goal.shape[1]
     if n <= 0:
         return None
     if m == n:
+        if is_vector_goal:
+            return q_goal.copy()
         out = np.zeros_like(q_goal)
         for k in range(n):
             out[:, k] = _normalize_quat(q_goal[:, k])
         return out
     if n == 1 and m >= 1:
+        if is_vector_goal:
+            return q_goal[:, 0].reshape(4, 1)
         return _normalize_quat(q_goal[:, 0]).reshape(4, 1)
     if m == 1:
+        if is_vector_goal:
+            return np.repeat(q_goal[:, 0].reshape(4, 1), n, axis=1)
         q = _normalize_quat(q_goal[:, 0])
         return np.repeat(q.reshape(4, 1), n, axis=1)
     
@@ -86,7 +160,10 @@ def _expand_q_goal(q_goal, n, jtime=None, dt=None):
             seg = int(np.floor(s))
             if seg >= m - 1:
                 seg = m - 1
-            out[:, k] = _normalize_quat(q_goal[:, seg])
+            if is_vector_goal:
+                out[:, k] = q_goal[:, seg]
+            else:
+                out[:, k] = _normalize_quat(q_goal[:, seg])
         return out
     return None
 
@@ -99,7 +176,7 @@ def _read_u_max(actuator):
     return float(limit() if callable(limit) else limit)
 
 
-def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=None, q_goal=None, jtime=None, title: str = "AL-iLQR C++ Final Trajectory"):
+def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=None, q_goal=None, boresight_body=None, jtime=None, title: str = "AL-iLQR C++ Final Trajectory"):
     n = X.shape[1]
     t_state = np.arange(n) * dt
     n_u = min(U.shape[1], max(0, n - 1))
@@ -129,10 +206,15 @@ def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=Non
     ax_q.plot(t_state, q[2, :], label="q2", linewidth=1.5)
     ax_q.plot(t_state, q[3, :], label="q3", linewidth=1.5)
     if q_goal_full is not None:
-        ax_q.plot(t_state, q_goal_full[0, :], "--", alpha=0.6, linewidth=1.2, label="q0 goal")
-        ax_q.plot(t_state, q_goal_full[1, :], "--", alpha=0.6, linewidth=1.2, label="q1 goal")
-        ax_q.plot(t_state, q_goal_full[2, :], "--", alpha=0.6, linewidth=1.2, label="q2 goal")
-        ax_q.plot(t_state, q_goal_full[3, :], "--", alpha=0.6, linewidth=1.2, label="q3 goal")
+        if np.any(np.isnan(q_goal_full[0, :])):
+            ax_q.plot(t_state, q_goal_full[1, :], "--", alpha=0.6, linewidth=1.2, label="target x")
+            ax_q.plot(t_state, q_goal_full[2, :], "--", alpha=0.6, linewidth=1.2, label="target y")
+            ax_q.plot(t_state, q_goal_full[3, :], "--", alpha=0.6, linewidth=1.2, label="target z")
+        else:
+            ax_q.plot(t_state, q_goal_full[0, :], "--", alpha=0.6, linewidth=1.2, label="q0 goal")
+            ax_q.plot(t_state, q_goal_full[1, :], "--", alpha=0.6, linewidth=1.2, label="q1 goal")
+            ax_q.plot(t_state, q_goal_full[2, :], "--", alpha=0.6, linewidth=1.2, label="q2 goal")
+            ax_q.plot(t_state, q_goal_full[3, :], "--", alpha=0.6, linewidth=1.2, label="q3 goal")
     ax_q.set_title("Quaternion")
     ax_q.set_xlabel("Time [s]")
     ax_q.set_ylabel("q")
@@ -169,8 +251,11 @@ def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=Non
     # Pointing error
     ax_pe.clear()
     if q_goal_full is not None:
-        pe = _compute_pointing_error_deg(q, q_goal_full)
-        ax_pe.plot(t_state, pe, "o-", color="C3", markersize=3, linewidth=1.5)
+        pe = _compute_pointing_error_deg_mixed(q, q_goal_full, boresight_body=boresight_body)
+        if np.all(np.isnan(pe)):
+            ax_pe.text(0.5, 0.5, "Pointing error unavailable", ha="center", va="center", transform=ax_pe.transAxes)
+        else:
+            ax_pe.plot(t_state, pe, "o-", color="C3", markersize=3, linewidth=1.5)
         ax_pe.set_title("Pointing Error")
         ax_pe.set_xlabel("Time [s]")
         ax_pe.set_ylabel("deg")

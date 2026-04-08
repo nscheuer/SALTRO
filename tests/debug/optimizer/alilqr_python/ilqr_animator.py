@@ -59,6 +59,59 @@ def _compute_pointing_error_deg(q, q_goal):
     return err_deg
 
 
+def _boresight_eci(q_b2i: np.ndarray, bore_body_unit: np.ndarray) -> np.ndarray:
+    q0, q1, q2, q3 = q_b2i
+    r = np.array(
+        [
+            [q0**2 + q1**2 - q2**2 - q3**2, 2 * (q1 * q2 - q0 * q3), 2 * (q1 * q3 + q0 * q2)],
+            [2 * (q1 * q2 + q0 * q3), q0**2 - q1**2 + q2**2 - q3**2, 2 * (q2 * q3 - q0 * q1)],
+            [2 * (q1 * q3 - q0 * q2), 2 * (q2 * q3 + q0 * q1), q0**2 - q1**2 - q2**2 + q3**2],
+        ],
+        dtype=float,
+    )
+    out = r @ bore_body_unit
+    nrm = np.linalg.norm(out)
+    return out / max(nrm, 1e-15)
+
+
+def _vec_angle_deg(u: np.ndarray, v: np.ndarray) -> float:
+    u = np.asarray(u, dtype=float).reshape(3)
+    v = np.asarray(v, dtype=float).reshape(3)
+    u = u / max(np.linalg.norm(u), 1e-15)
+    v = v / max(np.linalg.norm(v), 1e-15)
+    d = float(np.clip(np.dot(u, v), -1.0, 1.0))
+    return float(np.degrees(np.arccos(d)))
+
+
+def _compute_pointing_error_deg_mixed(q, q_goal, boresight=None):
+    n = q.shape[1]
+    err_deg = np.full(n, np.nan, dtype=float)
+    for k in range(n):
+        row = q_goal[:, k]
+        if not np.isnan(row[0]):
+            q_err = _quat_multiply(_quat_inverse(row), q[:, k])
+            err_deg[k] = 2.0 * np.arctan2(np.linalg.norm(q_err[1:]), abs(q_err[0])) * 180.0 / np.pi
+            continue
+
+        if boresight is None:
+            continue
+
+        target_vec = row[1:4]
+        if np.linalg.norm(target_vec) <= 0.0:
+            continue
+
+        bore = boresight[:, k] if boresight.ndim == 2 else boresight
+        if np.linalg.norm(bore) <= 0.0:
+            continue
+
+        bore_unit = bore / np.linalg.norm(bore)
+        target_unit = target_vec / np.linalg.norm(target_vec)
+        bore_i = _boresight_eci(q[:, k], bore_unit)
+        err_deg[k] = _vec_angle_deg(bore_i, target_unit)
+
+    return err_deg
+
+
 def _derive_mtq_limits(mtq_limits, snapshots):
     if mtq_limits is not None:
         vals = np.asarray(mtq_limits, dtype=float).reshape(-1)
@@ -393,32 +446,40 @@ def launch_animator(
         ax_sat.clear()
 
         C_ib_curr = _quat_to_rotmat(q_curr)
-        C_ib_goal = _quat_to_rotmat(q_goal_curr)
         C_bi_curr = C_ib_curr.T
-        C_bg = C_bi_curr @ C_ib_goal
-
         axis_len = 1.0
         body_axes = np.eye(3)
-        goal_axes = C_bg
 
         colors = ["#e41a1c", "#4daf4a", "#377eb8"]
         for i in range(3):
             b_axis = body_axes[:, i]
-            g_axis = goal_axes[:, i]
             ax_sat.quiver(0.0, 0.0, 0.0, b_axis[0], b_axis[1], b_axis[2], color=colors[i], length=axis_len, linewidth=2.0)
-            ax_sat.quiver(
-                0.0,
-                0.0,
-                0.0,
-                g_axis[0],
-                g_axis[1],
-                g_axis[2],
-                color=colors[i],
-                length=axis_len,
-                linewidth=1.6,
-                linestyle="--",
-                alpha=0.85,
-            )
+
+        has_quat_goal = not np.isnan(q_goal_curr[0])
+        if has_quat_goal:
+            C_ib_goal = _quat_to_rotmat(q_goal_curr)
+            C_bg = C_bi_curr @ C_ib_goal
+            for i in range(3):
+                g_axis = C_bg[:, i]
+                ax_sat.quiver(
+                    0.0,
+                    0.0,
+                    0.0,
+                    g_axis[0],
+                    g_axis[1],
+                    g_axis[2],
+                    color=colors[i],
+                    length=axis_len,
+                    linewidth=1.6,
+                    linestyle="--",
+                    alpha=0.85,
+                )
+        else:
+            target_i = _safe_normalize(q_goal_curr[1:4])
+            target_b = C_bi_curr @ target_i
+            target_b = _safe_normalize(target_b)
+            if np.linalg.norm(target_b) > 0.0:
+                ax_sat.quiver(0.0, 0.0, 0.0, target_b[0], target_b[1], target_b[2], color="#ffd166", length=1.2, linewidth=2.2)
 
         b_body = C_bi_curr @ np.asarray(b_inertial, dtype=float).reshape(3)
         b_hat = _safe_normalize(b_body)
@@ -432,6 +493,7 @@ def launch_animator(
         legend_handles = [
             Line2D([0], [0], color="k", linewidth=2.0, label="sat frame (solid xyz)"),
             Line2D([0], [0], color="k", linewidth=1.6, linestyle="--", label="goal frame (dashed xyz)"),
+            Line2D([0], [0], color="#ffd166", linewidth=2.2, label="target dir (vector goal)"),
             Line2D([0], [0], color="#17becf", linewidth=2.4, label="B direction (normalized)"),
             Line2D([0], [0], color="#ff7f0e", linewidth=2.4, label="torque direction (normalized)"),
         ]
@@ -449,6 +511,7 @@ def launch_animator(
         X = snap["X"]
         U = snap["U"]
         q_goal = snap["q_goal"]
+        boresight = snap.get("boresight", None)
         components = snap.get("components", None)
         cviol_t = snap.get("constraint_violation_t", None)
 
@@ -462,7 +525,7 @@ def launch_animator(
         rw_u = U[num_mtq:num_mtq + num_rw, :] if num_rw > 0 else np.zeros((0, n_u_local))
 
         q = X[3:7, :]
-        pe = _compute_pointing_error_deg(q, q_goal)
+        pe = _compute_pointing_error_deg_mixed(q, q_goal, boresight=boresight)
 
         ax_mtq.clear()
         ax_rw.clear()
@@ -514,7 +577,10 @@ def launch_animator(
         ax_rw.set_ylim(-y_rw_lim, y_rw_lim)
 
         ax_pe.clear()
-        ax_pe.plot(t_state, pe, "o-", markersize=2.5, linewidth=1.8, color="C3")
+        if np.all(np.isnan(pe)):
+            ax_pe.text(0.5, 0.5, "Pointing error unavailable", transform=ax_pe.transAxes, ha="center", va="center")
+        else:
+            ax_pe.plot(t_state, pe, "o-", markersize=2.5, linewidth=1.8, color="C3")
         ax_pe.set_title("Pointing Error")
         ax_pe.set_xlabel("Time [s]")
         ax_pe.set_ylabel("deg")
