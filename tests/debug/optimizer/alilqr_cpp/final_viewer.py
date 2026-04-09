@@ -168,6 +168,38 @@ def _expand_q_goal(q_goal, n, jtime=None, dt=None):
     return None
 
 
+def _expand_boresight(boresight, n, jtime=None, dt=None):
+    """Expand boresight vector to match trajectory length using zero-order hold."""
+    if boresight is None:
+        return None
+    if boresight.ndim == 1:
+        # Single boresight vector: repeat for all steps
+        return np.repeat(boresight.reshape(-1, 1), n, axis=1)
+    
+    m = boresight.shape[1]
+    if m == n:
+        return boresight.copy()
+    if m == 1:
+        return np.repeat(boresight, n, axis=1)
+    
+    # Use proper time-based resampling if jtime provided
+    if jtime is not None and dt is not None:
+        return _resample_zero_order_hold(jtime, boresight, dt)
+    
+    # Fallback to index-based expansion
+    if m >= 2 and n >= 2:
+        rows = boresight.shape[0]
+        out = np.zeros((rows, n))
+        for k in range(n):
+            s = k * (m - 1) / float(n - 1)
+            seg = int(np.floor(s))
+            if seg >= m - 1:
+                seg = m - 1
+            out[:, k] = boresight[:, seg]
+        return out
+    return None
+
+
 def _read_u_max(actuator):
     """Read actuator limit from either a pybind property or method."""
     limit = getattr(actuator, "u_max", None)
@@ -196,6 +228,9 @@ def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=Non
     w = X[0:3, :]
     h = X[7:, :]
     has_rw_state = h.shape[0] > 0
+    
+    # Expand boresight to match trajectory length
+    boresight_full = _expand_boresight(boresight_body, n, jtime, dt)
 
     num_mtq = satellite.numMTQ if satellite is not None else 0
     num_rw = satellite.numRW if satellite is not None else 0
@@ -251,7 +286,7 @@ def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=Non
     # Pointing error
     ax_pe.clear()
     if q_goal_full is not None:
-        pe = _compute_pointing_error_deg_mixed(q, q_goal_full, boresight_body=boresight_body)
+        pe = _compute_pointing_error_deg_mixed(q, q_goal_full, boresight_body=boresight_full)
         if np.all(np.isnan(pe)):
             ax_pe.text(0.5, 0.5, "Pointing error unavailable", ha="center", va="center", transform=ax_pe.transAxes)
         else:
