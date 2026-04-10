@@ -4,7 +4,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import saltro_py
+from spike_removal import apply_spike_removal
 
 
 def _augmented_penalty_total(
@@ -104,7 +106,8 @@ def ilqr(
     boresight: np.ndarray,
     lambda_aug: list[np.ndarray],
     mu_aug: list[np.ndarray],
-    debug: bool = False
+    debug: bool = False,
+    spike_removal_cfg: dict | None = None,
 ) -> tuple[np.ndarray, np.ndarray, str, list, list]:
     passsettings = plannersettings.passes[pass_idx]
     
@@ -161,6 +164,9 @@ def ilqr(
             J_prev_nom = satellite.totalCost(X, U_trim, B, boresight, q_goal, passsettings.cost)
             J_prev = J_prev_nom + _augmented_penalty_total(plannersettings, satellite, X, U, S, lambda_aug, mu_aug)
 
+            # Save nominal controls before forward pass modifies them (needed for spike removal blend)
+            U_bar = U.copy()
+
             ok_fp, X_new, U_new, J_new = saltro_py.forward_pass(
                 satellite,
                 X,
@@ -187,6 +193,16 @@ def ilqr(
 
             X = X_new
             U = U_new
+
+            # Spike removal: detect and replace homotopy artifacts after accepted step
+            if spike_removal_cfg is not None:
+                X, U, _spike_occurred = apply_spike_removal(
+                    X, U, U_bar, K_list,
+                    satellite, plannersettings, pass_idx,
+                    R, V, B, S, rho, jtime, boresight, q_goal,
+                    iteration=iteration,
+                    **spike_removal_cfg,
+                )
 
             delta_J = abs(J_prev - J_new)
             

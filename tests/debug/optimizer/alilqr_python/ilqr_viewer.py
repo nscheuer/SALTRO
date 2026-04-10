@@ -52,9 +52,91 @@ def _outer_start_indices(snapshots):
     return starts
 
 
+def _save_snapshots(snapshots, transitions, stop_reason, dt, cost_tol, out_dir=None):
+    """Save first, last, and ~3 intermediate snapshots as PNGs, plus raw data as npz."""
+    import os, pathlib
+    if out_dir is None:
+        out_dir = pathlib.Path.home() / "ilqr_viewer_out"
+    out_dir = pathlib.Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    n_snaps = len(snapshots)
+    # Indices: first, ~25%, ~50%, ~75%, last
+    candidates = sorted(set([
+        0,
+        max(0, n_snaps // 4),
+        max(0, n_snaps // 2),
+        max(0, 3 * n_snaps // 4),
+        n_snaps - 1,
+    ]))
+
+    n = snapshots[0]["X"].shape[1]
+    t_state = np.arange(n) * dt
+
+    for snap_idx in candidates:
+        snap = snapshots[snap_idx]
+        x = snap["X"]
+        q = x[3:7, :]
+        q_goal = snap["q_goal"]
+
+        pe = np.array([
+            2.0 * np.arctan2(
+                np.linalg.norm(
+                    _quat_multiply(_quat_inverse(q_goal[:, k]), q[:, k])[1:]
+                ),
+                abs(_quat_multiply(_quat_inverse(q_goal[:, k]), q[:, k])[0])
+            ) * 180.0 / np.pi
+            for k in range(q.shape[1])
+        ])
+
+        fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+        fig.suptitle(f"Snapshot {snap_idx}/{n_snaps-1}  |  J={snap['J']:.4e}  |  {stop_reason}", fontsize=11)
+
+        axes[0].plot(t_state, pe, "o-", color="C3", markersize=3)
+        axes[0].set_title("Pointing Error [deg]")
+        axes[0].set_xlabel("Time [s]"); axes[0].grid(True, alpha=0.3)
+
+        axes[1].plot(t_state, q[0, :], label="q0")
+        axes[1].plot(t_state, q[1, :], label="q1")
+        axes[1].plot(t_state, q[2, :], label="q2")
+        axes[1].plot(t_state, q[3, :], label="q3")
+        axes[1].set_title("Quaternion"); axes[1].set_xlabel("Time [s]")
+        axes[1].legend(fontsize=7); axes[1].grid(True, alpha=0.3)
+
+        w = x[0:3, :]
+        axes[2].plot(t_state, np.linalg.norm(w, axis=0), "k-", label="||ω||")
+        axes[2].plot(t_state, w[0, :], label="wx", alpha=0.7)
+        axes[2].plot(t_state, w[1, :], label="wy", alpha=0.7)
+        axes[2].plot(t_state, w[2, :], label="wz", alpha=0.7)
+        axes[2].set_title("Angular Velocity [rad/s]"); axes[2].set_xlabel("Time [s]")
+        axes[2].legend(fontsize=7); axes[2].grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        fname = out_dir / f"snap_{snap_idx:04d}.png"
+        plt.savefig(fname, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"[viewer] saved {fname}")
+
+    # Save raw data
+    npz_path = out_dir / "snapshots.npz"
+    np.savez_compressed(
+        npz_path,
+        n_snapshots=n_snaps,
+        dt=dt,
+        stop_reason=stop_reason,
+        **{f"X_{i}": snapshots[i]["X"] for i in range(n_snaps)},
+        **{f"U_{i}": snapshots[i]["U"] for i in range(n_snaps)},
+        **{f"J_{i}": np.array([snapshots[i]["J"]]) for i in range(n_snaps)},
+        **{f"q_goal_{i}": snapshots[i]["q_goal"] for i in range(n_snaps)},
+    )
+    print(f"[viewer] saved raw data → {npz_path}")
+
+
 def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
     if not snapshots:
         raise ValueError("No snapshots available for viewer")
+
+    _save_snapshots(snapshots, transitions, stop_reason, dt, cost_tol)
 
     n = snapshots[0]["X"].shape[1]
     t_state = np.arange(n) * dt
@@ -79,20 +161,20 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         "other": "other",
     }
 
-    fig = plt.figure(figsize=(18, 18), constrained_layout=True)
-    gs = fig.add_gridspec(6, 2, hspace=0.35, wspace=0.25)
+    fig = plt.figure(figsize=(20, 11), constrained_layout=True)
+    gs = fig.add_gridspec(3, 4, hspace=0.40, wspace=0.30)
 
-    ax_q = fig.add_subplot(gs[0, 0])
-    ax_w = fig.add_subplot(gs[0, 1])
-    ax_h = fig.add_subplot(gs[1, 0])
-    ax_pe = fig.add_subplot(gs[1, 1])
-    ax_mtq_u = fig.add_subplot(gs[2, 0])
-    ax_rw_u = fig.add_subplot(gs[2, 1])
-    ax_cat = fig.add_subplot(gs[3, 0])
-    ax_ind = fig.add_subplot(gs[3, 1])
-    ax_cviol = fig.add_subplot(gs[4, 0])
-    ax_J = fig.add_subplot(gs[4, 1])
-    ax_txt = fig.add_subplot(gs[5, :])
+    ax_q     = fig.add_subplot(gs[0, 0])
+    ax_w     = fig.add_subplot(gs[0, 1])
+    ax_pe    = fig.add_subplot(gs[0, 2])
+    ax_h     = fig.add_subplot(gs[0, 3])
+    ax_mtq_u = fig.add_subplot(gs[1, 0])
+    ax_rw_u  = fig.add_subplot(gs[1, 1])
+    ax_cat   = fig.add_subplot(gs[1, 2])
+    ax_ind   = fig.add_subplot(gs[1, 3])
+    ax_cviol = fig.add_subplot(gs[2, 0])
+    ax_J     = fig.add_subplot(gs[2, 1])
+    ax_txt   = fig.add_subplot(gs[2, 2:])
 
     idx = {"value": 0}
     outer_starts = _outer_start_indices(snapshots)

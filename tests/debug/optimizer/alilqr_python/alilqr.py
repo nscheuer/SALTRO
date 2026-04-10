@@ -155,6 +155,7 @@ def alilqr(
     q_goal: np.ndarray,
     boresight: np.ndarray,
     debug: bool = False,
+    spike_removal_cfg: dict | None = None,
 ) -> tuple[np.ndarray, np.ndarray, str, list, list]:
     passsettings = plannersettings.passes[pass_idx]
     
@@ -176,8 +177,9 @@ def alilqr(
     for iteration in range(passsettings.auglag.max_outer_iters):
         # Solve AL subproblem with iLQR first (ALTRO style).
         X, U, stop_reason, snaps, trans = ilqr(
-            plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho, 
-            jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug
+            plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho,
+            jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug,
+            spike_removal_cfg=spike_removal_cfg,
         )
 
         if debug:

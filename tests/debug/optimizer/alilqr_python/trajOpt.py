@@ -32,7 +32,8 @@ def trajOpt(
     jtime: np.ndarray,
     q_goal: np.ndarray,
     boresight: np.ndarray,
-    debug: bool = False
+    debug: bool = False,
+    spike_removal_cfg: dict | None = None,
 ) -> tuple:
     # Discretization
     dt_sec = plannersettings.passes[0].dt
@@ -65,8 +66,9 @@ def trajOpt(
     start_time = time.time()
     for pass_idx in range(plannersettings.num_passes):
         X, U, stop_reason, snaps, trans = alilqr(
-            plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho, 
-            jtime_flat, q_goal, boresight, debug=debug
+            plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho,
+            jtime_flat, q_goal, boresight, debug=debug,
+            spike_removal_cfg=spike_removal_cfg,
         )
         if debug:
             snapshots.extend(snaps)
