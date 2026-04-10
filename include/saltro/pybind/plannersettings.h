@@ -321,15 +321,17 @@ struct PassConfig {
  * Controls the backward-pass discretization and chunking window used when
  * generating tracking gains from an optimized trajectory.
  *
- * @param dt_tvlqr Discretization step for TVLQR gain generation. If <= 0,
- *                 planner pass dt is used.
+ * @param dt_tvlqr Fixed TVLQR gain discretization step. SALTRO currently
+ *                 uses the planner pass dt and keeps this at 0.0.
  * @param tvlqr_len Chunk duration in seconds for gain computation.
  * @param tvlqr_overlap Overlap duration in seconds between consecutive chunks.
  */
 struct TVLQRSettings {
-    double dt_tvlqr = 0.0;
+    double dt_tvlqr;
     double tvlqr_len = 60.0;
     double tvlqr_overlap = 15.0;
+
+    TVLQRSettings() : dt_tvlqr(0.0) {}
 };
 
 /**

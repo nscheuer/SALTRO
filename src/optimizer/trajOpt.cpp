@@ -296,9 +296,7 @@ bool trajOpt(
 		tracking_settings.num_passes = 1;
 		tracking_settings.passes[0] = settings_local.passes[std::max(0, settings_local.num_passes - 1)];
 
-		const double dt_tracking = (settings_local.tvlqr.dt_tvlqr > 0.0)
-			? settings_local.tvlqr.dt_tvlqr
-			: tracking_settings.passes[0].dt;
+		const double dt_tracking = tracking_settings.passes[0].dt;
 		if (dt_tracking > 0.0) {
 			tracking_settings.passes[0].dt = dt_tracking;
 		}
