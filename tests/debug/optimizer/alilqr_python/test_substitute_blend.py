@@ -322,7 +322,7 @@ def main():
         X.copy(), U.copy(),
         X_pd, U_pd,
         t_enter, t_exit,
-        blend_len=20,
+        B_len=20,
         X_nominal_pre=X_pre,
         U_bar=U_bar,
         K_list=K_list,
