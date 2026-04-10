@@ -22,7 +22,7 @@ def create_planner_settings():
     plannersettings.passes[0].ilqr.cost_tol = 1e-5
     plannersettings.passes[0].ilqr.max_iters = 20
 
-    plannersettings.passes[0].auglag.max_outer_iters = 20
+    plannersettings.passes[0].auglag.max_outer_iters = 30
     plannersettings.passes[0].auglag.constraint_tol = 1e-3
 
     cost = plannersettings.passes[0].cost
@@ -71,11 +71,14 @@ def main():
     satellite = create_satellite(plannersettings)
 
     jtime = np.array([0.22, 0.22 + 1000 / (36525 * 86400)])
-    qgoal = np.array([
-        [np.sqrt(2) / 2, np.sqrt(2) / 2],
-        [0.0, 0.0],
-        [0.0, 0.0],
-        [np.sqrt(2) / 2, np.sqrt(2) / 2],
+    # Vector pointing version: 3D direction vectors for initial and final pointing
+    # Constant 90-degree slew goal: body z-axis must point toward inertial x-direction
+    # Initial error: identity quaternion has z-axis along z-direction (perpendicular to x-goal) = 90 degrees
+    vector_goal = np.array([
+        [np.nan, np.nan],
+        [0.0, 0.0],  # x component (constant goal)
+        [-1.0, -1.0],  # y component (constant goal)
+        [0.0, 0.0],  # z component (constant goal)
     ])
     boresight = np.array([
         [1.0, 1.0],
@@ -99,7 +102,7 @@ def main():
         r0,
         v0,
         jtime,
-        qgoal,
+        vector_goal,
         boresight,
     )
     elapsed = time.time() - start_time
@@ -110,7 +113,7 @@ def main():
     print(f"trajOpt completed in {elapsed:.3f} seconds")
     print(f"Trajectory shape: X={X.shape}, U={U.shape}")
 
-    plot_final_trajectory(X, U, plannersettings.passes[0].dt, satellite=satellite, q_goal=qgoal)
+    plot_final_trajectory(X, U, plannersettings.passes[0].dt, satellite=satellite, q_goal=vector_goal, boresight_body=boresight, jtime=jtime)
 
 
 if __name__ == "__main__":

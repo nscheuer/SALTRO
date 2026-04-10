@@ -49,6 +49,22 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
         return false;
     }
 
+    // Validate TVLQR gain-generation settings
+    if (!std::isfinite(settings.tvlqr.dt_tvlqr) || settings.tvlqr.dt_tvlqr < 0.0) {
+        error_msg = "dt_tvlqr invalid";
+        return false;
+    }
+
+    if (!std::isfinite(settings.tvlqr.tvlqr_len) || settings.tvlqr.tvlqr_len <= 0.0) {
+        error_msg = "tvlqr_len invalid";
+        return false;
+    }
+
+    if (!std::isfinite(settings.tvlqr.tvlqr_overlap) || settings.tvlqr.tvlqr_overlap < 0.0) {
+        error_msg = "tvlqr_overlap invalid";
+        return false;
+    }
+
     // Validate passes if num_passes > 0
     if (settings.num_passes > 0) {
         for (int p = 0; p < settings.num_passes; ++p) {

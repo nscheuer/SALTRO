@@ -15,8 +15,8 @@ bool validateOrbitState(
     constexpr double MIN_SPEED_UNIT_HINT = 100.0;        // m/s
     constexpr double MAX_REASONABLE_SPEED = 2e4;         // m/s
     constexpr double MIN_LEO_ALTITUDE = 120e3;           // m
-    constexpr double MAX_LEO_ALTITUDE = 2000e3;          // m
-    constexpr double MAX_LEO_ECCENTRICITY = 0.2;
+    constexpr double MAX_LEO_ALTITUDE = 3000e3;          // m
+    constexpr double MAX_LEO_ECCENTRICITY = 0.3;
 
     const double mu = saltro::constants::MU_EARTH;
     const double re = saltro::constants::R_EARTH;
@@ -91,7 +91,7 @@ bool validateOrbitState(
     }
 
     if (e > MAX_LEO_ECCENTRICITY) {
-        error_msg = "orbit is too elliptical for LEO use (eccentricity > 0.2)";
+        error_msg = "orbit is too elliptical for LEO use (eccentricity > 0.3)";
         return false;
     }
 
