@@ -1,6 +1,7 @@
 #include <saltro/optimizer/iLQR.h>
 #include <saltro/optimizer/backwardpass.h>
 #include <saltro/optimizer/forwardpass.h>
+#include <saltro/optimizer/spike_removal.h>
 
 #include <algorithm>
 #include <cmath>
@@ -136,7 +137,10 @@ bool iLQR(
 
 			double J_prev = satellite.totalCost(X, U.leftCols(N_u), B, boresight, attitude_target, cost_cfg);
 			J_prev += augmented_penalty_total(satellite, cnst_cfg, X, U, S, lambda_aug, mu_aug);
-			
+
+			// Save nominal controls before forward pass (needed for spike removal blend)
+			const Eigen::MatrixXd U_bar = U;
+
 			bool fp_success = forwardPass(
 				satellite,
 				X,
@@ -158,12 +162,23 @@ bool iLQR(
 				J_prev,
 				J
 			);
-			
+
 			if (!fp_success) {
 				reg *= reg_cfg.reg_scale;
 				continue;
 			}
-			
+
+			// Spike removal: detect and replace homotopy artifacts after accepted step
+			const auto& spike_cfg = settings.passes[pass_idx].spike_removal;
+			if (spike_cfg.enabled) {
+				applySpikeRemoval(
+					satellite, X, U, U_bar, K,
+					settings, pass_idx,
+					R, V, B, S, rho, jtime, boresight, attitude_target,
+					iteration, spike_cfg
+				);
+			}
+
 			// Both passes succeeded
 			double delta_J = std::abs(J_prev - J);
 			if (delta_J <= ilqr_cfg.cost_tol) {
