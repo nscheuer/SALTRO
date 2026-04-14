@@ -10,7 +10,7 @@ Usage:
 import sys
 import numpy as np
 import matplotlib
-matplotlib.use("TkAgg")
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pathlib import Path
 
@@ -22,7 +22,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "configs"))
 import saltro_py
 from sat_3_1_hybrid import create_satellite
 from trajOpt import trajOpt
-from ilqr_viewer import launch_viewer
 from spike_removal import detect_spikes
 
 
@@ -116,8 +115,15 @@ SPIKE_REMOVAL_CFG = {
     "goal_switch_buffer": 15,
     "min_consecutive": 7,
     "exit_fudge": 2.0,
-    "kp_q": 2.0,
-    "kd_w": 5.0,
+    "min_prior_decrease_knots": 5,
+    "min_spike_ratio": 3.0,       # stricter: peak must be 3x entry
+    # Gentle PD: MTQ-only (rw_scale=0.0 keeps RW momentum near zero,
+    # avoiding AL momentum constraint violations).  Low gains keep omega
+    # well below wmax=0.35 rad/s.
+    "kp_q": 0.3,
+    "kd_w": 2.0,
+    "rw_scale": 0.0,
+    "omega_max": 0.30,  # hard clamp below wmax=0.349 rad/s
     "verbose": True,
 }
 
@@ -245,11 +251,7 @@ def main():
     plt.tight_layout()
     plt.savefig(str(Path(__file__).parent / "antispike_comparison.png"), dpi=150)
     print("\nComparison plot saved: antispike_comparison.png")
-    plt.show(block=False)
-
-    # Launch interactive viewer for antispike run
-    print("Launching interactive viewer for antispike run...")
-    launch_viewer(snaps_anti, trans_anti, reason_anti, dt, cost_tol)
+    plt.close("all")
 
 
 if __name__ == "__main__":

@@ -180,6 +180,7 @@ def alilqr(
             plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho,
             jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug,
             spike_removal_cfg=spike_removal_cfg,
+            outer_iter=iteration,
         )
 
         if debug:

@@ -326,11 +326,15 @@ def detect_spikes(
 # Phase 2: PD segment simulation
 # ---------------------------------------------------------------------------
 
-def _build_pd_control(x, q_target, satellite, B_eci, kp_q, kd_w):
+def _build_pd_control(x, q_target, satellite, B_eci, kp_q, kd_w, rw_scale=0.0):
     """Compute a simple PD control toward q_target.
 
     MTQ: least-norm dipole to achieve desired torque projected onto B-perp plane.
-    RW: direct torque (remainder after MTQ), clamped to limits.
+    RW: direct torque (remainder after MTQ), scaled by rw_scale.
+
+    rw_scale=0.0 means MTQ-only (default) — keeps RW momentum near zero
+    and avoids violating the RW momentum constraint in the AL outer loop.
+
     Returns control vector u of length (numMTQ + numRW).
     """
     q = x[3:7]
@@ -339,7 +343,7 @@ def _build_pd_control(x, q_target, satellite, B_eci, kp_q, kd_w):
     # Quaternion error
     q_err = _quat_error(q_target, q)
 
-    # Desired torque (body frame)
+    # Desired torque (body frame) — gentle gains to avoid omega constraint violation
     tau_des = -kp_q * q_err[1:4] - kd_w * omega
 
     n_mtq = satellite.numMTQ
@@ -355,17 +359,11 @@ def _build_pd_control(x, q_target, satellite, B_eci, kp_q, kd_w):
     tau_mtq_total = np.zeros(3)
 
     if B_norm_sq > 1e-20 and n_mtq > 0:
-        # For axis-aligned MTQs: tau_i = m_i * (axis_i × B_body)
-        # Aggregate: find least-norm scalar dipole per MTQ to minimize ||tau_des - sum tau_i||
-        # Simple approach: find single effective dipole m_eff in direction (B_body × tau_des)
-        # then distribute among MTQs by projection onto their axes
-        # Pseudoinverse for full 3-axis MTQ set:
         A = np.zeros((3, n_mtq))
         for i in range(n_mtq):
             axis_i = np.asarray(satellite.getMTQ(i).axis)
             A[:, i] = np.cross(axis_i, B_body)
 
-        # Least-norm solution: m = A^+ tau_des
         AtA = A.T @ A
         try:
             m_raw = np.linalg.lstsq(AtA, A.T @ tau_des, rcond=None)[0]
@@ -379,14 +377,15 @@ def _build_pd_control(x, q_target, satellite, B_eci, kp_q, kd_w):
             axis_i = np.asarray(satellite.getMTQ(i).axis)
             tau_mtq_total += u[i] * np.cross(axis_i, B_body)
 
-    # --- RW contribution: remaining torque ---
-    tau_remaining = tau_des - tau_mtq_total
-    for i in range(n_rw):
-        rw = satellite.getRW(i)
-        rw_axis = np.asarray(rw.axis)
-        u_max = float(rw.u_max)
-        tau_rw_i = float(np.dot(tau_remaining, rw_axis))
-        u[n_mtq + i] = float(np.clip(tau_rw_i, -u_max, u_max))
+    # --- RW contribution: scaled remainder (default 0 = MTQ-only) ---
+    if rw_scale > 0.0 and n_rw > 0:
+        tau_remaining = tau_des - tau_mtq_total
+        for i in range(n_rw):
+            rw = satellite.getRW(i)
+            rw_axis = np.asarray(rw.axis)
+            u_max = float(rw.u_max)
+            tau_rw_i = float(np.dot(tau_remaining, rw_axis)) * rw_scale
+            u[n_mtq + i] = float(np.clip(tau_rw_i, -u_max, u_max))
 
     return u
 
@@ -405,6 +404,9 @@ def simulate_pd_segment(
     dt,
     kp_q=2.0,
     kd_w=5.0,
+    omega_max=None,
+    h_max=None,
+    rw_scale=0.0,
 ):
     """Simulate a PD-controlled trajectory from x_start toward x_target.
 
@@ -416,6 +418,8 @@ def simulate_pd_segment(
     B_cols, S_cols, R_cols, V_cols, rho_cols : (3/1, n_steps) environment slices
     satellite, dist_cfg, dt : dynamics configuration
     kp_q, kd_w : PD gains (tune per application)
+    omega_max : if set, clamp ||omega|| to this value after each step (rad/s)
+    h_max : if set, clamp |h_rw| to this value after each step (N·m·s)
 
     Returns
     -------
@@ -441,10 +445,22 @@ def simulate_pd_segment(
         V_k = V_cols[:, k] if V_cols.ndim == 2 else V_cols
         rho_k = int(np.round(float(rho_cols[0, k]))) if rho_cols.ndim == 2 else int(rho_cols[k])
 
-        u_k = _build_pd_control(x_k, q_target, satellite, B_k, kp_q, kd_w)
+        u_k = _build_pd_control(x_k, q_target, satellite, B_k, kp_q, kd_w, rw_scale=rw_scale)
         U_pd[:, k] = u_k
 
         x_next = _rk4_step(satellite, x_k, u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k)
+
+        # Clamp angular velocity magnitude (prevents AL constraint violations)
+        if omega_max is not None:
+            omega_norm = np.linalg.norm(x_next[0:3])
+            if omega_norm > omega_max:
+                x_next[0:3] *= omega_max / omega_norm
+
+        # Clamp RW momentum magnitude
+        if h_max is not None:
+            for i in range(n_rw):
+                x_next[7 + i] = float(np.clip(x_next[7 + i], -h_max, h_max))
+
         X_pd[:, k + 1] = x_next
 
     return X_pd, U_pd
@@ -548,7 +564,7 @@ def compare_costs(
         cost_orig += sc(x_orig_k, u_orig_k)
         cost_pd_val += sc(x_pd_k, u_pd_k)
 
-    return cost_pd_val < cost_orig
+    return cost_pd_val < cost_orig, cost_orig, cost_pd_val
 
 
 # ---------------------------------------------------------------------------
@@ -627,6 +643,7 @@ def substitute_and_blend(
     dt,
     kp_q=2.0,
     kd_w=5.0,
+    rw_scale=0.0,
 ):
     """Substitute PD segment, blend, then re-rollout tail with iLQR gain correction.
 
@@ -677,7 +694,7 @@ def substitute_and_blend(
         R_k, B_k, S_k, V_k, rho_k = _env(k)
 
         # PD contribution: target the spike exit state
-        u_pd_k = _build_pd_control(X[:, k], q_exit_target, satellite, B_k, kp_q, kd_w)
+        u_pd_k = _build_pd_control(X[:, k], q_exit_target, satellite, B_k, kp_q, kd_w, rw_scale=rw_scale)
 
         # iLQR open-loop nominal in blend zone (no gain — state is too different from spiked nominal)
         u_ilqr_k = U_bar[:, k] if k < U_bar.shape[1] else np.zeros(nu)
@@ -699,14 +716,37 @@ def substitute_and_blend(
         if k + 1 < N:
             X[:, k + 1] = x_next
 
-    # --- Tail re-rollout [blend_end, N-1) — open-loop with U_bar ---
-    # Gain correction was tried but destabilizes when multiple spikes interact
-    # and the post-blend state is far from the pre-substitution nominal.
-    # Open-loop is safer; the backward pass will recompute corrective gains next iteration.
+    # --- Tail re-rollout [blend_end, N-1) — gain-corrected from blend endpoint ---
+    # u = U_bar + clamp(K @ dx).  Always apply the gain correction; K encodes
+    # the right relative weighting, and clamping du to actuator limits prevents
+    # blow-up.  The next backward pass will re-linearize around the result.
+    n_mtq = satellite.numMTQ
+    n_rw = satellite.numRW
+
     for k in range(blend_end, N - 1):
         R_k, B_k, S_k, V_k, rho_k = _env(k)
 
-        u_k = U_bar[:, k] if k < U_bar.shape[1] else np.zeros(nu)
+        u_bar_k = U_bar[:, k] if k < U_bar.shape[1] else np.zeros(nu)
+        K_k = K_list[k] if (K_list is not None and k < len(K_list) and K_list[k] is not None) else None
+
+        if K_k is not None:
+            dx = _state_error_reduced(X[:, k], X_nominal_pre[:, k], satellite)
+            du = K_k @ dx
+            for i in range(n_mtq):
+                u_max = float(satellite.getMTQ(i).u_max)
+                du[i] = float(np.clip(du[i], -u_max, u_max))
+            for i in range(n_rw):
+                u_max = float(satellite.getRW(i).u_max)
+                du[n_mtq + i] = float(np.clip(du[n_mtq + i], -u_max, u_max))
+            u_k = u_bar_k + du
+            for i in range(n_mtq):
+                u_max = float(satellite.getMTQ(i).u_max)
+                u_k[i] = float(np.clip(u_k[i], -u_max, u_max))
+            for i in range(n_rw):
+                u_max = float(satellite.getRW(i).u_max)
+                u_k[n_mtq + i] = float(np.clip(u_k[n_mtq + i], -u_max, u_max))
+        else:
+            u_k = u_bar_k
 
         U[:, k] = u_k
         x_next = _rk4_step(satellite, X[:, k], u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k)
@@ -747,6 +787,9 @@ def apply_spike_removal(
     min_spike_ratio=2.0,
     kp_q=2.0,
     kd_w=5.0,
+    omega_max=None,
+    h_max=None,
+    rw_scale=0.0,
     verbose=False,
 ):
     """Detect and remove trajectory spikes after an accepted iLQR forward pass.
@@ -768,6 +811,8 @@ def apply_spike_removal(
     min_prior_decrease_knots : require this many prior-decreasing knots before spike onset
     min_spike_ratio : spike peak must be >= this multiple of entry error
     kp_q, kd_w : PD gains for substitution
+    omega_max : clamp PD angular velocity to this magnitude (rad/s); prevents AL violations
+    h_max : clamp PD RW momentum to this magnitude (N·m·s)
     verbose : print diagnostic info
 
     Returns
@@ -777,8 +822,12 @@ def apply_spike_removal(
     """
     # Guard: only intervene in the configured iteration window
     if iteration < start_at_iter:
+        if verbose:
+            print(f"[SpikeRemoval] iter={iteration}: skipping (before start_at_iter={start_at_iter})")
         return X, U, False
     if iteration >= start_at_iter + max_intervention_iters:
+        if verbose:
+            print(f"[SpikeRemoval] iter={iteration}: skipping (past max_intervention_iters)")
         return X, U, False
 
     pass_settings = plannersettings.passes[pass_idx]
@@ -803,11 +852,26 @@ def apply_spike_removal(
         min_spike_ratio=min_spike_ratio,
     )
 
+    if verbose:
+        if not candidates:
+            # Compute raw pointing error stats to explain why nothing was detected
+            theta_vals = []
+            for k in range(N):
+                try:
+                    e = _pointing_error(X, attitude_target, boresight, k)
+                    theta_vals.append(e)
+                except Exception:
+                    theta_vals.append(float('nan'))
+            theta_arr = np.array([t for t in theta_vals if not np.isnan(t)])
+            print(f"[SpikeRemoval] iter={iteration}: no candidates "
+                  f"(err min={np.degrees(theta_arr.min()):.1f}° "
+                  f"max={np.degrees(theta_arr.max()):.1f}° "
+                  f"mean={np.degrees(theta_arr.mean()):.1f}°)")
+        else:
+            print(f"[SpikeRemoval] iter={iteration}: {len(candidates)} candidate(s): {candidates}")
+
     if not candidates:
         return X, U, False
-
-    if verbose:
-        print(f"[SpikeRemoval] iter={iteration}: {len(candidates)} candidate(s): {candidates}")
 
     substitution_occurred = False
 
@@ -844,16 +908,21 @@ def apply_spike_removal(
             dt=dt,
             kp_q=kp_q,
             kd_w=kd_w,
+            omega_max=omega_max,
+            h_max=h_max,
+            rw_scale=rw_scale,
         )
 
         # Cost comparison
-        if not compare_costs(
+        pd_cheaper, cost_orig_w, cost_pd_w = compare_costs(
             X, U, X_pd, U_pd,
             t_enter, t_exit,
             satellite, B, boresight, attitude_target, cost_cfg, N,
-        ):
+        )
+        if not pd_cheaper:
             if verbose:
-                print(f"[SpikeRemoval]   ({t_enter},{t_exit}): cost comparison failed — skipping")
+                print(f"[SpikeRemoval]   ({t_enter},{t_exit}): cost comparison failed "
+                      f"(orig={cost_orig_w:.3e} pd={cost_pd_w:.3e}) — skipping")
             continue
 
         # Keep-out check
@@ -883,7 +952,11 @@ def apply_spike_removal(
             dt,
             kp_q=kp_q,
             kd_w=kd_w,
+            rw_scale=rw_scale,
         )
         substitution_occurred = True
+        # Only substitute one spike per call — let the backward pass re-linearize
+        # before tackling any remaining spikes in the next iteration.
+        break
 
     return X, U, substitution_occurred

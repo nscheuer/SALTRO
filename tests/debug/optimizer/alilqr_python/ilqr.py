@@ -108,6 +108,7 @@ def ilqr(
     mu_aug: list[np.ndarray],
     debug: bool = False,
     spike_removal_cfg: dict | None = None,
+    outer_iter: int = 0,
 ) -> tuple[np.ndarray, np.ndarray, str, list, list]:
     passsettings = plannersettings.passes[pass_idx]
     

@@ -453,13 +453,13 @@ def test_compare_costs_pd_cheaper():
     X_pd[3, :] = 1.0  # identity attitude ≈ goal
     U_pd = np.zeros((nu, n_pd))
 
-    result = compare_costs(
+    result, cost_orig, cost_pd = compare_costs(
         X_orig, U_orig, X_pd, U_pd,
         t_enter, t_exit,
         sat, B, boresight, attitude_target, cost_cfg, N,
     )
 
-    assert result is True, "PD at goal should be cheaper than 180-deg detour"
+    assert result is True, f"PD at goal should be cheaper than 180-deg detour (orig={cost_orig:.3e} pd={cost_pd:.3e})"
 
 
 # ---------------------------------------------------------------------------
