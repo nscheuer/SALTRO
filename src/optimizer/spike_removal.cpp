@@ -327,9 +327,10 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> simulatePDSegment(
 }
 
 // ---------------------------------------------------------------------------
-// Cost comparison
+// Cost comparison (currently disabled — detection criteria are sufficient)
 // ---------------------------------------------------------------------------
 
+#if 0  // Cost comparison disabled; kept for potential future re-enablement
 bool pdIsCheaper(
 	const Satellite& satellite,
 	const Eigen::Ref<const Eigen::MatrixXd>& X_orig,
@@ -365,6 +366,7 @@ bool pdIsCheaper(
 
 	return cost_pd < cost_orig;
 }
+#endif  // Cost comparison disabled
 
 // ---------------------------------------------------------------------------
 // Keep-out check
@@ -715,15 +717,11 @@ bool applySpikeRemoval(
 			dist_cfg, dt, cfg
 		);
 
-		// Cost comparison
-		if (!pdIsCheaper(satellite, X, U, X_pd, U_pd, t_enter, t_exit,
-		                 B, boresight, attitude_target, cost_cfg, N)) {
-			if (cfg.verbose) {
-				std::cout << "[SpikeRemoval]   (" << t_enter << "," << t_exit
-				          << "): cost comparison failed -- skipping\n";
-			}
-			continue;
-		}
+		// Cost comparison disabled — detection criteria + keep-out are sufficient.
+		// The stage-cost comparison was rejecting valid homotopy spikes where the
+		// PD path is locally more expensive but globally beneficial (escapes the
+		// wrong SO(3) homotopy class).
+		(void)cost_cfg;  // suppress unused warning
 
 		// Keep-out check
 		if (!keepoutClear(satellite, X_pd, U_pd, S, cnst_cfg, N, t_enter)) {

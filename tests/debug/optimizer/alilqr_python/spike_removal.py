@@ -913,17 +913,9 @@ def apply_spike_removal(
             rw_scale=rw_scale,
         )
 
-        # Cost comparison
-        pd_cheaper, cost_orig_w, cost_pd_w = compare_costs(
-            X, U, X_pd, U_pd,
-            t_enter, t_exit,
-            satellite, B, boresight, attitude_target, cost_cfg, N,
-        )
-        if not pd_cheaper:
-            if verbose:
-                print(f"[SpikeRemoval]   ({t_enter},{t_exit}): cost comparison failed "
-                      f"(orig={cost_orig_w:.3e} pd={cost_pd_w:.3e}) — skipping")
-            continue
+        # Cost comparison disabled — detection criteria + keep-out are sufficient.
+        # The stage-cost comparison was rejecting valid homotopy spikes where the
+        # PD path is locally more expensive but globally beneficial.
 
         # Keep-out check
         if not check_keepout(X_pd, U_pd, S, satellite, cnst_cfg, N, t_enter):
