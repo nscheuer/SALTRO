@@ -105,6 +105,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("exit_fudge", &SpikeRemovalConfig::exit_fudge)
         .def_readwrite("min_prior_decrease_knots", &SpikeRemovalConfig::min_prior_decrease_knots)
         .def_readwrite("min_spike_ratio", &SpikeRemovalConfig::min_spike_ratio)
+        .def_readwrite("max_spike_knots", &SpikeRemovalConfig::max_spike_knots)
         .def_readwrite("kp_q", &SpikeRemovalConfig::kp_q)
         .def_readwrite("kd_w", &SpikeRemovalConfig::kd_w)
         .def_readwrite("rw_scale", &SpikeRemovalConfig::rw_scale)

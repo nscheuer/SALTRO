@@ -309,6 +309,9 @@ struct SpikeRemovalConfig {
     double exit_fudge = 2.0;
     int min_prior_decrease_knots = 10;
     double min_spike_ratio = 3.0;
+    /// Maximum spike window size (knots). Larger spikes are skipped.
+    /// 0 = no limit.
+    int max_spike_knots = 0;
     double kp_q = 0.3;
     double kd_w = 2.0;
     double rw_scale = 0.0;

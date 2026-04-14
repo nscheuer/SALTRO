@@ -596,6 +596,12 @@ std::vector<SpikeCandidate> detectSpikes(
 		}
 		if (t_exit < 0) { k = j + 1; continue; }
 
+		// Max spike window filter
+		if (cfg.max_spike_knots > 0 && (t_exit - t_enter) > cfg.max_spike_knots) {
+			k = j + 1;
+			continue;
+		}
+
 		// Actuation-driven filter
 		const int mid = (t_enter + t_exit) / 2;
 		const int check_knots[] = {
