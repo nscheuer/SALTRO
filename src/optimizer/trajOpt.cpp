@@ -170,13 +170,10 @@ bool trajOpt(
 		);
 		(void)max_c;
 		if (!ok) {
-			if (al_status == ALILQRStatus::InnerFailed) {
-				throw std::runtime_error("trajOpt failed during AL-iLQR inner solve");
-			}
-			if (al_status == ALILQRStatus::MaxOuterIterations) {
-				throw std::runtime_error("trajOpt AL-iLQR did not converge before max outer iterations");
-			}
-			throw std::runtime_error("trajOpt AL-iLQR failed");
+			// Return partial results (X and U contain the best trajectory found)
+			// rather than throwing.  The caller can check the return value.
+			N = N_fixed;
+			return false;
 		}
 	}
 
