@@ -27,8 +27,8 @@ def make_settings(spike_enabled):
     ps.num_passes = 1
     ps.passes[0].dt = 10.0
     ps.passes[0].ilqr.cost_tol = 1e-3
-    ps.passes[0].ilqr.max_iters = 20
-    ps.passes[0].auglag.max_outer_iters = 10
+    ps.passes[0].ilqr.max_iters = 250
+    ps.passes[0].auglag.max_outer_iters = 30
     ps.passes[0].auglag.constraint_tol = 1e-3
 
     cost = ps.passes[0].cost
@@ -40,7 +40,7 @@ def make_settings(spike_enabled):
     cost.angle_N = 1e2
     cost.ang_vel_N = 1e1
     cost.ang_cost_func_type = 3
-    cost.use_cost_hess = False
+    cost.use_cost_hess = True
 
     ps.disturbances.plan_for_aero = False
     ps.disturbances.plan_for_gg = False
@@ -68,6 +68,7 @@ def make_settings(spike_enabled):
         sr.exit_fudge = 2.0
         sr.min_prior_decrease_knots = 10
         sr.min_spike_ratio = 3.0
+        sr.max_spike_knots = 30
         sr.kp_q = 0.3
         sr.kd_w = 2.0
         sr.rw_scale = 0.0
