@@ -21,9 +21,9 @@ import saltro_py
 from sat_3_1_hybrid import create_satellite
 
 
-def make_settings(spike_enabled):
+def make_settings(spike_enabled, initcontroller=1):
     ps = saltro_py.PlannerSettings()
-    ps.init_traj.initcontroller = 1
+    ps.init_traj.initcontroller = initcontroller
     ps.num_passes = 1
     ps.passes[0].dt = 10.0
     ps.passes[0].ilqr.cost_tol = 1e-6
@@ -91,8 +91,8 @@ def main():
     r0 = np.array([7e6, 0.0, 0.0])
     v0 = np.array([0.0, 7.5e3, 0.0])
 
-    def run_cpp(label, spike_enabled):
-        ps = make_settings(spike_enabled)
+    def run_cpp(label, spike_enabled, initcontroller=1):
+        ps = make_settings(spike_enabled, initcontroller)
         sat = create_satellite(ps)
         # Redirect C-level stdout to suppress [BP]/[FP] debug lines.
         old_stdout = os.dup(1)
@@ -121,16 +121,22 @@ def main():
 
     qg = qgoal[:, 0]
 
-    # --- Baseline ---
-    print("=" * 60)
-    print("C++ BASELINE (no spike removal)...")
-    ok_base, X_base, U_base, t_base = run_cpp("Baseline", False)
+    results = {}
+    for ic, ic_label in [(1, "ExcCtrl"), (2, "BdotCtrl")]:
+        for spike, sp_label in [(False, "base"), (True, "anti")]:
+            label = f"{ic_label}_{sp_label}"
+            print("=" * 60)
+            print(f"{label} (initcontroller={ic}, spike={spike})...")
+            ok, X, U, t = run_cpp(label, spike, initcontroller=ic)
+            pe = pe_deg(X, qg)
+            results[label] = (ok, X, U, t, pe)
+            conv = "CONVERGED" if ok else "not converged"
+            print(f"  -> {conv}  max_pe={pe.max():.1f}°  final_pe={pe[-1]:.2f}°  time={t:.2f}s")
+            print()
 
-    # --- Antispike ---
-    print()
-    print("=" * 60)
-    print("C++ ANTISPIKE (spike removal enabled)...")
-    ok_anti, X_anti, U_anti, t_anti = run_cpp("Antispike", True)
+    # For backwards compat with plotting below
+    ok_base, X_base, U_base, t_base, _ = results["ExcCtrl_base"]
+    ok_anti, X_anti, U_anti, t_anti, _ = results["ExcCtrl_anti"]
 
     # --- Summary ---
     print()
@@ -139,11 +145,10 @@ def main():
     ps_tmp = make_settings(False)
     sat_tmp = create_satellite(ps_tmp)
     cost_cfg = ps_tmp.passes[0].cost
-    B_dummy = np.zeros((3, max(X_base.shape[1], X_anti.shape[1])))
-    for label, ok, X, U, t in [("Baseline", ok_base, X_base, U_base, t_base),
-                                ("Antispike", ok_anti, X_anti, U_anti, t_anti)]:
+    max_N = max(r[1].shape[1] for r in results.values())
+    B_dummy = np.zeros((3, max_N))
+    for label, (ok, X, U, t, pe) in results.items():
         N = X.shape[1]
-        pe = pe_deg(X, qg)
         qn = np.linalg.norm(X[3:7, :], axis=0)
         conv = "CONVERGED" if ok else "not converged"
         U_trim = U[:, :N-1]
@@ -168,124 +173,34 @@ def main():
     pe_base = pe_deg(X_base, qg)
     pe_anti = pe_deg(X_anti, qg)
 
-    fig, axes = plt.subplots(3, 2, figsize=(14, 12))
-    fig.suptitle("Baseline vs Antispike — 3MTQ+1RW 90° Slew", fontsize=14)
+    # 2x2 grid: rows=initcontroller, cols=base/anti
+    configs_plot = [
+        ("ExcCtrl_base", "ExcCtrl Baseline"),
+        ("ExcCtrl_anti", "ExcCtrl Antispike"),
+        ("BdotCtrl_base", "BdotCtrl Baseline"),
+        ("BdotCtrl_anti", "BdotCtrl Antispike"),
+    ]
 
-    # Row 0: Pointing Error
-    ax = axes[0, 0]
-    ax.set_title("Baseline — Pointing Error")
-    ax.plot(t_base_arr, pe_base, 'r-', linewidth=1.5)
-    ax.set_ylabel("deg")
-    ax.set_xlabel("Time [s]")
-    ax.axhline(1.0, color='g', linestyle='--', alpha=0.5, label="1°")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    ax = axes[0, 1]
-    ax.set_title("Antispike — Pointing Error")
-    ax.plot(t_anti_arr, pe_anti, 'b-', linewidth=1.5)
-    ax.set_ylabel("deg")
-    ax.set_xlabel("Time [s]")
-    ax.axhline(1.0, color='g', linestyle='--', alpha=0.5, label="1°")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    # Row 1: Quaternion
-    ax = axes[1, 0]
-    ax.set_title("Baseline — Quaternion")
-    for i, lbl in enumerate(["q0", "q1", "q2", "q3"]):
-        ax.plot(t_base_arr, X_base[3+i, :], label=lbl)
-    for i, val in enumerate(qg):
-        ax.axhline(val, color=f"C{i}", linestyle='--', alpha=0.4)
-    ax.set_ylabel("q")
-    ax.set_xlabel("Time [s]")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    ax = axes[1, 1]
-    ax.set_title("Antispike — Quaternion")
-    for i, lbl in enumerate(["q0", "q1", "q2", "q3"]):
-        ax.plot(t_anti_arr, X_anti[3+i, :], label=lbl)
-    for i, val in enumerate(qg):
-        ax.axhline(val, color=f"C{i}", linestyle='--', alpha=0.4)
-    ax.set_ylabel("q")
-    ax.set_xlabel("Time [s]")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    # Row 2: Angular Velocity
-    ax = axes[2, 0]
-    ax.set_title("Baseline — Angular Velocity")
-    for i, lbl in enumerate(["wx", "wy", "wz"]):
-        ax.plot(t_base_arr, X_base[i, :], label=lbl)
-    ax.set_ylabel("rad/s")
-    ax.set_xlabel("Time [s]")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    ax = axes[2, 1]
-    ax.set_title("Antispike — Angular Velocity")
-    for i, lbl in enumerate(["wx", "wy", "wz"]):
-        ax.plot(t_anti_arr, X_anti[i, :], label=lbl)
-    ax.set_ylabel("rad/s")
-    ax.set_xlabel("Time [s]")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
+    fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+    fig.suptitle("Pointing Error — 3MTQ+1RW 90° Slew", fontsize=14)
+    colors = ['r', 'b', 'r', 'b']
+    for idx, (key, title) in enumerate(configs_plot):
+        ax = axes[idx // 2, idx % 2]
+        ok, X, U, t, pe = results[key]
+        t_arr = np.arange(len(pe)) * dt
+        conv = "CONVERGED" if ok else "not converged"
+        ax.set_title(f"{title} — final={pe[-1]:.2f}° ({conv})")
+        ax.plot(t_arr, pe, colors[idx] + '-', linewidth=1.5)
+        ax.axhline(1.0, color='g', linestyle='--', alpha=0.5, label="1°")
+        ax.set_ylabel("deg")
+        ax.set_xlabel("Time [s]")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
     out_path = Path(__file__).parent / "antispike_comparison.png"
     fig.savefig(str(out_path), dpi=150)
     print(f"\nPlot saved: {out_path}")
-
-    # Control inputs plot
-    fig2, axes2 = plt.subplots(2, 2, figsize=(14, 8))
-    fig2.suptitle("Control Inputs — Baseline vs Antispike", fontsize=14)
-
-    n_mtq = 3
-    n_rw = 1
-    t_ctrl_base = t_base_arr[:-1]
-    t_ctrl_anti = t_anti_arr[:-1]
-
-    ax = axes2[0, 0]
-    ax.set_title("Baseline — MTQ")
-    for i in range(n_mtq):
-        ax.plot(t_ctrl_base, U_base[i, :], label=f"m_mtq{i}")
-    ax.set_ylabel("A m²")
-    ax.set_xlabel("Time [s]")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    ax = axes2[0, 1]
-    ax.set_title("Antispike — MTQ")
-    for i in range(n_mtq):
-        ax.plot(t_ctrl_anti, U_anti[i, :], label=f"m_mtq{i}")
-    ax.set_ylabel("A m²")
-    ax.set_xlabel("Time [s]")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    ax = axes2[1, 0]
-    ax.set_title("Baseline — RW")
-    for i in range(n_rw):
-        ax.plot(t_ctrl_base, U_base[n_mtq+i, :], label=f"tau_rw{i}")
-    ax.set_ylabel("N m")
-    ax.set_xlabel("Time [s]")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    ax = axes2[1, 1]
-    ax.set_title("Antispike — RW")
-    for i in range(n_rw):
-        ax.plot(t_ctrl_anti, U_anti[n_mtq+i, :], label=f"tau_rw{i}")
-    ax.set_ylabel("N m")
-    ax.set_xlabel("Time [s]")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    out_path2 = Path(__file__).parent / "antispike_controls.png"
-    fig2.savefig(str(out_path2), dpi=150)
-    print(f"Control plot saved: {out_path2}")
 
 
 if __name__ == "__main__":
