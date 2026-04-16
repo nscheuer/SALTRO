@@ -164,18 +164,29 @@ bool backwardPass(
 			if (lambda_aug[k].size() == c_k.size() && mu_aug[k].size() == c_k.size()) {
 				const Eigen::MatrixXd c_x = c_x_full * G_k.transpose();
 
+				// Augmented Lagrangian gradient: w_i = lambda_i + mu_i * c_i
+				// Lambda term always active; mu penalty active when c > 0 OR lambda > 0
 				Eigen::VectorXd w = Eigen::VectorXd::Zero(c_k.size());
 				for (int i = 0; i < c_k.size(); ++i) {
-					if (c_k(i) > 0.0) {
-						w(i) = lambda_aug[k](i) + mu_aug[k](i) * c_k(i);
+					const double li = lambda_aug[k](i);
+					const double mi = mu_aug[k](i);
+					const double ci = c_k(i);
+					// Lambda gradient always contributes
+					w(i) = li;
+					// Mu penalty gradient when constraint active or lambda positive
+					if (ci > 0.0 || li > 0.0) {
+						w(i) += mi * ci;
 					}
 				}
 
 				lx.noalias() += c_x.transpose() * w;
 				lu.noalias() += c_u.transpose() * w;
 
+				// Hessian (outer product) terms: active when c > 0 OR lambda > 0
 				for (int i = 0; i < c_k.size(); ++i) {
-					if (c_k(i) <= 0.0) {
+					const double li = lambda_aug[k](i);
+					const double ci = c_k(i);
+					if (ci <= 0.0 && li <= 0.0) {
 						continue;
 					}
 					const double mu_i = mu_aug[k](i);
@@ -234,6 +245,8 @@ bool backwardPass(
 		Eigen::VectorXd Q_x = lx + A_k.transpose() * p_k;
 		Eigen::VectorXd Q_u = lu + B_k_dyn.transpose() * p_k;
 		
+		// Symmetrize Q_uu before regularization (numerical noise can break Cholesky)
+		Q_uu = 0.5 * (Q_uu + Eigen::MatrixXd(Q_uu.transpose()));
 		Eigen::MatrixXd Q_uu_reg = Q_uu + reg * Eigen::MatrixXd::Identity(nu, nu);
 		Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
 		

@@ -240,13 +240,16 @@ bool forwardPass(
                 }
 
                 for (int i = 0; i < c_k.size(); ++i) {
-                    if (c_k(i) <= 0.0) {
-                        continue;
-                    }
                     const double ci = c_k(i);
                     const double li = lambda_aug[k](i);
                     const double mi = mu_aug[k](i);
-                    J_new += li * ci + 0.5 * mi * ci * ci;
+                    // Lambda term always active (drives dual variable toward optimum).
+                    // Mu penalty active when constraint violated OR lambda > 0
+                    // (keeps penalty "warm" for recently-active constraints).
+                    J_new += li * ci;
+                    if (ci > 0.0 || li > 0.0) {
+                        J_new += 0.5 * mi * ci * ci;
+                    }
                 }
             }
         }
