@@ -55,10 +55,32 @@ ps.passes[0].reg.reg_scale = 1.6
 ps.passes[0].linesearch.max_iters = 24
 ps.passes[0].linesearch.beta1 = 1e-10; ps.passes[0].linesearch.beta2 = 5000.0
 
+USE_SPIKE_REMOVAL = (sys.argv[6].lower() == "spike") if len(sys.argv) > 6 else False
+
 sat = create_satellite(ps)
 
+spike_cfg = None
+if USE_SPIKE_REMOVAL:
+    spike_cfg = {
+        "start_at_iter": 2,
+        "max_intervention_iters": 20,
+        "blend_len": 30,
+        "goal_switch_buffer": 15,
+        "min_consecutive": 7,
+        "exit_fudge": 2.0,
+        "min_prior_decrease_knots": 5,
+        "min_spike_ratio": 2.0,
+        "kp_q": 0.3,
+        "kd_w": 2.0,
+        "rw_scale": 0.0,
+        "omega_max": 0.30,
+        "verbose": True,
+    }
+    print("Spike removal ENABLED")
+
 X, U, stop, snaps, trans, dt, ctol, elapsed = trajOpt(
-    ps, sat, x0, r0, v0, jtime, qgoal, bs, debug=True
+    ps, sat, x0, r0, v0, jtime, qgoal, bs, debug=True,
+    spike_removal_cfg=spike_cfg,
 )
 
 print(f"Stop: {stop}  {len(snaps)} snapshots  elapsed: {elapsed:.1f}s")
@@ -163,12 +185,13 @@ if frames[-1] != n_frames - 1:
 
 print(f"Generating animation with {len(frames)} frames...")
 anim = FuncAnimation(fig, animate, frames=frames, repeat=False)
-out_path = Path(__file__).parent / f"convergence_angle{ANGLE_W:.0e}_ic{IC}.gif"
+spike_label = "_spike" if USE_SPIKE_REMOVAL else ""
+out_path = Path(__file__).parent / f"convergence_angle{ANGLE_W:.0e}_ic{IC}{spike_label}.gif"
 anim.save(str(out_path), writer=PillowWriter(fps=4))
 print(f"Saved: {out_path}")
 
 # Also save final frame as PNG
 animate(n_frames - 1)
-png_path = Path(__file__).parent / f"convergence_angle{ANGLE_W:.0e}_ic{IC}_final.png"
+png_path = Path(__file__).parent / f"convergence_angle{ANGLE_W:.0e}_ic{IC}{spike_label}_final.png"
 fig.savefig(str(png_path), dpi=150)
 print(f"Saved: {png_path}")

@@ -628,9 +628,80 @@ std::vector<SpikeCandidate> detectSpikes(
 			continue;
 		}
 
-		candidates.emplace_back(t_enter, t_exit);
+		candidates.emplace_back(SpikeCandidate{t_enter, t_exit});
 		k = t_exit + 1;
 	}
+
+	// =====================================================================
+	// Second detection pass: local PE outliers.
+	// Detect regions where the PE is significantly above the surrounding
+	// baseline.  This catches spikes that don't have the classical
+	// "monotonically decreasing → sudden increase" pattern — e.g. when
+	// the PE oscillates at ~10° between spikes.
+	//
+	// For each knot k, compute the local minimum PE in a window around it.
+	// If theta[k] > local_min * min_spike_ratio, it's a spike candidate.
+	// =====================================================================
+	const int window_half = std::max(cfg.min_consecutive, 5);
+	for (int kk = window_half; kk < N - window_half; ++kk) {
+		if (std::isnan(theta[kk])) continue;
+		if (buffered.count(kk) != 0) continue;
+
+		// Find minimum PE in the windows before and after this knot
+		double min_before = std::numeric_limits<double>::max();
+		for (int j = kk - window_half; j < kk; ++j) {
+			if (!std::isnan(theta[j]) && theta[j] < min_before) min_before = theta[j];
+		}
+		double min_after = std::numeric_limits<double>::max();
+		for (int j = kk + 1; j <= kk + window_half && j < N; ++j) {
+			if (!std::isnan(theta[j]) && theta[j] < min_after) min_after = theta[j];
+		}
+
+		const double local_baseline = std::min(min_before, min_after);
+		if (local_baseline >= std::numeric_limits<double>::max()) continue;
+
+		// Is this knot significantly above the local baseline?
+		if (theta[kk] < local_baseline * cfg.min_spike_ratio) continue;
+		// Also require absolute minimum spike height (avoid flagging tiny oscillations)
+		if (theta[kk] < 0.5) continue;  // ~28 deg minimum
+
+		// Expand the spike window: walk outward until PE drops below
+		// baseline * exit_fudge
+		const double exit_thresh = local_baseline * cfg.exit_fudge;
+		int t_enter_s = kk;
+		while (t_enter_s > 0 && !std::isnan(theta[t_enter_s - 1]) && theta[t_enter_s - 1] > exit_thresh) {
+			--t_enter_s;
+		}
+		int t_exit_s = kk;
+		while (t_exit_s < N - 1 && !std::isnan(theta[t_exit_s + 1]) && theta[t_exit_s + 1] > exit_thresh) {
+			++t_exit_s;
+		}
+		t_exit_s = std::min(t_exit_s + 1, N - 1);  // exit is exclusive
+
+		// Max spike window filter
+		if (cfg.max_spike_knots > 0 && (t_exit_s - t_enter_s) > cfg.max_spike_knots) {
+			continue;
+		}
+
+		// Check this doesn't overlap with an existing candidate
+		bool overlaps = false;
+		for (const auto& c : candidates) {
+			if (t_enter_s < c.second && t_exit_s > c.first) {
+				overlaps = true;
+				break;
+			}
+		}
+		if (overlaps) continue;
+
+		candidates.emplace_back(SpikeCandidate{t_enter_s, t_exit_s});
+		kk = t_exit_s;  // skip past this spike
+	}
+
+	// Sort by t_enter
+	std::sort(candidates.begin(), candidates.end(),
+	          [](const SpikeCandidate& a, const SpikeCandidate& b) {
+	              return a.first < b.first;
+	          });
 
 	return candidates;
 }
