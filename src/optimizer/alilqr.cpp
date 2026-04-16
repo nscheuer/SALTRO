@@ -146,10 +146,13 @@ bool alilqr(
 
         const auto c_list = collect_constraints(settings, satellite, X, U, S);
         for (size_t k = 0; k < c_list.size(); ++k) {
-            const Eigen::VectorXd c_pos = c_list[k].cwiseMax(0.0);
-            lambda_aug[k] = (lambda_aug[k] + mu_aug[k].cwiseProduct(c_pos))
-                                .cwiseMin(aug.lag_mult_max)
-                                .cwiseMax(0.0);
+            // Lambda update uses RAW constraint value (not clamped to positive).
+            // This allows lambda to decrease for satisfied constraints,
+            // maintaining proper dual variable evolution.
+            lambda_aug[k] = (lambda_aug[k] + mu_aug[k].cwiseProduct(c_list[k]))
+                                .cwiseMin(aug.lag_mult_max);
+            // For inequality constraints, lambda must stay non-negative
+            lambda_aug[k] = lambda_aug[k].cwiseMax(0.0);
             mu_aug[k] = (mu_aug[k] * aug.penalty_scale).cwiseMin(aug.penalty_max);
         }
     }
