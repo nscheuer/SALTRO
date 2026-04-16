@@ -728,57 +728,65 @@ std::vector<SpikeCandidate> detectSpikes(
 	// 3. Deadband: neighbors must be solidly on one hemisphere (|q·q_prev| > min)
 	// =====================================================================
 	{
-		const int m = std::max(cfg.min_consecutive, 5);  // context window
-		const double converge_thresh = M_PI / 4.0;       // 45° — context must be below this
-		const double deadband = 0.3;                      // min |q·q_prev| for neighbors
+		const double converge_thresh = M_PI / 4.0;  // 45° — context must be below this
+		const double deadband = 0.3;                 // min |q·q_next| for solid hemisphere
+		const int max_search = N / 2;                // max distance to search for context
 
-		for (int kk = m; kk < N - m; ++kk) {
+		for (int kk = 1; kk < N - 1; ++kk) {
 			if (std::isnan(theta[kk])) continue;
 			if (buffered.count(kk) != 0) continue;
+			if (theta[kk] < M_PI / 6.0) continue;  // 30° minimum PE to consider
 
-			// Check for hemisphere flip: q_k · q_{k-1} changes sign around kk
-			// Look for a region where consecutive q dots go through zero
-			// Check neighbors are solidly on their hemisphere relative to each other
-			bool left_solid = true;
-			for (int j = kk - m; j < kk - 1; ++j) {
-				if (j < 0) { left_solid = false; break; }
-				const double qdot_j = X.col(j).segment<4>(3).dot(X.col(j + 1).segment<4>(3));
-				if (std::abs(qdot_j) < deadband) { left_solid = false; break; }
+			// Search LEFT for the nearest well-converged knot
+			int left_idx = -1;
+			for (int j = kk - 1; j >= 0 && (kk - j) < max_search; --j) {
+				if (std::isnan(theta[j])) continue;
+				if (theta[j] < converge_thresh) {
+					left_idx = j;
+					break;
+				}
 			}
-			if (!left_solid) continue;
+			if (left_idx < 0) continue;
 
-			bool right_solid = true;
-			for (int j = kk + 1; j < kk + m && j < N - 1; ++j) {
-				const double qdot_j = X.col(j).segment<4>(3).dot(X.col(j + 1).segment<4>(3));
-				if (std::abs(qdot_j) < deadband) { right_solid = false; break; }
+			// Search RIGHT for the nearest well-converged knot
+			int right_idx = -1;
+			for (int j = kk + 1; j < N && (j - kk) < max_search; ++j) {
+				if (std::isnan(theta[j])) continue;
+				if (theta[j] < converge_thresh) {
+					right_idx = j;
+					break;
+				}
 			}
-			if (!right_solid) continue;
+			if (right_idx < 0) continue;
 
-			// Check if there's a hemisphere flip near kk:
-			// The left side should be on a different hemisphere than the right side
-			const Eigen::Vector4d q_left = X.col(std::max(0, kk - m)).segment<4>(3);
-			const Eigen::Vector4d q_right = X.col(std::min(N - 1, kk + m)).segment<4>(3);
-			const double left_right_dot = q_left.dot(q_right);
+			// Check hemisphere flip: left and right context on opposite hemispheres
+			const Eigen::Vector4d q_left = X.col(left_idx).segment<4>(3);
+			const Eigen::Vector4d q_right = X.col(right_idx).segment<4>(3);
+			if (q_left.dot(q_right) > -deadband) continue;
 
-			// If left and right are on the same hemisphere (dot > 0), no flip
-			// If on opposite hemispheres (dot < 0), there's a flip in between
-			if (left_right_dot > -deadband) continue;
+			// Check neighbors are solidly on their hemisphere (no noise)
+			if (left_idx > 0) {
+				if (std::abs(X.col(left_idx).segment<4>(3).dot(
+					X.col(left_idx - 1).segment<4>(3))) < deadband) continue;
+			}
+			if (right_idx < N - 1) {
+				if (std::abs(X.col(right_idx).segment<4>(3).dot(
+					X.col(right_idx + 1).segment<4>(3))) < deadband) continue;
+			}
 
-			// Filter 1: local context is well-converged
-			const double pe_left = std::isnan(theta[kk - m]) ? 999.0 : theta[kk - m];
-			const double pe_right = (kk + m < N && !std::isnan(theta[kk + m])) ? theta[kk + m] : 999.0;
-			if (pe_left > converge_thresh || pe_right > converge_thresh) continue;
+			// Filter 2: spike is symmetric — PE at center higher than context
+			if (theta[kk] <= theta[left_idx] || theta[kk] <= theta[right_idx]) continue;
 
-			// Filter 2: spike is symmetric — PE at center is higher than at edges
-			if (theta[kk] <= pe_left || theta[kk] <= pe_right) continue;
-
-			// Find spike window: expand around kk
+			// Find spike window using context PE as threshold
+			const double exit_pe = std::max(theta[left_idx], theta[right_idx]);
 			int t_enter_h = kk;
-			while (t_enter_h > 0 && theta[t_enter_h - 1] > std::max(pe_left, pe_right)) {
+			while (t_enter_h > left_idx && !std::isnan(theta[t_enter_h - 1]) &&
+			       theta[t_enter_h - 1] > exit_pe) {
 				--t_enter_h;
 			}
 			int t_exit_h = kk;
-			while (t_exit_h < N - 1 && theta[t_exit_h + 1] > std::max(pe_left, pe_right)) {
+			while (t_exit_h < right_idx && !std::isnan(theta[t_exit_h + 1]) &&
+			       theta[t_exit_h + 1] > exit_pe) {
 				++t_exit_h;
 			}
 			t_exit_h = std::min(t_exit_h + 1, N - 1);

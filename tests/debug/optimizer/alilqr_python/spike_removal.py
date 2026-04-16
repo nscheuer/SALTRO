@@ -319,6 +319,81 @@ def detect_spikes(
         candidates.append((t_enter, t_exit))
         k = t_exit + 1
 
+    # ----- Hemisphere flip detection -----
+    # Search for regions where well-converged context on either side
+    # has quaternions on opposite hemispheres (q_left · q_right < 0).
+    converge_thresh = np.pi / 4.0  # 45°
+    deadband = 0.3
+    max_search = N // 2
+
+    for kk in range(1, N - 1):
+        if np.isnan(theta[kk]) or kk in buffered:
+            continue
+        if theta[kk] < np.pi / 6.0:  # 30° minimum
+            continue
+
+        # Search left for nearest well-converged knot
+        left_idx = -1
+        for j in range(kk - 1, -1, -1):
+            if kk - j > max_search:
+                break
+            if np.isnan(theta[j]):
+                continue
+            if theta[j] < converge_thresh:
+                left_idx = j
+                break
+        if left_idx < 0:
+            continue
+
+        # Search right for nearest well-converged knot
+        right_idx = -1
+        for j in range(kk + 1, N):
+            if j - kk > max_search:
+                break
+            if np.isnan(theta[j]):
+                continue
+            if theta[j] < converge_thresh:
+                right_idx = j
+                break
+        if right_idx < 0:
+            continue
+
+        # Check hemisphere flip
+        q_left = X[3:7, left_idx]
+        q_right = X[3:7, right_idx]
+        if np.dot(q_left, q_right) > -deadband:
+            continue
+
+        # Neighbors solidly on their hemisphere
+        if left_idx > 0:
+            if abs(np.dot(X[3:7, left_idx], X[3:7, left_idx - 1])) < deadband:
+                continue
+        if right_idx < N - 1:
+            if abs(np.dot(X[3:7, right_idx], X[3:7, right_idx + 1])) < deadband:
+                continue
+
+        # Symmetric: PE at center > PE at edges
+        if theta[kk] <= theta[left_idx] or theta[kk] <= theta[right_idx]:
+            continue
+
+        # Find spike window
+        exit_pe = max(theta[left_idx], theta[right_idx])
+        t_enter_h = kk
+        while t_enter_h > left_idx and not np.isnan(theta[t_enter_h - 1]) and theta[t_enter_h - 1] > exit_pe:
+            t_enter_h -= 1
+        t_exit_h = kk
+        while t_exit_h < right_idx and not np.isnan(theta[t_exit_h + 1]) and theta[t_exit_h + 1] > exit_pe:
+            t_exit_h += 1
+        t_exit_h = min(t_exit_h + 1, N - 1)
+
+        # Check no overlap
+        overlaps = any(t_enter_h < te and t_exit_h > ts for ts, te in candidates)
+        if overlaps:
+            continue
+
+        candidates.append((t_enter_h, t_exit_h))
+
+    candidates.sort(key=lambda c: c[0])
     return candidates
 
 
