@@ -36,10 +36,13 @@ def _augmented_penalty_total(
             uk = np.zeros(satellite.controlDim)
 
         ck = np.asarray(satellite.constraints(k, N, xk, uk, S[:, k], cnst_cfg), dtype=float)
-        ck_pos = np.maximum(0.0, ck)
         lam_k = np.asarray(lambda_aug[k], dtype=float)
         mu_k = np.asarray(mu_aug[k], dtype=float)
-        total += float(lam_k @ ck_pos + 0.5 * np.sum(mu_k * ck_pos * ck_pos))
+        # Lambda term always active; mu penalty active when c>0 OR lambda>0
+        for i in range(len(ck)):
+            total += lam_k[i] * ck[i]
+            if ck[i] > 0.0 or lam_k[i] > 0.0:
+                total += 0.5 * mu_k[i] * ck[i] * ck[i]
 
     return total
 
@@ -133,10 +136,29 @@ def ilqr(
             }
         )
 
-    for iteration in range(passsettings.ilqr.max_iters):
-        reg = passsettings.reg.reg_init
+    # Two-variable regularization (rho, drho) matching C++ iLQR.
+    reg = passsettings.reg.reg_init
+    dreg = 0.0
+    reg_scale = passsettings.reg.reg_scale
+    reg_bump = passsettings.reg.reg_bump
+    reg_min = passsettings.reg.reg_min
+    reg_max = passsettings.reg.reg_max
 
-        while reg <= passsettings.reg.reg_max:
+    def increase_reg():
+        nonlocal reg, dreg
+        dreg = max(dreg * reg_scale, reg_scale)
+        reg = max(reg * dreg, reg_min)
+
+    def decrease_reg():
+        nonlocal reg, dreg
+        dreg = min(dreg / reg_scale, 1.0 / reg_scale)
+        reg = dreg * reg
+        if reg < reg_min:
+            reg = 0.0
+
+    for iteration in range(passsettings.ilqr.max_iters):
+
+        while reg <= reg_max:
             U_trim = U[:, :X.shape[1] - 1]
             ok_bp, K, d, deltaV = saltro_py.backward_pass(
                 satellite,
@@ -155,8 +177,11 @@ def ilqr(
                 reg,
             )
             if not ok_bp:
-                reg *= passsettings.reg.reg_scale
+                increase_reg()
                 continue
+
+            # Decrease reg after successful BP (like original ALTRO)
+            decrease_reg()
 
             K_list = [K[k] for k in range(K.shape[0])]
             d_list = [d[:, k] for k in range(d.shape[1])]
@@ -189,7 +214,10 @@ def ilqr(
                 J_prev,
             )
             if not ok_fp:
-                reg *= passsettings.reg.reg_scale
+                # Triple increase: increaseReg + bump + increaseReg
+                increase_reg()
+                reg += reg_bump
+                increase_reg()
                 continue
 
             X = X_new
@@ -206,7 +234,7 @@ def ilqr(
                 )
 
             delta_J = abs(J_prev - J_new)
-            
+
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
                 snapshots.append(
@@ -226,13 +254,13 @@ def ilqr(
                     "act_delta": delta_J,
                     "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol
                 })
-            
+
             if delta_J <= passsettings.ilqr.cost_tol:
                 return X, U, "converged", snapshots, transitions
-            
+
             break
 
-        if reg > passsettings.reg.reg_max:
+        if reg > reg_max:
             return X, U, "reg_exceeded", snapshots, transitions
-        
+
     return X, U, "max_iters", snapshots, transitions

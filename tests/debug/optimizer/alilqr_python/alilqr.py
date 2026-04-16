@@ -219,17 +219,16 @@ def alilqr(
             stop_reason = f"AL-iLQR converged: max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}"
             break
 
-        # Update lambda_k and mu_k elementwise (inequality constraints).
+        # Update lambda and mu matching C++ alilqr.cpp:
+        # Lambda update uses RAW constraint value (not clamped to positive).
+        # Lambda clamped to non-negative after update (inequality constraints).
         clist = _collect_constraints(plannersettings, satellite, X, U, S)
         for k, ck in enumerate(clist):
-            ck_pos = np.maximum(0.0, ck)
-            lambda_aug[k] = np.maximum(
-                0.0,
-                np.minimum(
-                    passsettings.auglag.lag_mult_max,
-                    lambda_aug[k] + mu_aug[k] * ck_pos,
-                ),
+            lambda_aug[k] = np.minimum(
+                passsettings.auglag.lag_mult_max,
+                lambda_aug[k] + mu_aug[k] * ck,  # raw c, not max(0,c)
             )
+            lambda_aug[k] = np.maximum(0.0, lambda_aug[k])  # non-negative for inequality
             mu_aug[k] = np.minimum(passsettings.auglag.penalty_max, phi_aug * mu_aug[k])
 
     return X, U, stop_reason, snapshots, transitions
