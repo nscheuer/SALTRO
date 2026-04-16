@@ -349,12 +349,24 @@ struct AugLagConfig {
  */
 struct ILQRConfig {
     int max_iters = 250;
-    double grad_tol = 1e-3;
+    double grad_tol = 0.0;
     double cost_tol = 1e-1;
     int z_count_lim = 10;
 
     double max_cost = 1e40;
     double state_bound = 10.0;
+
+    /// Require strict cost decrease in line search (J_new < J_prev).
+    /// Original ALTRO behavior; prevents accepting cost-increasing steps.
+    bool ls_strict_decrease = false;
+
+    /// Require BOTH grad_tol AND cost_tol for convergence (true),
+    /// or allow either alone (false).  Original ALTRO uses conjunctive.
+    bool conjunctive_convergence = false;
+
+    /// Persist regularization across iLQR iterations (true = ALTRO-style),
+    /// or reset to reg_init each iteration (false = legacy).
+    bool persistent_reg = false;
 };
 
 /**

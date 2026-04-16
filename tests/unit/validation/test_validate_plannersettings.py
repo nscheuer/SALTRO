@@ -787,14 +787,13 @@ def test_invalid_ilqr_grad_tol_negative():
     assert error_msg == "ilqr.grad_tol invalid"
 
 
-def test_invalid_ilqr_grad_tol_zero():
-    """Zero ilqr.grad_tol should fail"""
+def test_valid_ilqr_grad_tol_zero():
+    """Zero ilqr.grad_tol should pass (disables gradient convergence check)"""
     settings = valid_settings()
     settings.passes[0].ilqr.grad_tol = 0.0
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
-    assert not ok
-    assert error_msg == "ilqr.grad_tol invalid"
+
+    assert ok, f"grad_tol=0 should be valid (disables check), got: {error_msg}"
 
 
 def test_invalid_ilqr_cost_tol_negative():
