@@ -64,7 +64,7 @@
 [SpikeRemoval] iter=141: skipping (past max_intervention_iters)
 [SpikeRemoval] iter=142: skipping (past max_intervention_iters)
 [SpikeRemoval] iter=143: skipping (past max_intervention_iters)
-[SpikeRemoval] iter=  -> CONVERGED  max_pe=90.0°  final_pe=8.93°  time=8.12s
+[SpikeRemoval] iter=  -> CONVERGED  max_pe=90.0°  final_pe=8.93°  time=8.57s
 
 ============================================================
 ExcCtrl_base (initcontroller=1, spike=False)...

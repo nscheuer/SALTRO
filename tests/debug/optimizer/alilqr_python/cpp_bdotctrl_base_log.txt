@@ -66,7 +66,7 @@
 [SpikeRemoval] iter=162: skipping (past max_intervention_iters)
 [SpikeRemoval] iter=163: skipping (past max_intervention_iters)
 [SpikeRemoval] iter=164: skipping (past max_intervention_iters)
-[SpikeRemoval] iter=165: skipping (past max_interventi  -> CONVERGED  max_pe=90.0°  final_pe=9.51°  time=6.28s
+[SpikeRemoval] iter=165: skipping (past max_interventi  -> CONVERGED  max_pe=90.0°  final_pe=9.51°  time=6.02s
 
 ============================================================
 BdotCtrl_base (initcontroller=2, spike=False)...

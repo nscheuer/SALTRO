@@ -1,4 +1,4 @@
-  -> CONVERGED  max_pe=179.4°  final_pe=5.71°  time=9.51s
+  -> CONVERGED  max_pe=179.4°  final_pe=5.71°  time=8.63s
 
 ============================================================
 ZeroCtrl_anti (initcontroller=0, spike=True)...

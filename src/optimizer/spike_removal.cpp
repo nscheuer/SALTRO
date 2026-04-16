@@ -715,6 +715,94 @@ std::vector<SpikeCandidate> detectSpikes(
 		kk = t_exit_s;  // skip past this spike
 	}
 
+	// =====================================================================
+	// Third detection pass: hemisphere flip detection.
+	// The fundamental signature of a winding spike: the trajectory crosses
+	// to the opposite hemisphere of S³ relative to itself.
+	// s_k = sign(q_k · q_{k-1}).  A sign change in s indicates the
+	// quaternion crossed through q·q_prev = 0 (a 180° rotation in one step).
+	//
+	// Filters:
+	// 1. Local context is well-converged: PE at k±m is below a threshold
+	// 2. Symmetric: PE at k-m and k+m are both lower than at k
+	// 3. Deadband: neighbors must be solidly on one hemisphere (|q·q_prev| > min)
+	// =====================================================================
+	{
+		const int m = std::max(cfg.min_consecutive, 5);  // context window
+		const double converge_thresh = M_PI / 4.0;       // 45° — context must be below this
+		const double deadband = 0.3;                      // min |q·q_prev| for neighbors
+
+		for (int kk = m; kk < N - m; ++kk) {
+			if (std::isnan(theta[kk])) continue;
+			if (buffered.count(kk) != 0) continue;
+
+			// Check for hemisphere flip: q_k · q_{k-1} changes sign around kk
+			// Look for a region where consecutive q dots go through zero
+			// Check neighbors are solidly on their hemisphere relative to each other
+			bool left_solid = true;
+			for (int j = kk - m; j < kk - 1; ++j) {
+				if (j < 0) { left_solid = false; break; }
+				const double qdot_j = X.col(j).segment<4>(3).dot(X.col(j + 1).segment<4>(3));
+				if (std::abs(qdot_j) < deadband) { left_solid = false; break; }
+			}
+			if (!left_solid) continue;
+
+			bool right_solid = true;
+			for (int j = kk + 1; j < kk + m && j < N - 1; ++j) {
+				const double qdot_j = X.col(j).segment<4>(3).dot(X.col(j + 1).segment<4>(3));
+				if (std::abs(qdot_j) < deadband) { right_solid = false; break; }
+			}
+			if (!right_solid) continue;
+
+			// Check if there's a hemisphere flip near kk:
+			// The left side should be on a different hemisphere than the right side
+			const Eigen::Vector4d q_left = X.col(std::max(0, kk - m)).segment<4>(3);
+			const Eigen::Vector4d q_right = X.col(std::min(N - 1, kk + m)).segment<4>(3);
+			const double left_right_dot = q_left.dot(q_right);
+
+			// If left and right are on the same hemisphere (dot > 0), no flip
+			// If on opposite hemispheres (dot < 0), there's a flip in between
+			if (left_right_dot > -deadband) continue;
+
+			// Filter 1: local context is well-converged
+			const double pe_left = std::isnan(theta[kk - m]) ? 999.0 : theta[kk - m];
+			const double pe_right = (kk + m < N && !std::isnan(theta[kk + m])) ? theta[kk + m] : 999.0;
+			if (pe_left > converge_thresh || pe_right > converge_thresh) continue;
+
+			// Filter 2: spike is symmetric — PE at center is higher than at edges
+			if (theta[kk] <= pe_left || theta[kk] <= pe_right) continue;
+
+			// Find spike window: expand around kk
+			int t_enter_h = kk;
+			while (t_enter_h > 0 && theta[t_enter_h - 1] > std::max(pe_left, pe_right)) {
+				--t_enter_h;
+			}
+			int t_exit_h = kk;
+			while (t_exit_h < N - 1 && theta[t_exit_h + 1] > std::max(pe_left, pe_right)) {
+				++t_exit_h;
+			}
+			t_exit_h = std::min(t_exit_h + 1, N - 1);
+
+			// Max spike window filter
+			if (cfg.max_spike_knots > 0 && (t_exit_h - t_enter_h) > cfg.max_spike_knots) {
+				continue;
+			}
+
+			// Check no overlap
+			bool overlaps = false;
+			for (const auto& c : candidates) {
+				if (t_enter_h < c.second && t_exit_h > c.first) {
+					overlaps = true;
+					break;
+				}
+			}
+			if (overlaps) continue;
+
+			candidates.emplace_back(SpikeCandidate{t_enter_h, t_exit_h});
+			kk = t_exit_h;
+		}
+	}
+
 	// Sort by t_enter
 	std::sort(candidates.begin(), candidates.end(),
 	          [](const SpikeCandidate& a, const SpikeCandidate& b) {
