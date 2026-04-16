@@ -252,7 +252,11 @@ bool forwardPass(
         }
 
         // Line search check
-        const bool ls_ok = linesearch(J_minus, J_new, X, U, X_bar, U_bar, alpha, deltaV, ls_cfg);
+        bool ls_ok = linesearch(J_minus, J_new, X, U, X_bar, U_bar, alpha, deltaV, ls_cfg);
+        // Optionally require strict cost decrease (original ALTRO behavior)
+        if (ls_ok && settings.passes[0].ilqr.ls_strict_decrease && J_new >= J_minus) {
+            ls_ok = false;
+        }
         const double delta_V_alpha = alpha * (deltaV(0) + alpha * deltaV(1));
         const double z = (std::isfinite(delta_V_alpha) && std::abs(delta_V_alpha) >= 1e-16)
             ? (J_minus - J_new) / (-delta_V_alpha)

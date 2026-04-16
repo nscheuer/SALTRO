@@ -208,7 +208,7 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
-            if (pass.ilqr.grad_tol <= 0.0 || !std::isfinite(pass.ilqr.grad_tol)) {
+            if (pass.ilqr.grad_tol < 0.0 || !std::isfinite(pass.ilqr.grad_tol)) {
                 error_msg = "ilqr.grad_tol invalid";
                 return false;
             }
