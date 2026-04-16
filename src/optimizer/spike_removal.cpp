@@ -868,6 +868,29 @@ bool applySpikeRemoval(
 		dt = (jtime(1) - jtime(0)) * 36525.0 * 86400.0;
 	}
 
+	// Compute current mean PE
+	double mean_pe = 0.0;
+	int pe_count = 0;
+	for (int k = 0; k < N; ++k) {
+		const double pe = pointingError(X, attitude_target, boresight, k);
+		if (std::isfinite(pe)) {
+			mean_pe += pe;
+			++pe_count;
+		}
+	}
+	mean_pe = (pe_count > 0) ? mean_pe / pe_count : 0.0;
+
+	// Guard: don't intervene if mean PE is low (< 5°) — the trajectory
+	// is well-converged and spike removal would likely degrade it.
+	if (mean_pe < 5.0 * M_PI / 180.0) {
+		if (cfg.verbose) {
+			std::cout << "[SpikeRemoval] iter=" << iteration
+			          << ": skipping (mean PE " << (mean_pe * 180.0 / M_PI)
+			          << "° is low)\n";
+		}
+		return false;
+	}
+
 	// Detect candidates
 	const auto candidates = detectSpikes(satellite, X, U, attitude_target, boresight, B, cnst_cfg, cfg);
 

@@ -917,6 +917,31 @@ def apply_spike_removal(
     else:
         dt = float(pass_settings.dt)
 
+    # Compute current mean PE
+    theta_all = []
+    for k in range(N):
+        try:
+            theta_all.append(_pointing_error(X, attitude_target, boresight, k))
+        except Exception:
+            pass
+    current_mean_pe = float(np.mean(theta_all)) if theta_all else float('inf')
+
+    # Guard: don't intervene if mean PE is low and stable/improving.
+    # Prevents spike removal from destroying a well-converged trajectory
+    # that has slightly increased PE from AL constraint enforcement.
+    if not hasattr(apply_spike_removal, '_prev_mean_pe'):
+        apply_spike_removal._prev_mean_pe = float('inf')
+    prev_mean_pe = apply_spike_removal._prev_mean_pe
+    apply_spike_removal._prev_mean_pe = current_mean_pe
+
+    # Only intervene if mean PE is above a minimum threshold OR has increased
+    # significantly from the previous call (indicating a regression).
+    mean_pe_deg = np.degrees(current_mean_pe)
+    if mean_pe_deg < 5.0 and current_mean_pe <= prev_mean_pe * 1.5:
+        if verbose:
+            print(f"[SpikeRemoval] iter={iteration}: skipping (mean PE {mean_pe_deg:.1f}° is low and stable)")
+        return X, U, False
+
     # Detect spike candidates
     candidates = detect_spikes(
         X, U, attitude_target, boresight, B, satellite, cnst_cfg,
