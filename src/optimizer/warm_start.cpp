@@ -136,9 +136,7 @@ bool warm_start(
             if (!std::isfinite(qn) || qn <= 1e-12) {
                 return false;
             }
-            q_next /= qn;
-            if (q_next(0) < 0.0) q_next = -q_next;  // Stay on q0 >= 0 hemisphere
-            x_next.segment<4>(Satellite::QUAT_INDEX) = q_next;
+            x_next.segment<4>(Satellite::QUAT_INDEX) = q_next / qn;
         }
 
         X.col(k + 1) = x_next;

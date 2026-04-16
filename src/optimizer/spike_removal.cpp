@@ -206,14 +206,10 @@ Eigen::VectorXd rk4Step(
 		},
 		x, 0.0, dt, x_next
 	);
-	// Normalize quaternion and enforce positive scalar half of S³
+	// Normalize quaternion
 	Eigen::Vector4d q = x_next.segment<4>(3);
 	const double qn = q.norm();
-	if (qn > 1e-10) {
-		q /= qn;
-		if (q(0) < 0.0) q = -q;
-		x_next.segment<4>(3) = q;
-	}
+	if (qn > 1e-10) x_next.segment<4>(3) = q / qn;
 	return x_next;
 }
 

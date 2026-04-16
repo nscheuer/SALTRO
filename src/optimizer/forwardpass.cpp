@@ -190,15 +190,12 @@ bool forwardPass(
             }
 
             if (x_next.size() == nx && valid_state_quat(x_next)) {
-                // CRITICAL: Normalize quaternion and enforce positive scalar half
-                // of S³ to prevent double-cover sign flipping between iterations.
+                // Normalize quaternion after integration to prevent drift.
                 if (x_next.size() >= 7) {
                     Eigen::Vector4d q = x_next.segment<4>(3);
                     double qn = q.norm();
                     if (qn > 1e-10 && std::isfinite(qn)) {
-                        q /= qn;
-                        if (q(0) < 0.0) q = -q;  // Stay on q0 >= 0 hemisphere
-                        x_next.segment<4>(3) = q;
+                        x_next.segment<4>(3) = q / qn;
                     } else {
                         rollout_ok = false;
                         fail_k = k;
