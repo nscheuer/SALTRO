@@ -27,18 +27,18 @@ def make_settings(spike_enabled, initcontroller=1):
     ps.num_passes = 1
     ps.passes[0].dt = 10.0
     ps.passes[0].ilqr.cost_tol = 1e-6
-    ps.passes[0].ilqr.max_iters = 1000
-    ps.passes[0].auglag.max_outer_iters = 50
+    ps.passes[0].ilqr.max_iters = 200
+    ps.passes[0].auglag.max_outer_iters = 30
     ps.passes[0].auglag.constraint_tol = 1e-3
 
     cost = ps.passes[0].cost
-    cost.angle = 1e6
-    cost.ang_vel = 1e4
+    cost.angle = 1e4
+    cost.ang_vel = 1e2
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1e-1
     cost.rw_control_weight = 1.0
-    cost.angle_N = 1e6
-    cost.ang_vel_N = 1e4
+    cost.angle_N = 1e4
+    cost.ang_vel_N = 1e2
     cost.ang_cost_func_type = 3
     cost.use_cost_hess = True
 
@@ -50,8 +50,8 @@ def make_settings(spike_enabled, initcontroller=1):
     ps.disturbances.plan_for_resdipole = False
 
     ps.passes[0].reg.reg_init = 1e-6
-    ps.passes[0].reg.reg_max = 1e10
-    ps.passes[0].reg.reg_scale = 10.0
+    ps.passes[0].reg.reg_max = 1e30
+    ps.passes[0].reg.reg_scale = 1.6
 
     ps.passes[0].linesearch.max_iters = 24
     ps.passes[0].linesearch.beta1 = 1e-10
@@ -66,8 +66,8 @@ def make_settings(spike_enabled, initcontroller=1):
         sr.goal_switch_buffer = 15
         sr.min_consecutive = 7
         sr.exit_fudge = 2.0
-        sr.min_prior_decrease_knots = 10
-        sr.min_spike_ratio = 3.0
+        sr.min_prior_decrease_knots = 5
+        sr.min_spike_ratio = 2.0
         sr.max_spike_knots = 55
         sr.kp_q = 0.3
         sr.kd_w = 2.0
