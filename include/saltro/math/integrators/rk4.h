@@ -142,62 +142,67 @@ void rk4_jacobians(
     Eigen::VectorXd x2(nx), x3(nx), x4(nx);
     Eigen::VectorXd k1(nx), k2(nx), k3(nx), k4(nx);
 
-    // Normalization Jacobian at the initial state
+    // Following the original ALTRO implementation exactly:
+    // Each intermediate raw state x_ir = x_norm + coeff*dt*k_i is normalized
+    // before evaluating dynamics. The chain rule tracks derivatives w.r.t.
+    // the initial RAW state x0_raw through all normalization steps.
+    //
+    // Key: dxd_i/dx0_raw = A_ci * N_i * (dx_ir/dx0_raw)
+    //      dx_ir/dx0_raw = N0 + coeff*dt*(dxd_{i-1}/dx0_raw)  [note N0, not I]
+
+    // Normalize the initial state
+    Eigen::VectorXd x_norm = x;
+    x_norm.segment<4>(quat_idx).normalize();
     const Eigen::MatrixXd N0 = stateNormJacobian(x, nx, quat_idx);
 
-    // ========================================================================
     // Stage 1: k1 = f(t, x_norm, u)
-    // ========================================================================
-    dynamics_jac(t, x, u, A_c1, B_c1, k1);
-    // dk1/dx0_raw = A_c1 * N0  (chain rule through initial normalization)
+    dynamics_jac(t, x_norm, u, A_c1, B_c1, k1);
+    // dxd0/dx0_raw = A_c1 * N0
     dk1_dx = A_c1 * N0;
     dk1_du = B_c1;
 
-    // ========================================================================
-    // Stage 2: k2 = f(t + dt/2, norm(x + dt/2 * k1), u)
-    // ========================================================================
-    x2 = x + 0.5 * dt * k1;
-    // Normalize quaternion at intermediate state
+    // Stage 2: x1r = x_norm + 0.5*dt*k1, x1 = norm(x1r)
+    Eigen::VectorXd x1r = x_norm + 0.5 * dt * k1;
+    x2 = x1r;
     x2.segment<4>(quat_idx).normalize();
-    const Eigen::MatrixXd N2 = stateNormJacobian(x + 0.5 * dt * k1, nx, quat_idx);
+    const Eigen::MatrixXd N1 = stateNormJacobian(x1r, nx, quat_idx);
     dynamics_jac(t + 0.5 * dt, x2, u, A_c2, B_c2, k2);
-    // dx2_raw/dx0_raw = I + 0.5*dt*dk1_dx, then norm: dx2/dx0_raw = N2 * (I + 0.5*dt*dk1_dx)
-    // dk2/dx0_raw = A_c2 * N2 * (I + 0.5*dt*dk1_dx)
-    dk2_dx = A_c2 * N2 * (I + 0.5 * dt * dk1_dx);
-    dk2_du = A_c2 * N2 * (0.5 * dt * dk1_du) + B_c2;
+    // dx1r/dx0_raw = N0 + 0.5*dt*(dxd0/dx0_raw) = N0 + 0.5*dt*A_c1*N0
+    Eigen::MatrixXd dx1r_dx0r = N0 + 0.5 * dt * dk1_dx;
+    dk2_dx = A_c2 * N1 * dx1r_dx0r;
+    dk2_du = A_c2 * N1 * (0.5 * dt * dk1_du) + B_c2;
 
-    // ========================================================================
-    // Stage 3: k3 = f(t + dt/2, norm(x + dt/2 * k2), u)
-    // ========================================================================
-    x3 = x + 0.5 * dt * k2;
+    // Stage 3: x2r = x_norm + 0.5*dt*k2, x2 = norm(x2r)
+    Eigen::VectorXd x2r = x_norm + 0.5 * dt * k2;
+    x3 = x2r;
     x3.segment<4>(quat_idx).normalize();
-    const Eigen::MatrixXd N3 = stateNormJacobian(x + 0.5 * dt * k2, nx, quat_idx);
+    const Eigen::MatrixXd N2 = stateNormJacobian(x2r, nx, quat_idx);
     dynamics_jac(t + 0.5 * dt, x3, u, A_c3, B_c3, k3);
-    dk3_dx = A_c3 * N3 * (I + 0.5 * dt * dk2_dx);
-    dk3_du = A_c3 * N3 * (0.5 * dt * dk2_du) + B_c3;
+    // dx2r/dx0_raw = N0 + 0.5*dt*(dxd1/dx0_raw)
+    Eigen::MatrixXd dx2r_dx0r = N0 + 0.5 * dt * dk2_dx;
+    dk3_dx = A_c3 * N2 * dx2r_dx0r;
+    dk3_du = A_c3 * N2 * (0.5 * dt * dk2_du) + B_c3;
 
-    // ========================================================================
-    // Stage 4: k4 = f(t + dt, norm(x + dt * k3), u)
-    // ========================================================================
-    x4 = x + dt * k3;
+    // Stage 4: x3r = x_norm + dt*k3, x3 = norm(x3r)
+    Eigen::VectorXd x3r = x_norm + dt * k3;
+    x4 = x3r;
     x4.segment<4>(quat_idx).normalize();
-    const Eigen::MatrixXd N4 = stateNormJacobian(x + dt * k3, nx, quat_idx);
+    const Eigen::MatrixXd N3 = stateNormJacobian(x3r, nx, quat_idx);
     dynamics_jac(t + dt, x4, u, A_c4, B_c4, k4);
-    dk4_dx = A_c4 * N4 * (I + dt * dk3_dx);
-    dk4_du = A_c4 * N4 * (dt * dk3_du) + B_c4;
+    // dx3r/dx0_raw = N0 + dt*(dxd2/dx0_raw)
+    Eigen::MatrixXd dx3r_dx0r = N0 + dt * dk3_dx;
+    dk4_dx = A_c4 * N3 * dx3r_dx0r;
+    dk4_du = A_c4 * N3 * (dt * dk3_du) + B_c4;
 
-    // ========================================================================
-    // Assemble discrete Jacobians
-    // ========================================================================
-    // x_{k+1}_raw = x + (dt/6)*(k1 + 2*k2 + 2*k3 + k4)
-    // Then normalize: x_{k+1} = norm(x_{k+1}_raw)
-    Eigen::VectorXd x_next_raw = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+    // Assemble: x_{k+1}_raw = x_norm + (dt/6)*(k1 + 2*k2 + 2*k3 + k4)
+    Eigen::VectorXd x_next_raw = x_norm + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
     const Eigen::MatrixXd N_next = stateNormJacobian(x_next_raw, nx, quat_idx);
 
+    // dx_{k+1}_raw/dx0_raw = N0 + (dt/6)*(dk1_dx + 2*dk2_dx + 2*dk3_dx + dk4_dx)
     Eigen::MatrixXd A_raw = N0 + (dt / 6.0) * (dk1_dx + 2.0 * dk2_dx + 2.0 * dk3_dx + dk4_dx);
     Eigen::MatrixXd B_raw = (dt / 6.0) * (dk1_du + 2.0 * dk2_du + 2.0 * dk3_du + dk4_du);
 
-    // Final normalization at output
+    // Final normalization: dx_{k+1}/dx0_raw = N_next * A_raw
     A_discrete = N_next * A_raw;
     B_discrete = N_next * B_raw;
 }
