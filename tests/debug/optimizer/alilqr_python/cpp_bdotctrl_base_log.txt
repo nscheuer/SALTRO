@@ -1,95 +1,72 @@
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: no candidates
-[SpikeRemoval] iter=3: no candidates
-[SpikeRemoval] iter=4: no candidates
-[SpikeRemoval] iter=5: no candidates
-[SpikeRemoval] iter=6: no candidates
-[SpikeRemoval] iter=7: no candidates
-[SpikeRemoval] iter=8: no candidates
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: no candidates
-[SpikeRemoval] iter=3: no candidates
-[SpikeRemoval] iter=4: no candidates
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: no candidates
-[SpikeRemoval] iter=3: no candidates
-[SpikeRemoval] iter=4: no candidates
-[SpikeRemoval] iter=5: no candidates
-[SpikeRemoval] iter=6: no candidates
-[SpikeRemoval] iter=7: no candidates
-[SpikeRemoval] iter=8: no candidates
-[SpikeRemoval] iter=9: 1 candidate(s)
-[SpikeRemoval]   (0,9): substituting PD segment
-[SpikeRemoval] iter=10: 2 candidate(s)
-[SpikeRemoval]   (27,46): substituting PD segment
-[SpikeRemoval] iter=11: 2 candidate(s)
-[SpikeRemoval]   (35,48): substituting PD segment
-[SpikeRemoval] iter=12: 2 candidate(s)
-[SpikeRemoval]   (33,64): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 2 candidate(s)
-[SpikeRemoval]   (33,54): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 2 candidate(s)
-[SpikeRemoval]   (33,56): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 1 candidate(s)
-[SpikeRemoval]   (35,47): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 1 candidate(s)
-[SpikeRemoval]   (37,46): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 2 candidate(s)
-[SpikeRemoval]   (35,62): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 2 candidate(s)
-[SpikeRemoval]   (36,49): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: no candidates
-[SpikeRemoval] iter=3: 1 candidate(s)
-[SpikeRemoval]   (36,44): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 1 candidate(s)
-[SpikeRemoval]   (35,43): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 1 candidate(s)
-[SpikeRemoval]   (36,44): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 1 candidate(s)
-[SpikeRemoval]   (36,45): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 1 candidate(s)
-[SpikeRemoval]   (36,58): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 1 candidate(s)
-[SpikeRemoval]   (36,51): substituting PD segment
-[SpikeRemoval] iter=3: 3 candidate(s)
-[SpikeRemoval]   (10,26): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 1 candidate(s)
-[SpikeRemoval]   (63,81): substituting PD segment
-[SpikeRemoval] iter=3: 2 candidate(s)
-[SpikeRemoval]   (63,91): substituting PD segment
-[SpikeRemoval] iter=0: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=1: skipping (before start_at_iter=2)
-[SpikeRemoval] iter=2: 2 candidate(s)
-[SpikeRemoval]   (77,100): substituting PD segment
-  -> CONVERGED  max_pe=179.9°  final_pe=127.35°  time=8.75s
+[SpikeRemoval] iter=97: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=98: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=99: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=100: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=101: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=102: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=103: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=104: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=105: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=106: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=107: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=108: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=109: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=110: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=111: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=112: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=113: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=114: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=115: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=116: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=117: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=118: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=119: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=120: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=121: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=122: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=123: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=124: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=125: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=126: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=127: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=128: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=129: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=130: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=131: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=132: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=133: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=134: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=135: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=136: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=137: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=138: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=139: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=140: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=141: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=142: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=143: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=144: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=145: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=146: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=147: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=148: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=149: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=150: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=151: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=152: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=153: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=154: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=155: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=156: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=157: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=158: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=159: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=160: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=161: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=162: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=163: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=164: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=165: skipping (past max_interventi  -> CONVERGED  max_pe=90.0°  final_pe=9.51°  time=6.28s
 
 ============================================================
 BdotCtrl_base (initcontroller=2, spike=False)...

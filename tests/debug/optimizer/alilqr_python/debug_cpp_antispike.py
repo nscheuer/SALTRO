@@ -160,10 +160,11 @@ def main():
               f"max_pe={pe.max():.1f}°  final_pe={pe[-1]:.1f}°  "
               f"qnorm=[{qn.min():.6f},{qn.max():.6f}]  time={t:.2f}s")
 
-    # --- Plots ---
+    # --- Plots + GIFs ---
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation, PillowWriter
 
     dt = 10.0
     N_base = X_base.shape[1]

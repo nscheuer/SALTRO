@@ -662,8 +662,13 @@ std::vector<SpikeCandidate> detectSpikes(
 
 		// Is this knot significantly above the local baseline?
 		if (theta[kk] < local_baseline * cfg.min_spike_ratio) continue;
-		// Also require absolute minimum spike height (avoid flagging tiny oscillations)
-		if (theta[kk] < 0.5) continue;  // ~28 deg minimum
+		// Require absolute minimum spike height — only flag genuine SO(3) wraps,
+		// not mild oscillations in an already-converging trajectory.
+		// pi/3 ≈ 60° ensures we only catch large deviations.
+		if (theta[kk] < M_PI / 3.0) continue;
+		// Also require the local baseline to be reasonably low — if the whole
+		// trajectory is at 80°+ PE, there's no "spike" to remove.
+		if (local_baseline > M_PI / 4.0) continue;  // ~45° baseline max
 
 		// Expand the spike window: walk outward until PE drops below
 		// baseline * exit_fudge
@@ -682,6 +687,19 @@ std::vector<SpikeCandidate> detectSpikes(
 		if (cfg.max_spike_knots > 0 && (t_exit_s - t_enter_s) > cfg.max_spike_knots) {
 			continue;
 		}
+
+		// Control-effort filter: verify the spike has significant control effort.
+		// Genuine homotopy spikes have the optimizer actively commanding torque
+		// to drive the wrap. If controls are small, it's not a spike — it's just
+		// the trajectory passing through a high-error region naturally.
+		bool has_control_effort = false;
+		for (int ck = t_enter_s; ck < t_exit_s && ck < U.cols(); ++ck) {
+			if (isSaturated(U.col(ck), satellite, 0.5)) {  // 50% of any actuator limit
+				has_control_effort = true;
+				break;
+			}
+		}
+		if (!has_control_effort) continue;
 
 		// Check this doesn't overlap with an existing candidate
 		bool overlaps = false;
