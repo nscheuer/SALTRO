@@ -193,18 +193,13 @@ bool iLQR(
 					reg = 0.0;
 				}
 			}
-			// Both passes succeeded
-			double delta_J = std::abs(J_prev - J);
 			++telemetry.accepted_steps;
-			telemetry.last_delta_J = delta_J;
 			telemetry.final_cost = J;
-			if (delta_J <= ilqr_cfg.cost_tol) {
-				status = ILQRStatus::Converged;
-				return true;
-			}
 
-			// Both passes succeeded — check convergence.
+			// Both passes succeeded — check convergence (grad_tol/conjunctive
+			// flags supersede the legacy cost-only early return).
 			const double delta_J = std::abs(J_prev - J);
+			telemetry.last_delta_J = delta_J;
 			const bool cost_converged = (delta_J <= ilqr_cfg.cost_tol);
 
 			bool grad_converged = false;
