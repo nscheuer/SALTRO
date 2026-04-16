@@ -115,11 +115,27 @@ bool iLQR(
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
 	// Main iLQR iteration loop.
+	// Two-variable regularization scheme (rho, drho) from original ALTRO:
+	//   drho is a scaling factor that itself accelerates on repeated failures,
+	//   producing super-exponential growth when the optimizer is struggling.
+	//   On success, drho decreases, allowing rho to shrink smoothly.
 	double reg = reg_cfg.reg_init;
-	for (int iteration = 0; iteration < ilqr_cfg.max_iters; ++iteration) {
-		if (!ilqr_cfg.persistent_reg) {
-			reg = reg_cfg.reg_init;  // Legacy: reset each iteration
+	double dreg = 0.0;
+
+	auto increaseReg = [&]() {
+		dreg = std::max(dreg * reg_cfg.reg_scale, reg_cfg.reg_scale);
+		reg = std::max(reg * dreg, reg_cfg.reg_min);
+	};
+
+	auto decreaseReg = [&]() {
+		dreg = std::min(dreg / reg_cfg.reg_scale, 1.0 / reg_cfg.reg_scale);
+		reg = dreg * reg;
+		if (reg < reg_cfg.reg_min) {
+			reg = 0.0;
 		}
+	};
+
+	for (int iteration = 0; iteration < ilqr_cfg.max_iters; ++iteration) {
 		const int N_u = std::max(0, N - 1);
 
 		// Regularization retry loop
@@ -133,13 +149,12 @@ bool iLQR(
 			);
 
 			if (!bp_success) {
-				if (ilqr_cfg.persistent_reg) {
-					reg = reg * reg_cfg.reg_scale + reg_cfg.reg_bump;
-				} else {
-					reg *= reg_cfg.reg_scale;  // Legacy: simple multiply
-				}
+				increaseReg();
 				continue;
 			}
+
+			// Decrease reg after successful backward pass (like original)
+			decreaseReg();
 
 			double J_prev = satellite.totalCost(X, U.leftCols(N_u), B, boresight, attitude_target, cost_cfg);
 			J_prev += augmented_penalty_total(satellite, cnst_cfg, X, U, S, lambda_aug, mu_aug);
@@ -170,24 +185,11 @@ bool iLQR(
 			);
 
 			if (!fp_success) {
-				if (ilqr_cfg.persistent_reg) {
-					// Triple increase (original ALTRO): increaseReg + bump + increaseReg
-					reg = reg * reg_cfg.reg_scale + reg_cfg.reg_bump;
-					reg += reg_cfg.reg_bump;
-					reg = reg * reg_cfg.reg_scale + reg_cfg.reg_bump;
-				} else {
-					reg *= reg_cfg.reg_scale;  // Legacy: simple multiply
-				}
+				// increaseReg + bump + increaseReg (triple increase on FP failure)
+				increaseReg();
+				reg += reg_cfg.reg_bump;
+				increaseReg();
 				continue;
-			}
-
-			if (ilqr_cfg.persistent_reg) {
-				// Decrease regularization on success
-				reg = reg / reg_cfg.reg_scale;
-				// Drop to zero below reg_min (pure Newton when well-conditioned)
-				if (reg < reg_cfg.reg_min) {
-					reg = 0.0;
-				}
 			}
 
 			// Spike removal: detect and replace homotopy artifacts after accepted step

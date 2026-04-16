@@ -27,18 +27,18 @@ def make_settings(spike_enabled, initcontroller=1):
     ps.num_passes = 1
     ps.passes[0].dt = 10.0
     ps.passes[0].ilqr.cost_tol = 1e-6
-    ps.passes[0].ilqr.max_iters = 200
+    ps.passes[0].ilqr.max_iters = 1000
     ps.passes[0].auglag.max_outer_iters = 50
     ps.passes[0].auglag.constraint_tol = 1e-3
 
     cost = ps.passes[0].cost
-    cost.angle = 1e2
-    cost.ang_vel = 1e1
+    cost.angle = 1e6
+    cost.ang_vel = 1e4
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1e-1
     cost.rw_control_weight = 1.0
     cost.angle_N = 1e6
-    cost.ang_vel_N = 1e5
+    cost.ang_vel_N = 1e4
     cost.ang_cost_func_type = 3
     cost.use_cost_hess = True
 
@@ -122,7 +122,7 @@ def main():
     qg = qgoal[:, 0]
 
     results = {}
-    for ic, ic_label in [(1, "ExcCtrl"), (2, "BdotCtrl")]:
+    for ic, ic_label in [(0, "ZeroCtrl"), (1, "ExcCtrl"), (2, "BdotCtrl")]:
         for spike, sp_label in [(False, "base"), (True, "anti")]:
             label = f"{ic_label}_{sp_label}"
             print("=" * 60)
@@ -173,24 +173,26 @@ def main():
     pe_base = pe_deg(X_base, qg)
     pe_anti = pe_deg(X_anti, qg)
 
-    # 2x2 grid: rows=initcontroller, cols=base/anti
+    # 3x2 grid: rows=initcontroller, cols=base/anti
     configs_plot = [
+        ("ZeroCtrl_base", "ZeroCtrl Baseline"),
+        ("ZeroCtrl_anti", "ZeroCtrl Antispike"),
         ("ExcCtrl_base", "ExcCtrl Baseline"),
         ("ExcCtrl_anti", "ExcCtrl Antispike"),
         ("BdotCtrl_base", "BdotCtrl Baseline"),
         ("BdotCtrl_anti", "BdotCtrl Antispike"),
     ]
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+    fig, axes = plt.subplots(3, 2, figsize=(14, 12))
     fig.suptitle("Pointing Error — 3MTQ+1RW 90° Slew", fontsize=14)
-    colors = ['r', 'b', 'r', 'b']
     for idx, (key, title) in enumerate(configs_plot):
         ax = axes[idx // 2, idx % 2]
+        color = 'r' if idx % 2 == 0 else 'b'
         ok, X, U, t, pe = results[key]
         t_arr = np.arange(len(pe)) * dt
         conv = "CONVERGED" if ok else "not converged"
         ax.set_title(f"{title} — final={pe[-1]:.2f}° ({conv})")
-        ax.plot(t_arr, pe, colors[idx] + '-', linewidth=1.5)
+        ax.plot(t_arr, pe, color + '-', linewidth=1.5)
         ax.axhline(1.0, color='g', linestyle='--', alpha=0.5, label="1°")
         ax.set_ylabel("deg")
         ax.set_xlabel("Time [s]")

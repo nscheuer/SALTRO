@@ -1,0 +1,9 @@
+[SpikeRemoval] iter=255: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=256: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=257: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=258: skipping (past max_intervention_iters)
+[SpikeRemoval] iter=259: skipping (past max_intervention_iters)
+[SpikeRemoval]  -> not converged  max_pe=175.1°  final_pe=170.30°  time=27.23s
+
+============================================================
+BdotCtrl_base (initcontroller=2, spike=False)...
