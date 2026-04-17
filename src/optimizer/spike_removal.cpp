@@ -4,6 +4,7 @@
 #include <saltro/math/attitude.h>
 #include <saltro/math/mrp.h>
 #include <saltro/math/quaternion.h>
+#include <saltro/pybind/controller/pdcontroller.h>
 
 #include <algorithm>
 #include <cmath>
@@ -81,103 +82,6 @@ bool torqueOpposesError(
 	return alpha.dot(n_err) < 0.0;
 }
 
-// ---------------------------------------------------------------------------
-// PD controller
-// ---------------------------------------------------------------------------
-
-/// Actuator-agnostic PD control.
-///
-/// Computes tau_des via PD on quaternion error + omega damping, then
-/// solves satellite.actuatorTorque(x, u, B) * J = tau_des for u using
-/// the numerical Jacobian of actuatorTorque w.r.t. u. This dispatches
-/// through the Satellite's actuator mixing and respects whatever
-/// topology exists (any MTQ/RW combination, or future actuator types).
-///
-/// The solution minimizes ||J u - tau_des||^2 + rw_scale_penalty * ||u_rw||^2
-/// via weighted least squares. When rw_scale=0, RW channels are penalized
-/// infinitely (forced to zero) making this MTQ-only. When rw_scale=1,
-/// all channels are weighted equally.
-Eigen::VectorXd buildPDControl(
-	const Eigen::VectorXd& x,
-	const Eigen::Vector4d& q_target,
-	const Satellite& satellite,
-	const Eigen::Vector3d& B_eci,
-	double kp_q,
-	double kd_w,
-	double rw_scale
-) {
-	const Eigen::Vector4d q = x.segment<4>(3);
-	const Eigen::Vector3d omega = x.head<3>();
-
-	// Quaternion error
-	const Eigen::Vector4d q_err = saltro::math::quatError(q_target, q);
-
-	// Desired torque (body frame)
-	const Eigen::Vector3d tau_des = -kp_q * q_err.tail<3>() - kd_w * omega;
-
-	const int n_mtq = satellite.numMTQ();
-	const int n_rw = satellite.numRW();
-	const int nu = n_mtq + n_rw;
-	if (nu <= 0) return Eigen::VectorXd::Zero(std::max(nu, 0));
-	// Sanity bound — the optimizer never has more than this many channels.
-	if (nu > saltro::limits::MAX_CTRL_DIM) return Eigen::VectorXd::Zero(nu);
-
-	// Build actuator torque Jacobian J = d tau / d u  (3 x nu)
-	// by finite-differencing actuatorTorque with unit vectors.
-	// This is actuator-agnostic: works for MTQ, RW, or any future
-	// actuator type that Satellite::actuatorTorque dispatches on.
-	const Eigen::VectorXd u_zero = Eigen::VectorXd::Zero(nu);
-	const Eigen::Vector3d tau_zero = satellite.actuatorTorque(x, u_zero, B_eci);
-
-	Eigen::MatrixXd J(3, nu);
-	for (int i = 0; i < nu; ++i) {
-		Eigen::VectorXd u_unit = Eigen::VectorXd::Zero(nu);
-		u_unit(i) = 1.0;
-		const Eigen::Vector3d tau_i = satellite.actuatorTorque(x, u_unit, B_eci);
-		J.col(i) = tau_i - tau_zero;
-	}
-
-	// Weighted least-squares allocation:
-	//   minimize ||J u - tau_des||^2 + sum_i w_i * u_i^2
-	// where w_i is small for "preferred" actuators, large for penalized.
-	//
-	// Preference policy: if rw_scale > 0, treat all actuators equally
-	// (Tikhonov with small regularization). If rw_scale == 0, penalize
-	// RW channels to force MTQ-only allocation when possible.
-	Eigen::VectorXd reg_weights = Eigen::VectorXd::Constant(nu, 1e-6);
-	if (rw_scale == 0.0) {
-		// MTQ-only mode: heavily penalize RW channels to drive them to zero.
-		for (int i = 0; i < n_rw; ++i) {
-			reg_weights(n_mtq + i) = 1e6;
-		}
-	}
-
-	// Solve (J^T J + diag(reg_weights)) u = J^T tau_des
-	Eigen::MatrixXd JtJ = J.transpose() * J;
-	for (int i = 0; i < nu; ++i) {
-		JtJ(i, i) += reg_weights(i);
-	}
-	Eigen::VectorXd u;
-	try {
-		u = JtJ.ldlt().solve(J.transpose() * tau_des);
-	} catch (...) {
-		return Eigen::VectorXd::Zero(nu);
-	}
-	if (!u.allFinite()) return Eigen::VectorXd::Zero(nu);
-
-	// Clamp each actuator to its own limit
-	for (int i = 0; i < n_mtq; ++i) {
-		const double u_max = satellite.getMTQ(i).u_max();
-		u(i) = std::clamp(u(i), -u_max, u_max);
-	}
-	for (int i = 0; i < n_rw; ++i) {
-		const double u_max = satellite.getRW(i).u_max();
-		u(n_mtq + i) = std::clamp(u(n_mtq + i), -u_max, u_max);
-	}
-
-	return u;
-}
-
 /// Extract environment vectors at knot k.
 struct Env {
 	Eigen::Vector3d R, B, S, V;
@@ -234,6 +138,7 @@ Eigen::VectorXd stateErrorReduced(
 /// Returns (X_pd: nx × n_steps+1, U_pd: nu × n_steps).
 std::pair<Eigen::MatrixXd, Eigen::MatrixXd> simulatePDSegment(
 	const Satellite& satellite,
+	const saltro::controller::PDController& pd,
 	const Eigen::VectorXd& x_start,
 	const Eigen::Vector4d& q_target,
 	int n_steps,
@@ -261,18 +166,10 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> simulatePDSegment(
 		const Eigen::Vector3d V_k(V_slice.col(k));
 		const int rho_k = static_cast<int>(std::max(0.0, std::round(rho_slice(0, k))));
 
-		Eigen::VectorXd u_k = buildPDControl(x_k, q_target, satellite, B_k,
-		                                     cfg.kp_q, cfg.kd_w, cfg.rw_scale);
-
-		// Clamp to actuator limits
-		const int n_mtq = satellite.numMTQ();
-		const int n_rw = satellite.numRW();
-		for (int i = 0; i < n_mtq; ++i) {
-			u_k(i) = std::clamp(u_k(i), -satellite.getMTQ(i).u_max(), satellite.getMTQ(i).u_max());
-		}
-		for (int i = 0; i < n_rw; ++i) {
-			u_k(n_mtq+i) = std::clamp(u_k(n_mtq+i), -satellite.getRW(i).u_max(), satellite.getRW(i).u_max());
-		}
+		// PDController handles allocation, authority weighting, and scale-to-max
+		// saturation internally.  boresight is unused by PD but required by
+		// the Controller interface.
+		Eigen::VectorXd u_k = pd.find_u(x_k, B_k, q_target, Eigen::Vector3d::Zero());
 		U_pd.col(k) = u_k;
 
 		Eigen::VectorXd x_next = satellite.dynamicsStepRK4(x_k, u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k);
@@ -367,8 +264,33 @@ bool keepoutClear(
 // Substitute + blend + tail re-rollout
 // ---------------------------------------------------------------------------
 
+/// Scale-to-max-saturation clamp.  Uniform scaling preserves torque direction.
+void scaleToMax(Eigen::VectorXd& u, const Satellite& satellite) {
+	const int n_mtq = satellite.numMTQ();
+	const int n_rw = satellite.numRW();
+	double max_ratio = 1.0;
+	for (int i = 0; i < n_mtq; ++i) {
+		const double u_max = std::abs(satellite.getMTQ(i).u_max());
+		if (u_max > 0.0) {
+			const double r = std::abs(u(i)) / u_max;
+			if (r > max_ratio) max_ratio = r;
+		}
+	}
+	for (int i = 0; i < n_rw; ++i) {
+		const double u_max = std::abs(satellite.getRW(i).u_max());
+		if (u_max > 0.0) {
+			const double r = std::abs(u(n_mtq + i)) / u_max;
+			if (r > max_ratio) max_ratio = r;
+		}
+	}
+	if (max_ratio > 1.0) {
+		u /= max_ratio;
+	}
+}
+
 void substituteAndBlend(
 	const Satellite& satellite,
+	const saltro::controller::PDController& pd,
 	Eigen::Ref<Eigen::MatrixXd> X,
 	Eigen::Ref<Eigen::MatrixXd> U,
 	const Eigen::MatrixXd& X_pd,
@@ -386,11 +308,10 @@ void substituteAndBlend(
 	double dt,
 	const SpikeRemovalConfig& cfg
 ) {
+	(void)cfg;
 	const int N = static_cast<int>(X.cols());
 	const int nu = static_cast<int>(U.rows());
 	const int n_pd = t_exit - t_enter;
-	const int n_mtq = satellite.numMTQ();
-	const int n_rw = satellite.numRW();
 
 	// --- Substitution region [t_enter, t_exit) ---
 	X.block(0, t_enter, X.rows(), n_pd) = X_pd.leftCols(n_pd);
@@ -411,23 +332,15 @@ void substituteAndBlend(
 		const double lam = static_cast<double>(k - t_exit) / static_cast<double>(blend_len);
 		const auto env = getEnv(R, B, S, V, rho, k);
 
-		// PD contribution
-		Eigen::VectorXd u_pd_k = buildPDControl(X.col(k), q_exit_target, satellite, env.B,
-		                                        cfg.kp_q, cfg.kd_w, cfg.rw_scale);
+		// PD contribution (already scale-to-max clamped inside PDController)
+		Eigen::VectorXd u_pd_k = pd.find_u(X.col(k), env.B, q_exit_target, Eigen::Vector3d::Zero());
 		// iLQR open-loop nominal
 		const Eigen::VectorXd u_ilqr_k = (k < U_bar.cols())
 			? Eigen::VectorXd(U_bar.col(k))
 			: Eigen::VectorXd::Zero(nu);
 
 		Eigen::VectorXd u_blend = (1.0 - lam) * u_pd_k + lam * u_ilqr_k;
-
-		// Clamp
-		for (int i = 0; i < n_mtq; ++i) {
-			u_blend(i) = std::clamp(u_blend(i), -satellite.getMTQ(i).u_max(), satellite.getMTQ(i).u_max());
-		}
-		for (int i = 0; i < n_rw; ++i) {
-			u_blend(n_mtq+i) = std::clamp(u_blend(n_mtq+i), -satellite.getRW(i).u_max(), satellite.getRW(i).u_max());
-		}
+		scaleToMax(u_blend, satellite);
 
 		U.col(k) = u_blend;
 		if (k + 1 < N) {
@@ -448,23 +361,9 @@ void substituteAndBlend(
 		if (k < static_cast<int>(K.size()) && K[k].size() > 0) {
 			const Eigen::VectorXd dx = stateErrorReduced(X.col(k), X_nominal_pre.col(k), satellite);
 			Eigen::VectorXd du = K[k] * dx;
-
-			// Clamp du per channel
-			for (int i = 0; i < n_mtq; ++i) {
-				du(i) = std::clamp(du(i), -satellite.getMTQ(i).u_max(), satellite.getMTQ(i).u_max());
-			}
-			for (int i = 0; i < n_rw; ++i) {
-				du(n_mtq+i) = std::clamp(du(n_mtq+i), -satellite.getRW(i).u_max(), satellite.getRW(i).u_max());
-			}
+			scaleToMax(du, satellite);
 			u_k += du;
-
-			// Clamp total
-			for (int i = 0; i < n_mtq; ++i) {
-				u_k(i) = std::clamp(u_k(i), -satellite.getMTQ(i).u_max(), satellite.getMTQ(i).u_max());
-			}
-			for (int i = 0; i < n_rw; ++i) {
-				u_k(n_mtq+i) = std::clamp(u_k(n_mtq+i), -satellite.getRW(i).u_max(), satellite.getRW(i).u_max());
-			}
+			scaleToMax(u_k, satellite);
 		}
 
 		U.col(k) = u_k;
@@ -856,6 +755,13 @@ bool applySpikeRemoval(
 		return false;
 	}
 
+	// Build the PD controller once per call.  Config overrides the auto-tuned
+	// default gains; spike removal has been tuned with more aggressive values
+	// than a nominal-response PD would use.
+	saltro::controller::PDController pd(satellite);
+	pd.setGains(cfg.kp_q, cfg.kd_w);
+	pd.setRWScale(cfg.rw_scale);
+
 	// Detect candidates
 	const auto candidates = detectSpikes(satellite, X, U, attitude_target, boresight, B, cnst_cfg, cfg);
 
@@ -885,7 +791,7 @@ bool applySpikeRemoval(
 		const Eigen::Vector4d q_target = X.col(t_exit).segment<4>(3);
 
 		auto [X_pd, U_pd] = simulatePDSegment(
-			satellite, X.col(t_enter), q_target, n_steps,
+			satellite, pd, X.col(t_enter), q_target, n_steps,
 			B_slice, S_slice, R_slice, V_slice, rho_slice,
 			dist_cfg, dt, cfg
 		);
@@ -914,7 +820,7 @@ bool applySpikeRemoval(
 		const Eigen::MatrixXd X_nominal_pre = X;
 
 		substituteAndBlend(
-			satellite, X, U, X_pd, U_pd,
+			satellite, pd, X, U, X_pd, U_pd,
 			t_enter, t_exit, cfg.blend_len,
 			X_nominal_pre, U_bar, K,
 			dist_cfg, R, B, S, V, rho, dt, cfg
