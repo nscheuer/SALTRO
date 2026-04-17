@@ -115,7 +115,8 @@
       "Bash(curl -sL \"https://raw.githubusercontent.com/patrickmckeen/PhD_Dissertation_Code/main/GeneralizedADS/ADCS/trajectory_planner/src/planner/GeneralUtil.hpp\")",
       "Bash(grep -v \"^$\")",
       "Bash(ls -la \"c:\\\\Users\\\\LV - Patrick McKeen\\\\saltro\\\\tests\\\\debug\\\\optimizer\\\\alilqr_python\\\\convergence_angle\"*.png)",
-      "Bash(ls -la \"/mnt/c/Users/LV - Patrick McKeen/saltro/tests/debug/optimizer/alilqr_python/convergence_angle\"*final*.png)"
+      "Bash(ls -la \"/mnt/c/Users/LV - Patrick McKeen/saltro/tests/debug/optimizer/alilqr_python/convergence_angle\"*final*.png)",
+      "Bash(awk 'NR==276,/^}/{print NR\": \"$0}' src/pybind/satellite.cpp)"
     ]
   }
 }

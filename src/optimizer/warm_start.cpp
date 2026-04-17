@@ -3,7 +3,6 @@
 #include <cmath>
 #include <memory>
 
-#include <saltro/math/integrators/rk4.h>
 #include <saltro/pybind/controller/controller.h>
 #include <saltro/pybind/controller/excitationcontroller.h>
 #include <saltro/pybind/controller/integratedbdotcontroller.h>
@@ -110,33 +109,19 @@ bool warm_start(
 
         const int rho_k = static_cast<int>(std::max(0.0, std::round(rho(k))));
 
-        Satellite::VecX x_next;
-        rk4_step<Satellite::VecX>(
-            [&](double, const Satellite::VecX& x_state, Satellite::VecX& dxdt) {
-                dxdt = satellite.dynamics(
-                    x_state,
-                    uk_scaled,
-                    settings.disturbances,
-                    R.col(k),
-                    B.col(k),
-                    S.col(k),
-                    V.col(k),
-                    rho_k
-                );
-            },
-            xk,
-            0.0,
-            dt,
-            x_next
+        // Integrate dynamics + quaternion renormalization in one call.
+        Satellite::VecX x_next = satellite.dynamicsStepRK4(
+            xk, uk_scaled, dt, settings.disturbances,
+            R.col(k), B.col(k), S.col(k), V.col(k), rho_k
         );
 
+        // Sanity check: dynamicsStepRK4 skips normalization silently on
+        // degenerate quaternions.  Reject the warm-start if that happened.
         if (x_next.size() >= Satellite::QUAT_INDEX + 4) {
-            Eigen::Vector4d q_next = x_next.segment<4>(Satellite::QUAT_INDEX);
-            const double qn = q_next.norm();
-            if (!std::isfinite(qn) || qn <= 1e-12) {
+            const double qn = x_next.segment<4>(Satellite::QUAT_INDEX).norm();
+            if (!std::isfinite(qn) || std::abs(qn - 1.0) > 1e-6) {
                 return false;
             }
-            x_next.segment<4>(Satellite::QUAT_INDEX) = q_next / qn;
         }
 
         X.col(k + 1) = x_next;

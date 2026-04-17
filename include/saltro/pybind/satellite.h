@@ -338,9 +338,37 @@ public:
      * @param rho Atmospheric density.
      * @return State derivative vector.
      */
-    VecX dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, 
-                 const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci, 
+    VecX dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist,
+                 const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci,
                  const Vec3& V_eci, const int rho) const;
+
+    /**
+     * @brief Integrate one RK4 step of the satellite dynamics and normalize
+     *        the quaternion.
+     *
+     * Convenience wrapper that binds `dynamics(x, u, dist, R, B, S, V, rho)`
+     * into `saltro::math::rk4_step` with a constant control `u` over the
+     * interval \f$[0, \Delta t]\f$, then renormalizes the quaternion block
+     * to counteract RK4 integration drift.  Matches the pattern used by the
+     * forward pass, warm-start, and spike removal so all three produce
+     * identical trajectory quality.
+     *
+     * @param x Current state (full state with quaternion at QUAT_INDEX).
+     * @param u Control applied over the step (held constant).
+     * @param dt Timestep in seconds.
+     * @param dist Disturbance configuration.
+     * @param R_eci Position (ECI).
+     * @param B_eci Magnetic field (ECI).
+     * @param S_eci Sun direction (ECI).
+     * @param V_eci Velocity (ECI).
+     * @param rho Atmospheric density.
+     * @return Next state with quaternion renormalized.
+     */
+    VecX dynamicsStepRK4(const VecX& x, const VecX& u, double dt,
+                         const DisturbanceConfig& dist,
+                         const Vec3& R_eci, const Vec3& B_eci,
+                         const Vec3& S_eci, const Vec3& V_eci,
+                         int rho) const;
 
     /**
      * @brief Compute dynamics Jacobians.

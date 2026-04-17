@@ -1,6 +1,7 @@
 #include <saltro/optimizer/spike_removal.h>
 
-#include <saltro/math/integrators/rk4.h>
+#include <saltro/limits.h>
+#include <saltro/math/attitude.h>
 #include <saltro/math/mrp.h>
 #include <saltro/math/quaternion.h>
 
@@ -13,40 +14,10 @@
 
 namespace saltro::optimizer {
 
-// ---------------------------------------------------------------------------
-// Quaternion helpers
-// ---------------------------------------------------------------------------
-
 namespace {
 
-Eigen::Vector4d quatConj(const Eigen::Vector4d& q) {
-	return {q(0), -q(1), -q(2), -q(3)};
-}
-
-Eigen::Vector4d quatMult(const Eigen::Vector4d& q1, const Eigen::Vector4d& q2) {
-	const double w1 = q1(0), x1 = q1(1), y1 = q1(2), z1 = q1(3);
-	const double w2 = q2(0), x2 = q2(1), y2 = q2(2), z2 = q2(3);
-	return {
-		w1*w2 - x1*x2 - y1*y2 - z1*z2,
-		w1*x2 + x1*w2 + y1*z2 - z1*y2,
-		w1*y2 - x1*z2 + y1*w2 + z1*x2,
-		w1*z2 + x1*y2 - y1*x2 + z1*w2,
-	};
-}
-
-Eigen::Vector4d quatErrorShortest(const Eigen::Vector4d& q_target,
-                                  const Eigen::Vector4d& q_current) {
-	Eigen::Vector4d q_err = quatMult(quatConj(q_target), q_current);
-	if (q_err(0) < 0.0) q_err = -q_err;
-	return q_err;
-}
-
-double quatAngle(const Eigen::Vector4d& q_err) {
-	const double w = std::clamp(std::abs(q_err(0)), 0.0, 1.0);
-	return 2.0 * std::acos(w);
-}
-
-/// Pointing error at knot k (radians).
+/// Pointing error at knot k (radians) — thin wrapper over saltro::math::pointingError
+/// that indexes into the trajectory matrices.
 double pointingError(
 	const Eigen::Ref<const Eigen::MatrixXd>& X,
 	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
@@ -55,17 +26,8 @@ double pointingError(
 ) {
 	const Eigen::Vector4d target = attitude_target.col(k);
 	const Eigen::Vector4d q = X.col(k).segment<4>(3);
-
-	if (std::isnan(target(0))) {
-		// Vector-pointing mode
-		const Eigen::Vector3d target_vec = target.tail<3>().normalized();
-		const Eigen::Matrix3d C = saltro::math::rotationMatrix(q);
-		const Eigen::Vector3d boresight_eci = (C * boresight.col(k).head<3>()).normalized();
-		return std::acos(std::clamp(boresight_eci.dot(target_vec), -1.0, 1.0));
-	}
-
-	// Quaternion mode
-	return quatAngle(quatErrorShortest(target, q));
+	const Eigen::Vector3d bs = boresight.col(k).head<3>();
+	return saltro::math::pointingError(q, target, bs);
 }
 
 /// Find set of knot indices where goal changes.
@@ -109,7 +71,7 @@ bool torqueOpposesError(
 	if (std::isnan(target(0))) return false;
 
 	const Eigen::Vector4d q = x.segment<4>(3);
-	const Eigen::Vector4d q_err = quatErrorShortest(target, q);
+	const Eigen::Vector4d q_err = saltro::math::quatError(target, q);
 	const Eigen::Vector3d err_axis = q_err.tail<3>();
 	const double err_norm = err_axis.norm();
 	if (err_norm < 1e-8) return false;
@@ -148,7 +110,7 @@ Eigen::VectorXd buildPDControl(
 	const Eigen::Vector3d omega = x.head<3>();
 
 	// Quaternion error
-	const Eigen::Vector4d q_err = quatErrorShortest(q_target, q);
+	const Eigen::Vector4d q_err = saltro::math::quatError(q_target, q);
 
 	// Desired torque (body frame)
 	const Eigen::Vector3d tau_des = -kp_q * q_err.tail<3>() - kd_w * omega;
@@ -156,7 +118,9 @@ Eigen::VectorXd buildPDControl(
 	const int n_mtq = satellite.numMTQ();
 	const int n_rw = satellite.numRW();
 	const int nu = n_mtq + n_rw;
-	if (nu == 0) return Eigen::VectorXd::Zero(0);
+	if (nu <= 0) return Eigen::VectorXd::Zero(std::max(nu, 0));
+	// Sanity bound — the optimizer never has more than this many channels.
+	if (nu > saltro::limits::MAX_CTRL_DIM) return Eigen::VectorXd::Zero(nu);
 
 	// Build actuator torque Jacobian J = d tau / d u  (3 x nu)
 	// by finite-differencing actuatorTorque with unit vectors.
@@ -212,36 +176,6 @@ Eigen::VectorXd buildPDControl(
 	}
 
 	return u;
-}
-
-// ---------------------------------------------------------------------------
-// RK4 step helper (matches forwardpass.cpp pattern)
-// ---------------------------------------------------------------------------
-
-Eigen::VectorXd rk4Step(
-	const Satellite& satellite,
-	const Eigen::VectorXd& x,
-	const Eigen::VectorXd& u,
-	double dt,
-	const DisturbanceConfig& dist_cfg,
-	const Eigen::Vector3d& R_k,
-	const Eigen::Vector3d& B_k,
-	const Eigen::Vector3d& S_k,
-	const Eigen::Vector3d& V_k,
-	int rho_k
-) {
-	Eigen::VectorXd x_next;
-	rk4_step<Eigen::VectorXd>(
-		[&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
-			dxdt = satellite.dynamics(x_state, u, dist_cfg, R_k, B_k, S_k, V_k, rho_k);
-		},
-		x, 0.0, dt, x_next
-	);
-	// Normalize quaternion
-	Eigen::Vector4d q = x_next.segment<4>(3);
-	const double qn = q.norm();
-	if (qn > 1e-10) x_next.segment<4>(3) = q / qn;
-	return x_next;
 }
 
 /// Extract environment vectors at knot k.
@@ -341,7 +275,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> simulatePDSegment(
 		}
 		U_pd.col(k) = u_k;
 
-		Eigen::VectorXd x_next = rk4Step(satellite, x_k, u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k);
+		Eigen::VectorXd x_next = satellite.dynamicsStepRK4(x_k, u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k);
 
 		// Clamp angular velocity
 		if (cfg.omega_max > 0.0) {
@@ -497,8 +431,8 @@ void substituteAndBlend(
 
 		U.col(k) = u_blend;
 		if (k + 1 < N) {
-			X.col(k + 1) = rk4Step(satellite, X.col(k), u_blend, dt, dist_cfg,
-			                       env.R, env.B, env.S, env.V, env.rho);
+			X.col(k + 1) = satellite.dynamicsStepRK4(X.col(k), u_blend, dt, dist_cfg,
+			                                         env.R, env.B, env.S, env.V, env.rho);
 		}
 	}
 
@@ -535,8 +469,8 @@ void substituteAndBlend(
 
 		U.col(k) = u_k;
 		if (k + 1 < N) {
-			X.col(k + 1) = rk4Step(satellite, X.col(k), u_k, dt, dist_cfg,
-			                       env.R, env.B, env.S, env.V, env.rho);
+			X.col(k + 1) = satellite.dynamicsStepRK4(X.col(k), u_k, dt, dist_cfg,
+			                                         env.R, env.B, env.S, env.V, env.rho);
 		}
 	}
 }

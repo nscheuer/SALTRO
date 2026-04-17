@@ -1,6 +1,5 @@
 #include <saltro/optimizer/forwardpass.h>
 
-#include <saltro/math/integrators/rk4.h>
 #include <saltro/math/mrp.h>
 #include <algorithm>
 #include <cmath>
@@ -157,30 +156,18 @@ bool forwardPass(
 
             U_bar.col(k) = u_bar_k;
 
-            // Integrate dynamics with RK4 to get x_bar(k+1)
+            // Integrate dynamics with RK4 to get x_bar(k+1).
+            // Uses Satellite::dynamicsStepRK4 which binds the dynamics lambda
+            // and renormalizes the quaternion post-step.
             Eigen::VectorXd x_next;
             try {
-                rk4_step<Eigen::VectorXd>(
-                    [&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
-                        const Eigen::Vector3d R_k = (R.cols() > k) ? Eigen::Vector3d(R.col(k)) : Eigen::Vector3d::Zero();
-                        const Eigen::Vector3d V_k = (V.cols() > k) ? Eigen::Vector3d(V.col(k)) : Eigen::Vector3d::Zero();
-                        const Eigen::Vector3d S_k = (S.cols() > k) ? Eigen::Vector3d(S.col(k)) : Eigen::Vector3d::Zero();
-                        const int rho_k = (rho.cols() > k) ? static_cast<int>(std::max(0.0, std::round(rho(0, k)))) : 0;
-                        dxdt = satellite.dynamics(
-                            x_state,
-                            u_bar_k,
-                            dist_cfg,
-                            R_k,
-                            B.col(k),
-                            S_k,
-                            V_k,
-                            rho_k
-                        );
-                    },
-                    X_bar.col(k),
-                    0.0,
-                    dt,
-                    x_next
+                const Eigen::Vector3d R_k = (R.cols() > k) ? Eigen::Vector3d(R.col(k)) : Eigen::Vector3d::Zero();
+                const Eigen::Vector3d V_k = (V.cols() > k) ? Eigen::Vector3d(V.col(k)) : Eigen::Vector3d::Zero();
+                const Eigen::Vector3d S_k = (S.cols() > k) ? Eigen::Vector3d(S.col(k)) : Eigen::Vector3d::Zero();
+                const int rho_k = (rho.cols() > k) ? static_cast<int>(std::max(0.0, std::round(rho(0, k)))) : 0;
+                x_next = satellite.dynamicsStepRK4(
+                    X_bar.col(k), u_bar_k, dt, dist_cfg,
+                    R_k, B.col(k), S_k, V_k, rho_k
                 );
             } catch (const std::exception&) {
                 rollout_ok = false;
@@ -190,19 +177,6 @@ bool forwardPass(
             }
 
             if (x_next.size() == nx && valid_state_quat(x_next)) {
-                // Normalize quaternion after integration to prevent drift.
-                if (x_next.size() >= 7) {
-                    Eigen::Vector4d q = x_next.segment<4>(3);
-                    double qn = q.norm();
-                    if (qn > 1e-10 && std::isfinite(qn)) {
-                        x_next.segment<4>(3) = q / qn;
-                    } else {
-                        rollout_ok = false;
-                        fail_k = k;
-                        fail_reason = "quaternion_normalization_failed";
-                        break;
-                    }
-                }
                 X_bar.col(k + 1) = x_next;
             } else {
                 rollout_ok = false;
