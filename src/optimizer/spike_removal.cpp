@@ -123,6 +123,18 @@ bool torqueOpposesError(
 // PD controller
 // ---------------------------------------------------------------------------
 
+/// Actuator-agnostic PD control.
+///
+/// Computes tau_des via PD on quaternion error + omega damping, then
+/// solves satellite.actuatorTorque(x, u, B) * J = tau_des for u using
+/// the numerical Jacobian of actuatorTorque w.r.t. u. This dispatches
+/// through the Satellite's actuator mixing and respects whatever
+/// topology exists (any MTQ/RW combination, or future actuator types).
+///
+/// The solution minimizes ||J u - tau_des||^2 + rw_scale_penalty * ||u_rw||^2
+/// via weighted least squares. When rw_scale=0, RW channels are penalized
+/// infinitely (forced to zero) making this MTQ-only. When rw_scale=1,
+/// all channels are weighted equally.
 Eigen::VectorXd buildPDControl(
 	const Eigen::VectorXd& x,
 	const Eigen::Vector4d& q_target,
@@ -136,7 +148,7 @@ Eigen::VectorXd buildPDControl(
 	const Eigen::Vector3d omega = x.head<3>();
 
 	// Quaternion error
-	Eigen::Vector4d q_err = quatErrorShortest(q_target, q);
+	const Eigen::Vector4d q_err = quatErrorShortest(q_target, q);
 
 	// Desired torque (body frame)
 	const Eigen::Vector3d tau_des = -kp_q * q_err.tail<3>() - kd_w * omega;
@@ -144,40 +156,59 @@ Eigen::VectorXd buildPDControl(
 	const int n_mtq = satellite.numMTQ();
 	const int n_rw = satellite.numRW();
 	const int nu = n_mtq + n_rw;
-	Eigen::VectorXd u = Eigen::VectorXd::Zero(nu);
+	if (nu == 0) return Eigen::VectorXd::Zero(0);
 
-	// MTQ contribution
-	const Eigen::Matrix3d C = saltro::math::rotationMatrix(q);
-	const Eigen::Vector3d B_body = C.transpose() * B_eci;
-	const double B_norm_sq = B_body.squaredNorm();
-	Eigen::Vector3d tau_mtq_total = Eigen::Vector3d::Zero();
+	// Build actuator torque Jacobian J = d tau / d u  (3 x nu)
+	// by finite-differencing actuatorTorque with unit vectors.
+	// This is actuator-agnostic: works for MTQ, RW, or any future
+	// actuator type that Satellite::actuatorTorque dispatches on.
+	const Eigen::VectorXd u_zero = Eigen::VectorXd::Zero(nu);
+	const Eigen::Vector3d tau_zero = satellite.actuatorTorque(x, u_zero, B_eci);
 
-	if (B_norm_sq > 1e-20 && n_mtq > 0) {
-		Eigen::MatrixXd A(3, n_mtq);
-		for (int i = 0; i < n_mtq; ++i) {
-			A.col(i) = satellite.getMTQ(i).axis().cross(B_body);
-		}
+	Eigen::MatrixXd J(3, nu);
+	for (int i = 0; i < nu; ++i) {
+		Eigen::VectorXd u_unit = Eigen::VectorXd::Zero(nu);
+		u_unit(i) = 1.0;
+		const Eigen::Vector3d tau_i = satellite.actuatorTorque(x, u_unit, B_eci);
+		J.col(i) = tau_i - tau_zero;
+	}
 
-		// Least-squares dipole: m = (A^T A)^{-1} A^T tau_des
-		const Eigen::VectorXd m_raw =
-			(A.transpose() * A).ldlt().solve(A.transpose() * tau_des);
-
-		for (int i = 0; i < n_mtq; ++i) {
-			const double u_max = satellite.getMTQ(i).u_max();
-			u(i) = std::clamp(m_raw(i), -u_max, u_max);
-			tau_mtq_total += u(i) * satellite.getMTQ(i).axis().cross(B_body);
+	// Weighted least-squares allocation:
+	//   minimize ||J u - tau_des||^2 + sum_i w_i * u_i^2
+	// where w_i is small for "preferred" actuators, large for penalized.
+	//
+	// Preference policy: if rw_scale > 0, treat all actuators equally
+	// (Tikhonov with small regularization). If rw_scale == 0, penalize
+	// RW channels to force MTQ-only allocation when possible.
+	Eigen::VectorXd reg_weights = Eigen::VectorXd::Constant(nu, 1e-6);
+	if (rw_scale == 0.0) {
+		// MTQ-only mode: heavily penalize RW channels to drive them to zero.
+		for (int i = 0; i < n_rw; ++i) {
+			reg_weights(n_mtq + i) = 1e6;
 		}
 	}
 
-	// RW contribution (scaled remainder)
-	if (rw_scale > 0.0 && n_rw > 0) {
-		const Eigen::Vector3d tau_remaining = tau_des - tau_mtq_total;
-		for (int i = 0; i < n_rw; ++i) {
-			const Eigen::Vector3d rw_axis = satellite.getRW(i).axis();
-			const double u_max = satellite.getRW(i).u_max();
-			const double tau_rw_i = tau_remaining.dot(rw_axis) * rw_scale;
-			u(n_mtq + i) = std::clamp(tau_rw_i, -u_max, u_max);
-		}
+	// Solve (J^T J + diag(reg_weights)) u = J^T tau_des
+	Eigen::MatrixXd JtJ = J.transpose() * J;
+	for (int i = 0; i < nu; ++i) {
+		JtJ(i, i) += reg_weights(i);
+	}
+	Eigen::VectorXd u;
+	try {
+		u = JtJ.ldlt().solve(J.transpose() * tau_des);
+	} catch (...) {
+		return Eigen::VectorXd::Zero(nu);
+	}
+	if (!u.allFinite()) return Eigen::VectorXd::Zero(nu);
+
+	// Clamp each actuator to its own limit
+	for (int i = 0; i < n_mtq; ++i) {
+		const double u_max = satellite.getMTQ(i).u_max();
+		u(i) = std::clamp(u(i), -u_max, u_max);
+	}
+	for (int i = 0; i < n_rw; ++i) {
+		const double u_max = satellite.getRW(i).u_max();
+		u(n_mtq + i) = std::clamp(u(n_mtq + i), -u_max, u_max);
 	}
 
 	return u;
