@@ -131,6 +131,100 @@ Eigen::VectorXd stateErrorReduced(
 }
 
 // ---------------------------------------------------------------------------
+// Winding-number spike detector (Round 3 prototype)
+// ---------------------------------------------------------------------------
+
+/// Step-wise SO(3) geodesic distance: 2·acos(|q_k · q_{k+1}|).
+/// Uses |·| so the result is the true SO(3) rotation angle (ignoring
+/// quaternion double-cover), always in [0, π].
+double quatStepAngle(const Eigen::Vector4d& q1, const Eigen::Vector4d& q2) {
+	return 2.0 * std::acos(std::clamp(std::abs(q1.dot(q2)), 0.0, 1.0));
+}
+
+/// Winding-number geometric spike detector (experimental — off by default).
+///
+/// A spike is characterized by the trajectory travelling along SO(3) far
+/// more than the direct geodesic between the window endpoints — an "out
+/// and back" loop that accumulates rotation without net displacement.
+/// Over a window [t1, t2]:
+///
+///   excess(t1, t2) = traveled(t1, t2) - direct(t1, t2)
+///                  = Σ step_geodesic  -  geodesic(q_{t1}, q_{t2})
+///
+/// Smooth trajectories give excess ≈ 0; a full 180° wrap gives excess ≈ 2π.
+///
+/// Round 3 A/B result (kept as prototype): winding alone is NOT a drop-in
+/// replacement for the three-pass detector.  It over-intervenes because it
+/// lacks the heuristic gates (prior-decrease, spike-magnitude, physics-
+/// limited-actuation) that prevent re-flagging trajectories the optimizer
+/// is already refining.  A future hybrid — winding for detection, three-
+/// pass filters as gates — may be worth exploring.
+std::vector<SpikeCandidate> detectSpikesWinding(
+	const Eigen::Ref<const Eigen::MatrixXd>& X,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+	const SpikeRemovalConfig& cfg
+) {
+	const int N = static_cast<int>(X.cols());
+	std::vector<SpikeCandidate> candidates;
+	if (N < 3) return candidates;
+
+	// Step-wise geodesic distances and cumulative traveled-distance.
+	std::vector<double> step(N - 1, 0.0);
+	std::vector<double> S(N, 0.0);
+	for (int k = 0; k < N - 1; ++k) {
+		const Eigen::Vector4d qk = X.col(k).segment<4>(3);
+		const Eigen::Vector4d qk1 = X.col(k + 1).segment<4>(3);
+		step[k] = quatStepAngle(qk, qk1);
+		S[k + 1] = S[k] + step[k];
+	}
+
+	// Goal transitions must not fall inside any flagged window — slews are
+	// legitimate distance, not spikes.
+	const auto transitions = findGoalTransitions(attitude_target);
+
+	const int min_w = 5;
+	const int max_w = (cfg.max_spike_knots > 0)
+		? cfg.max_spike_knots
+		: std::min(N - 1, 200);
+
+	int t1 = 0;
+	while (t1 + min_w < N) {
+		const Eigen::Vector4d q_t1 = X.col(t1).segment<4>(3);
+
+		double best_excess = 0.0;
+		int best_t2 = -1;
+		for (int w = min_w; w <= max_w && t1 + w < N; ++w) {
+			const int t2 = t1 + w;
+
+			// Reject windows spanning a goal transition.
+			bool crosses = false;
+			for (int t : transitions) {
+				if (t > t1 && t < t2) { crosses = true; break; }
+			}
+			if (crosses) continue;
+
+			const double traveled = S[t2] - S[t1];
+			const Eigen::Vector4d q_t2 = X.col(t2).segment<4>(3);
+			const double direct = quatStepAngle(q_t1, q_t2);
+			const double excess = traveled - direct;
+			if (excess > best_excess) {
+				best_excess = excess;
+				best_t2 = t2;
+			}
+		}
+
+		if (best_excess > cfg.winding_excess_threshold && best_t2 > 0) {
+			candidates.emplace_back(SpikeCandidate{t1, best_t2});
+			t1 = best_t2 + 1;
+		} else {
+			++t1;
+		}
+	}
+
+	return candidates;
+}
+
+// ---------------------------------------------------------------------------
 // PD segment simulation
 // ---------------------------------------------------------------------------
 
@@ -187,48 +281,6 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> simulatePDSegment(
 
 	return {X_pd, U_pd};
 }
-
-// ---------------------------------------------------------------------------
-// Cost comparison (currently disabled — detection criteria are sufficient)
-// ---------------------------------------------------------------------------
-
-#if 0  // Cost comparison disabled; kept for potential future re-enablement
-bool pdIsCheaper(
-	const Satellite& satellite,
-	const Eigen::Ref<const Eigen::MatrixXd>& X_orig,
-	const Eigen::Ref<const Eigen::MatrixXd>& U_orig,
-	const Eigen::MatrixXd& X_pd,
-	const Eigen::MatrixXd& U_pd,
-	int t_enter, int t_exit,
-	const Eigen::Ref<const Eigen::MatrixXd>& B,
-	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
-	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
-	const CostConfig& cost_cfg,
-	int N
-) {
-	double cost_orig = 0.0;
-	double cost_pd = 0.0;
-
-	for (int k = t_enter; k < t_exit; ++k) {
-		const int idx = k - t_enter;
-
-		const double c_orig = satellite.stageCost(
-			k, N, X_orig.col(k),
-			(k < U_orig.cols()) ? Eigen::VectorXd(U_orig.col(k)) : Eigen::VectorXd::Zero(satellite.controlDim()),
-			boresight.col(k), attitude_target.col(k), B.col(k), cost_cfg);
-		cost_orig += c_orig;
-
-		const Eigen::VectorXd x_pd_k = (idx < X_pd.cols()) ? Eigen::VectorXd(X_pd.col(idx)) : X_orig.col(k);
-		const Eigen::VectorXd u_pd_k = (idx < U_pd.cols()) ? Eigen::VectorXd(U_pd.col(idx)) : Eigen::VectorXd::Zero(satellite.controlDim());
-		const double c_pd = satellite.stageCost(
-			k, N, x_pd_k, u_pd_k,
-			boresight.col(k), attitude_target.col(k), B.col(k), cost_cfg);
-		cost_pd += c_pd;
-	}
-
-	return cost_pd < cost_orig;
-}
-#endif  // Cost comparison disabled
 
 // ---------------------------------------------------------------------------
 // Keep-out check
@@ -391,6 +443,13 @@ std::vector<SpikeCandidate> detectSpikes(
 	const SpikeRemovalConfig& cfg
 ) {
 	(void)cnst_cfg; // reserved for future constraint-based filtering
+
+	// Round 3 experimental path: geometric winding-number detector.
+	if (cfg.winding_detector) {
+		(void)U; (void)boresight; (void)B;  // unused by winding path
+		return detectSpikesWinding(X, attitude_target, cfg);
+	}
+
 	const int N = static_cast<int>(X.cols());
 	const auto transitions = findGoalTransitions(attitude_target);
 
@@ -721,7 +780,6 @@ bool applySpikeRemoval(
 	}
 
 	const auto& pass = settings.passes[pass_idx];
-	const auto& cost_cfg = pass.cost;
 	const auto& cnst_cfg = settings.constraints;
 	const auto& dist_cfg = settings.disturbances;
 	const int N = static_cast<int>(X.cols());
@@ -795,12 +853,6 @@ bool applySpikeRemoval(
 			B_slice, S_slice, R_slice, V_slice, rho_slice,
 			dist_cfg, dt, cfg
 		);
-
-		// Cost comparison disabled — detection criteria + keep-out are sufficient.
-		// The stage-cost comparison was rejecting valid homotopy spikes where the
-		// PD path is locally more expensive but globally beneficial (escapes the
-		// wrong SO(3) homotopy class).
-		(void)cost_cfg;  // suppress unused warning
 
 		// Keep-out check
 		if (!keepoutClear(satellite, X_pd, U_pd, S, cnst_cfg, N, t_enter)) {

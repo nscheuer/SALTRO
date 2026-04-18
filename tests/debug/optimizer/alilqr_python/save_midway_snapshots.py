@@ -19,7 +19,8 @@ ANGLE_W = float(sys.argv[1]) if len(sys.argv) > 1 else 1e4
 IC = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 MAX_ITERS = int(sys.argv[3]) if len(sys.argv) > 3 else 200
 MAX_OUTER = int(sys.argv[4]) if len(sys.argv) > 4 else 30
-USE_SPIKE = (sys.argv[5].lower() == "spike") if len(sys.argv) > 5 else False
+USE_SPIKE = (sys.argv[5].lower() in ("spike", "winding")) if len(sys.argv) > 5 else False
+USE_WINDING = (sys.argv[5].lower() == "winding") if len(sys.argv) > 5 else False
 
 qg = np.array([np.sqrt(2)/2, 0, 0, np.sqrt(2)/2])
 x0 = np.array([0.01, 0.01, 0.01, 1, 0, 0, 0, 0.0])
@@ -47,7 +48,7 @@ ps.passes[0].linesearch.max_iters = 24
 ps.passes[0].linesearch.beta1 = 1e-10; ps.passes[0].linesearch.beta2 = 5000.0
 
 sat = create_satellite(ps)
-spike_label = "_spike" if USE_SPIKE else ""
+spike_label = ("_winding" if USE_WINDING else "_spike") if USE_SPIKE else ""
 spike_cfg = None
 if USE_SPIKE:
     spike_cfg = {
@@ -56,7 +57,12 @@ if USE_SPIKE:
         "exit_fudge": 2.0, "min_prior_decrease_knots": 5, "min_spike_ratio": 2.0,
         "kp_q": 0.3, "kd_w": 2.0, "rw_scale": 0.0, "omega_max": 0.30, "verbose": True,
     }
-    print("Spike removal ENABLED")
+    if USE_WINDING:
+        spike_cfg["winding_detector"] = True
+        spike_cfg["winding_excess_threshold"] = np.pi  # 180° excess
+        print("Spike removal ENABLED (winding detector)")
+    else:
+        print("Spike removal ENABLED (three-pass detector)")
 
 X, U, stop, snaps, trans, dt_val, ctol, elapsed = trajOpt(
     ps, sat, x0, r0, v0, jtime, qgoal, bs, debug=True, spike_removal_cfg=spike_cfg,
