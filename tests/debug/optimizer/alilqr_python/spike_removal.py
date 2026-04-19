@@ -398,88 +398,6 @@ def detect_spikes(
 
 
 # ---------------------------------------------------------------------------
-# Winding-number spike detector (Round 3 prototype)
-# ---------------------------------------------------------------------------
-
-def _quat_step_angle(q1, q2):
-    """Step-wise SO(3) geodesic distance: 2·acos(|q1·q2|), in [0, π]."""
-    return 2.0 * np.arccos(min(abs(float(np.dot(q1, q2))), 1.0))
-
-
-def detect_spikes_winding(X, attitude_target, excess_threshold, max_spike_knots=0,
-                          goal_switch_buffer=15):
-    """Geometric winding-number spike detector.
-
-    A spike is flagged when, over some window [t1, t2], the trajectory
-    travels along SO(3) significantly farther than the direct geodesic
-    between its endpoints:
-
-        excess(t1, t2) = Σ step_geodesic(q_k, q_{k+1}) - geodesic(q_{t1}, q_{t2})
-
-    Smooth motion gives excess ≈ 0; a 180° wrap gives excess ≈ 2π.  The
-    scan is O(N * max_w) and picks, at each t1, the earliest window whose
-    excess exceeds ``excess_threshold``.
-
-    Parameters
-    ----------
-    X : (nx, N) trajectory states (quaternion in rows 3..6)
-    attitude_target : (4, N) — used only to find goal transitions
-    excess_threshold : float (rad) — minimum geodesic excess to flag
-    max_spike_knots : int — largest window size; 0 = half trajectory
-    goal_switch_buffer : unused here; transitions are handled via the
-        cross-detection check below
-
-    Returns
-    -------
-    list of (t_enter, t_exit) tuples
-    """
-    N = X.shape[1]
-    if N < 3:
-        return []
-
-    # Step-wise geodesic distances and cumulative traveled-distance.
-    step = np.zeros(N - 1)
-    S = np.zeros(N)
-    for k in range(N - 1):
-        qk = X[3:7, k]
-        qk1 = X[3:7, k + 1]
-        step[k] = _quat_step_angle(qk, qk1)
-        S[k + 1] = S[k] + step[k]
-
-    transitions = _find_goal_transitions(attitude_target)
-    min_w = 5
-    max_w = max_spike_knots if max_spike_knots > 0 else min(N - 1, 200)
-
-    candidates = []
-    t1 = 0
-    while t1 + min_w < N:
-        q_t1 = X[3:7, t1]
-        best_excess = 0.0
-        best_t2 = -1
-        for w in range(min_w, max_w + 1):
-            t2 = t1 + w
-            if t2 >= N:
-                break
-            # Skip windows spanning a goal transition.
-            if any(t1 < t < t2 for t in transitions):
-                continue
-            traveled = S[t2] - S[t1]
-            direct = _quat_step_angle(q_t1, X[3:7, t2])
-            excess = traveled - direct
-            if excess > best_excess:
-                best_excess = excess
-                best_t2 = t2
-
-        if best_excess > excess_threshold and best_t2 > 0:
-            candidates.append((t1, best_t2))
-            t1 = best_t2 + 1
-        else:
-            t1 += 1
-
-    return candidates
-
-
-# ---------------------------------------------------------------------------
 # Phase 2: PD segment simulation
 # ---------------------------------------------------------------------------
 
@@ -948,8 +866,6 @@ def apply_spike_removal(
     h_max=None,
     rw_scale=0.0,
     verbose=False,
-    winding_detector=False,
-    winding_excess_threshold=None,
     max_spike_knots=0,
 ):
     """Detect and remove trajectory spikes after an accepted iLQR forward pass.
@@ -1028,23 +944,14 @@ def apply_spike_removal(
         return X, U, False
 
     # Detect spike candidates
-    if winding_detector:
-        thresh = winding_excess_threshold if winding_excess_threshold is not None else np.pi / 3.0
-        candidates = detect_spikes_winding(
-            X, attitude_target,
-            excess_threshold=thresh,
-            max_spike_knots=max_spike_knots,
-            goal_switch_buffer=goal_switch_buffer,
-        )
-    else:
-        candidates = detect_spikes(
-            X, U, attitude_target, boresight, B, satellite, cnst_cfg,
-            goal_switch_buffer=goal_switch_buffer,
-            min_consecutive=min_consecutive,
-            exit_fudge=exit_fudge,
-            min_prior_decrease_knots=min_prior_decrease_knots,
-            min_spike_ratio=min_spike_ratio,
-        )
+    candidates = detect_spikes(
+        X, U, attitude_target, boresight, B, satellite, cnst_cfg,
+        goal_switch_buffer=goal_switch_buffer,
+        min_consecutive=min_consecutive,
+        exit_fudge=exit_fudge,
+        min_prior_decrease_knots=min_prior_decrease_knots,
+        min_spike_ratio=min_spike_ratio,
+    )
 
     if verbose:
         if not candidates:

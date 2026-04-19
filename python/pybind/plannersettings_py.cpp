@@ -113,9 +113,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("kd_w", &SpikeRemovalConfig::kd_w)
         .def_readwrite("rw_scale", &SpikeRemovalConfig::rw_scale)
         .def_readwrite("omega_max", &SpikeRemovalConfig::omega_max)
-        .def_readwrite("verbose", &SpikeRemovalConfig::verbose)
-        .def_readwrite("winding_detector", &SpikeRemovalConfig::winding_detector)
-        .def_readwrite("winding_excess_threshold", &SpikeRemovalConfig::winding_excess_threshold);
+        .def_readwrite("verbose", &SpikeRemovalConfig::verbose);
 
     py::class_<PassConfig>(m, "PassConfig")
         .def(py::init<>())

@@ -329,26 +329,6 @@ struct SpikeRemovalConfig {
     double rw_scale = 0.0;
     double omega_max = 0.0;
     bool verbose = false;
-
-    /// Experimental winding-number geometric detector.  A spike is flagged
-    /// when the trajectory travels along SO(3) significantly longer than the
-    /// direct geodesic between its endpoints — an "out and back" path that
-    /// accumulates rotation without net displacement.
-    ///
-    /// Round 3 A/B (2026-04-17): does **not** replace the three-pass detector.
-    /// At w=1e4 it is 2× slower with no quality gain; at w=1e6 it destroys
-    /// the trajectory (PE_final=141°, ctol=9e-4) — the three-pass physics-
-    /// limited and prior-decrease filters catch real edge cases that pure
-    /// geometry misses.  Kept as a prototype for future hybrid approaches
-    /// (geometric detection + heuristic gating).
-    bool winding_detector = false;
-
-    /// Geodesic excess threshold (radians) for the winding detector.
-    /// Window [t1,t2] is flagged when (traveled - direct) > this value.
-    /// Threshold sweep shows the detector is effectively binary — any value
-    /// ≥ 3π/4 gives identical results; π/2 over-fires and destroys the
-    /// trajectory.
-    double winding_excess_threshold = M_PI;
 };
 
 /**
