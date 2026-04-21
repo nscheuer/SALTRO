@@ -73,6 +73,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("grad_tol", &ILQRConfig::grad_tol)
         .def_readwrite("cost_tol", &ILQRConfig::cost_tol)
         .def_readwrite("z_count_lim", &ILQRConfig::z_count_lim)
+        .def_readwrite("ls_attempts_lim", &ILQRConfig::ls_attempts_lim)
         .def_readwrite("max_cost", &ILQRConfig::max_cost)
         .def_readwrite("state_bound", &ILQRConfig::state_bound)
         .def_readwrite("ls_strict_decrease", &ILQRConfig::ls_strict_decrease)

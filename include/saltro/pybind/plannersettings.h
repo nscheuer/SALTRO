@@ -232,6 +232,16 @@ struct ILQRConfig {
     double cost_tol = 1e-1;
     int z_count_lim = 10;
 
+    /// Maximum number of backward+forward-pass retries within a single
+    /// iLQR iteration (i.e., the inner regularization-raise loop).  If
+    /// we hit this cap without accepting a step, bail out of the outer
+    /// loop rather than letting reg cascade to reg_max via triple-bumps
+    /// on every forward-pass fail.  Iterations immediately following a
+    /// spike-removal substitution automatically get ~10× this budget
+    /// because the discontinuous trajectory perturbation legitimately
+    /// needs more re-linearization attempts to settle.
+    int ls_attempts_lim = 30;
+
     double max_cost = 1e40;
     double state_bound = 10.0;
 

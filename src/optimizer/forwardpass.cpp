@@ -13,6 +13,16 @@
 #define SALTRO_OPT_DLOG(msg) do {} while (0)
 #endif
 
+// Runtime-gated verbose forward-pass logging. Set env var SALTRO_FP_VERBOSE=1
+// to log alpha, z, J_new, and rollout-fail reasons per line-search trial.
+// Cached so we only touch getenv once per process.
+#include <cstdlib>
+static bool fp_verbose_enabled() {
+    static const bool v = (std::getenv("SALTRO_FP_VERBOSE") != nullptr);
+    return v;
+}
+#define SALTRO_FP_VLOG(msg) do { if (fp_verbose_enabled()) { std::cerr << msg << std::endl; } } while (0)
+
 namespace saltro::optimizer {
 
 static bool linesearch(
@@ -190,6 +200,8 @@ bool forwardPass(
             (void)fail_k;  // Used only in debug logging macro
             (void)fail_reason;  // Used only in debug logging macro
             SALTRO_OPT_DLOG("[FP] reject alpha=" << alpha << " k=" << fail_k << " reason=" << fail_reason);
+            SALTRO_FP_VLOG("[FP] rollout_fail alpha=" << alpha
+                           << " k=" << fail_k << " reason=" << fail_reason);
             continue;
         }
 
@@ -240,6 +252,12 @@ bool forwardPass(
             : std::numeric_limits<double>::quiet_NaN();
         (void)z;  // Used only in debug logging macro
         SALTRO_OPT_DLOG("[FP] alpha=" << alpha << " J_new=" << J_new << " z=" << z << " ls_ok=" << static_cast<int>(ls_ok));
+        if (!ls_ok) {
+            SALTRO_FP_VLOG("[FP] ls_reject alpha=" << alpha
+                           << " J_prev=" << J_minus << " J_new=" << J_new
+                           << " dJ=" << (J_minus - J_new) << " z=" << z
+                           << " (beta1=" << ls_cfg.beta1 << " beta2=" << ls_cfg.beta2 << ")");
+        }
         if (ls_ok) {
             // Overwrite outputs with the new trajectory/control
             X = X_bar;
@@ -254,6 +272,7 @@ bool forwardPass(
     }
 
     SALTRO_OPT_DLOG("[FP] failed all line-search trials; keep J=" << J_prev);
+    SALTRO_FP_VLOG("[FP] ALL TRIALS FAILED  J_prev=" << J_prev);
     J_new = J_prev;
     return false;
 }

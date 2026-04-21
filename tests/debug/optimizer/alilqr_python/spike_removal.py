@@ -791,17 +791,19 @@ def substitute_and_blend(
         if k + 1 < N:
             X[:, k + 1] = x_next
 
-    # Tail re-rollout SKIPPED — applying the spiked nominal's K matrix with
-    # large dx (post-blend state far from pre-substitution nominal) produces
-    # astronomical feedback corrections that RK4 can't integrate stably.
-    # Leaving U[blend_end:] at pre-substitution values; iLQR's next forward
-    # pass propagates the new blended state forward through those controls
-    # and linesearch rejects the result if it's worse, so nothing is lost.
-    #
-    # Original design assumed "up and back" geometry keeps dx small at the
-    # stitch, but multi-RW configs and larger slews violate that assumption
-    # and blow up ω past RK4's stability region.
-    return X, U
+    # Tail re-rollout [blend_end, N-1) — OPEN-LOOP propagation with U_bar.
+    # Must integrate to produce a feasible trajectory (X[k+1] = f(X[k], U[k])),
+    # otherwise the next backward_pass linearizes around invalid states.
+    # Applying feedback K·dx from the pre-substitution gains to the large dx
+    # at the blend boundary blows up (state past RK4 stability), so we use
+    # pure open-loop U_bar.  The safety valve catches divergence.
+    for k in range(blend_end, N - 1):
+        R_k, B_k, S_k, V_k, rho_k = _env(k)
+        u_k = U_bar[:, k] if k < U_bar.shape[1] else np.zeros(nu)
+        U[:, k] = u_k
+        x_next = _rk4_step(satellite, X[:, k], u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k)
+        if k + 1 < N:
+            X[:, k + 1] = x_next
 
     return X, U
 
@@ -989,9 +991,18 @@ def apply_spike_removal(
             rw_scale=rw_scale,
         )
 
-        # Cost comparison disabled — detection criteria + keep-out are sufficient.
-        # The stage-cost comparison was rejecting valid homotopy spikes where the
-        # PD path is locally more expensive but globally beneficial.
+        # Validate PD sim output before using it.  At large dt (e.g., 30s)
+        # the PD rollout can diverge (RK4 stiffness), producing NaN/Inf
+        # quaternions.  Handing that to check_keepout or substitute_and_blend
+        # crashes `satellite.constraints` on "Quaternion norm is too small".
+        pd_q_norms = np.linalg.norm(X_pd[3:7, :], axis=0)
+        pd_bad = (not np.all(np.isfinite(X_pd))
+                  or not np.all(np.isfinite(U_pd))
+                  or np.any(np.abs(pd_q_norms - 1.0) > 1e-3))
+        if pd_bad:
+            if verbose:
+                print(f"[SpikeRemoval]   ({t_enter},{t_exit}): PD sim diverged — skipping")
+            continue
 
         # Keep-out check
         if not check_keepout(X_pd, U_pd, S, satellite, cnst_cfg, N, t_enter):

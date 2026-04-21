@@ -284,18 +284,25 @@ void substituteAndBlend(
 		}
 	}
 
-	// Tail re-rollout SKIPPED — applying the spiked nominal's K matrix with
-	// large dx (post-blend state far from pre-substitution nominal) produces
-	// astronomical feedback corrections that RK4 can't integrate stably.
-	// Leave U[blend_end:] at pre-substitution values; iLQR's next forward
-	// pass propagates the new blended state through those controls and
-	// linesearch rejects the result if it's worse, so nothing is lost.
-	//
-	// Original design assumed "up and back" geometry keeps dx small at the
-	// stitch, but multi-RW configs and larger slews violate that assumption
-	// and blow up ω past RK4's stability region.
+	// Tail re-rollout [blend_end, N-1) — OPEN-LOOP propagation with U_bar.
+	// Must integrate to produce a feasible trajectory (X[k+1] = f(X[k], U[k])),
+	// otherwise the next backward_pass linearizes around invalid states.
+	// Applying feedback K·dx from the pre-substitution gains to the large dx
+	// at the blend boundary blows up (state past RK4 stability), so we use
+	// pure open-loop U_bar.  The safety valve catches divergence.
 	(void)K;
-	(void)blend_end;
+	for (int k = blend_end; k < N - 1; ++k) {
+		const auto env = getEnv(R, B, S, V, rho, k);
+		const Eigen::VectorXd u_bar_k = (k < U_bar.cols())
+			? Eigen::VectorXd(U_bar.col(k))
+			: Eigen::VectorXd::Zero(nu);
+		U.col(k) = u_bar_k;
+		if (k + 1 < N) {
+			X.col(k + 1) = satellite.dynamicsStepRK4(
+				X.col(k), u_bar_k, dt, dist_cfg,
+				env.R, env.B, env.S, env.V, env.rho);
+		}
+	}
 }
 
 } // anonymous namespace
@@ -719,6 +726,26 @@ bool applySpikeRemoval(
 			B_slice, S_slice, R_slice, V_slice, rho_slice,
 			dist_cfg, dt, cfg
 		);
+
+		// Validate PD sim output.  At large dt the PD rollout can diverge
+		// (RK4 stiffness), producing NaN/Inf quaternions that crash
+		// keepoutClear / satellite.constraints downstream.
+		bool pd_bad = !X_pd.allFinite() || !U_pd.allFinite();
+		if (!pd_bad) {
+			for (int k = 0; k < X_pd.cols(); ++k) {
+				const double qn = X_pd.col(k).segment<4>(3).norm();
+				if (!std::isfinite(qn) || std::abs(qn - 1.0) > 1e-3) {
+					pd_bad = true; break;
+				}
+			}
+		}
+		if (pd_bad) {
+			if (cfg.verbose) {
+				std::cout << "[SpikeRemoval]   (" << t_enter << "," << t_exit
+				          << "): PD sim diverged -- skipping\n";
+			}
+			continue;
+		}
 
 		// Keep-out check
 		if (!keepoutClear(satellite, X_pd, U_pd, S, cnst_cfg, N, t_enter)) {

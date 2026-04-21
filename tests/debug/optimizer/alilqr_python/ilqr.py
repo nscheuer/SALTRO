@@ -156,9 +156,23 @@ def ilqr(
         if reg < reg_min:
             reg = 0.0
 
+    base_lsl = max(1, int(getattr(passsettings.ilqr, "ls_attempts_lim", 30)))
+    # Post-spike iterations get a modest bump: the substitution perturbs
+    # X, U, so the next BP+FP needs some room to rebuild around a new
+    # trajectory.  If the rebuild requires more than a small multiple of
+    # base_lsl, something else is wrong (bad substitution, stale linearization,
+    # stiff integrator) and more attempts won't fix it — investigate instead.
+    post_spike_lsl = max(base_lsl * 3, 50)
+    spike_occurred_last_iter = False
+
     for iteration in range(passsettings.ilqr.max_iters):
 
-        while reg <= reg_max:
+        effective_lsl = post_spike_lsl if spike_occurred_last_iter else base_lsl
+        spike_occurred_this_iter = False
+
+        attempts = 0
+        while reg <= reg_max and attempts < effective_lsl:
+            attempts += 1
             U_trim = U[:, :X.shape[1] - 1]
             ok_bp, K, d, deltaV = saltro_py.backward_pass(
                 satellite,
@@ -225,13 +239,15 @@ def ilqr(
 
             # Spike removal: detect and replace homotopy artifacts after accepted step
             if spike_removal_cfg is not None:
-                X, U, _spike_occurred = apply_spike_removal(
+                X, U, spike_happened = apply_spike_removal(
                     X, U, U_bar, K_list,
                     satellite, plannersettings, pass_idx,
                     R, V, B, S, rho, jtime, boresight, q_goal,
                     iteration=iteration,
                     **spike_removal_cfg,
                 )
+                if spike_happened:
+                    spike_occurred_this_iter = True
 
             delta_J = abs(J_prev - J_new)
 
@@ -260,7 +276,12 @@ def ilqr(
 
             break
 
+        # Update spike tracker for next iteration's ls budget.
+        spike_occurred_last_iter = spike_occurred_this_iter
+
         if reg > reg_max:
             return X, U, "reg_exceeded", snapshots, transitions
+        if attempts >= effective_lsl:
+            return X, U, "ls_attempts_exceeded", snapshots, transitions
 
     return X, U, "max_iters", snapshots, transitions
