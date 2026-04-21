@@ -129,8 +129,18 @@ def _find_goal_transitions(attitude_target):
     return transitions
 
 
-def _is_saturated(u, satellite, threshold=0.95):
-    """True if any dominant control channel is at >= threshold * u_max."""
+def _is_saturated(u, satellite, control_limit_scale, ratio_of_al_ceiling=0.9):
+    """True if any dominant control channel is saturated against the
+    effective AL-imposed ceiling (u_max × control_limit_scale).
+
+    AL drives |u| to at most control_limit_scale · u_max (typically 0.75).
+    Measuring saturation as a fraction of the hardware u_max was dead
+    code — AL never let u reach 95% of u_max.  We now scale by
+    control_limit_scale so the threshold tracks whatever the user sets.
+    `ratio_of_al_ceiling` defaults to 0.95 = "within 5% of the effective
+    AL ceiling" ≈ saturated.
+    """
+    threshold = ratio_of_al_ceiling * control_limit_scale
     n_mtq = satellite.numMTQ
     n_rw = satellite.numRW
     for i in range(n_mtq):
@@ -306,7 +316,7 @@ def detect_spikes(
             x_k = X[:, ck]
             B_k = B[:, ck]
             tau_act = np.asarray(satellite.actuatorTorque(x_k, u_k, B_k))
-            if _is_saturated(u_k, satellite) and _torque_opposes_error(
+            if _is_saturated(u_k, satellite, cnst_cfg.control_limit_scale) and _torque_opposes_error(
                 x_k, tau_act, attitude_target[:, ck], satellite
             ):
                 physics_limited_votes += 1

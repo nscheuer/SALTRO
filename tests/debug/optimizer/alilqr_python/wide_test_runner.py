@@ -251,8 +251,11 @@ def save_gif(name, snaps, ps, sat, qg):
     frames = list(range(0, len(snaps), step))
     if frames[-1] != len(snaps) - 1:
         frames.append(len(snaps) - 1)
+    # Hold final frame for 10s at fps=5 = 50 extra frames.
+    FPS = 5
+    frames = frames + [len(snaps) - 1] * (FPS * 10)
     anim = FuncAnimation(fig, animate, frames=frames, repeat=False)
-    anim.save(str(OUT / f"{name}.gif"), writer=PillowWriter(fps=5))
+    anim.save(str(OUT / f"{name}.gif"), writer=PillowWriter(fps=FPS))
     plt.close(fig)
 
 

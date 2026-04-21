@@ -43,21 +43,33 @@ std::set<int> findGoalTransitions(const Eigen::Ref<const Eigen::MatrixXd>& attit
 	return transitions;
 }
 
-/// Check if any dominant control channel is saturated.
+/// Check if any dominant control channel is saturated against the effective
+/// AL-imposed ceiling (u_max × control_limit_scale).
+///
+/// The AL penalty drives |u| to at most `control_limit_scale × u_max`
+/// (default 0.75).  Measuring saturation as a fraction of the hardware
+/// u_max was dead code — AL never let |u| reach 0.95·u_max.  We now scale
+/// by control_limit_scale so the threshold tracks whatever the user sets
+/// (e.g., 0.75 or 0.9).  `ratio_of_al_ceiling` defaults to 0.9, meaning
+/// "within 10% of the effective AL ceiling" ≈ saturated — gives a bit
+/// of margin to catch cases that are clearly AL-pegged but not
+/// numerically at the exact ceiling.
 bool isSaturated(
 	const Eigen::VectorXd& u,
 	const Satellite& satellite,
-	double threshold = 0.95
+	double control_limit_scale,
+	double ratio_of_al_ceiling = 0.9
 ) {
 	const int n_mtq = satellite.numMTQ();
 	const int n_rw = satellite.numRW();
+	const double thresh = ratio_of_al_ceiling * control_limit_scale;
 	for (int i = 0; i < n_mtq; ++i) {
 		const double u_max = satellite.getMTQ(i).u_max();
-		if (u_max > 0 && std::abs(u(i)) >= threshold * u_max) return true;
+		if (u_max > 0 && std::abs(u(i)) >= thresh * u_max) return true;
 	}
 	for (int i = 0; i < n_rw; ++i) {
 		const double u_max = satellite.getRW(i).u_max();
-		if (u_max > 0 && std::abs(u(n_mtq + i)) >= threshold * u_max) return true;
+		if (u_max > 0 && std::abs(u(n_mtq + i)) >= thresh * u_max) return true;
 	}
 	return false;
 }
@@ -414,7 +426,7 @@ std::vector<SpikeCandidate> detectSpikes(
 			++n_checked;
 			const Eigen::VectorXd u_k = U.col(ck);
 			const Eigen::Vector3d tau = satellite.actuatorTorque(X.col(ck), u_k, B.col(ck));
-			if (isSaturated(u_k, satellite) &&
+			if (isSaturated(u_k, satellite, cnst_cfg.control_limit_scale) &&
 			    torqueOpposesError(X.col(ck), tau, attitude_target.col(ck), satellite)) {
 				++physics_limited_votes;
 			}
@@ -490,7 +502,10 @@ std::vector<SpikeCandidate> detectSpikes(
 		// the trajectory passing through a high-error region naturally.
 		bool has_control_effort = false;
 		for (int ck = t_enter_s; ck < t_exit_s && ck < U.cols(); ++ck) {
-			if (isSaturated(U.col(ck), satellite, 0.5)) {  // 50% of any actuator limit
+			// Pass 2 control-effort heuristic: "is there meaningful command at this knot?"
+			// Use hardware u_max (scale=1.0) + 50% threshold — this is about detecting
+			// any significant effort, not proximity to the AL ceiling.
+			if (isSaturated(U.col(ck), satellite, 1.0, 0.5)) {
 				has_control_effort = true;
 				break;
 			}

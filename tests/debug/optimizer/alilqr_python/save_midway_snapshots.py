@@ -171,10 +171,15 @@ frames = list(range(0, n_frames, step))
 if frames[-1] != n_frames - 1:
     frames.append(n_frames - 1)
 
+# Hold the final frame for 10 seconds at end of GIF.
+FPS = 4
+HOLD_SECONDS = 10
+frames = frames + [n_frames - 1] * (FPS * HOLD_SECONDS)
+
 print(f"Generating GIF with {len(frames)} frames...")
 anim = FuncAnimation(fig2, animate, frames=frames, repeat=False)
 gif_path = Path(__file__).parent / f"convergence_angle{ANGLE_W:.0e}_ic{IC}{spike_label}.gif"
-anim.save(str(gif_path), writer=PillowWriter(fps=4))
+anim.save(str(gif_path), writer=PillowWriter(fps=FPS))
 print(f"Saved: {gif_path}")
 
 png_path = Path(__file__).parent / f"convergence_angle{ANGLE_W:.0e}_ic{IC}{spike_label}_final.png"
