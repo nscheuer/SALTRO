@@ -791,42 +791,17 @@ def substitute_and_blend(
         if k + 1 < N:
             X[:, k + 1] = x_next
 
-    # --- Tail re-rollout [blend_end, N-1) — gain-corrected from blend endpoint ---
-    # u = U_bar + clamp(K @ dx).  Always apply the gain correction; K encodes
-    # the right relative weighting, and clamping du to actuator limits prevents
-    # blow-up.  The next backward pass will re-linearize around the result.
-    n_mtq = satellite.numMTQ
-    n_rw = satellite.numRW
-
-    for k in range(blend_end, N - 1):
-        R_k, B_k, S_k, V_k, rho_k = _env(k)
-
-        u_bar_k = U_bar[:, k] if k < U_bar.shape[1] else np.zeros(nu)
-        K_k = K_list[k] if (K_list is not None and k < len(K_list) and K_list[k] is not None) else None
-
-        if K_k is not None:
-            dx = _state_error_reduced(X[:, k], X_nominal_pre[:, k], satellite)
-            du = K_k @ dx
-            for i in range(n_mtq):
-                u_max = float(satellite.getMTQ(i).u_max)
-                du[i] = float(np.clip(du[i], -u_max, u_max))
-            for i in range(n_rw):
-                u_max = float(satellite.getRW(i).u_max)
-                du[n_mtq + i] = float(np.clip(du[n_mtq + i], -u_max, u_max))
-            u_k = u_bar_k + du
-            for i in range(n_mtq):
-                u_max = float(satellite.getMTQ(i).u_max)
-                u_k[i] = float(np.clip(u_k[i], -u_max, u_max))
-            for i in range(n_rw):
-                u_max = float(satellite.getRW(i).u_max)
-                u_k[n_mtq + i] = float(np.clip(u_k[n_mtq + i], -u_max, u_max))
-        else:
-            u_k = u_bar_k
-
-        U[:, k] = u_k
-        x_next = _rk4_step(satellite, X[:, k], u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k)
-        if k + 1 < N:
-            X[:, k + 1] = x_next
+    # Tail re-rollout SKIPPED — applying the spiked nominal's K matrix with
+    # large dx (post-blend state far from pre-substitution nominal) produces
+    # astronomical feedback corrections that RK4 can't integrate stably.
+    # Leaving U[blend_end:] at pre-substitution values; iLQR's next forward
+    # pass propagates the new blended state forward through those controls
+    # and linesearch rejects the result if it's worse, so nothing is lost.
+    #
+    # Original design assumed "up and back" geometry keeps dx small at the
+    # stitch, but multi-RW configs and larger slews violate that assumption
+    # and blow up ω past RK4's stability region.
+    return X, U
 
     return X, U
 
@@ -1027,10 +1002,13 @@ def apply_spike_removal(
         if verbose:
             print(f"[SpikeRemoval]   ({t_enter},{t_exit}): substituting PD segment")
 
-        # Save pre-substitution nominal for gain correction reference
+        # Save pre-substitution nominal for gain correction reference AND
+        # for safety-valve rollback if substitution produces degenerate state.
         X_nominal_pre = X.copy()
+        X_saved = X.copy()
+        U_saved = U.copy()
 
-        # Substitute and re-rollout
+        # Substitute + blend (tail rollout removed — iLQR handles that).
         X, U = substitute_and_blend(
             X, U,
             X_pd, U_pd,
@@ -1047,6 +1025,32 @@ def apply_spike_removal(
             kd_w=kd_w,
             rw_scale=rw_scale,
         )
+
+        # Safety valve: reject the substitution if it produced a degenerate
+        # trajectory (NaN/Inf, quaternion norm drift, or ω far past limits).
+        # Degenerate substitutions otherwise crash the next backward_pass
+        # with "Quaternion norm is too small to normalize".
+        q_norms = np.linalg.norm(X[3:7, :], axis=0)
+        w_max = np.max(np.abs(X[0:3, :]))
+        # Tolerance: |q| must be 1 ± 1e-3; ω must be within 2× the wmax
+        # constraint (pipeline allows transient excursions during AL warm-up).
+        wmax_safe = 2.0 * 20.0 * np.pi / 180.0   # 40°/s
+        bad = (not np.all(np.isfinite(X)) or
+               not np.all(np.isfinite(U)) or
+               np.any(np.abs(q_norms - 1.0) > 1e-3) or
+               w_max > wmax_safe)
+        if bad:
+            if verbose:
+                reason = ("non-finite" if not np.all(np.isfinite(X)) else
+                          (f"|q| drift (worst={np.max(np.abs(q_norms-1)):.3e})"
+                           if np.any(np.abs(q_norms-1.0) > 1e-3) else
+                           f"|ω| exceeded safe limit ({np.degrees(w_max):.1f}°/s)"))
+                print(f"[SpikeRemoval]   ({t_enter},{t_exit}): safety valve — "
+                      f"REVERTING substitution ({reason})")
+            X = X_saved
+            U = U_saved
+            continue
+
         substitution_occurred = True
         # Only substitute one spike per call — let the backward pass re-linearize
         # before tackling any remaining spikes in the next iteration.

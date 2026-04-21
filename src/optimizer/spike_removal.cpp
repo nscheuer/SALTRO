@@ -107,29 +107,6 @@ Env getEnv(
 	};
 }
 
-/// Reduced state error matching iLQR convention: [dw(3), mrp(3), dh(nRW)].
-Eigen::VectorXd stateErrorReduced(
-	const Eigen::VectorXd& x_current,
-	const Eigen::VectorXd& x_nominal,
-	const Satellite& satellite
-) {
-	const int nRW = satellite.numRW();
-	const int nxr = satellite.reducedStateDim();
-	Eigen::VectorXd dx = Eigen::VectorXd::Zero(nxr);
-
-	dx.head<3>() = x_current.head<3>() - x_nominal.head<3>();
-
-	const Eigen::Vector4d q_ref = x_nominal.segment<4>(3);
-	const Eigen::Vector4d q_cur = x_current.segment<4>(3);
-	const Eigen::Vector4d q_err = saltro::math::quatError(q_ref, q_cur);
-	dx.segment<3>(3) = saltro::math::quatToMRP(q_err);
-
-	for (int i = 0; i < nRW; ++i) {
-		dx(6 + i) = x_current(7 + i) - x_nominal(7 + i);
-	}
-	return dx;
-}
-
 // ---------------------------------------------------------------------------
 // PD segment simulation
 // ---------------------------------------------------------------------------
@@ -307,29 +284,18 @@ void substituteAndBlend(
 		}
 	}
 
-	// --- Tail re-rollout [blend_end, N-1) with gain correction ---
-	for (int k = blend_end; k < N - 1; ++k) {
-		const auto env = getEnv(R, B, S, V, rho, k);
-		const Eigen::VectorXd u_bar_k = (k < U_bar.cols())
-			? Eigen::VectorXd(U_bar.col(k))
-			: Eigen::VectorXd::Zero(nu);
-
-		Eigen::VectorXd u_k = u_bar_k;
-
-		if (k < static_cast<int>(K.size()) && K[k].size() > 0) {
-			const Eigen::VectorXd dx = stateErrorReduced(X.col(k), X_nominal_pre.col(k), satellite);
-			Eigen::VectorXd du = K[k] * dx;
-			scaleToMax(du, satellite);
-			u_k += du;
-			scaleToMax(u_k, satellite);
-		}
-
-		U.col(k) = u_k;
-		if (k + 1 < N) {
-			X.col(k + 1) = satellite.dynamicsStepRK4(X.col(k), u_k, dt, dist_cfg,
-			                                         env.R, env.B, env.S, env.V, env.rho);
-		}
-	}
+	// Tail re-rollout SKIPPED — applying the spiked nominal's K matrix with
+	// large dx (post-blend state far from pre-substitution nominal) produces
+	// astronomical feedback corrections that RK4 can't integrate stably.
+	// Leave U[blend_end:] at pre-substitution values; iLQR's next forward
+	// pass propagates the new blended state through those controls and
+	// linesearch rejects the result if it's worse, so nothing is lost.
+	//
+	// Original design assumed "up and back" geometry keeps dx small at the
+	// stitch, but multi-RW configs and larger slews violate that assumption
+	// and blow up ω past RK4's stability region.
+	(void)K;
+	(void)blend_end;
 }
 
 } // anonymous namespace
@@ -768,8 +734,10 @@ bool applySpikeRemoval(
 			          << "): substituting PD segment\n";
 		}
 
-		// Save pre-substitution nominal
+		// Save pre-substitution state for safety-valve rollback.
 		const Eigen::MatrixXd X_nominal_pre = X;
+		const Eigen::MatrixXd X_saved = X;
+		const Eigen::MatrixXd U_saved = U;
 
 		substituteAndBlend(
 			satellite, pd, X, U, X_pd, U_pd,
@@ -777,6 +745,32 @@ bool applySpikeRemoval(
 			X_nominal_pre, U_bar, K,
 			dist_cfg, R, B, S, V, rho, dt, cfg
 		);
+
+		// Safety valve: reject if substitution produced a degenerate
+		// trajectory.  Degenerate states crash the next backward_pass on
+		// "Quaternion norm is too small to normalize".
+		constexpr double kWmaxSafe = 2.0 * 20.0 * M_PI / 180.0;  // 40°/s
+		bool degenerate = !X.allFinite() || !U.allFinite();
+		if (!degenerate) {
+			for (int k = 0; k < N; ++k) {
+				const double qn = X.col(k).segment<4>(3).norm();
+				if (!std::isfinite(qn) || std::abs(qn - 1.0) > 1e-3) {
+					degenerate = true; break;
+				}
+				if (X.col(k).head<3>().cwiseAbs().maxCoeff() > kWmaxSafe) {
+					degenerate = true; break;
+				}
+			}
+		}
+		if (degenerate) {
+			if (cfg.verbose) {
+				std::cout << "[SpikeRemoval]   (" << t_enter << "," << t_exit
+				          << "): safety valve -- reverting substitution\n";
+			}
+			X = X_saved;
+			U = U_saved;
+			continue;
+		}
 
 		// Only substitute one spike per call
 		return true;
