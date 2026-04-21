@@ -33,8 +33,8 @@ def build(initctrl=1, dt=10.0, angle=1e4, max_iters=300, max_outer=40,
     c.angle = angle; c.ang_vel = angle/100
     c.control_mult = 1.0
     c.mtq_control_weight = 1e-1; c.rw_control_weight = 1.0
-    c.angle_N = angle; c.ang_vel_N = angle/100
     c.ang_cost_func_type = 3; c.use_cost_hess = True
+    c.setTerminalEmphasis(100.0)
     ps.passes[0].reg.reg_init = 1e-6; ps.passes[0].reg.reg_max = 1e30
     ps.passes[0].reg.reg_scale = 1.6
     ps.passes[0].linesearch.max_iters = 24

@@ -40,19 +40,19 @@ ps.passes[0].auglag.max_outer_iters = 2
 if case == "dt30":
     ps.passes[0].dt = 30.0
     sat = create_3_1(ps); time_s = 3000.0
-    c.angle = 1e4; c.ang_vel = 1e2; c.angle_N = 1e4; c.ang_vel_N = 1e2
+    c.angle = 1e4; c.ang_vel = 1e2; c.setTerminalEmphasis(100.0)
 elif case == "rw":
     ps.passes[0].dt = 10.0
     sat = create_0_3(ps); time_s = 1000.0
-    c.angle = 1e4; c.ang_vel = 1e2; c.angle_N = 1e4; c.ang_vel_N = 1e2
+    c.angle = 1e4; c.ang_vel = 1e2; c.setTerminalEmphasis(100.0)
 elif case == "baseline":
     ps.passes[0].dt = 10.0
     sat = create_3_1(ps); time_s = 1000.0
-    c.angle = 1e4; c.ang_vel = 1e2; c.angle_N = 1e4; c.ang_vel_N = 1e2
+    c.angle = 1e4; c.ang_vel = 1e2; c.setTerminalEmphasis(100.0)
 elif case == "omega5x":
     ps.passes[0].dt = 10.0
     sat = create_3_1(ps); time_s = 1000.0
-    c.angle = 1e4; c.ang_vel = 1e2; c.angle_N = 1e4; c.ang_vel_N = 1e2
+    c.angle = 1e4; c.ang_vel = 1e2; c.setTerminalEmphasis(100.0)
 
 omega0 = 0.05 if case == "omega5x" else 0.01
 x0 = np.hstack([[omega0, omega0, omega0], [1, 0, 0, 0], np.zeros(sat.numRW)])

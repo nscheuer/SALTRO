@@ -54,7 +54,12 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ang_vel_mag_N", &CostConfig::ang_vel_mag_N)
         .def_readwrite("ang_vel_err_dir_N", &CostConfig::ang_vel_err_dir_N)
         .def_readwrite("ang_cost_func_type", &CostConfig::ang_cost_func_type)
-        .def_readwrite("use_cost_hess", &CostConfig::use_cost_hess);
+        .def_readwrite("use_cost_hess", &CostConfig::use_cost_hess)
+        .def("setTerminalEmphasis", &CostConfig::setTerminalEmphasis,
+             py::arg("k") = 100.0,
+             "Scale all terminal weights by k, preserving stage ratios. "
+             "k=1 matches stage; k=100 is strong terminal emphasis. "
+             "Always prefer this over editing individual terminal fields.");
 
     py::class_<AugLagConfig>(m, "AugLagConfig")
         .def(py::init<>())

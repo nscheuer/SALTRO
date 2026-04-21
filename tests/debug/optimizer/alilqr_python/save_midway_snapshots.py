@@ -37,8 +37,10 @@ ps.passes[0].auglag.constraint_tol = 1e-3
 c = ps.passes[0].cost
 c.angle = ANGLE_W; c.ang_vel = ANGLE_W / 100
 c.control_mult = 1.0; c.mtq_control_weight = 1e-1; c.rw_control_weight = 1.0
-c.angle_N = ANGLE_W; c.ang_vel_N = ANGLE_W / 100
 c.ang_cost_func_type = 3; c.use_cost_hess = True
+# Terminal emphasis: scale all terminal weights uniformly against stage
+# to avoid weight-ratio pathology (see CostConfig docs).
+c.setTerminalEmphasis(100.0)
 for a in ["aero","gg","srp","prop","gendist","resdipole"]:
     setattr(ps.disturbances, "plan_for_"+a, False)
 ps.passes[0].reg.reg_init = 1e-6; ps.passes[0].reg.reg_max = 1e30

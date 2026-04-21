@@ -160,6 +160,17 @@ struct CostConfig {
     double RWh_stiction_mult = 0.01;
     double RWh_ok_mult = 0.5;
 
+    /// Terminal weights.  **Principle**: preserve the stage ratios.  If you
+    /// set `angle_N` high without matching `ang_vel_N`, the optimizer chases
+    /// the target angle at max torque with no penalty for arriving at high ω
+    /// — which overruns the AL control-limit penalty and produces wild
+    /// actuator saturations (verified experimentally via the angle_N fine
+    /// sweep, 2026-04-21: at angle_N=10× or 1000× angle with ang_vel_N=ang_vel,
+    /// mtq/rw peaks at 600-1400% of u_max and the solver diverges).
+    ///
+    /// Use `setTerminalEmphasis(k)` to scale all terminal weights uniformly
+    /// instead of editing fields individually.  Defaults already follow the
+    /// principle at a modest 10× emphasis.
     double angle_N = 1e4;
     double ang_vel_N = 1e5;
     double ang_vel_mag_N = 0.0;
@@ -167,6 +178,17 @@ struct CostConfig {
 
     int ang_cost_func_type = 2;
     bool use_cost_hess = false;
+
+    /// Scale all terminal weights by `k`, preserving ratios with their
+    /// stage counterparts.  This is the safe way to increase terminal
+    /// emphasis without introducing the weight-ratio pathology described
+    /// above.  `k=1` matches stage; `k=100` is a strong terminal emphasis.
+    void setTerminalEmphasis(double k) {
+        angle_N = k * angle;
+        ang_vel_N = k * ang_vel;
+        ang_vel_mag_N = k * ang_vel_mag;
+        ang_vel_err_dir_N = k * ang_vel_err_dir;
+    }
 };
 
 /**
