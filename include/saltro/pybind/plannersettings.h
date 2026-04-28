@@ -154,6 +154,22 @@ struct CostConfig {
     double ang_vel_err_dir = 0.0;
     double control_mult = 1.0;
 
+    /// Roll-axis weight fraction for the axis-aware ω cost in vector-pointing
+    /// mode (0 < ratio ≤ 1). 1.0 reduces W_ω to uniform `c.ang_vel · I`,
+    /// matching the current isotropic cost. Smaller values down-weight rotation
+    /// about the boresight, freeing the optimizer to spend control on the
+    /// 2-DOF off-axis pointing error. Ignored in quaternion-goal mode (all
+    /// 3 DOF are constrained there). Default is current behavior.
+    double ang_vel_roll_ratio = 1.0;
+
+    /// PSD-fraction knob β ∈ [0, 1) for the Lyapunov α·err_dir^T·ω
+    /// crossterm. The realized scale is α = β · √(c.angle · λ_min(W_ω)),
+    /// keeping the block-quadratic in (q_e_v, ω_e) PSD by construction.
+    /// 0 (default) disables the crossterm entirely. If `ang_vel_err_dir`
+    /// is set nonzero, the back-compat path overrides α with that raw
+    /// value and ignores this ratio.
+    double ang_vel_err_dir_ratio = 0.0;
+
     double mtq_control_weight = 1e3;
     double rw_control_weight = 1e8;
     double magic_control_weight = 0.0001;
@@ -164,6 +180,11 @@ struct CostConfig {
     double RWh_stiction_mult = 0.01;
     double RWh_ok_mult = 0.5;
 
+    /// Terminal weights.  **Principle**: preserve the stage ratios.  If you
+    /// set `angle_N` high without matching `ang_vel_N`, the optimizer chases
+    /// the target angle at max torque with no penalty for arriving at high ω.
+    /// Use `setTerminalEmphasis(k)` to scale all terminal weights uniformly
+    /// instead of editing fields individually.
     double angle_N = 1e4;
     double ang_vel_N = 1e5;
     double ang_vel_mag_N = 0.0;
@@ -171,6 +192,16 @@ struct CostConfig {
 
     int ang_cost_func_type = 2;
     bool use_cost_hess = false;
+
+    /// Scale all terminal weights by `k`, preserving ratios with their
+    /// stage counterparts.  `k=1` matches stage; `k=100` is strong terminal
+    /// emphasis.
+    void setTerminalEmphasis(double k) {
+        angle_N = k * angle;
+        ang_vel_N = k * ang_vel;
+        ang_vel_mag_N = k * ang_vel_mag;
+        ang_vel_err_dir_N = k * ang_vel_err_dir;
+    }
 };
 
 /**
