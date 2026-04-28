@@ -338,9 +338,37 @@ public:
      * @param rho Atmospheric density.
      * @return State derivative vector.
      */
-    VecX dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist, 
-                 const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci, 
+    VecX dynamics(const VecX& x, const VecX& u, const DisturbanceConfig& dist,
+                 const Vec3& R_eci, const Vec3& B_eci, const Vec3& S_eci,
                  const Vec3& V_eci, const int rho) const;
+
+    /**
+     * @brief Integrate one RK4 step of the satellite dynamics and normalize
+     *        the quaternion.
+     *
+     * Convenience wrapper that binds `dynamics(x, u, dist, R, B, S, V, rho)`
+     * into `saltro::math::rk4_step` with a constant control `u` over the
+     * interval \f$[0, \Delta t]\f$, then renormalizes the quaternion block
+     * to counteract RK4 integration drift.  Matches the pattern used by the
+     * forward pass, warm-start, and spike removal so all three produce
+     * identical trajectory quality.
+     *
+     * @param x Current state (full state with quaternion at QUAT_INDEX).
+     * @param u Control applied over the step (held constant).
+     * @param dt Timestep in seconds.
+     * @param dist Disturbance configuration.
+     * @param R_eci Position (ECI).
+     * @param B_eci Magnetic field (ECI).
+     * @param S_eci Sun direction (ECI).
+     * @param V_eci Velocity (ECI).
+     * @param rho Atmospheric density.
+     * @return Next state with quaternion renormalized.
+     */
+    VecX dynamicsStepRK4(const VecX& x, const VecX& u, double dt,
+                         const DisturbanceConfig& dist,
+                         const Vec3& R_eci, const Vec3& B_eci,
+                         const Vec3& S_eci, const Vec3& V_eci,
+                         int rho) const;
 
     /**
      * @brief Compute dynamics Jacobians.
@@ -398,8 +426,8 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Scalar cost value.
      */
-    double stageCost(int k, int N, const VecX& x, const VecX& u, 
-                    const Vec3& boresight_body, const Vec4& attitude_target, 
+    double stageCost(int k, int N, const VecX& x, const VecX& u,
+                    const Vec3& boresight_body, const Vec4& attitude_target,
                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -412,7 +440,7 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Scalar terminal cost.
      */
-    double terminalCost(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
+    double terminalCost(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
                        const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -431,8 +459,8 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Tuple of (∇_x J, ∇_u J).
      */
-    std::tuple<VecX, MatX, MatX> stageCostJacobians(int k, int N, const VecX& x, const VecX& u, 
-                                                    const Vec3& boresight_body, const Vec4& attitude_target, 
+    std::tuple<VecX, MatX, MatX> stageCostJacobians(int k, int N, const VecX& x, const VecX& u,
+                                                    const Vec3& boresight_body, const Vec4& attitude_target,
                                                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -447,7 +475,7 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Tuple of (∇_x J, ∇_u J).
      */
-    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
+    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
                                                        const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -463,8 +491,8 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
      */
-    std::tuple<MatX, MatX, MatX> stageCostHessians(int k, int N, const VecX& x, const VecX& u, 
-                                                   const Vec3& boresight_body, const Vec4& attitude_target, 
+    std::tuple<MatX, MatX, MatX> stageCostHessians(int k, int N, const VecX& x, const VecX& u,
+                                                   const Vec3& boresight_body, const Vec4& attitude_target,
                                                    const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -479,7 +507,7 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
      */
-    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
+    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
                                                       const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -589,6 +617,6 @@ private:
      * @param q_current Current quaternion state
      * @return Pair<q_goal_quaternion, is_eci_format>
      */
-    std::pair<Vec4, bool> processAttitudeTarget(const Vec4& attitude_target, const Vec3& boresight_body, const Vec4& q_current) const;
+    std::pair<Vec4, bool> processAttitudeTarget(const Vec4& attitude_target, const Vec3& boresight_body) const;
 
 };

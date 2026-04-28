@@ -40,6 +40,8 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ang_vel", &CostConfig::ang_vel)
         .def_readwrite("ang_vel_mag", &CostConfig::ang_vel_mag)
         .def_readwrite("ang_vel_err_dir", &CostConfig::ang_vel_err_dir)
+        .def_readwrite("ang_vel_roll_ratio", &CostConfig::ang_vel_roll_ratio)
+        .def_readwrite("ang_vel_err_dir_ratio", &CostConfig::ang_vel_err_dir_ratio)
         .def_readwrite("control_mult", &CostConfig::control_mult)
         .def_readwrite("mtq_control_weight", &CostConfig::mtq_control_weight)
         .def_readwrite("rw_control_weight", &CostConfig::rw_control_weight)
@@ -54,7 +56,10 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ang_vel_mag_N", &CostConfig::ang_vel_mag_N)
         .def_readwrite("ang_vel_err_dir_N", &CostConfig::ang_vel_err_dir_N)
         .def_readwrite("ang_cost_func_type", &CostConfig::ang_cost_func_type)
-        .def_readwrite("use_cost_hess", &CostConfig::use_cost_hess);
+        .def_readwrite("use_cost_hess", &CostConfig::use_cost_hess)
+        .def("setTerminalEmphasis", &CostConfig::setTerminalEmphasis,
+             py::arg("k") = 100.0,
+             "Scale all terminal weights by k, preserving stage ratios.");
 
     py::class_<AugLagConfig>(m, "AugLagConfig")
         .def(py::init<>())
