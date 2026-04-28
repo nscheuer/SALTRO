@@ -1773,8 +1773,14 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             d2c_dq2 += bs_unit(b) * H_RTv[b];
         }
 
-        Eigen::Matrix4d Hqq_ang = d2h_dc2 * (dc_dq * dc_dq.transpose())
-                                + dh_dc * d2c_dq2;
+        // GN drops only the second-order chain-rule term `f'·d²c/dq²` (which
+        // can be indefinite). The PwA correction `−grad_dot_q·I_4` below is
+        // the manifold-curvature term and is PSD when `f'·c < 0` (holds for
+        // our cost shapes in the aligned hemisphere) — keep it always.
+        Eigen::Matrix4d Hqq_ang = d2h_dc2 * (dc_dq * dc_dq.transpose());
+        if (!cost_cfg.cost_hess_gauss_newton) {
+            Hqq_ang += dh_dc * d2c_dq2;
+        }
         lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) += w_ang_eff * Hqq_ang;
         // PwA correction: −(grad·q)·I_4.  ∂h_amb/∂q · q = f'(c) · 2c.
         const double grad_dot_q = dh_dc * 2.0 * c_val;
