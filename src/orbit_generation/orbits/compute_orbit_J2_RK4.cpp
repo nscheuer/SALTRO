@@ -94,7 +94,7 @@ bool compute_orbit_J2_RK4(
         for (int i = 0; i < n; ++i)
         {
             State6 x_new;
-            rk4_step(j2_dynamics, x, t, h, x_new);
+            saltro::math::rk4_step(j2_dynamics, x, t, h, x_new);
             x = x_new;
             t += h;
         }

@@ -14,6 +14,10 @@ enum class ALILQRStatus {
     MaxOuterIterations,
     // Inner iLQR failed with a non-recoverable status.
     InnerFailed,
+    // Penalty parameter μ saturated at penalty_max on every active constraint
+    // yet cmax is still > constraint_tol. Further outer iterations cannot grow
+    // the penalty, so continuing is pointless. Mirrors PhD's "penMax" exit.
+    PenaltyMaxReached,
 };
 
 bool alilqr(

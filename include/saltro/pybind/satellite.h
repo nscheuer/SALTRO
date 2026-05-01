@@ -426,8 +426,8 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Scalar cost value.
      */
-    double stageCost(int k, int N, const VecX& x, const VecX& u, 
-                    const Vec3& boresight_body, const Vec4& attitude_target, 
+    double stageCost(int k, int N, const VecX& x, const VecX& u,
+                    const Vec3& boresight_body, const Vec4& attitude_target,
                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -440,7 +440,7 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Scalar terminal cost.
      */
-    double terminalCost(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
+    double terminalCost(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
                        const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -459,8 +459,8 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Tuple of (∇_x J, ∇_u J).
      */
-    std::tuple<VecX, MatX, MatX> stageCostJacobians(int k, int N, const VecX& x, const VecX& u, 
-                                                    const Vec3& boresight_body, const Vec4& attitude_target, 
+    std::tuple<VecX, MatX, MatX> stageCostJacobians(int k, int N, const VecX& x, const VecX& u,
+                                                    const Vec3& boresight_body, const Vec4& attitude_target,
                                                     const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -475,7 +475,7 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Tuple of (∇_x J, ∇_u J).
      */
-    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
+    std::tuple<VecX, MatX, MatX> terminalCostJacobians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
                                                        const Vec3& B_eci, const CostConfig& cost_cfg) const;
     
     /**
@@ -491,8 +491,8 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
      */
-    std::tuple<MatX, MatX, MatX> stageCostHessians(int k, int N, const VecX& x, const VecX& u, 
-                                                   const Vec3& boresight_body, const Vec4& attitude_target, 
+    std::tuple<MatX, MatX, MatX> stageCostHessians(int k, int N, const VecX& x, const VecX& u,
+                                                   const Vec3& boresight_body, const Vec4& attitude_target,
                                                    const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -507,7 +507,7 @@ public:
      * @param cost_cfg Cost configuration.
      * @return Tuple of Hessian matrices (Hxx, Huu, Hxu).
      */
-    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target, 
+    std::tuple<MatX, MatX, MatX> terminalCostHessians(const VecX& x, const Vec3& boresight_body, const Vec4& attitude_target,
                                                       const Vec3& B_eci, const CostConfig& cost_cfg) const;
 
     /**
@@ -617,6 +617,6 @@ private:
      * @param q_current Current quaternion state
      * @return Pair<q_goal_quaternion, is_eci_format>
      */
-    std::pair<Vec4, bool> processAttitudeTarget(const Vec4& attitude_target, const Vec3& boresight_body, const Vec4& q_current) const;
+    std::pair<Vec4, bool> processAttitudeTarget(const Vec4& attitude_target, const Vec3& boresight_body) const;
 
 };

@@ -22,6 +22,8 @@ const char* status_to_string(saltro::optimizer::ALILQRStatus status)
             return "max_outer_iterations";
         case ALILQRStatus::InnerFailed:
             return "inner_failed";
+        case ALILQRStatus::PenaltyMaxReached:
+            return "penalty_max_reached";
         default:
             return "unknown";
     }

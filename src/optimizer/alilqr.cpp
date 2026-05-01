@@ -139,12 +139,32 @@ bool alilqr(
 
         const double max_c = max_constraint_violation(settings, satellite, X, U, S);
         max_constraint_violation_out = max_c;
+
+        // Outer-break gate (PhD-aligned 2026-04-23):
+        // Declare converged when constraints are satisfied AND either
+        //   (a) the inner iLQR reported ILQRStatus::Converged at this outer
+        //       iteration (so the trajectory actually settled to the current
+        //       λ/μ), AND we have had at least min_outer_iters iterations of
+        //       λ/μ updates (so duals are not arbitrary); OR
+        //   (b) max_c is below a stricter tolerance — a fast path that trusts
+        //       the constraint-satisfaction signal outright (disabled when
+        //       constraint_tol_strict <= 0, the default).
+        // Previously saltro exited on (max_c <= constraint_tol) alone, which
+        // could declare victory after an inner MaxIterations bailout or before
+        // duals had settled.
         if (max_c <= aug.constraint_tol) {
-            status = ALILQRStatus::Converged;
-            return true;
+            const bool inner_ok = (ilqr_status == ILQRStatus::Converged);
+            const bool outer_matured = (outer_iter + 1) >= aug.min_outer_iters;
+            const bool strict_path =
+                (aug.constraint_tol_strict > 0.0) && (max_c <= aug.constraint_tol_strict);
+            if (strict_path || (inner_ok && outer_matured)) {
+                status = ALILQRStatus::Converged;
+                return true;
+            }
         }
 
         const auto c_list = collect_constraints(settings, satellite, X, U, S);
+        bool any_mu_below_max = false;
         for (size_t k = 0; k < c_list.size(); ++k) {
             // Lambda update uses RAW constraint value (not clamped to positive).
             // This allows lambda to decrease for satisfied constraints,
@@ -154,6 +174,20 @@ bool alilqr(
             // For inequality constraints, lambda must stay non-negative
             lambda_aug[k] = lambda_aug[k].cwiseMax(0.0);
             mu_aug[k] = (mu_aug[k] * aug.penalty_scale).cwiseMin(aug.penalty_max);
+            for (int i = 0; i < mu_aug[k].size(); ++i) {
+                if (mu_aug[k](i) < aug.penalty_max) {
+                    any_mu_below_max = true;
+                }
+            }
+        }
+
+        // PhD "penMax" exit: if μ has saturated everywhere and we still can't
+        // drive cmax below constraint_tol, further outer iterations cannot
+        // grow penalty. Break out rather than burning remaining outer budget.
+        if (!any_mu_below_max && max_c > aug.constraint_tol) {
+            status = ALILQRStatus::PenaltyMaxReached;
+            max_constraint_violation_out = max_c;
+            return false;
         }
     }
 

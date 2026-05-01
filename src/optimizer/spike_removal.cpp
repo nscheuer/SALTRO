@@ -706,7 +706,26 @@ bool applySpikeRemoval(
 	// than a nominal-response PD would use.
 	saltro::controller::PDController pd(satellite);
 	pd.setGains(cfg.kp_q, cfg.kd_w);
-	pd.setRWScale(cfg.rw_scale);
+
+	// Auto-set rw_scale from satellite topology when user passes sentinel (-1).
+	// Fraction-of-actuators: rw_scale = numRW / (numMTQ + numRW).
+	//   3+0 MTQ-only  → 0.0   (no RW to use)
+	//   0+3 RW-only   → 1.0   (must use RW; otherwise PD produces zero torque)
+	//   3+1 hybrid    → 0.25  (MTQ-dominant, RW assists)
+	//   3+3 hybrid    → 0.5   (balanced)
+	double effective_rw_scale = cfg.rw_scale;
+	if (effective_rw_scale < 0.0) {
+		const int n_mtq_sat = satellite.numMTQ();
+		const int n_rw_sat = satellite.numRW();
+		const int tot = n_mtq_sat + n_rw_sat;
+		effective_rw_scale = (tot > 0) ? (static_cast<double>(n_rw_sat) / tot) : 0.0;
+		if (cfg.verbose) {
+			std::cout << "[SpikeRemoval] iter=" << iteration
+			          << ": auto rw_scale=" << effective_rw_scale
+			          << " (nMTQ=" << n_mtq_sat << ", nRW=" << n_rw_sat << ")\n";
+		}
+	}
+	pd.setRWScale(effective_rw_scale);
 
 	// Detect candidates
 	const auto candidates = detectSpikes(satellite, X, U, attitude_target, boresight, B, cnst_cfg, cfg);

@@ -195,7 +195,7 @@ int main() {
         };
         
         Satellite::VecX x_next(sat.stateDim());
-        rk4_step(dynamics_func, x_current, jtime(i), dt, x_next);
+        saltro::math::rk4_step(dynamics_func, x_current, jtime(i), dt, x_next);
         
         // Normalize quaternion
         Eigen::Vector4d q = x_next.segment<4>(Satellite::QUAT_INDEX);
@@ -242,7 +242,7 @@ int main() {
         };
         
         Satellite::VecX x_next(sat.stateDim());
-        rk4_step(dynamics_func, x_current, i * dt, dt, x_next);
+        saltro::math::rk4_step(dynamics_func, x_current, i * dt, dt, x_next);
         
         Eigen::Vector4d q = x_next.segment<4>(Satellite::QUAT_INDEX);
         q.normalize();
@@ -310,7 +310,7 @@ int main() {
         };
         
         Satellite::VecX x_next(sat.stateDim());
-        rk4_step(dynamics_func, x_current, i * dt, dt, x_next);
+        saltro::math::rk4_step(dynamics_func, x_current, i * dt, dt, x_next);
         
         Eigen::Vector4d q = x_next.segment<4>(Satellite::QUAT_INDEX);
         q.normalize();

@@ -13,11 +13,16 @@ class TestSatelliteDynamicsFixture:
     
     def setup_method(self):
         """Set up satellite with actuators and generate orbit"""
-        # Inertia matrix (cube-shaped satellite)
+        # Inertia matrix — non-diagonal, non-isotropic. An isotropic J causes
+        # ω × (J·ω) ≡ 0 which hides bugs in the ∂²ω̇/∂ω² Hessian block
+        # (e.g., Bug 4 fixed 2026-04-23 where the Hessian was spuriously
+        # w-dependent instead of constant). The diagonal chosen to match the
+        # sat_3_3_hybrid baseline weights; the small off-diagonals break the
+        # isotropy degeneracy without changing the scenario meaningfully.
         self.J = np.array([
-            [0.067, 0.0, 0.0],
-            [0.0, 0.067, 0.0],
-            [0.0, 0.0, 0.067]
+            [0.067, 0.004, -0.002],
+            [0.004, 0.071, 0.003],
+            [-0.002, 0.003, 0.069]
         ])
         
         # Create satellite
@@ -945,38 +950,51 @@ def test_hessians_are_symmetric_where_expected():
 # TEST SECTION 12: Dynamics Hessians - Finite Difference Validation
 # ============================================================================
 
-def test_hessian_wrt_state_matches_finite_differences_single_component():
-    """Test that Hessian w.r.t. state matches finite differences for one component"""
+# ω outputs (0, 1, 2) and RW-momentum outputs (7, 8, 9) both have analytic
+# Hessians that directly match FD on the raw state. Quaternion outputs (3-6)
+# differ: `dynamics()` internally normalizes q before computing q̇, but
+# `dynamicsHessians()` differentiates the closed-form formula w.r.t. raw q.
+# FD-on-raw-q therefore picks up the normalization's projection while analytic
+# does not. To test quaternion outputs properly we'd need tangent-space
+# perturbations (or a non-normalizing dynamics variant); leaving those out
+# here. The covered set still catches Bug 4 (which lives in ω outputs).
+@pytest.mark.parametrize("out_idx", [0, 1, 2, 7, 8, 9])
+def test_hessian_wrt_state_matches_finite_differences(out_idx):
+    """Test that Hessian w.r.t. state matches finite differences for each
+    ω / RW-momentum output component. Previously only out_idx=0 was tested,
+    which hid Bug 4 (∂²ω̇/∂ω∂ω was w-dependent instead of constant) because
+    an isotropic J made ω × (J·ω) identically zero. Fixture now uses
+    non-diagonal J.
+    """
     fixture = TestSatelliteDynamicsFixture()
     fixture.setup_method()
-    
+
     step = 50
-    
+
     x = np.zeros(fixture.sat.stateDim)
     x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
     x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
-    
+
     u = np.zeros(fixture.sat.controlDim)
     dist = saltro_py.DisturbanceConfig()
     dist.plan_for_gg = True
     dist.plan_for_aero = True
     dist.plan_for_srp = True
-    
+
     R_eci = fixture.R[:, step]
     B_eci = fixture.B[:, step]
     S_eci = fixture.S[:, step]
     V_eci = fixture.V[:, step]
-    
+
     hess_xx, _, _ = fixture.sat.dynamicsHessians(
         x, u, dist, R_eci, B_eci, S_eci, V_eci
     )
-    
-    out_idx = saltro_py.Satellite.AV_INDEX
+
     eps = 1e-5
     nx = fixture.sat.stateDim
-    
+
     hess_numerical = np.zeros((nx, nx))
-    
+
     # Four-point stencil for second derivative
     for j1 in range(nx):
         for j2 in range(j1, nx):
@@ -984,7 +1002,7 @@ def test_hessian_wrt_state_matches_finite_differences_single_component():
             x_pm = x.copy()
             x_mp = x.copy()
             x_mm = x.copy()
-            
+
             x_pp[j1] += eps
             x_pp[j2] += eps
             x_pm[j1] += eps
@@ -993,27 +1011,31 @@ def test_hessian_wrt_state_matches_finite_differences_single_component():
             x_mp[j2] += eps
             x_mm[j1] -= eps
             x_mm[j2] -= eps
-            
+
             f_pp = fixture.sat.dynamics(x_pp, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
             f_pm = fixture.sat.dynamics(x_pm, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
             f_mp = fixture.sat.dynamics(x_mp, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
             f_mm = fixture.sat.dynamics(x_mm, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
-            
+
             second_deriv = (f_pp - f_pm - f_mp + f_mm) / (4.0 * eps * eps)
-            
+
             hess_numerical[j1, j2] = second_deriv
             hess_numerical[j2, j1] = second_deriv
-    
+
     # Compare
     rel_tol = 5e-3
     abs_tol = 1e-6
-    
+
     for j1 in range(nx):
         for j2 in range(nx):
             analytical = hess_xx[out_idx][j1, j2]
             numerical = hess_numerical[j1, j2]
-            
+
             rel_err = abs(analytical - numerical) / abs(numerical) if abs(numerical) > abs_tol else 0.0
             abs_err = abs(analytical - numerical)
-            
-            assert (rel_err <= rel_tol or abs_err <= abs_tol)
+
+            assert (rel_err <= rel_tol or abs_err <= abs_tol), (
+                f"out_idx={out_idx}, j1={j1}, j2={j2}: "
+                f"ana={analytical:.6e}, fd={numerical:.6e}, "
+                f"rel_err={rel_err:.3e}, abs_err={abs_err:.3e}"
+            )

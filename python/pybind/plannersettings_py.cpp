@@ -40,6 +40,8 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ang_vel", &CostConfig::ang_vel)
         .def_readwrite("ang_vel_mag", &CostConfig::ang_vel_mag)
         .def_readwrite("ang_vel_err_dir", &CostConfig::ang_vel_err_dir)
+        .def_readwrite("ang_vel_roll_ratio", &CostConfig::ang_vel_roll_ratio)
+        .def_readwrite("ang_vel_err_dir_ratio", &CostConfig::ang_vel_err_dir_ratio)
         .def_readwrite("control_mult", &CostConfig::control_mult)
         .def_readwrite("mtq_control_weight", &CostConfig::mtq_control_weight)
         .def_readwrite("rw_control_weight", &CostConfig::rw_control_weight)
@@ -55,6 +57,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ang_vel_err_dir_N", &CostConfig::ang_vel_err_dir_N)
         .def_readwrite("ang_cost_func_type", &CostConfig::ang_cost_func_type)
         .def_readwrite("use_cost_hess", &CostConfig::use_cost_hess)
+        .def_readwrite("cost_hess_gauss_newton", &CostConfig::cost_hess_gauss_newton)
         .def("setTerminalEmphasis", &CostConfig::setTerminalEmphasis,
              py::arg("k") = 100.0,
              "Scale all terminal weights by k, preserving stage ratios. "
@@ -64,6 +67,8 @@ void bind_plannersettings(py::module_& m) {
     py::class_<AugLagConfig>(m, "AugLagConfig")
         .def(py::init<>())
         .def_readwrite("max_outer_iters", &AugLagConfig::max_outer_iters)
+        .def_readwrite("min_outer_iters", &AugLagConfig::min_outer_iters)
+        .def_readwrite("constraint_tol_strict", &AugLagConfig::constraint_tol_strict)
         .def_readwrite("lag_mult_init", &AugLagConfig::lag_mult_init)
         .def_readwrite("lag_mult_max", &AugLagConfig::lag_mult_max)
         .def_readwrite("penalty_init", &AugLagConfig::penalty_init)
@@ -77,6 +82,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("max_iters", &ILQRConfig::max_iters)
         .def_readwrite("grad_tol", &ILQRConfig::grad_tol)
         .def_readwrite("cost_tol", &ILQRConfig::cost_tol)
+        .def_readwrite("ilqr_cost_tol", &ILQRConfig::ilqr_cost_tol)
         .def_readwrite("z_count_lim", &ILQRConfig::z_count_lim)
         .def_readwrite("ls_attempts_lim", &ILQRConfig::ls_attempts_lim)
         .def_readwrite("max_cost", &ILQRConfig::max_cost)
@@ -95,7 +101,14 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("reg_min_cond", &RegularizationConfig::reg_min_cond)
         .def_readwrite("rand_add_ratio", &RegularizationConfig::rand_add_ratio)
         .def_readwrite("use_dynamics_hess", &RegularizationConfig::use_dynamics_hess)
-        .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess);
+        .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess)
+        .def_readwrite("psd_clip_quu_ddp", &RegularizationConfig::psd_clip_quu_ddp)
+        .def_readwrite("use_eigen_modification", &RegularizationConfig::use_eigen_modification)
+        .def_readwrite("eigen_reg_use_abs", &RegularizationConfig::eigen_reg_use_abs)
+        .def_readwrite("eigen_reg_use_relative_floor", &RegularizationConfig::eigen_reg_use_relative_floor)
+        .def_readwrite("eigen_reg_condition_cap", &RegularizationConfig::eigen_reg_condition_cap)
+        .def_readwrite("eigen_reg_mimic_uniform_trigger", &RegularizationConfig::eigen_reg_mimic_uniform_trigger)
+        .def_readwrite("eigen_reg_add_mode", &RegularizationConfig::eigen_reg_add_mode);
 
     py::class_<LineSearchConfig>(m, "LineSearchConfig")
         .def(py::init<>())

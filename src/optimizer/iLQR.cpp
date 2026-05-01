@@ -122,6 +122,13 @@ bool iLQR(
 	double reg = reg_cfg.reg_init;
 	double dreg = 0.0;
 
+	// Stagnation counter (PhD dlaZcount). Incremented each iteration where the
+	// cost-convergence test passes but normal convergence hasn't fired (e.g.,
+	// conjunctive_convergence=true and grad_tol unmet). If the counter exceeds
+	// z_count_lim, we break as Converged because further iterations cannot
+	// improve cost. Reset whenever we see meaningful cost progress.
+	int stagnation_count = 0;
+
 	auto increaseReg = [&]() {
 		dreg = std::max(dreg * reg_cfg.reg_scale, reg_cfg.reg_scale);
 		reg = std::max(reg * dreg, reg_cfg.reg_min);
@@ -129,10 +136,16 @@ bool iLQR(
 
 	auto decreaseReg = [&]() {
 		dreg = std::min(dreg / reg_cfg.reg_scale, 1.0 / reg_cfg.reg_scale);
-		reg = dreg * reg;
-		if (reg < reg_cfg.reg_min) {
-			reg = 0.0;
-		}
+		reg = std::max(dreg * reg, reg_cfg.reg_min);
+		// Clamp both ways at reg_min (2026-04-24). Previously decrease snapped
+		// `reg` to 0 when it fell below reg_min — that created a sharp
+		// discontinuity in Q_uu_reg as reg transitioned reg_min → 0 on adjacent
+		// iterations. Near the threshold the solver chatters between reg=0
+		// (BP sometimes fails) and reg=reg_min (BP succeeds), producing
+		// nondeterministic basin choices across runs. Clamping at reg_min
+		// makes Q_uu_reg continuous and the update trajectory deterministic.
+		// reg_min = 1e-8 is small enough that the baseline is negligible
+		// compared to typical Q_uu scales.
 	};
 
 	for (int iteration = 0; iteration < ilqr_cfg.max_iters; ++iteration) {
@@ -204,8 +217,17 @@ bool iLQR(
 			}
 
 			// Both passes succeeded — check convergence.
+			// Two-tier cost tolerance (standard 2-level AL pattern):
+			//   - `ilqr_cost_tol` = loose inner tol used by the inner iLQR
+			//     break ("good enough for this λ/μ, move on").
+			//   - `cost_tol` = strict outer tol used for stagnation counting
+			//     and by the AL outer break.
+			// If ilqr_cost_tol <= cost_tol we disable the 2-tier behavior
+			// and treat them identically.
 			const double delta_J = std::abs(J_prev - J);
-			const bool cost_converged = (delta_J <= ilqr_cfg.cost_tol);
+			const double inner_tol = std::max(ilqr_cfg.ilqr_cost_tol, ilqr_cfg.cost_tol);
+			const bool inner_cost_converged = (delta_J <= inner_tol);
+			const bool outer_cost_converged = (delta_J <= ilqr_cfg.cost_tol);
 
 			bool grad_converged = false;
 			if (ilqr_cfg.grad_tol > 0.0) {
@@ -218,19 +240,38 @@ bool iLQR(
 			}
 
 			if (ilqr_cfg.conjunctive_convergence) {
-				// Original ALTRO: require ALL conditions to hold.
-				// grad_tol=0 disables that requirement (treated as satisfied).
+				// Conjunctive: require ALL conditions to hold (cost AND grad).
+				// Uses STRICT cost_tol — if conjunctive is requested the caller
+				// wants a fully-settled inner solve. grad_tol=0 disables that
+				// requirement (treated as satisfied).
 				const bool grad_ok = (ilqr_cfg.grad_tol <= 0.0) || grad_converged;
-				if (cost_converged && grad_ok) {
+				if (outer_cost_converged && grad_ok) {
 					status = ILQRStatus::Converged;
 					return true;
 				}
 			} else {
-				// Disjunctive: either cost or gradient convergence suffices.
-				if (cost_converged || (ilqr_cfg.grad_tol > 0.0 && grad_converged)) {
+				// Disjunctive (literature-standard for inner): ANY of
+				// {loose cost, grad, stagnation} fires break. Uses LOOSE
+				// ilqr_cost_tol for the cost path — inner doesn't need to
+				// match the outer strict tol.
+				if (inner_cost_converged || (ilqr_cfg.grad_tol > 0.0 && grad_converged)) {
 					status = ILQRStatus::Converged;
 					return true;
 				}
+			}
+
+			// Stagnation break: if cost has stopped changing at the STRICT
+			// outer tol for z_count_lim consecutive iterations, accept as
+			// Converged. Prevents the solver from burning max_iters on a
+			// flat plateau when conjunctive grad_tol can't be satisfied.
+			if (outer_cost_converged) {
+				++stagnation_count;
+				if (ilqr_cfg.z_count_lim > 0 && stagnation_count >= ilqr_cfg.z_count_lim) {
+					status = ILQRStatus::Converged;
+					return true;
+				}
+			} else {
+				stagnation_count = 0;
 			}
 
 			break;  // Exit regularization loop, continue to next iteration

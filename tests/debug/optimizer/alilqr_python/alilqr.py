@@ -215,14 +215,30 @@ def alilqr(
                 }
             )
 
+        # AL outer convergence — match C++ alilqr.cpp:155-164.
+        # Exit when constraints are satisfied AND either:
+        #   (a) the inner iLQR reported Converged AND we have done at least
+        #       `min_outer_iters` outer iters (so duals are not arbitrary), OR
+        #   (b) `max_c <= constraint_tol_strict` — strict fast-path bypassing
+        #       the maturity gate (disabled when constraint_tol_strict <= 0).
+        # Previously python exited on `max_c <= constraint_tol` alone, which
+        # could declare victory after an inner MaxIterations bailout or before
+        # duals had settled — divergence from C++ behavior.
+        min_outer = int(getattr(passsettings.auglag, "min_outer_iters", 1))
+        constraint_tol_strict = float(getattr(passsettings.auglag, "constraint_tol_strict", 0.0))
         if max_c <= passsettings.auglag.constraint_tol:
-            stop_reason = f"AL-iLQR converged: max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}"
-            break
+            inner_ok = (stop_reason == "converged")
+            outer_matured = (iteration + 1) >= min_outer
+            strict_path = (constraint_tol_strict > 0.0) and (max_c <= constraint_tol_strict)
+            if strict_path or (inner_ok and outer_matured):
+                stop_reason = f"AL-iLQR converged: max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}"
+                break
 
         # Update lambda and mu matching C++ alilqr.cpp:
         # Lambda update uses RAW constraint value (not clamped to positive).
         # Lambda clamped to non-negative after update (inequality constraints).
         clist = _collect_constraints(plannersettings, satellite, X, U, S)
+        any_mu_below_max = False
         for k, ck in enumerate(clist):
             lambda_aug[k] = np.minimum(
                 passsettings.auglag.lag_mult_max,
@@ -230,6 +246,16 @@ def alilqr(
             )
             lambda_aug[k] = np.maximum(0.0, lambda_aug[k])  # non-negative for inequality
             mu_aug[k] = np.minimum(passsettings.auglag.penalty_max, phi_aug * mu_aug[k])
+            if np.any(mu_aug[k] < passsettings.auglag.penalty_max):
+                any_mu_below_max = True
+
+        # Penalty saturation exit — match C++ alilqr.cpp:187-191.
+        # If μ has saturated everywhere and we still can't drive max_c below
+        # constraint_tol, further outer iterations cannot grow penalty.
+        # Break out rather than burning remaining outer budget.
+        if not any_mu_below_max and max_c > passsettings.auglag.constraint_tol:
+            stop_reason = f"penalty_max_reached: max_c={max_c:.2e} > {passsettings.auglag.constraint_tol:.2e}"
+            break
 
     return X, U, stop_reason, snapshots, transitions
 

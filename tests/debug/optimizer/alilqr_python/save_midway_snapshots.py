@@ -56,7 +56,7 @@ if USE_SPIKE:
         "start_at_iter": 2, "max_intervention_iters": 20,
         "blend_len": 30, "goal_switch_buffer": 15, "min_consecutive": 7,
         "exit_fudge": 2.0, "min_prior_decrease_knots": 5, "min_spike_ratio": 2.0,
-        "kp_q": 0.3, "kd_w": 2.0, "rw_scale": 0.0, "omega_max": 0.30, "verbose": True,
+        "kp_q": 0.3, "kd_w": 2.0, "rw_scale": -1.0, "omega_max": 0.30, "verbose": True,
     }
     print("Spike removal ENABLED")
 

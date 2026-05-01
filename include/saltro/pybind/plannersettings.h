@@ -150,6 +150,22 @@ struct CostConfig {
     double ang_vel_err_dir = 0.0;
     double control_mult = 1.0;
 
+    /// Roll-axis weight fraction for the axis-aware ω cost in vector-pointing
+    /// mode (0 < ratio ≤ 1). 1.0 reduces W_ω to uniform `c.ang_vel · I`,
+    /// matching the current isotropic cost. Smaller values down-weight rotation
+    /// about the boresight, freeing the optimizer to spend control on the
+    /// 2-DOF off-axis pointing error. Ignored in quaternion-goal mode (all
+    /// 3 DOF are constrained there). Default is current behavior.
+    double ang_vel_roll_ratio = 1.0;
+
+    /// PSD-fraction knob β ∈ [0, 1) for the Lyapunov α·err_dir^T·(ω-ω_ff)
+    /// crossterm. The realized scale is α = β · √(c.angle · λ_min(W_ω)),
+    /// keeping the block-quadratic in (q_e_v, ω_e) PSD by construction.
+    /// 0 (default) disables the crossterm entirely. If `ang_vel_err_dir`
+    /// is set nonzero, the back-compat path overrides α with that raw
+    /// value and ignores this ratio.
+    double ang_vel_err_dir_ratio = 0.0;
+
     double mtq_control_weight = 1e3;
     double rw_control_weight = 1e8;
     double magic_control_weight = 0.0001;
@@ -178,6 +194,21 @@ struct CostConfig {
 
     int ang_cost_func_type = 2;
     bool use_cost_hess = false;
+
+    /// Gauss-Newton mode for the angle-cost (q,q) Hessian block. When true,
+    /// drop the second-order chain-rule term `f'(c)·d²c/dq²` (which can be
+    /// indefinite in vec mode where `c = bs·R^T·r̂` is degree-2 in q). Keep
+    /// the PwA manifold-curvature correction `−grad_dot_q · I_4` — it's the
+    /// sphere-tangent projection and is PSD when `f'·c < 0`, which holds
+    /// for our cost shapes in the aligned hemisphere.
+    ///
+    /// Effect by mode:
+    ///   - **Vec mode:** drops `f'·d²c/dq²`. Empirically improves convergence
+    ///     dramatically (PE_fin 6-22° → 0.2-6.6° on baseline scenarios).
+    ///   - **Quat mode:** has no `f'·d²d/dq²` term (d = q_g·q is linear in q),
+    ///     so this flag is a no-op.
+    /// Default (false) preserves the current full-Hessian behavior.
+    bool cost_hess_gauss_newton = false;
 
     /// Scale all terminal weights by `k`, preserving ratios with their
     /// stage counterparts.  This is the safe way to increase terminal
@@ -218,6 +249,19 @@ struct CostConfig {
 struct AugLagConfig {
     int max_outer_iters = 30;
 
+    /// Minimum outer iterations before the "constraints satisfied" outer-break
+    /// path can fire. Original ALTRO requires `j > 2` (i.e., ≥ 3 outer iters)
+    /// so that at least one round of λ/μ updates has happened before declaring
+    /// victory; prevents declaring converged on a warm-start that happens to
+    /// satisfy the tolerance by coincidence before the dual variables have
+    /// settled. Ignored if `max_c <= constraint_tol_strict` (see below).
+    int min_outer_iters = 3;
+
+    /// A stricter constraint tolerance that, when met, lets the outer loop
+    /// break immediately without waiting for `min_outer_iters`. Set to 0 to
+    /// disable the fast path (always wait for min_outer_iters).
+    double constraint_tol_strict = 0.0;
+
     double lag_mult_init = 0.0;
     double lag_mult_max = 1e20;
 
@@ -251,7 +295,15 @@ struct AugLagConfig {
 struct ILQRConfig {
     int max_iters = 250;
     double grad_tol = 0.0;
+    /// Strict outer cost-improvement tolerance. For matching AL-subproblem
+    /// "done" status across outer iterations.
     double cost_tol = 1e-1;
+    /// Looser inner cost-improvement tolerance for inner-iLQR breakout.
+    /// Standard 2-level AL pattern: inner converges loosely to the current
+    /// λ/μ, outer refines duals and tightens overall. Thesis uses 10-50×
+    /// cost_tol; we default to 10×. Set ≤ cost_tol to disable the 2-tier
+    /// behavior (treat inner and outer identically).
+    double ilqr_cost_tol = 1e0;
     int z_count_lim = 10;
 
     /// Maximum number of backward+forward-pass retries within a single
@@ -269,10 +321,16 @@ struct ILQRConfig {
 
     /// Require strict cost decrease in line search (J_new < J_prev).
     /// Original ALTRO behavior; prevents accepting cost-increasing steps.
-    bool ls_strict_decrease = false;
+    /// Default now matches PhD reference (2026-04-23 port fix).
+    bool ls_strict_decrease = true;
 
-    /// Require BOTH grad_tol AND cost_tol for convergence (true),
-    /// or allow either alone (false).  Original ALTRO uses conjunctive.
+    /// Inner iLQR convergence: conjunctive (both grad AND cost) vs disjunctive
+    /// (either grad OR cost OR stagnation). Standard literature uses
+    /// DISJUNCTIVE at inner with a stagnation-counter fallback, then
+    /// CONJUNCTIVE at the outer AL break. That lets the inner loop declare
+    /// "good enough for this λ/μ" loosely and move on to dual refinement.
+    /// Briefly flipped to true 2026-04-23 to match OldPlanner.cpp, but that
+    /// direction was wrong for the inner loop — reverted 2026-04-24.
     bool conjunctive_convergence = false;
 
     /// Persist regularization across iLQR iterations (true = ALTRO-style),
@@ -304,7 +362,11 @@ struct ILQRConfig {
  * @param use_constraint_hess Use second derivatives of constraints
  */
 struct RegularizationConfig {
-    double reg_init = 1e-2;
+    /// Start with ZERO regularization; only add ρ·I when Q_uu fails Cholesky.
+    /// Principled: no baseline smoothing of the problem — trust the structure
+    /// and regularize reactively. Matches thesis matlab (regInit = 0).
+    /// Previous default was 1e-2 (heuristic); changed 2026-04-24.
+    double reg_init = 0.0;
     double reg_min = 1e-8;
     double reg_max = 1e30;
     double reg_scale = 1.6;
@@ -315,6 +377,64 @@ struct RegularizationConfig {
 
     bool use_dynamics_hess = false;
     bool use_constraint_hess = false;
+
+    /// PSD-clip the dynamics-Hessian contribution to Q_uu before adding it
+    /// to the iLQR base.  Eigendecomposes Quu_ddp, clips eigenvalues to ≥0,
+    /// reassembles.  Drops the spurious "anti-curvature" eigenmodes that
+    /// arise from RK4 cross-stage interaction in control axes that are
+    /// linear-in-u in continuous time (notably RW: ḣ = −u_rw → continuous
+    /// f_uu = 0; discrete F_uu nonzero from stage chain rule, indefinite
+    /// when contracted with the huge cost-to-go gradient under terminal
+    /// emphasis).  Default off — only meaningful when use_dynamics_hess
+    /// is true.  Diagnosed empirically 2026-04-26: full DDP without clip
+    /// converges to PE 52° vs iLQR's 2° due to one −5e+13 RW-RW eigenvalue.
+    bool psd_clip_quu_ddp = false;
+
+    /// Experimental: replace uniform ρ·I Tikhonov regularization of Q_uu
+    /// with an eigendecomposition-based modification.  Three independent
+    /// cells can be enabled via the flags below; combined as:
+    ///   λ' = (use_abs ? |λ| : λ)                                # Cell 2
+    ///   floor = max(ρ, use_rel_floor ? γ·max(λ') : 0)            # Cells 1, 5
+    ///   λ' = max(λ', floor)
+    /// Cell 1 (absolute floor at ρ) is ALWAYS on when the eigen path is
+    /// enabled — that's what replaces the uniform Tikhonov.
+    bool use_eigen_modification = false;
+
+    /// Cell 2: take absolute value of eigenvalues (flip saddle directions
+    /// to descent).  No-op if Q_uu has no negative eigenvalues.
+    bool eigen_reg_use_abs = true;
+
+    /// Cell 5: floor eigenvalues at γ·max(|λ|), capping condition number.
+    /// Off by default — can over-regularize naturally wide-conditioned
+    /// problems (our typical Q_uu has κ ≈ 10^9 from B^T·P·B scale).
+    bool eigen_reg_use_relative_floor = false;
+
+    /// Relative-floor fraction γ for Cell 5.  Condition cap is 1/γ.
+    /// Defaults to 1e-12 (safe vs double precision) rather than 1e-6 —
+    /// aggressive caps damp healthy weak-actuator directions that
+    /// legitimately need larger steps.
+    double eigen_reg_condition_cap = 1e-12;
+
+    /// Emulate uniform Tikhonov's natural "should-I-bump-ρ" trigger in
+    /// the eigen path.  Uniform LLT fails iff λ_min(Q_uu) < -ρ (matrix
+    /// not PD after adding ρ·I); eigen path would otherwise always
+    /// succeed, so ρ never grows in response to conditioning — only to
+    /// forward-pass failures, which is too coarse a signal.  With this
+    /// on: the BP returns false when λ_min < -ρ, mirroring uniform's
+    /// adaptive feedback.  When BP doesn't fail, the eigen modifications
+    /// are applied (getting saddle-flip + condition-cap benefits for
+    /// mildly indefinite / ill-conditioned Q_uu).  Default true.
+    bool eigen_reg_mimic_uniform_trigger = true;
+
+    /// Use `λ' = (abs?|λ|:λ) + ρ` (add mode) instead of `max(..., ρ)`
+    /// (max mode).  Add mode matches uniform Tikhonov's behavior for
+    /// positive eigenvalues exactly (`λ + ρ`) while still flipping
+    /// saddles when Cell 2 is on.  Max mode leaves large eigenvalues
+    /// untouched, which changes step magnitude compared to uniform and
+    /// can trip linesearch on some configs (e.g., 3+3 hybrid).
+    /// Default false (max mode) for backwards compat; set true to get
+    /// uniform-matching behavior with saddle-flip.
+    bool eigen_reg_add_mode = false;
 };
 
 /**
@@ -358,7 +478,11 @@ struct SpikeRemovalConfig {
     int max_spike_knots = 0;
     double kp_q = 0.3;
     double kd_w = 2.0;
-    double rw_scale = 0.0;
+    /// Relative weight of RW vs MTQ in the PD substitution allocator.
+    /// -1.0 = auto (numRW / (numMTQ + numRW)) — recommended, prevents
+    /// zero-control on RW-only sats and under-uses MTQ on RW-heavy configs.
+    /// 0.0 = MTQ-only; 1.0 = RW equal-priority.
+    double rw_scale = -1.0;
     double omega_max = 0.0;
     bool verbose = false;
 };

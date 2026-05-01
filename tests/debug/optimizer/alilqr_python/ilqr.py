@@ -152,9 +152,7 @@ def ilqr(
     def decrease_reg():
         nonlocal reg, dreg
         dreg = min(dreg / reg_scale, 1.0 / reg_scale)
-        reg = dreg * reg
-        if reg < reg_min:
-            reg = 0.0
+        reg = max(dreg * reg, reg_min)  # match C++ iLQR.cpp:137-149 — clamp to reg_min, not snap to 0
 
     base_lsl = max(1, int(getattr(passsettings.ilqr, "ls_attempts_lim", 30)))
     # Post-spike iterations get a modest bump: the substitution perturbs
@@ -164,6 +162,20 @@ def ilqr(
     # stiff integrator) and more attempts won't fix it — investigate instead.
     post_spike_lsl = max(base_lsl * 3, 50)
     spike_occurred_last_iter = False
+
+    # Convergence machinery — match C++ iLQR.cpp:220-275.
+    #   - Two-tier cost tolerance: `inner_tol = max(ilqr_cost_tol, cost_tol)`.
+    #     Disjunctive convergence (default): exit on ANY of {inner cost, grad}.
+    #     Conjunctive: require BOTH outer-tol cost AND grad.
+    #   - Stagnation counter: increments on `delta_J <= cost_tol` (strict);
+    #     resets otherwise.  Exit when count >= z_count_lim.
+    ilqr_cost_tol_loose = float(getattr(passsettings.ilqr, "ilqr_cost_tol",
+                                         passsettings.ilqr.cost_tol))
+    inner_tol = max(ilqr_cost_tol_loose, passsettings.ilqr.cost_tol)
+    grad_tol = float(getattr(passsettings.ilqr, "grad_tol", 0.0))
+    z_count_lim = int(getattr(passsettings.ilqr, "z_count_lim", 0))
+    conjunctive = bool(getattr(passsettings.ilqr, "conjunctive_convergence", False))
+    stagnation_count = 0
 
     for iteration in range(passsettings.ilqr.max_iters):
 
@@ -237,19 +249,46 @@ def ilqr(
             X = X_new
             U = U_new
 
-            # Spike removal: detect and replace homotopy artifacts after accepted step
+            # Spike removal: detect and replace homotopy artifacts after accepted step.
+            # Gate: if the current trajectory is close to satisfying AL constraints
+            # (max violation within gate_ratio × constraint_tol), skip.  A PD
+            # substitution at this stage would perturb the trajectory enough that
+            # high μ penalties make recovery hard.  Naturally adaptive — scales
+            # with constraint_tol, no fixed iteration threshold.
             if spike_removal_cfg is not None:
-                X, U, spike_happened = apply_spike_removal(
-                    X, U, U_bar, K_list,
-                    satellite, plannersettings, pass_idx,
-                    R, V, B, S, rho, jtime, boresight, q_goal,
-                    iteration=iteration,
-                    **spike_removal_cfg,
-                )
-                if spike_happened:
-                    spike_occurred_this_iter = True
+                from alilqr import max_constraint_violation
+                max_c = max_constraint_violation(plannersettings, satellite, X, U, S)
+                gate_ratio = spike_removal_cfg.get("constraint_gate_ratio", 10.0)
+                gate_thresh = gate_ratio * passsettings.auglag.constraint_tol
+                if max_c < gate_thresh:
+                    if spike_removal_cfg.get("verbose", False):
+                        print(f"[SpikeRemoval] outer={outer_iter} iter={iteration}: "
+                              f"skipping (max_c={max_c:.2e} < {gate_thresh:.2e}, "
+                              f"{gate_ratio}× constraint_tol)")
+                else:
+                    # Strip the gate key before passing through (apply_spike_removal
+                    # doesn't accept it).
+                    cfg_inner = {k: v for k, v in spike_removal_cfg.items()
+                                 if k != "constraint_gate_ratio"}
+                    X, U, spike_happened = apply_spike_removal(
+                        X, U, U_bar, K_list,
+                        satellite, plannersettings, pass_idx,
+                        R, V, B, S, rho, jtime, boresight, q_goal,
+                        iteration=iteration,
+                        **cfg_inner,
+                    )
+                    if spike_happened:
+                        spike_occurred_this_iter = True
 
             delta_J = abs(J_prev - J_new)
+
+            # Convergence checks — match C++ iLQR.cpp:227-275.
+            inner_cost_converged = (delta_J <= inner_tol)
+            outer_cost_converged = (delta_J <= passsettings.ilqr.cost_tol)
+            grad_converged = False
+            if grad_tol > 0.0:
+                max_d_norm = max(np.linalg.norm(d_k) for d_k in d_list)
+                grad_converged = (max_d_norm <= grad_tol)
 
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
@@ -268,11 +307,32 @@ def ilqr(
                     "bp_ok": True,
                     "fp_ok": True,
                     "act_delta": delta_J,
-                    "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol
+                    "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol,
+                    "inner_cost_converged": inner_cost_converged,
+                    "grad_converged": grad_converged,
+                    "stagnation_count": stagnation_count,
                 })
 
-            if delta_J <= passsettings.ilqr.cost_tol:
-                return X, U, "converged", snapshots, transitions
+            if conjunctive:
+                # Conjunctive: require BOTH outer-tol cost AND grad-ok (grad_tol≤0
+                # treats grad-ok as satisfied).
+                grad_ok = (grad_tol <= 0.0) or grad_converged
+                if outer_cost_converged and grad_ok:
+                    return X, U, "converged", snapshots, transitions
+            else:
+                # Disjunctive (default): exit on ANY of {loose inner cost, grad}.
+                if inner_cost_converged or (grad_tol > 0.0 and grad_converged):
+                    return X, U, "converged", snapshots, transitions
+
+            # Stagnation counter — increments on STRICT cost-tol satisfaction
+            # for `z_count_lim` consecutive iterations.  Prevents burning
+            # max_iters on a flat plateau.
+            if outer_cost_converged:
+                stagnation_count += 1
+                if z_count_lim > 0 and stagnation_count >= z_count_lim:
+                    return X, U, "converged", snapshots, transitions
+            else:
+                stagnation_count = 0
 
             break
 

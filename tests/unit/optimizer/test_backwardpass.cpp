@@ -288,7 +288,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass N=2 hand-verified computati
 		B_c_out = B_c;
 		k_out = satellite_test.dynamics(x_local, u_local, dist_config, R_0, B_0, S_0, V_0, 0);
 	};
-	rk4_jacobians(dynamics_jac_wrapper, x_0, u_0, 0.0, dt, A_0, B_0_dyn);
+	saltro::math::rk4_jacobians(dynamics_jac_wrapper, x_0, u_0, 0.0, dt, A_0, B_0_dyn);
 
 	// Project derivatives and dynamics into reduced state space (MRP-based).
 	const int nRW = satellite_test.numRW();

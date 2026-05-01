@@ -35,15 +35,24 @@ namespace saltro::controller {
  */
 class ExcitationController final : public Controller {
 public:
+    /** Reference dt (seconds) for excitation gain scaling. At dt == dt_ref the
+     *  target angular acceleration equals the nominal value; larger dt reduces
+     *  excitation so that per-knot ω impulse stays bounded. */
+    static constexpr double kDtRefSeconds = 10.0;
+
     /**
      * @brief Construct an excitation controller with default parameters.
      *
      * Initializes excitation fractions, command limits, and damping gains to default
-     * values suitable for typical LEO satellite system identification.
+     * values suitable for typical LEO satellite system identification. The target
+     * angular acceleration used during auto-tuning is scaled by (dt_ref / dt) so that
+     * per-knot angular-velocity impulse stays bounded on long-horizon passes.
      *
      * @param satellite Satellite model with actuator limits and inertia properties
+     * @param dt Integration step (seconds) for the pass using this controller. Values
+     *           <= 0 or non-finite fall back to @ref kDtRefSeconds.
      */
-    explicit ExcitationController(const Satellite& satellite);
+    explicit ExcitationController(const Satellite& satellite, double dt = kDtRefSeconds);
 
     /**
      * @brief Compute excitation control input with rate damping.
@@ -95,6 +104,10 @@ private:
     
     /** Reference angular rate for gain normalization (rad/s), default: 5°/s */
     double omega_ref_rad_s_ = 5.0 * 3.14159265358979323846 / 180.0;
+
+    /** Integration step (seconds) for the pass. Set from constructor; used in
+     *  autoTuneGains() to scale target_accel by (dt_ref / dt). */
+    double dt_seconds_ = kDtRefSeconds;
 };
 
 }

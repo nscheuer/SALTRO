@@ -7,8 +7,13 @@ Each scenario changes ONE thing from the baseline and saves:
 
 Runs three-pass spike removal (current baseline detector) with verbose=False.
 Summary table printed at end.
+
+Env vars:
+    WIDE_COSTREF=1            — enable new α-from-β crossterm via
+                                ang_vel_err_dir_ratio. Output → wide_results_costref/.
+    WIDE_COSTREF_BETA=<f>     — β value for ang_vel_err_dir_ratio (default 0.3).
 """
-import sys, time, numpy as np
+import os, sys, time, numpy as np
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -28,7 +33,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-OUT = Path(__file__).parent / "wide_results"
+COSTREF_ENABLED = os.environ.get("WIDE_COSTREF") == "1"
+COSTREF_BETA = float(os.environ.get("WIDE_COSTREF_BETA", "0.3"))
+CURRICULUM_ENABLED = os.environ.get("WIDE_CURRICULUM") == "1"
+INITCONTROLLER = int(os.environ.get("WIDE_INITCONTROLLER", "1"))
+SCENARIO_FILTER = os.environ.get("WIDE_SCENARIO_FILTER")  # comma-separated
+OUT_SUFFIX = os.environ.get("WIDE_OUT_SUFFIX", "")
+ANG_COST_TYPE = int(os.environ.get("WIDE_ANG_COST_TYPE", "3"))
+GAUSS_NEWTON = os.environ.get("WIDE_GAUSS_NEWTON") == "1"
+default_out = "wide_results_costref" if COSTREF_ENABLED else "wide_results"
+OUT = Path(__file__).parent / (default_out + OUT_SUFFIX)
 OUT.mkdir(exist_ok=True)
 
 # -----------------------------------------------------------------------------
@@ -47,30 +61,50 @@ def baseline_params():
     )
 
 
-def build_planner(p):
-    ps = saltro_py.PlannerSettings()
-    ps.init_traj.initcontroller = 1
-    ps.num_passes = 1
-    ps.passes[0].dt = p["dt"]
-    ps.passes[0].ilqr.cost_tol = 1e-6
-    ps.passes[0].ilqr.max_iters = p["max_iters"]
-    ps.passes[0].ilqr.grad_tol = 0.0
-    ps.passes[0].auglag.max_outer_iters = p["max_outer"]
-    ps.passes[0].auglag.constraint_tol = 1e-3
-    c = ps.passes[0].cost
-    c.angle = p["angle"]; c.ang_vel = p["ang_vel"]
+def _config_pass(pass_obj, p, *, angle_weight, max_iters, cost_tol):
+    pass_obj.dt = p["dt"]
+    pass_obj.ilqr.cost_tol = cost_tol
+    pass_obj.ilqr.max_iters = max_iters
+    pass_obj.ilqr.grad_tol = 0.0
+    pass_obj.auglag.max_outer_iters = p["max_outer"]
+    pass_obj.auglag.constraint_tol = 1e-3
+    c = pass_obj.cost
+    c.angle = angle_weight; c.ang_vel = p["ang_vel"]
     c.control_mult = 1.0
     c.mtq_control_weight = p["mtq_cw"]; c.rw_control_weight = p["rw_cw"]
-    c.ang_cost_func_type = 3; c.use_cost_hess = True
-    # Terminal emphasis: 100× stage (preserves ratios, avoids weight-ratio
-    # pathology).  See CostConfig::setTerminalEmphasis documentation.
+    c.ang_cost_func_type = ANG_COST_TYPE; c.use_cost_hess = True
+    c.cost_hess_gauss_newton = GAUSS_NEWTON
     c.setTerminalEmphasis(100.0)
+    if COSTREF_ENABLED:
+        c.ang_vel_err_dir_ratio = COSTREF_BETA
+        c.ang_vel_err_dir = 0.0  # disable legacy when newpath active
+    else:
+        # Legacy: w_avang = ang_vel (PhD form). Confirms "legacy" path.
+        c.ang_vel_err_dir = c.ang_vel
+    pass_obj.reg.reg_init = 0.0; pass_obj.reg.reg_max = 1e30
+    pass_obj.reg.reg_scale = 1.6
+    pass_obj.linesearch.max_iters = 24
+    pass_obj.linesearch.beta1 = 1e-10; pass_obj.linesearch.beta2 = 5000.0
+
+
+def build_planner(p):
+    ps = saltro_py.PlannerSettings()
+    ps.init_traj.initcontroller = INITCONTROLLER
+    if CURRICULUM_ENABLED:
+        # Two-phase: pass 0 detumbles (zero attitude weight, half the iters),
+        # pass 1 does full attitude tracking. Trajectory is warm-started from
+        # pass 0's output. Mirrors thesis-matlab phase scheduling.
+        ps.num_passes = 2
+        _config_pass(ps.passes[0], p, angle_weight=0.0,
+                     max_iters=max(50, p["max_iters"] // 4), cost_tol=1e-3)
+        _config_pass(ps.passes[1], p, angle_weight=p["angle"],
+                     max_iters=p["max_iters"], cost_tol=1e-6)
+    else:
+        ps.num_passes = 1
+        _config_pass(ps.passes[0], p, angle_weight=p["angle"],
+                     max_iters=p["max_iters"], cost_tol=1e-6)
     for a in ["aero", "gg", "srp", "prop", "gendist", "resdipole"]:
         setattr(ps.disturbances, "plan_for_" + a, p["disturbances"].get(a, False))
-    ps.passes[0].reg.reg_init = 1e-6; ps.passes[0].reg.reg_max = 1e30
-    ps.passes[0].reg.reg_scale = 1.6
-    ps.passes[0].linesearch.max_iters = 24
-    ps.passes[0].linesearch.beta1 = 1e-10; ps.passes[0].linesearch.beta2 = 5000.0
     return ps
 
 
@@ -94,11 +128,17 @@ def run_scenario(name, params):
 
     cfg = None
     if params["use_spike"]:
+        # Diagnostic-friendly: gate=0 (never skip on constraint feasibility),
+        # large intervention window, verbose. Tight detector thresholds
+        # (min_consecutive=7, min_spike_ratio=2.0) — relaxed thresholds
+        # caused thrashing in 2026-04-27 test (00_baseline 5197 iters,
+        # PE_fin=123°, max_iters reached).
         cfg = {
-            "start_at_iter": 2, "max_intervention_iters": 20,
+            "start_at_iter": 2, "max_intervention_iters": 10000,
             "blend_len": 30, "goal_switch_buffer": 15, "min_consecutive": 7,
             "exit_fudge": 2.0, "min_prior_decrease_knots": 5, "min_spike_ratio": 2.0,
-            "kp_q": 0.3, "kd_w": 2.0, "rw_scale": 0.0, "omega_max": 0.30, "verbose": False,
+            "kp_q": 0.3, "kd_w": 2.0, "rw_scale": -1.0, "omega_max": 0.30, "verbose": True,
+            "constraint_gate_ratio": 0.0,
         }
 
     t0 = time.time()
@@ -212,7 +252,11 @@ def save_final(name, X, U, ps, sat, qg, stop):
 def save_gif(name, snaps, ps, sat, qg):
     N = snaps[0]['X'].shape[1]
     t_arr = np.arange(N) * ps.passes[0].dt
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    n_mtq = sat.numMTQ; n_rw = sat.numRW
+    mtq_umax = [sat.getMTQ(i).u_max for i in range(n_mtq)]
+    rw_umax = [sat.getRW(i).u_max for i in range(n_rw)]
+    rw_hmax = [sat.getRW(i).momentumMax for i in range(n_rw)]
+    fig, axes = plt.subplots(2, 3, figsize=(16, 8))
     fig.suptitle(name, fontsize=11)
 
     def animate(frame):
@@ -222,28 +266,58 @@ def save_gif(name, snaps, ps, sat, qg):
         pe = pe_profile(snap['X'], qg)
         X_f = snap['X']; U_f = snap['U']
         J = snap['J']; oi = snap.get('outer_iter', '?')
+        # [0,0] PE
         ax = axes[0, 0]
         ax.plot(t_arr, pe, 'b-', linewidth=1.5)
         ax.axhline(1.0, color='g', linestyle='--', alpha=0.4)
         ax.set_ylabel("PE (deg)"); ax.set_xlabel("t (s)"); ax.set_ylim(-5, 185)
         ax.set_title(f"iter {frame}/{len(snaps)-1}  outer={oi}  J={J:.3e}", fontsize=9)
         ax.grid(True, alpha=0.3)
+        # [0,1] Quaternion
         ax = axes[0, 1]
         for i in range(4):
             ax.plot(t_arr, X_f[3+i, :], linewidth=1.2, label=f"q{i}")
         ax.set_ylabel("q"); ax.set_ylim(-1.1, 1.1); ax.legend(fontsize=7)
         ax.grid(True, alpha=0.3); ax.set_title("q", fontsize=9)
-        ax = axes[1, 0]
-        t_u = t_arr[:U_f.shape[1]]
-        for i in range(U_f.shape[0]):
-            ax.plot(t_u, U_f[i, :], linewidth=0.7)
-        ax.set_ylabel("u"); ax.set_xlabel("t (s)"); ax.grid(True, alpha=0.3)
-        ax.set_title(f"max|u|={np.max(np.abs(U_f)) if U_f.size else 0:.3f}", fontsize=9)
-        ax = axes[1, 1]
+        # [0,2] ω
+        ax = axes[0, 2]
         for i in range(3):
             ax.plot(t_arr, np.degrees(X_f[i, :]), linewidth=1.2, label=f"w{i}")
+        wmax_deg = np.degrees(ps.constraints.wmax)
+        ax.axhline(wmax_deg, color='r', linestyle='--', alpha=0.4)
+        ax.axhline(-wmax_deg, color='r', linestyle='--', alpha=0.4)
         ax.set_ylabel("ω (°/s)"); ax.set_xlabel("t (s)"); ax.legend(fontsize=7)
         ax.grid(True, alpha=0.3); ax.set_title("ω", fontsize=9)
+        # [1,0] MTQ utilization %
+        ax = axes[1, 0]
+        if n_mtq > 0 and U_f.shape[1] > 0:
+            t_u = t_arr[:U_f.shape[1]]
+            for i in range(n_mtq):
+                ax.plot(t_u, U_f[i, :] / mtq_umax[i] * 100, linewidth=0.9, label=f"m{i}")
+            ax.axhline(75, color='r', linestyle='--', alpha=0.4, label='AL ceiling')
+            ax.axhline(-75, color='r', linestyle='--', alpha=0.4)
+        ax.set_ylim(-110, 110); ax.set_ylabel("MTQ %"); ax.set_xlabel("t (s)")
+        ax.legend(fontsize=7); ax.grid(True, alpha=0.3); ax.set_title("MTQ utilization", fontsize=9)
+        # [1,1] RW torque utilization %
+        ax = axes[1, 1]
+        if n_rw > 0 and U_f.shape[1] > 0:
+            t_u = t_arr[:U_f.shape[1]]
+            for i in range(n_rw):
+                ax.plot(t_u, U_f[n_mtq+i, :] / rw_umax[i] * 100, linewidth=0.9, label=f"τ{i}")
+            ax.axhline(75, color='r', linestyle='--', alpha=0.4)
+            ax.axhline(-75, color='r', linestyle='--', alpha=0.4)
+        ax.set_ylim(-110, 110); ax.set_ylabel("RW τ %"); ax.set_xlabel("t (s)")
+        ax.legend(fontsize=7); ax.grid(True, alpha=0.3); ax.set_title("RW torque utilization", fontsize=9)
+        # [1,2] RW momentum utilization %
+        ax = axes[1, 2]
+        if n_rw > 0:
+            for i in range(n_rw):
+                h_i = X_f[7 + i, :]
+                ax.plot(t_arr, h_i / rw_hmax[i] * 100, linewidth=1.0, label=f"h{i}")
+            ax.axhline(100, color='r', linestyle='--', alpha=0.4)
+            ax.axhline(-100, color='r', linestyle='--', alpha=0.4)
+        ax.set_ylim(-120, 120); ax.set_ylabel("h_rw %"); ax.set_xlabel("t (s)")
+        ax.legend(fontsize=7); ax.grid(True, alpha=0.3); ax.set_title("RW momentum", fontsize=9)
         plt.tight_layout()
         return axes.flat
 
@@ -316,6 +390,17 @@ SCENARIOS = [
 # Main
 # -----------------------------------------------------------------------------
 results = []
+if SCENARIO_FILTER:
+    keep = set(s.strip() for s in SCENARIO_FILTER.split(","))
+    SCENARIOS = [s for s in SCENARIOS if s[0] in keep]
+
+if COSTREF_ENABLED:
+    print(f"Cost refactor: ang_vel_err_dir_ratio = {COSTREF_BETA} (α-from-β PSD crossterm)")
+if CURRICULUM_ENABLED:
+    print("Curriculum: pass 0 detumble (angle=0), pass 1 full tracking")
+if INITCONTROLLER != 1:
+    name = {0: "ZeroController", 2: "Bdot"}.get(INITCONTROLLER, str(INITCONTROLLER))
+    print(f"Init controller: {name}")
 print(f"Running {len(SCENARIOS)} scenarios, output → {OUT}\n")
 for name, params in SCENARIOS:
     print(f"→ {name}", flush=True)

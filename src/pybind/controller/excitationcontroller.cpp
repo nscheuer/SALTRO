@@ -5,8 +5,9 @@
 
 namespace saltro::controller {
 
-ExcitationController::ExcitationController(const Satellite& satellite)
+ExcitationController::ExcitationController(const Satellite& satellite, double dt)
     : Controller(satellite) {
+    dt_seconds_ = (std::isfinite(dt) && dt > 0.0) ? dt : kDtRefSeconds;
     autoTuneGains();
 }
 
@@ -68,7 +69,11 @@ Satellite::VecX ExcitationController::find_u(
 
 void ExcitationController::autoTuneGains() {
     const double J_avg = std::max(1e-6, satellite_.inertia().trace() / 3.0);
-    const double target_accel = 0.5 * 3.14159265358979323846 / 180.0;
+    const double base_target_accel = 0.5 * 3.14159265358979323846 / 180.0;
+    // Scale target α by (dt_ref / dt) so per-knot ω impulse (α·dt) stays bounded on
+    // long-horizon passes; at dt == kDtRefSeconds this is a no-op.
+    const double dt_scale = kDtRefSeconds / std::max(1e-6, dt_seconds_);
+    const double target_accel = base_target_accel * dt_scale;
     const double target_tau = J_avg * target_accel;
 
     const int num_mtq = satellite_.numMTQ();

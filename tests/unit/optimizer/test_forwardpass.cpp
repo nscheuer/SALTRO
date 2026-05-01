@@ -161,7 +161,7 @@ public:
 			result.U.col(k) = u_bar;
 
 			Eigen::VectorXd x_next;
-			rk4_step<Eigen::VectorXd>(
+			saltro::math::rk4_step<Eigen::VectorXd>(
 				[&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
 					dxdt = satellite.dynamics(
 						x_state,
@@ -348,7 +348,7 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass reduces cost and matches dyna
 		REQUIRE(dt > 0.0);
 
 		Eigen::VectorXd x_next;
-		rk4_step<Eigen::VectorXd>(
+		saltro::math::rk4_step<Eigen::VectorXd>(
 			[&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
 				dxdt = satellite.dynamics(
 					x_state,

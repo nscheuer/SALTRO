@@ -73,7 +73,7 @@ public:
         };
         
         Satellite::VecX x_next(sat.stateDim());
-        rk4_step(dynamics_func, x, step_idx * dt, dt_step, x_next);
+        saltro::math::rk4_step(dynamics_func, x, step_idx * dt, dt_step, x_next);
         
         // Normalize quaternion
         Eigen::Vector4d q = x_next.segment<4>(Satellite::QUAT_INDEX);

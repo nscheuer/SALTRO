@@ -41,9 +41,14 @@ bool warm_start(
         case 0:
             active_controller = std::make_unique<controller::ZeroController>(satellite);
             break;
-        case 1:
-            active_controller = std::make_unique<controller::ExcitationController>(satellite);
+        case 1: {
+            const double exc_dt = (settings.num_passes > 0 && std::isfinite(settings.passes[0].dt)
+                                   && settings.passes[0].dt > 0.0)
+                                      ? settings.passes[0].dt
+                                      : controller::ExcitationController::kDtRefSeconds;
+            active_controller = std::make_unique<controller::ExcitationController>(satellite, exc_dt);
             break;
+        }
         case 2:
             active_controller = std::make_unique<controller::IntegratedBdotController>(satellite);
             break;

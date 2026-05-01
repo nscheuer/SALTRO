@@ -131,7 +131,7 @@ TEST_CASE_METHOD(WarmStartFixture, "warm_start uses RK4 propagation consistently
 	const double dt = (jtime(1) - jtime(0)) * SEC_PER_CENTURY;
 	const int rho0 = static_cast<int>(std::max(0.0, std::round(rho(0))));
 
-	rk4_step<Satellite::VecX>(
+	saltro::math::rk4_step<Satellite::VecX>(
 		[&](double, const Satellite::VecX& x_state, Satellite::VecX& dxdt) {
 			dxdt = satellite.dynamics(
 				x_state,

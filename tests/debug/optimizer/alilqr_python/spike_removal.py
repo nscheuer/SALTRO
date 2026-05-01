@@ -851,7 +851,7 @@ def apply_spike_removal(
     kd_w=5.0,
     omega_max=None,
     h_max=None,
-    rw_scale=0.0,
+    rw_scale=-1.0,  # -1 = auto (numRW / (numMTQ + numRW))
     verbose=False,
     max_spike_knots=0,
 ):
@@ -893,6 +893,22 @@ def apply_spike_removal(
             print(f"[SpikeRemoval] iter={iteration}: skipping (past max_intervention_iters)")
         return X, U, False
 
+    # Auto-set rw_scale based on satellite topology if user passed sentinel (-1).
+    # Fraction-of-actuators: rw_scale = numRW / (numMTQ + numRW).
+    #   3+0 MTQ only  → 0.0  (MTQ-only)
+    #   0+3 RW only   → 1.0  (must use RW; otherwise PD produces zero torque)
+    #   3+1 hybrid    → 0.25 (MTQ-dominant, RW assists)
+    #   3+3 hybrid    → 0.5  (balanced)
+    # Explicit override: user passes rw_scale >= 0.0 to keep current semantics.
+    if rw_scale < 0.0:
+        n_mtq_sat = satellite.numMTQ
+        n_rw_sat = satellite.numRW
+        tot = n_mtq_sat + n_rw_sat
+        rw_scale = (n_rw_sat / tot) if tot > 0 else 0.0
+        if verbose:
+            print(f"[SpikeRemoval] iter={iteration}: auto rw_scale={rw_scale:.2f} "
+                  f"(nMTQ={n_mtq_sat}, nRW={n_rw_sat})")
+
     pass_settings = plannersettings.passes[pass_idx]
     cost_cfg = pass_settings.cost
     cnst_cfg = plannersettings.constraints
@@ -905,7 +921,7 @@ def apply_spike_removal(
     else:
         dt = float(pass_settings.dt)
 
-    # Compute current mean PE
+    # Compute current PE stats across the trajectory.
     theta_all = []
     for k in range(N):
         try:
@@ -913,21 +929,27 @@ def apply_spike_removal(
         except Exception:
             pass
     current_mean_pe = float(np.mean(theta_all)) if theta_all else float('inf')
+    current_max_pe = float(np.max(theta_all)) if theta_all else float('inf')
 
-    # Guard: don't intervene if mean PE is low and stable/improving.
-    # Prevents spike removal from destroying a well-converged trajectory
-    # that has slightly increased PE from AL constraint enforcement.
+    # Guard: don't intervene if the trajectory is uniformly good — no knot
+    # exceeds `low_pe_max_threshold` AND mean PE is not regressing.  Earlier
+    # version used `mean PE < 5°` which mis-fires on trajectories that are
+    # mostly converged but contain isolated late-iter spike knots (mean
+    # stays low while a real spike sits in plain sight).  Switching the
+    # magnitude criterion to max PE catches that case.
     if not hasattr(apply_spike_removal, '_prev_mean_pe'):
         apply_spike_removal._prev_mean_pe = float('inf')
     prev_mean_pe = apply_spike_removal._prev_mean_pe
     apply_spike_removal._prev_mean_pe = current_mean_pe
 
-    # Only intervene if mean PE is above a minimum threshold OR has increased
-    # significantly from the previous call (indicating a regression).
+    low_pe_max_threshold_deg = 10.0
+    max_pe_deg = np.degrees(current_max_pe)
     mean_pe_deg = np.degrees(current_mean_pe)
-    if mean_pe_deg < 5.0 and current_mean_pe <= prev_mean_pe * 1.5:
+    if max_pe_deg < low_pe_max_threshold_deg and current_mean_pe <= prev_mean_pe * 1.5:
         if verbose:
-            print(f"[SpikeRemoval] iter={iteration}: skipping (mean PE {mean_pe_deg:.1f}° is low and stable)")
+            print(f"[SpikeRemoval] iter={iteration}: skipping "
+                  f"(max PE {max_pe_deg:.1f}° < {low_pe_max_threshold_deg:.0f}°, "
+                  f"mean {mean_pe_deg:.1f}° stable)")
         return X, U, False
 
     # Detect spike candidates
