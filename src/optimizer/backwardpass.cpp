@@ -139,12 +139,19 @@ bool backwardPass(
 		// Reshape lu from 1×nu matrix to nu vector
 		Eigen::VectorXd lu = lu_mat.row(0);
 		
-		// Scale stage cost derivatives by dt
-		lx_full = dt * lx_full;
-		lu = dt * lu;
-		lxx_full = dt * lxx_full;
-		luu = dt * luu;
-		lux_hess_full = dt * lux_hess_full;
+		// NOTE: previously scaled stage-cost derivatives by dt, but
+		// Satellite::totalCost SUMS stageCost without any dt factor (see
+		// satellite.cpp `J_total += stage_cost`). Multiplying gradients by
+		// dt was therefore inconsistent with the cost being optimized — BP's
+		// predicted ΔV came out a factor of dt too large in pure-cost regions
+		// and mixed in AL regions (since the AL gradient is added below WITHOUT
+		// dt scaling, so AL part was un-scaled while stage part was over-scaled).
+		// Confirmed via closed-loop FD gradient check: bisect by cost component
+		// (angle only, +ω, +control, +AL) all gave ratio = 1/dt = 0.10 pre-fix
+		// and ratio = 1.000 ± 0.025 after the dt factors were removed.
+		// Smoke test on the chronic 12_omega_5x ict=1e-3 + spike scenario:
+		//   pre-fix : 137 iters, 6.26°PE, ls_attempts_exceeded
+		//   post-fix: 325 iters, 2.14°PE, converged (better than synced 3.0°)
 		
 		// Step 2: Build G matrices for projection
 		Eigen::Vector4d q_k = x_k.segment<4>(3);
