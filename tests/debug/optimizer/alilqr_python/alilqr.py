@@ -167,14 +167,42 @@ def alilqr(
         np.full_like(ck, fill_value=passsettings.auglag.lag_mult_init, dtype=float)
         for ck in clist0
     ]
-    mu_aug = [
+    # mu_real grows by φ each outer; mu_eff is the masked version passed to inner.
+    # Active-set freeze (SALTRO_FROZEN_AS=1): mu_eff = mu_real where the constraint
+    # was active at outer start, else 0. The C++ gate `c > 0 OR λ > 0` still fires
+    # but the cost contribution `λ·c + 0.5·μ·c²` is zero when (λ=0 AND μ=0), so
+    # frozen-inactive constraints contribute nothing during inner regardless of
+    # how the trajectory moves. Activation discovery deferred to outer boundary.
+    import os as _os_fr
+    _frozen_as = _os_fr.environ.get("SALTRO_FROZEN_AS", "0") == "1"
+    mu_real = [
         np.full_like(ck, fill_value=passsettings.auglag.penalty_init / passsettings.auglag.penalty_scale, dtype=float)
         for ck in clist0
     ]
     phi_aug = passsettings.auglag.penalty_scale
     stop_reason = "max_outer_iters"
-    
+
     for iteration in range(passsettings.auglag.max_outer_iters):
+        if _frozen_as:
+            # Freeze active set at outer start using current trajectory.
+            ck_outer = _collect_constraints(plannersettings, satellite, X, U, S)
+            mu_aug = []
+            frozen_active_count = 0
+            frozen_total = 0
+            for k, ck0 in enumerate(ck_outer):
+                active_now = (ck0 > 0.0) | (lambda_aug[k] > 0.0)
+                mu_aug.append(np.where(active_now, mu_real[k], 0.0))
+                frozen_active_count += int(active_now.sum())
+                frozen_total += int(active_now.size)
+            if debug:
+                transitions.append({
+                    "outer_iter": iteration,
+                    "frozen_active": frozen_active_count,
+                    "frozen_total": frozen_total,
+                })
+        else:
+            mu_aug = mu_real
+
         # Solve AL subproblem with iLQR first (ALTRO style).
         X, U, stop_reason, snaps, trans = ilqr(
             plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho,
@@ -237,17 +265,49 @@ def alilqr(
         # Update lambda and mu matching C++ alilqr.cpp:
         # Lambda update uses RAW constraint value (not clamped to positive).
         # Lambda clamped to non-negative after update (inequality constraints).
+        # Diagnostic: SALTRO_KINK_FIX=1 env var swaps to λ_new = max(0, λ + μ·max(0,c))
+        # which keeps λ from decaying when c < 0 → gate stays active via λ → no
+        # C¹-not-C² kink in cost surface across c=0 in subsequent inner solves.
+        # Trades KKT-complementarity (λ·c → 0) for cost-surface smoothness.
+        import os as _os_kink
+        _kink_fix = _os_kink.environ.get("SALTRO_KINK_FIX", "0") == "1"
         clist = _collect_constraints(plannersettings, satellite, X, U, S)
         any_mu_below_max = False
+        # Lambda floor: SALTRO_LAMBDA_FLOOR=ε keeps λ ≥ ε·μ once a constraint
+        # has ever been active. Prevents the standard-update zeroing from
+        # creating a (λ=0, c~0) kink at next outer's BP linearization.
+        # KKT bias: ≤ ε in slack at convergence; controllable by ε.
+        _lam_floor_eps = float(_os_kink.environ.get("SALTRO_LAMBDA_FLOOR", "0.0"))
         for k, ck in enumerate(clist):
+            ck_for_dual = np.maximum(0.0, ck) if _kink_fix else ck
+            # Use mu_real for dual update (frozen-inactive constraints still
+            # get caught up via λ when they get violated during inner).
+            mu_for_dual = mu_real[k] if _frozen_as else mu_aug[k]
+            lambda_old = lambda_aug[k].copy()
             lambda_aug[k] = np.minimum(
                 passsettings.auglag.lag_mult_max,
-                lambda_aug[k] + mu_aug[k] * ck,  # raw c, not max(0,c)
+                lambda_aug[k] + mu_for_dual * ck_for_dual,
             )
             lambda_aug[k] = np.maximum(0.0, lambda_aug[k])  # non-negative for inequality
-            mu_aug[k] = np.minimum(passsettings.auglag.penalty_max, phi_aug * mu_aug[k])
-            if np.any(mu_aug[k] < passsettings.auglag.penalty_max):
-                any_mu_below_max = True
+            if _lam_floor_eps > 0.0:
+                # Apply floor only to constraints with prior history (λ_old > 0).
+                # Newly-violated constraints follow standard update first; once
+                # they appear, the floor protects them.
+                ever_active = lambda_old > 0.0
+                floor_v = _lam_floor_eps * mu_for_dual
+                lambda_aug[k] = np.where(
+                    ever_active,
+                    np.maximum(lambda_aug[k], floor_v),
+                    lambda_aug[k],
+                )
+            if _frozen_as:
+                mu_real[k] = np.minimum(passsettings.auglag.penalty_max, phi_aug * mu_real[k])
+                if np.any(mu_real[k] < passsettings.auglag.penalty_max):
+                    any_mu_below_max = True
+            else:
+                mu_aug[k] = np.minimum(passsettings.auglag.penalty_max, phi_aug * mu_aug[k])
+                if np.any(mu_aug[k] < passsettings.auglag.penalty_max):
+                    any_mu_below_max = True
 
         # Penalty saturation exit — match C++ alilqr.cpp:187-191.
         # If μ has saturated everywhere and we still can't drive max_c below

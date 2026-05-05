@@ -1,3 +1,4 @@
+import os
 import sys
 import numpy as np
 from pathlib import Path
@@ -7,6 +8,12 @@ sys.path.insert(0, str(ROOT / "build"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import saltro_py
 from spike_removal import apply_spike_removal
+
+# Diagnostic-only: capture per-knot Q_uu eigenvalues from the BP call that
+# produced the accepted step. Costs an extra eigvalsh per knot per iter, so
+# gate on env var. Adds {quu_lambda_min, quu_lambda_max, quu_indef_frac,
+# quu_worst_knot} to the transition dict.
+_LOG_QUU = os.environ.get("SALTRO_LOG_QUU", "0") == "1"
 
 
 def _augmented_penalty_total(
@@ -183,10 +190,15 @@ def ilqr(
         spike_occurred_this_iter = False
 
         attempts = 0
+        bp_failures = 0
+        fp_failures = 0
+        reg_at_entry = reg
+        # Per-iter Q_uu spectrum stats; populated on the LAST successful BP only.
+        quu_stats = None
         while reg <= reg_max and attempts < effective_lsl:
             attempts += 1
             U_trim = U[:, :X.shape[1] - 1]
-            ok_bp, K, d, deltaV = saltro_py.backward_pass(
+            bp_ret = saltro_py.backward_pass(
                 satellite,
                 X,
                 U_trim,
@@ -201,13 +213,37 @@ def ilqr(
                 lambda_aug,
                 mu_aug,
                 reg,
+                return_quu=_LOG_QUU,
             )
+            if _LOG_QUU:
+                ok_bp, K, d, deltaV, Q_uu_hist, Quu_ddp_hist = bp_ret
+            else:
+                ok_bp, K, d, deltaV = bp_ret
             if not ok_bp:
+                bp_failures += 1
                 increase_reg()
                 continue
 
             # Decrease reg after successful BP (like original ALTRO)
             decrease_reg()
+
+            # Capture Q_uu eigenvalue stats from the SUCCESSFUL BP. This is
+            # the Q_uu actually used to compute K — what FP will roll out.
+            if _LOG_QUU:
+                # Q_uu_hist shape: (N-1, nu, nu). Compute per-knot λmin/λmax.
+                lmins = np.empty(Q_uu_hist.shape[0])
+                lmaxs = np.empty(Q_uu_hist.shape[0])
+                for kk in range(Q_uu_hist.shape[0]):
+                    e = np.linalg.eigvalsh(Q_uu_hist[kk])
+                    lmins[kk] = e[0]
+                    lmaxs[kk] = e[-1]
+                indef = lmins < 0
+                quu_stats = {
+                    "quu_lambda_min": float(lmins.min()),
+                    "quu_lambda_max": float(lmaxs.max()),
+                    "quu_indef_frac": float(indef.mean()),
+                    "quu_worst_knot": int(lmins.argmin()),
+                }
 
             K_list = [K[k] for k in range(K.shape[0])]
             d_list = [d[:, k] for k in range(d.shape[1])]
@@ -215,6 +251,14 @@ def ilqr(
             U_trim = U[:, :X.shape[1] - 1]
             J_prev_nom = satellite.totalCost(X, U_trim, B, boresight, q_goal, passsettings.cost)
             J_prev = J_prev_nom + _augmented_penalty_total(plannersettings, satellite, X, U, S, lambda_aug, mu_aug)
+
+            # NOTE: open-loop FD gradient check was tried here but is not
+            # the right test — BP's deltaV(0) is the closed-loop coefficient
+            # (with K feedback contributions baked in via Q_u = lu + B^T·p_kp1
+            # propagated through the optimal feedback). Open-loop FD measures
+            # ∇J·d directly, which differs from closed-loop deltaV(0) by the
+            # K_k·δx_k feedback effect. Closed-loop FD requires reduced-state
+            # MRP arithmetic; deferred unless re-needed.
 
             # Save nominal controls before forward pass modifies them (needed for spike removal blend)
             U_bar = U.copy()
@@ -240,6 +284,7 @@ def ilqr(
                 J_prev,
             )
             if not ok_fp:
+                fp_failures += 1
                 # Triple increase: increaseReg + bump + increaseReg
                 increase_reg()
                 reg += reg_bump
@@ -303,15 +348,31 @@ def ilqr(
                         "B": B.copy(),
                     }
                 )
-                transitions.append({
+                # Diagnostic-grade telemetry. max_d_norm cheap if grad_tol unused.
+                _max_d = float(max(np.linalg.norm(d_k) for d_k in d_list))
+                tr = {
+                    "iter": iteration,
                     "bp_ok": True,
                     "fp_ok": True,
-                    "act_delta": delta_J,
+                    "act_delta": float(delta_J),
+                    "J_prev": float(J_prev),
+                    "J_new": float(J_new),
                     "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol,
                     "inner_cost_converged": inner_cost_converged,
                     "grad_converged": grad_converged,
                     "stagnation_count": stagnation_count,
-                })
+                    "reg_at_entry": float(reg_at_entry),
+                    "reg_after_bp": float(reg),
+                    "bp_attempts": attempts,
+                    "bp_failures": bp_failures,
+                    "fp_failures": fp_failures,
+                    "max_d": _max_d,
+                    "deltaV0": float(deltaV[0]),
+                    "deltaV1": float(deltaV[1]),
+                }
+                if quu_stats is not None:
+                    tr.update(quu_stats)
+                transitions.append(tr)
 
             if conjunctive:
                 # Conjunctive: require BOTH outer-tol cost AND grad-ok (grad_tol≤0
@@ -339,9 +400,21 @@ def ilqr(
         # Update spike tracker for next iteration's ls budget.
         spike_occurred_last_iter = spike_occurred_this_iter
 
-        if reg > reg_max:
-            return X, U, "reg_exceeded", snapshots, transitions
-        if attempts >= effective_lsl:
-            return X, U, "ls_attempts_exceeded", snapshots, transitions
+        if reg > reg_max or attempts >= effective_lsl:
+            # Inner-loop failure: record diagnostic-grade transition before returning
+            if debug:
+                transitions.append({
+                    "iter": iteration,
+                    "bp_ok": (bp_failures < attempts),
+                    "fp_ok": False,
+                    "reason": "reg_exceeded" if reg > reg_max else "ls_attempts_exceeded",
+                    "reg_at_entry": float(reg_at_entry),
+                    "reg_at_fail": float(reg),
+                    "bp_attempts": attempts,
+                    "bp_failures": bp_failures,
+                    "fp_failures": fp_failures,
+                })
+            reason = "reg_exceeded" if reg > reg_max else "ls_attempts_exceeded"
+            return X, U, reason, snapshots, transitions
 
     return X, U, "max_iters", snapshots, transitions
