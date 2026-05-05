@@ -252,13 +252,101 @@ def ilqr(
             J_prev_nom = satellite.totalCost(X, U_trim, B, boresight, q_goal, passsettings.cost)
             J_prev = J_prev_nom + _augmented_penalty_total(plannersettings, satellite, X, U, S, lambda_aug, mu_aug)
 
-            # NOTE: open-loop FD gradient check was tried here but is not
-            # the right test — BP's deltaV(0) is the closed-loop coefficient
-            # (with K feedback contributions baked in via Q_u = lu + B^T·p_kp1
-            # propagated through the optimal feedback). Open-loop FD measures
-            # ∇J·d directly, which differs from closed-loop deltaV(0) by the
-            # K_k·δx_k feedback effect. Closed-loop FD requires reduced-state
-            # MRP arithmetic; deferred unless re-needed.
+            # ====== CLOSED-LOOP GRADIENT CHECK (env-var gated) ======
+            # Compare BP's deltaV(0) (which IS the closed-loop linear
+            # coefficient via Q_u = lu + B^T·p_kp1 with K feedback baked in)
+            # against actual closed-loop FD: roll out FP-style with K·δx_red
+            # feedback at α=ε, compute (J_pert − J_prev)/ε, compare to
+            # deltaV(0). Ratio close to 1 → BP gradient matches reality.
+            # Far from 1 → gradient mismatch (real bug or modeling issue).
+            if os.environ.get("SALTRO_GRAD_CHECK", "0") == "1":
+                _gc_iters = os.environ.get("SALTRO_GRAD_CHECK_ITERS", "5")
+                _gc_iter_set = {int(s) for s in _gc_iters.split(",") if s.strip()}
+                if iteration in _gc_iter_set:
+                    eps = float(os.environ.get("SALTRO_GRAD_CHECK_EPS", "1e-7"))
+
+                    # MRP-aware closed-loop rollout matching forwardpass.cpp:
+                    #   state_error_reduced = [δω, MRP(quatError(q_ref, q_bar)), δh_rw]
+                    #   u_bar = u + α·d + K · state_error_reduced
+                    def _W_mat(q):
+                        q0, q1, q2, q3 = q
+                        return np.array([
+                            [-q1, -q2, -q3],
+                            [ q0, -q3,  q2],
+                            [ q3,  q0, -q1],
+                            [-q2,  q1,  q0],
+                        ])
+
+                    def _quat_conj(q):
+                        return np.array([q[0], -q[1], -q[2], -q[3]])
+
+                    def _quat_mult(q1, q2):
+                        return q2[0] * q1 + _W_mat(q1) @ q2[1:]
+
+                    def _quat_error(q_ref, q_bar):
+                        q_err = _quat_mult(_quat_conj(q_ref), q_bar)
+                        if q_err[0] < 0.0:
+                            q_err = -q_err
+                        return q_err
+
+                    def _quat_to_mrp(q_err):
+                        return 2.0 * q_err[1:] / (1.0 + q_err[0])
+
+                    N_gc = X.shape[1]
+                    nRW_gc = satellite.numRW
+                    X_pert = np.zeros_like(X)
+                    X_pert[:, 0] = X[:, 0]
+                    U_pert = np.zeros_like(U)
+                    dt_gc = passsettings.dt
+
+                    for kk in range(N_gc - 1):
+                        # Reduced-state error: [δω, MRP(q_err), δh_rw]
+                        delta_x_red = np.zeros(6 + nRW_gc)
+                        delta_x_red[:3] = X_pert[:3, kk] - X[:3, kk]
+                        q_ref = X[3:7, kk]
+                        q_bar = X_pert[3:7, kk]
+                        q_err = _quat_error(q_ref, q_bar)
+                        delta_x_red[3:6] = _quat_to_mrp(q_err)
+                        for i in range(nRW_gc):
+                            delta_x_red[6 + i] = X_pert[7 + i, kk] - X[7 + i, kk]
+
+                        u_bar_kk = U[:, kk] + eps * d_list[kk] + K_list[kk] @ delta_x_red
+                        U_pert[:, kk] = u_bar_kk
+
+                        x_next = saltro_py.rk4_step_discrete(
+                            satellite,
+                            X_pert[:, kk],
+                            u_bar_kk,
+                            R[:, kk],
+                            B[:, kk],
+                            S[:, kk],
+                            V[:, kk],
+                            dt_gc,
+                        )
+                        X_pert[:, kk + 1] = x_next
+
+                    U_pert_trim = U_pert[:, :N_gc - 1]
+                    J_pert_nom = satellite.totalCost(
+                        X_pert, U_pert_trim, B, boresight, q_goal, passsettings.cost
+                    )
+                    J_pert_AL = _augmented_penalty_total(
+                        plannersettings, satellite, X_pert, U_pert, S, lambda_aug, mu_aug
+                    )
+                    J_pert = J_pert_nom + J_pert_AL
+
+                    g_actual = (J_pert - J_prev) / eps
+                    g_predicted = float(deltaV[0])
+                    g_ratio = (
+                        g_actual / g_predicted if abs(g_predicted) > 1e-30 else float("nan")
+                    )
+                    print(
+                        f"[GradCheckCL] outer={outer_iter} iter={iteration} "
+                        f"eps={eps:.2e} predicted={g_predicted:.6e} "
+                        f"actual={g_actual:.6e} ratio={g_ratio:.6f} "
+                        f"J_prev={J_prev:.6e} J_pert={J_pert:.6e} "
+                        f"dJ_pert={(J_pert - J_prev):.6e}",
+                        flush=True,
+                    )
 
             # Save nominal controls before forward pass modifies them (needed for spike removal blend)
             U_bar = U.copy()

@@ -65,6 +65,8 @@ class Scenario:
     max_iters: int = 200
     max_outer: int = 30
     constraint_tol: float = 1e-3
+    # AL bisection: penalty_init=0 forces μ stays at 0 → AL term inert
+    penalty_init: float = -1.0  # -1 means "use planner default"
     # LS + reg
     ls_max_iters: int = 24
     reg_init: float = 0.0
@@ -270,6 +272,53 @@ _add(Scenario(
     grad_check=True,
     description="GRADCHECK: FD-verify BP deltaV(0) against actual cost gradient",
 ))
+_add(Scenario(
+    name="12gc_5x_ict1e-3_spike_gradcheck_full",
+    omega0=(0.05, 0.05, 0.05),
+    ilqr_cost_tol=1e-3,
+    use_spike=True,
+    max_iters=300, max_outer=6,  # production config
+    grad_check=True,
+    description="GRADCHECK production-config: probe later iters where neg-z appears",
+))
+
+# ---- BISECT: which cost component breaks BP gradient? ----------------------
+# Strategy: progressively enable cost terms. AL disabled via penalty_init=0.
+# Spike removal off. Few iters. If ratio=1 → that component is correct.
+# Easy initial conditions to avoid constraint violations.
+_BISECT_BASE = dict(
+    omega0=(0.005, 0.005, 0.005),  # well below wmax=0.1 → no ω-constraint hit
+    goal_angle_deg=10.0,             # small slew → no aggressive control
+    use_spike=False,
+    penalty_init=0.0,                # AL term inert
+    max_iters=10, max_outer=1,
+    grad_check=True,
+)
+
+_add(Scenario(
+    name="bisect_angle_only",
+    angle=1e4, ang_vel=0.0, mtq_cw=0.0, rw_cw=0.0,
+    **_BISECT_BASE,
+    description="BISECT: angle cost only, no AL, no other terms",
+))
+_add(Scenario(
+    name="bisect_angle_omega",
+    angle=1e4, ang_vel=1e2, mtq_cw=0.0, rw_cw=0.0,
+    **_BISECT_BASE,
+    description="BISECT: angle + ω, no control, no AL",
+))
+_add(Scenario(
+    name="bisect_angle_omega_ctrl",
+    angle=1e4, ang_vel=1e2, mtq_cw=1e-1, rw_cw=1.0,
+    **_BISECT_BASE,
+    description="BISECT: angle + ω + control, no AL",
+))
+_add(Scenario(
+    name="bisect_full_no_AL",
+    angle=1e4, ang_vel=1e2, mtq_cw=1e-1, rw_cw=1.0,
+    **_BISECT_BASE,
+    description="BISECT: full stage cost, AL inert (penalty_init=0)",
+))
 
 
 # ============================================================================
@@ -288,6 +337,8 @@ def _build_planner(s: Scenario, saltro_py):
     p.ilqr.grad_tol = s.grad_tol
     p.auglag.max_outer_iters = s.max_outer
     p.auglag.constraint_tol = s.constraint_tol
+    if s.penalty_init >= 0.0:
+        p.auglag.penalty_init = s.penalty_init
 
     c = p.cost
     c.angle = s.angle; c.ang_vel = s.ang_vel
@@ -645,7 +696,7 @@ def run_driver(scenario_name: str, save_json: Path | None = None):
         env["SALTRO_LAMBDA_FLOOR"] = str(SCENARIOS[scenario_name].lambda_floor_eps)
     if scenario_name in SCENARIOS and getattr(SCENARIOS[scenario_name], "grad_check", False):
         env["SALTRO_GRAD_CHECK"] = "1"
-        env["SALTRO_GRAD_CHECK_ITERS"] = "0,3,5,10,20,40"
+        env["SALTRO_GRAD_CHECK_ITERS"] = "0,3,5,10,20,30,40,50,75,100,150,200"
         env["SALTRO_GRAD_CHECK_EPS"] = "1e-7"
 
     print(f"[driver] running scenario {scenario_name} in subprocess...")
