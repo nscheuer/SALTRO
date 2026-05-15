@@ -18,7 +18,11 @@ Covers:
 import numpy as np
 import pytest
 import sys
-sys.path.insert(0, '/home/nic2703/SALTRO/build')
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(ROOT / "build"))
+
 import saltro_py
 
 

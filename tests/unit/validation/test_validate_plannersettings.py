@@ -37,7 +37,13 @@ def valid_settings():
     settings.passes[0].ilqr = saltro_py.ILQRConfig()
     settings.passes[0].reg = saltro_py.RegularizationConfig()
     settings.passes[0].linesearch = saltro_py.LineSearchConfig()
-    
+
+    # RegularizationConfig defaults have reg_init=0 and reg_min=1e-8 which
+    # violates the validator's `reg_min <= reg_init` rule. Pin to values that
+    # satisfy it; individual tests can still override these to test invalid
+    # configurations explicitly.
+    settings.passes[0].reg.reg_init = 1e-6
+
     return settings
 
 
@@ -67,11 +73,15 @@ def test_valid_plannersettings_with_multiple_passes():
     """Valid PlannerSettings with multiple passes should pass"""
     settings = valid_settings()
     settings.num_passes = 2
-    # Copy first pass config to second pass
-    settings.passes[1] = settings.passes[0]
+    # The pybind binding for `passes[i] = pass_j` is a no-op — assigning a
+    # whole pass struct does not propagate. Configure pass[1] field-by-field
+    # to match the validity requirements (only reg_init in this case;
+    # the other defaults pass on their own).
+    settings.passes[1].dt = 1.0
+    settings.passes[1].reg.reg_init = 1e-6
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
-    assert ok
+
+    assert ok, error_msg
 
 
 # ============================================================================
