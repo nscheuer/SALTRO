@@ -120,10 +120,45 @@ def test_mtq_ddtorq_dudbasestate_with_non_zero_dB_dq():
 
     x = valid_base_state()
     B = valid_magnetic_field()
-    
+
     dB_dq = np.ones((4, 3))
 
     H = mtq.ddtorq_dudbasestate(0.5, x, B, dB_dq)
 
     assert H.shape[0] == 1
     assert H.shape[1] == 7
+
+
+def test_mtq_torque_matches_u_times_axis_cross_b_for_random_configs():
+    """τ_MTQ = u * (axis_hat × B). Validate across random axes and fields
+    to catch sign / argument-order regressions that two hand-picked
+    cases (x-axis, y-axis) miss."""
+    rng = np.random.default_rng(20260514)
+    for _ in range(20):
+        raw_axis = rng.normal(size=3)
+        if np.linalg.norm(raw_axis) < 1e-6:
+            continue
+        axis_hat = raw_axis / np.linalg.norm(raw_axis)
+
+        mtq = saltro_py.MTQ(raw_axis, 1.0)
+        x = valid_base_state()
+        B = rng.normal(size=3) * 1e-5
+        u = rng.uniform(-0.5, 0.5)
+
+        tau = mtq.torque(u, x, B)
+        expected = u * np.cross(axis_hat, B)
+        assert np.allclose(tau, expected, atol=1e-15)
+
+
+def test_mtq_torque_is_perpendicular_to_axis_and_to_b():
+    """Cross product → τ ⊥ axis and τ ⊥ B by construction."""
+    axis = np.array([0.3, 0.4, 0.866])
+    axis_n = axis / np.linalg.norm(axis)
+    mtq = saltro_py.MTQ(axis, 1.0)
+    x = valid_base_state()
+    B = np.array([2e-5, -1e-5, 1.5e-5])
+
+    tau = mtq.torque(0.3, x, B)
+
+    assert abs(np.dot(tau, axis_n)) < 1e-15
+    assert abs(np.dot(tau, B)) < 1e-15
