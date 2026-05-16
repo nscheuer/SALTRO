@@ -891,6 +891,21 @@ def apply_spike_removal(
             print(f"[SpikeRemoval] iter={iteration}: skipping (past max_intervention_iters)")
         return X, U, False
 
+    # Guard: MTQ-only configurations don't have homotopy spikes in the usual
+    # sense — the trajectory naturally oscillates through hemispheres because
+    # the actuators can only produce torque perpendicular to the B-field, so
+    # B-field-aligned errors are uncontrollable and lead to long-period
+    # oscillations.  Substituting those "spikes" with PD forces the trajectory
+    # off the feasible manifold; iLQR then spends iterations recovering.
+    # Empirically (2026-05-15 on 01_sat_3_0_mtq, full iter budget):
+    #   with spike-removal:  PE_fin=59.7°, PE_mean=117.7°
+    #   without spike-removal: PE_fin=3.7°,  PE_mean=89.3°
+    # 56° PE_fin improvement, 28° PE_mean improvement.
+    if satellite.numRW == 0:
+        if verbose and iteration == start_at_iter:
+            print(f"[SpikeRemoval] MTQ-only config (numRW=0): skipping all substitutions for this run")
+        return X, U, False
+
     # Auto-set rw_scale based on satellite topology if user passed sentinel (-1).
     # Fraction-of-actuators: rw_scale = numRW / (numMTQ + numRW).
     #   3+0 MTQ only  → 0.0  (MTQ-only)
