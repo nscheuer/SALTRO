@@ -14,6 +14,7 @@ Env vars:
     WIDE_COSTREF_BETA=<f>     — β value for ang_vel_err_dir_ratio (default 0.3).
 """
 import os, sys, time, numpy as np
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -57,7 +58,8 @@ def baseline_params():
         goal_angle_deg=90.0,
         disturbances={},
         use_spike=True,
-        max_iters=200, max_outer=30,
+        max_iters=int(os.environ.get("WIDE_MAX_ITERS", "200")),
+        max_outer=int(os.environ.get("WIDE_MAX_OUTER", "30")),
     )
 
 
@@ -127,18 +129,23 @@ def run_scenario(name, params):
     jtime = np.array([0.22, 0.22 + params["time_s"] / (36525.0 * 86400.0)])
 
     cfg = None
-    if params["use_spike"]:
-        # Diagnostic-friendly: gate=0 (never skip on constraint feasibility),
-        # large intervention window, verbose. Tight detector thresholds
-        # (min_consecutive=7, min_spike_ratio=2.0) — relaxed thresholds
-        # caused thrashing in 2026-04-27 test (00_baseline 5197 iters,
-        # PE_fin=123°, max_iters reached).
+    if params["use_spike"] and os.environ.get("WIDE_NO_SPIKE") != "1":
         cfg = {
-            "start_at_iter": 2, "max_intervention_iters": 10000,
-            "blend_len": 30, "goal_switch_buffer": 15, "min_consecutive": 7,
-            "exit_fudge": 2.0, "min_prior_decrease_knots": 5, "min_spike_ratio": 2.0,
-            "kp_q": 0.3, "kd_w": 2.0, "rw_scale": -1.0, "omega_max": 0.30, "verbose": True,
-            "constraint_gate_ratio": 0.0,
+            "start_at_iter": int(os.environ.get("WIDE_SPIKE_START_AT", "2")),
+            "max_intervention_iters": 10000,
+            "blend_len": 30, "goal_switch_buffer": 15,
+            "min_consecutive": int(os.environ.get("WIDE_SPIKE_MIN_CONSEC", "7")),
+            "exit_fudge": 2.0, "min_prior_decrease_knots": 5,
+            "min_spike_ratio": float(os.environ.get("WIDE_SPIKE_MIN_RATIO", "2.0")),
+            "entry_error_max_rad": float(os.environ.get("WIDE_SPIKE_ENTRY_MAX", "0.5")),
+            "prior_low_max_rad": float(os.environ.get("WIDE_SPIKE_PRIOR_LOW_MAX", "0.15")),
+            "post_low_max_rad": float(os.environ.get("WIDE_SPIKE_POST_LOW_MAX", "0.15")),
+            "min_post_stable_knots": int(os.environ.get("WIDE_SPIKE_POST_KNOTS", "10")),
+            "post_vs_prior_ratio": float(os.environ.get("WIDE_SPIKE_POST_RATIO", "0.5")),
+            "kp_q": float(os.environ.get("WIDE_SPIKE_KP_Q", "0.3")),
+            "kd_w": float(os.environ.get("WIDE_SPIKE_KD_W", "2.0")),
+            "rw_scale": -1.0, "omega_max": 0.30, "verbose": True,
+            "constraint_gate_ratio": float(os.environ.get("WIDE_SPIKE_GATE_RATIO", "0.0")),
         }
 
     t0 = time.time()
@@ -171,12 +178,14 @@ def run_scenario(name, params):
         "ctol": ctol,
     }
 
+    # Use a single timestamp for all three images so they're consistent.
+    run_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Save midway snapshot grid
-    save_midway(name, snaps, X, U, ps, sat, qg, r0, v0, jtime)
+    save_midway(name, snaps, X, U, ps, sat, qg, r0, v0, jtime, ts=run_ts)
     # Save GIF
-    save_gif(name, snaps, ps, sat, qg)
+    save_gif(name, snaps, ps, sat, qg, ts=run_ts)
     # Save final panel
-    save_final(name, X, U, ps, sat, qg, stop)
+    save_final(name, X, U, ps, sat, qg, stop, ts=run_ts)
 
     return result
 
@@ -186,18 +195,21 @@ def pe_profile(X, qg):
                      for k in range(X.shape[1])])
 
 
-def save_midway(name, snaps, X_final, U_final, ps, sat, qg, r0, v0, jtime):
+def save_midway(name, snaps, X_final, U_final, ps, sat, qg, r0, v0, jtime, ts=None):
     N = snaps[0]['X'].shape[1]
     t_arr = np.arange(N) * ps.passes[0].dt
     key_iters = sorted(set(i for i in [0, 5, 10, 20, 50, 100, len(snaps)//4, len(snaps)//2, 3*len(snaps)//4, len(snaps)-1]
                             if 0 <= i < len(snaps)))
-    fig, axes = plt.subplots(len(key_iters), 2, figsize=(14, 3*len(key_iters)))
-    fig.suptitle(f"{name}  |  {len(snaps)} iters", fontsize=11)
+    fig, axes = plt.subplots(len(key_iters), 3, figsize=(18, 3*len(key_iters)))
+    if ts is None:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fig.suptitle(f"{name}  |  {len(snaps)} iters  |  {ts}", fontsize=11)
     if len(key_iters) == 1:
-        axes = axes.reshape(1, 2)
+        axes = axes.reshape(1, 3)
     for row, idx in enumerate(key_iters):
         snap = snaps[idx]
         pe = pe_profile(snap['X'], qg)
+        X_s = snap['X']
         U_s = snap['U']
         ax_pe = axes[row, 0]
         ax_pe.plot(t_arr, pe, 'b-', linewidth=1.2)
@@ -205,23 +217,30 @@ def save_midway(name, snaps, X_final, U_final, ps, sat, qg, r0, v0, jtime):
         ax_pe.set_ylim(-5, 185); ax_pe.set_ylabel(f"iter {idx}\nPE (deg)")
         ax_pe.set_title(f"PE mean={pe.mean():.1f}° max={pe.max():.1f}°  J={snap['J']:.2e}", fontsize=9)
         ax_pe.grid(True, alpha=0.3)
-        ax_ctrl = axes[row, 1]
+        ax_q = axes[row, 1]
+        for i in range(4):
+            ax_q.plot(t_arr, X_s[3+i, :], linewidth=1.0, label=f"q{i}")
+        ax_q.set_ylim(-1.1, 1.1); ax_q.set_ylabel("q"); ax_q.grid(True, alpha=0.3)
+        ax_q.legend(loc='upper right', fontsize=7); ax_q.set_title("Quaternion", fontsize=9)
+        ax_ctrl = axes[row, 2]
         t_u = t_arr[:U_s.shape[1]]
         for i in range(U_s.shape[0]):
             ax_ctrl.plot(t_u, U_s[i, :], linewidth=0.7)
         ax_ctrl.set_ylabel("u"); ax_ctrl.grid(True, alpha=0.3)
         ax_ctrl.set_title(f"max|u|={np.max(np.abs(U_s)) if U_s.size else 0:.3f}", fontsize=9)
-    axes[-1, 0].set_xlabel("t (s)"); axes[-1, 1].set_xlabel("t (s)")
+    axes[-1, 0].set_xlabel("t (s)"); axes[-1, 1].set_xlabel("t (s)"); axes[-1, 2].set_xlabel("t (s)")
     plt.tight_layout()
     fig.savefig(OUT / f"{name}_midway.png", dpi=100); plt.close(fig)
 
 
-def save_final(name, X, U, ps, sat, qg, stop):
+def save_final(name, X, U, ps, sat, qg, stop, ts=None):
     N = X.shape[1]
     t_arr = np.arange(N) * ps.passes[0].dt
     pe = pe_profile(X, qg)
     fig, axes = plt.subplots(2, 2, figsize=(14, 9))
-    fig.suptitle(f"{name}  |  {stop.split(':')[0]}", fontsize=11)
+    if ts is None:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fig.suptitle(f"{name}  |  {stop.split(':')[0]}  |  {ts}", fontsize=11)
     ax = axes[0, 0]
     ax.plot(t_arr, pe, 'b-', linewidth=1.5); ax.axhline(1.0, color='g', linestyle='--', alpha=0.4)
     ax.set_ylabel("PE (deg)"); ax.set_xlabel("t (s)"); ax.set_ylim(-5, 185)
@@ -249,7 +268,7 @@ def save_final(name, X, U, ps, sat, qg, stop):
     fig.savefig(OUT / f"{name}_final.png", dpi=120); plt.close(fig)
 
 
-def save_gif(name, snaps, ps, sat, qg):
+def save_gif(name, snaps, ps, sat, qg, ts=None):
     N = snaps[0]['X'].shape[1]
     t_arr = np.arange(N) * ps.passes[0].dt
     n_mtq = sat.numMTQ; n_rw = sat.numRW
@@ -257,7 +276,9 @@ def save_gif(name, snaps, ps, sat, qg):
     rw_umax = [sat.getRW(i).u_max for i in range(n_rw)]
     rw_hmax = [sat.getRW(i).momentumMax for i in range(n_rw)]
     fig, axes = plt.subplots(2, 3, figsize=(16, 8))
-    fig.suptitle(name, fontsize=11)
+    if ts is None:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fig.suptitle(f"{name}  |  {ts}", fontsize=11)
 
     def animate(frame):
         for ax in axes.flat:

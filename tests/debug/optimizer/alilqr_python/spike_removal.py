@@ -193,10 +193,20 @@ def detect_spikes(
     satellite,
     cnst_cfg,
     goal_switch_buffer: int = 15,
-    min_consecutive: int = 7,
+    min_consecutive: int = 5,
     exit_fudge: float = 2.0,
     min_prior_decrease_knots: int = 10,
     min_spike_ratio: float = 2.0,
+    min_peak_rad: float = 1.0,
+    entry_error_max_rad: float = 0.5,
+    entry_gate_traj_min_factor: float = 1.5,
+    prior_low_max_rad: float = 0.15,
+    post_low_max_rad: float = 0.15,
+    min_post_stable_knots: int = 10,
+    post_vs_prior_ratio: float = 0.5,
+    peak_exit_ratio: float = 0.3,
+    signflip_override_post_min_max_rad: float = 0.5,
+    verbose: bool = False,
 ) -> list:
     """Detect spike candidate windows in a trajectory.
 
@@ -240,72 +250,128 @@ def detect_spikes(
         else:
             theta[k] = _pointing_error(X, attitude_target, boresight, k)
 
-    candidates = []
-    k = 0
-    while k < N - 1:
-        if np.isnan(theta[k]):
-            k += 1
+    # --- Transition-based detection ---
+    # The spike IS the hemisphere transition: where q · q_0 crosses zero.
+    # The trajectory can't slew infinitely fast, so the transition takes a
+    # few knots — during those knots PE peaks because the trajectory is
+    # near the antipode region.
+    # Detection model:
+    #   1. Find each transition: knot where sign(q·q_0) flips relative to
+    #      the previous knot.  No persistence required — even single-knot
+    #      transitions count (a real fast spike).
+    #   2. For each transition, find the local PE peak within ±max_half
+    #      window.  Apply min_peak_rad filter.
+    #   3. Walk PE outward from the peak to find spike window boundaries:
+    #      left along the rising flank, right along the falling flank,
+    #      capped at max_window_width total.
+    #   4. Skip windows that extend to the trajectory end (legitimate
+    #      slew tail in opposite hemisphere).
+    #   5. Merge overlapping/adjacent windows.
+    # No q_goal needed (q_0 reference is always defined, works for vector-
+    # pointing mode too).
+    q_ref = X[3:7, 0]
+
+    dots = np.zeros(N)
+    for kk in range(N):
+        dots[kk] = float(np.dot(X[3:7, kk], q_ref))
+
+    # Identify each transition: knot where sign(dot) differs from previous knot.
+    transitions = []
+    for kk in range(1, N):
+        prev_sign = 1 if dots[kk - 1] >= 0 else -1
+        cur_sign = 1 if dots[kk] >= 0 else -1
+        if prev_sign != cur_sign:
+            # Use the knot where |dot| is closer to zero as the transition.
+            t_event = kk if abs(dots[kk]) < abs(dots[kk - 1]) else kk - 1
+            transitions.append(t_event)
+
+    if verbose and transitions:
+        print(f"  [detect] hemisphere transitions: {transitions}")
+
+    max_window_width = 20
+    max_half = max_window_width // 2
+
+    raw_candidates = []
+    for k_trans in transitions:
+        if k_trans in buffered:
             continue
 
-        # Count consecutive increasing-error knots starting at k
-        run_start = k
-        run_len = 0
-        j = k
-        while j + 1 < N and not np.isnan(theta[j+1]) and theta[j+1] > theta[j]:
-            run_len += 1
-            j += 1
+        # Find local peak within ±max_half of the transition.
+        lo = max(0, k_trans - max_half)
+        hi = min(N - 1, k_trans + max_half)
+        window_slice = theta[lo:hi + 1]
+        if np.all(np.isnan(window_slice)):
+            continue
+        k_peak = lo + int(np.nanargmax(window_slice))
+        peak_val = float(theta[k_peak])
 
-        if run_len < min_consecutive:
-            k += 1
+        if peak_val < min_peak_rad:
+            if verbose:
+                print(f"  [detect] reject transition @{k_trans}: peak={np.degrees(peak_val):.1f}° < {np.degrees(min_peak_rad):.1f}°")
             continue
 
-        t_enter = run_start
-        entry_error = theta[t_enter]
-
-        # --- Prior-decrease filter ---
-        # A genuine homotopy spike follows a period of convergence.
-        # Count how many non-NaN knots immediately before t_enter had decreasing error.
-        prior_decrease = 0
-        pk = t_enter - 1
-        while pk > 0 and np.isnan(theta[pk]):
-            pk -= 1  # skip buffered knots
-        while pk > 0 and not np.isnan(theta[pk]) and not np.isnan(theta[pk - 1]):
-            if theta[pk] < theta[pk - 1]:
-                prior_decrease += 1
-                pk -= 1
+        # Walk left from k_peak along the rising flank (PE rises as we move
+        # forward in time, so theta[k] < theta[k+1] when k is to the left
+        # of the peak in the rising flank).
+        t_enter = k_peak
+        for i in range(1, max_half + 1):
+            k_walk = k_peak - i
+            if k_walk < 0 or np.isnan(theta[k_walk]):
+                break
+            if theta[k_walk] < theta[k_walk + 1]:
+                t_enter = k_walk
             else:
                 break
-        if prior_decrease < min_prior_decrease_knots:
-            # Error was not converging before this run — likely the initial approach
-            k = j + 1
-            continue
 
-        # --- Spike-magnitude filter ---
-        # The peak error in the run must be significantly larger than the entry error.
-        # This rules out small oscillations during the approach phase.
-        peak_in_run = max(theta[run_start:j + 1])
-        if peak_in_run < entry_error * min_spike_ratio:
-            k += 1
-            continue
-
-        # Find exit: first knot after run where error <= entry_error * exit_fudge
-        t_exit = None
-        for m in range(j + 1, N):
-            if np.isnan(theta[m]):
+        # Walk right from k_peak along the falling flank (PE falls as we
+        # move forward, so theta[k] < theta[k-1] on the right of the peak).
+        t_exit = k_peak
+        for i in range(1, max_half + 1):
+            k_walk = k_peak + i
+            if k_walk >= N or np.isnan(theta[k_walk]):
                 break
-            if theta[m] <= entry_error * exit_fudge:
-                t_exit = m
+            if theta[k_walk] < theta[k_walk - 1]:
+                t_exit = k_walk
+            else:
                 break
 
-        if t_exit is None:
-            # No exit found before end of trajectory — skip (may be final slew)
-            k = j + 1
+        # Enforce total window cap (peak walk may exceed max_window_width
+        # when both flanks are long; trim symmetrically toward k_peak).
+        if t_exit - t_enter > max_window_width:
+            overflow = (t_exit - t_enter) - max_window_width
+            half_over = overflow // 2
+            t_enter += half_over
+            t_exit -= (overflow - half_over)
+
+        # Skip windows that extend to the trajectory end — those are
+        # legitimate slew tails ending in the opposite hemisphere relative
+        # to q_0, not homotopy spikes.
+        if t_exit >= N - 1:
+            if verbose:
+                print(f"  [detect] reject transition @{k_trans}: window ({t_enter},{t_exit}) ends at N-1 (legit slew)")
             continue
 
-        # --- Actuation-driven filter ---
-        # Check representative knots in the spike window.
-        # If the actuator is saturated AND torque opposes the error at most knots,
-        # this is a physics-limited constraint, not a homotopy spike — discard.
+        if verbose:
+            print(f"  [detect] accept transition @{k_trans}: window ({t_enter},{t_exit}) peak={np.degrees(peak_val):.1f}° (k_peak={k_peak})")
+        raw_candidates.append((t_enter, t_exit))
+
+    # --- Merge overlapping or adjacent windows ---
+    raw_candidates.sort()
+    merged = []
+    for c_start, c_end in raw_candidates:
+        if merged and c_start <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], c_end))
+        else:
+            merged.append((c_start, c_end))
+
+    if verbose and len(merged) != len(raw_candidates):
+        print(f"  [detect] merged {len(raw_candidates)} raw → {len(merged)} candidates: {merged}")
+
+    candidates = []
+    # Actuation-driven filter: drop windows where the actuator is saturated
+    # AND opposing the error.  That's physics-limited oscillation, not a
+    # homotopy artifact worth substituting.
+    for t_enter, t_exit in merged:
         mid = (t_enter + t_exit) // 2
         check_knots = [t_enter, mid, min(mid + (t_exit - t_enter) // 4, t_exit - 1)]
         check_knots = [ck for ck in check_knots if 0 <= ck < U.shape[1]]
@@ -322,88 +388,12 @@ def detect_spikes(
                 physics_limited_votes += 1
 
         if physics_limited_votes >= max(1, len(check_knots) // 2 + 1):
-            # Majority of checked knots look physics-limited — discard
-            k = j + 1
+            if verbose:
+                print(f"  [detect] reject ({t_enter},{t_exit}): physics-limited ({physics_limited_votes}/{len(check_knots)})")
             continue
 
         candidates.append((t_enter, t_exit))
-        k = t_exit + 1
 
-    # ----- Hemisphere flip detection -----
-    # Search for regions where well-converged context on either side
-    # has quaternions on opposite hemispheres (q_left · q_right < 0).
-    converge_thresh = np.pi / 4.0  # 45°
-    deadband = 0.3
-    max_search = N // 2
-
-    for kk in range(1, N - 1):
-        if np.isnan(theta[kk]) or kk in buffered:
-            continue
-        if theta[kk] < np.pi / 6.0:  # 30° minimum
-            continue
-
-        # Search left for nearest well-converged knot
-        left_idx = -1
-        for j in range(kk - 1, -1, -1):
-            if kk - j > max_search:
-                break
-            if np.isnan(theta[j]):
-                continue
-            if theta[j] < converge_thresh:
-                left_idx = j
-                break
-        if left_idx < 0:
-            continue
-
-        # Search right for nearest well-converged knot
-        right_idx = -1
-        for j in range(kk + 1, N):
-            if j - kk > max_search:
-                break
-            if np.isnan(theta[j]):
-                continue
-            if theta[j] < converge_thresh:
-                right_idx = j
-                break
-        if right_idx < 0:
-            continue
-
-        # Check hemisphere flip
-        q_left = X[3:7, left_idx]
-        q_right = X[3:7, right_idx]
-        if np.dot(q_left, q_right) > -deadband:
-            continue
-
-        # Neighbors solidly on their hemisphere
-        if left_idx > 0:
-            if abs(np.dot(X[3:7, left_idx], X[3:7, left_idx - 1])) < deadband:
-                continue
-        if right_idx < N - 1:
-            if abs(np.dot(X[3:7, right_idx], X[3:7, right_idx + 1])) < deadband:
-                continue
-
-        # Symmetric: PE at center > PE at edges
-        if theta[kk] <= theta[left_idx] or theta[kk] <= theta[right_idx]:
-            continue
-
-        # Find spike window
-        exit_pe = max(theta[left_idx], theta[right_idx])
-        t_enter_h = kk
-        while t_enter_h > left_idx and not np.isnan(theta[t_enter_h - 1]) and theta[t_enter_h - 1] > exit_pe:
-            t_enter_h -= 1
-        t_exit_h = kk
-        while t_exit_h < right_idx and not np.isnan(theta[t_exit_h + 1]) and theta[t_exit_h + 1] > exit_pe:
-            t_exit_h += 1
-        t_exit_h = min(t_exit_h + 1, N - 1)
-
-        # Check no overlap
-        overlaps = any(t_enter_h < te and t_exit_h > ts for ts, te in candidates)
-        if overlaps:
-            continue
-
-        candidates.append((t_enter_h, t_exit_h))
-
-    candidates.sort(key=lambda c: c[0])
     return candidates
 
 
@@ -843,10 +833,18 @@ def apply_spike_removal(
     max_intervention_iters=5,
     blend_len=30,
     goal_switch_buffer=15,
-    min_consecutive=7,
+    min_consecutive=5,
     exit_fudge=2.0,
     min_prior_decrease_knots=10,
     min_spike_ratio=2.0,
+    min_peak_rad=1.0,
+    entry_error_max_rad=0.5,
+    entry_gate_traj_min_factor=1.5,
+    prior_low_max_rad=0.15,
+    post_low_max_rad=0.15,
+    min_post_stable_knots=10,
+    post_vs_prior_ratio=0.5,
+    signflip_override_post_min_max_rad=0.5,
     kp_q=2.0,
     kd_w=5.0,
     omega_max=None,
@@ -960,6 +958,15 @@ def apply_spike_removal(
         exit_fudge=exit_fudge,
         min_prior_decrease_knots=min_prior_decrease_knots,
         min_spike_ratio=min_spike_ratio,
+        min_peak_rad=min_peak_rad,
+        entry_error_max_rad=entry_error_max_rad,
+        entry_gate_traj_min_factor=entry_gate_traj_min_factor,
+        prior_low_max_rad=prior_low_max_rad,
+        post_low_max_rad=post_low_max_rad,
+        min_post_stable_knots=min_post_stable_knots,
+        post_vs_prior_ratio=post_vs_prior_ratio,
+        signflip_override_post_min_max_rad=signflip_override_post_min_max_rad,
+        verbose=verbose,
     )
 
     if verbose:
@@ -1000,8 +1007,20 @@ def apply_spike_removal(
         V_slice = V[:, t_enter:t_end_pd]
         rho_slice = rho[:, t_enter:t_end_pd]
 
-        # PD target: the spike exit state
+        # PD target: the spike exit state, with quaternion mirrored if the
+        # exit state is in the opposite hemisphere from the entry state.
+        # For a single-transition spike (no return), X[t_exit] is in H2;
+        # using its negative gives the H1 representation of the same
+        # orientation, so PD steers smoothly in H1 without crossing
+        # hemispheres.  For a pair-transition spike, X[t_exit] is already
+        # back in H1, no flip needed.
         x_target = X[:, t_exit].copy()
+        q_enter = X[3:7, t_enter]
+        q_exit = X[3:7, t_exit]
+        if float(np.dot(q_enter, q_exit)) < 0.0:
+            x_target[3:7] = -x_target[3:7]
+            if verbose:
+                print(f"[SpikeRemoval]   ({t_enter},{t_exit}): mirroring PD target (q_enter·q_exit<0)")
 
         # Simulate PD segment
         X_pd, U_pd = simulate_pd_segment(
