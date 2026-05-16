@@ -206,6 +206,7 @@ def detect_spikes(
     post_vs_prior_ratio: float = 0.5,
     peak_exit_ratio: float = 0.3,
     signflip_override_post_min_max_rad: float = 0.5,
+    tail_skip_entry_threshold_rad: float = 0.5,
     verbose: bool = False,
 ) -> list:
     """Detect spike candidate windows in a trajectory.
@@ -343,12 +344,16 @@ def detect_spikes(
             t_enter += half_over
             t_exit -= (overflow - half_over)
 
-        # Skip windows that extend to the trajectory end — those are
-        # legitimate slew tails ending in the opposite hemisphere relative
-        # to q_0, not homotopy spikes.
-        if t_exit >= N - 1:
+        # Skip tail windows ONLY when t_enter has high PE — that's a real
+        # slew tail that ends in the opposite hemisphere relative to q_0.
+        # When t_enter has LOW PE, the trajectory was converged just before
+        # the spike — that's a genuine tail spike worth substituting (e.g.
+        # case 09 control-light, where iter ~20-50 has a converged baseline
+        # plus a sudden tail spike at t≈900).
+        if t_exit >= N - 1 and not np.isnan(theta[t_enter]) and theta[t_enter] > tail_skip_entry_threshold_rad:
             if verbose:
-                print(f"  [detect] reject transition @{k_trans}: window ({t_enter},{t_exit}) ends at N-1 (legit slew)")
+                print(f"  [detect] reject transition @{k_trans}: window ({t_enter},{t_exit}) ends at N-1, "
+                      f"t_enter PE={np.degrees(theta[t_enter]):.1f}° > {np.degrees(tail_skip_entry_threshold_rad):.1f}° (slew tail)")
             continue
 
         if verbose:
@@ -845,6 +850,8 @@ def apply_spike_removal(
     min_post_stable_knots=10,
     post_vs_prior_ratio=0.5,
     signflip_override_post_min_max_rad=0.5,
+    tail_skip_entry_threshold_rad=0.5,
+    force_mtq_only=False,
     kp_q=2.0,
     kd_w=5.0,
     omega_max=None,
@@ -901,7 +908,7 @@ def apply_spike_removal(
     #   with spike-removal:  PE_fin=59.7°, PE_mean=117.7°
     #   without spike-removal: PE_fin=3.7°,  PE_mean=89.3°
     # 56° PE_fin improvement, 28° PE_mean improvement.
-    if satellite.numRW == 0:
+    if satellite.numRW == 0 and not force_mtq_only:
         if verbose and iteration == start_at_iter:
             print(f"[SpikeRemoval] MTQ-only config (numRW=0): skipping all substitutions for this run")
         return X, U, False
@@ -981,6 +988,7 @@ def apply_spike_removal(
         min_post_stable_knots=min_post_stable_knots,
         post_vs_prior_ratio=post_vs_prior_ratio,
         signflip_override_post_min_max_rad=signflip_override_post_min_max_rad,
+        tail_skip_entry_threshold_rad=tail_skip_entry_threshold_rad,
         verbose=verbose,
     )
 

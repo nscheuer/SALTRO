@@ -83,8 +83,16 @@ def _config_pass(pass_obj, p, *, angle_weight, max_iters, cost_tol):
     else:
         # Legacy: w_avang = ang_vel (PhD form). Confirms "legacy" path.
         c.ang_vel_err_dir = c.ang_vel
-    pass_obj.reg.reg_init = 0.0; pass_obj.reg.reg_max = 1e30
+    pass_obj.reg.reg_init = float(os.environ.get("WIDE_REG_INIT", "0.0"))
+    pass_obj.reg.reg_max = 1e30
     pass_obj.reg.reg_scale = 1.6
+    if os.environ.get("WIDE_EIGEN_MOD") == "1":
+        pass_obj.reg.use_eigen_modification = True
+        if os.environ.get("WIDE_EIGEN_RELFLOOR") == "1":
+            pass_obj.reg.eigen_reg_use_relative_floor = True
+        kappa_cap = os.environ.get("WIDE_EIGEN_KAPPA_CAP")
+        if kappa_cap is not None:
+            pass_obj.reg.eigen_reg_condition_cap = float(kappa_cap)
     pass_obj.linesearch.max_iters = 24
     pass_obj.linesearch.beta1 = 1e-10; pass_obj.linesearch.beta2 = 5000.0
 
@@ -142,6 +150,8 @@ def run_scenario(name, params):
             "post_low_max_rad": float(os.environ.get("WIDE_SPIKE_POST_LOW_MAX", "0.15")),
             "min_post_stable_knots": int(os.environ.get("WIDE_SPIKE_POST_KNOTS", "10")),
             "post_vs_prior_ratio": float(os.environ.get("WIDE_SPIKE_POST_RATIO", "0.5")),
+            "force_mtq_only": os.environ.get("WIDE_SPIKE_FORCE_MTQ") == "1",
+            "tail_skip_entry_threshold_rad": float(os.environ.get("WIDE_SPIKE_TAIL_ENTRY_MAX", "0.5")),
             "kp_q": float(os.environ.get("WIDE_SPIKE_KP_Q", "0.3")),
             "kd_w": float(os.environ.get("WIDE_SPIKE_KD_W", "2.0")),
             "rw_scale": -1.0, "omega_max": 0.30, "verbose": True,
