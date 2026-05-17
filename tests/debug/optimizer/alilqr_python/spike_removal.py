@@ -374,8 +374,11 @@ def detect_spikes(
 
     candidates = []
     # Actuation-driven filter: drop windows where the actuator is saturated
-    # AND opposing the error.  That's physics-limited oscillation, not a
-    # homotopy artifact worth substituting.
+    # AND opposing either the slew error OR the angular velocity.  Either
+    # case means the actuator is doing its best but can't fully fix the
+    # state — physics-limited, not a homotopy artifact worth substituting.
+    # The omega-opposing branch catches saturated detumble (case 13_omega_10x
+    # at high ω₀), which the slew-only check misses.
     for t_enter, t_exit in merged:
         mid = (t_enter + t_exit) // 2
         check_knots = [t_enter, mid, min(mid + (t_exit - t_enter) // 4, t_exit - 1)]
@@ -387,9 +390,23 @@ def detect_spikes(
             x_k = X[:, ck]
             B_k = B[:, ck]
             tau_act = np.asarray(satellite.actuatorTorque(x_k, u_k, B_k))
-            if _is_saturated(u_k, satellite, cnst_cfg.control_limit_scale) and _torque_opposes_error(
+            if not _is_saturated(u_k, satellite, cnst_cfg.control_limit_scale):
+                continue
+            # Opposes slew error: torque drives ω toward target attitude
+            opposes_err = _torque_opposes_error(
                 x_k, tau_act, attitude_target[:, ck], satellite
-            ):
+            )
+            # Opposes ω: torque is decelerating the angular velocity
+            # (J^-1 τ · ω < 0 means α opposes ω).  At high ω with saturated
+            # actuators, this is the dominant constraint.
+            omega_k = np.asarray(x_k[0:3])
+            omega_norm = float(np.linalg.norm(omega_k))
+            opposes_omega = False
+            if omega_norm > 1e-8:
+                J_inv = np.asarray(satellite.invInertiaNoRW)
+                alpha = J_inv @ np.asarray(tau_act)
+                opposes_omega = float(np.dot(alpha, omega_k / omega_norm)) < 0.0
+            if opposes_err or opposes_omega:
                 physics_limited_votes += 1
 
         if physics_limited_votes >= max(1, len(check_knots) // 2 + 1):
