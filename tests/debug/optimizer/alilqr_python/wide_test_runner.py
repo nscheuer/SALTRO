@@ -160,6 +160,7 @@ def run_scenario(name, params):
             "post_vs_prior_ratio": float(os.environ.get("WIDE_SPIKE_POST_RATIO", "0.5")),
             "force_mtq_only": os.environ.get("WIDE_SPIKE_FORCE_MTQ") == "1",
             "tail_skip_entry_threshold_rad": float(os.environ.get("WIDE_SPIKE_TAIL_ENTRY_MAX", "0.5")),
+            "omega_skip_threshold_rad": float(os.environ.get("WIDE_SPIKE_OMEGA_SKIP", "0.0")),
             "kp_q": float(os.environ.get("WIDE_SPIKE_KP_Q", "0.3")),
             "kd_w": float(os.environ.get("WIDE_SPIKE_KD_W", "2.0")),
             "rw_scale": -1.0, "omega_max": 0.30, "verbose": True,

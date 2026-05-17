@@ -852,6 +852,7 @@ def apply_spike_removal(
     signflip_override_post_min_max_rad=0.5,
     tail_skip_entry_threshold_rad=0.5,
     force_mtq_only=False,
+    omega_skip_threshold_rad=0.0,
     kp_q=2.0,
     kd_w=5.0,
     omega_max=None,
@@ -912,6 +913,19 @@ def apply_spike_removal(
         if verbose and iteration == start_at_iter:
             print(f"[SpikeRemoval] MTQ-only config (numRW=0): skipping all substitutions for this run")
         return X, U, False
+
+    # Auto-skip when initial ||ω₀|| is large.  Per 2026-05-17 A/B on
+    # 13_omega_10x: bdot init + spike-off CONVERGED (PE_fin 12.1°) vs
+    # bdot + spike-on hit penalty_max_reached (PE_fin 90.2°).  At high
+    # initial tumble, the trajectory naturally crosses hemispheres many
+    # times — same pathology as MTQ-only.  Off by default
+    # (omega_skip_threshold_rad=0); enable via WIDE_SPIKE_OMEGA_SKIP > 0.
+    if omega_skip_threshold_rad > 0.0:
+        omega0_norm = float(np.linalg.norm(X[0:3, 0]))
+        if omega0_norm > omega_skip_threshold_rad:
+            if verbose and iteration == start_at_iter:
+                print(f"[SpikeRemoval] High initial ||ω₀||={omega0_norm:.3f} rad/s > {omega_skip_threshold_rad}: skipping all substitutions")
+            return X, U, False
 
     # Auto-set rw_scale based on satellite topology if user passed sentinel (-1).
     # Fraction-of-actuators: rw_scale = numRW / (numMTQ + numRW).
