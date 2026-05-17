@@ -207,6 +207,8 @@ def detect_spikes(
     peak_exit_ratio: float = 0.3,
     signflip_override_post_min_max_rad: float = 0.5,
     tail_skip_entry_threshold_rad: float = 0.5,
+    omega_physics_floor_rad_s: float = 0.1,
+    omega_alignment_threshold: float = 0.7,
     verbose: bool = False,
 ) -> list:
     """Detect spike candidate windows in a trajectory.
@@ -396,17 +398,27 @@ def detect_spikes(
             opposes_err = _torque_opposes_error(
                 x_k, tau_act, attitude_target[:, ck], satellite
             )
-            # Opposes ω: torque is decelerating the angular velocity
-            # (J^-1 τ · ω < 0 means α opposes ω).  At high ω with saturated
-            # actuators, this is the dominant constraint.
+            # Strongly opposes ω: α (= J^-1·τ_act) is highly aligned with
+            # -ω̂.  A simple "α·ω < 0" sign check over-rejects real homotopy
+            # spikes whose peak/exit happens to involve mild deceleration.
+            # The alignment threshold captures "the actuator is DEDICATED
+            # to decelerating ω", which is the saturated-detumble pattern
+            # (case 13).  In a real homotopy spike (case 03 peak), α may
+            # have some negative ω component but it's also doing other
+            # things (slew correction) — alignment with -ω̂ is moderate,
+            # not extreme.  Gated by omega_physics_floor since the
+            # alignment metric is unreliable at small ω.
             omega_k = np.asarray(x_k[0:3])
             omega_norm = float(np.linalg.norm(omega_k))
-            opposes_omega = False
-            if omega_norm > 1e-8:
+            opposes_omega_strongly = False
+            if omega_norm > omega_physics_floor_rad_s:
                 J_inv = np.asarray(satellite.invInertiaNoRW)
                 alpha = J_inv @ np.asarray(tau_act)
-                opposes_omega = float(np.dot(alpha, omega_k / omega_norm)) < 0.0
-            if opposes_err or opposes_omega:
+                alpha_norm = float(np.linalg.norm(alpha))
+                if alpha_norm > 1e-10:
+                    align_neg_omega = -float(np.dot(alpha, omega_k)) / (alpha_norm * omega_norm)
+                    opposes_omega_strongly = align_neg_omega > omega_alignment_threshold
+            if opposes_err or opposes_omega_strongly:
                 physics_limited_votes += 1
 
         if physics_limited_votes >= max(1, len(check_knots) // 2 + 1):
@@ -504,6 +516,7 @@ def simulate_pd_segment(
     omega_max=None,
     h_max=None,
     rw_scale=0.0,
+    pd_dt_ref=10.0,
 ):
     """Simulate a PD-controlled trajectory from x_start toward x_target.
 
@@ -528,6 +541,21 @@ def simulate_pd_segment(
     n_rw = satellite.numRW
     nu = n_mtq + n_rw
 
+    # Scale PD gains by reference dt / actual dt.  Gains are tuned at
+    # pd_dt_ref (default 10s).  At longer dt the same gain produces too
+    # much rotation per step (J/kd_w time constant becomes < dt → unstable
+    # discrete response); at shorter dt the gain is too weak.  Inverse
+    # scaling keeps the discrete-step damping behavior consistent.
+    # Confirmed on case 11_long_3000s_dt30 where unscaled PD was producing
+    # substitutions that iLQR couldn't absorb cleanly.
+    if dt > 0 and pd_dt_ref > 0:
+        gain_scale = float(pd_dt_ref) / float(dt)
+        kp_q_eff = kp_q * gain_scale
+        kd_w_eff = kd_w * gain_scale
+    else:
+        kp_q_eff = kp_q
+        kd_w_eff = kd_w
+
     q_target = x_target[3:7]
 
     X_pd = np.zeros((nx, n_steps + 1))
@@ -542,7 +570,7 @@ def simulate_pd_segment(
         V_k = V_cols[:, k] if V_cols.ndim == 2 else V_cols
         rho_k = int(np.round(float(rho_cols[0, k]))) if rho_cols.ndim == 2 else int(rho_cols[k])
 
-        u_k = _build_pd_control(x_k, q_target, satellite, B_k, kp_q, kd_w, rw_scale=rw_scale)
+        u_k = _build_pd_control(x_k, q_target, satellite, B_k, kp_q_eff, kd_w_eff, rw_scale=rw_scale)
         U_pd[:, k] = u_k
 
         x_next = _rk4_step(satellite, x_k, u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k)
@@ -741,6 +769,7 @@ def substitute_and_blend(
     kp_q=2.0,
     kd_w=5.0,
     rw_scale=0.0,
+    pd_dt_ref=10.0,
 ):
     """Substitute PD segment, blend, then re-rollout tail with iLQR gain correction.
 
@@ -785,13 +814,22 @@ def substitute_and_blend(
 
     blend_end = min(t_exit + B_len, N - 1)
 
+    # Scale PD gains by reference dt / actual dt (see simulate_pd_segment).
+    if dt > 0 and pd_dt_ref > 0:
+        gain_scale = float(pd_dt_ref) / float(dt)
+        kp_q_eff = kp_q * gain_scale
+        kd_w_eff = kd_w * gain_scale
+    else:
+        kp_q_eff = kp_q
+        kd_w_eff = kd_w
+
     # --- Blend zone [t_exit, blend_end) ---
     for k in range(t_exit, blend_end):
         lam = float(k - t_exit) / float(B_len)  # 0 at t_exit, 1 at blend_end
         R_k, B_k, S_k, V_k, rho_k = _env(k)
 
         # PD contribution: target the spike exit state
-        u_pd_k = _build_pd_control(X[:, k], q_exit_target, satellite, B_k, kp_q, kd_w, rw_scale=rw_scale)
+        u_pd_k = _build_pd_control(X[:, k], q_exit_target, satellite, B_k, kp_q_eff, kd_w_eff, rw_scale=rw_scale)
 
         # iLQR open-loop nominal in blend zone (no gain — state is too different from spiked nominal)
         u_ilqr_k = U_bar[:, k] if k < U_bar.shape[1] else np.zeros(nu)
@@ -870,6 +908,9 @@ def apply_spike_removal(
     tail_skip_entry_threshold_rad=0.5,
     force_mtq_only=False,
     omega_skip_threshold_rad=0.0,
+    omega_physics_floor_rad_s=0.1,
+    omega_alignment_threshold=0.7,
+    pd_dt_ref=10.0,
     kp_q=2.0,
     kd_w=5.0,
     omega_max=None,
@@ -1020,6 +1061,8 @@ def apply_spike_removal(
         post_vs_prior_ratio=post_vs_prior_ratio,
         signflip_override_post_min_max_rad=signflip_override_post_min_max_rad,
         tail_skip_entry_threshold_rad=tail_skip_entry_threshold_rad,
+        omega_physics_floor_rad_s=omega_physics_floor_rad_s,
+        omega_alignment_threshold=omega_alignment_threshold,
         verbose=verbose,
     )
 
@@ -1094,6 +1137,7 @@ def apply_spike_removal(
             omega_max=omega_max,
             h_max=h_max,
             rw_scale=rw_scale,
+            pd_dt_ref=pd_dt_ref,
         )
 
         # Validate PD sim output before using it.  At large dt (e.g., 30s)
@@ -1140,6 +1184,7 @@ def apply_spike_removal(
             kp_q=kp_q,
             kd_w=kd_w,
             rw_scale=rw_scale,
+            pd_dt_ref=pd_dt_ref,
         )
 
         # Safety valve: reject the substitution if it produced a degenerate

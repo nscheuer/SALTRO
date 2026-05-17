@@ -161,6 +161,9 @@ def run_scenario(name, params):
             "force_mtq_only": os.environ.get("WIDE_SPIKE_FORCE_MTQ") == "1",
             "tail_skip_entry_threshold_rad": float(os.environ.get("WIDE_SPIKE_TAIL_ENTRY_MAX", "0.5")),
             "omega_skip_threshold_rad": float(os.environ.get("WIDE_SPIKE_OMEGA_SKIP", "0.0")),
+            "omega_physics_floor_rad_s": float(os.environ.get("WIDE_SPIKE_OMEGA_PHYS_FLOOR", "0.1")),
+            "omega_alignment_threshold": float(os.environ.get("WIDE_SPIKE_OMEGA_ALIGN", "0.7")),
+            "pd_dt_ref": float(os.environ.get("WIDE_SPIKE_PD_DT_REF", "10.0")),
             "kp_q": float(os.environ.get("WIDE_SPIKE_KP_Q", "0.3")),
             "kd_w": float(os.environ.get("WIDE_SPIKE_KD_W", "2.0")),
             "rw_scale": -1.0, "omega_max": 0.30, "verbose": True,
@@ -423,6 +426,18 @@ SCENARIOS = [
 
     # Larger slew
     ("17_slew_180",         merge(B, goal_angle_deg=180.0)),
+
+    # Tumble-direction ablation: 10x ω₀, hybrid (3+1) sat with RW along body-x.
+    # 18: ω along body-x = RW axis → RW can damp directly (solver test).
+    # 19: ω along body-y ⊥ to RW axis → RW useless on this axis (physics test).
+    ("18_omega_10x_rw_aligned", merge(B, omega0=np.array([0.173, 0.0, 0.0]))),
+    ("19_omega_10x_rw_perp",    merge(B, omega0=np.array([0.0, 0.173, 0.0]))),
+
+    # MTQ-only at 10x ω₀ — no RW available, MTQ produces zero torque
+    # whenever ω becomes parallel to B during the trajectory.  Pure
+    # physics-limited reference.
+    ("20_omega_10x_mtq_only",   merge(B, sat_fn=create_3_0,
+                                      omega0=np.array([0.10, 0.10, 0.10]))),
 ]
 
 
