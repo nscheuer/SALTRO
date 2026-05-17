@@ -131,6 +131,8 @@ def run_scenario(name, params):
     # Build initial state with the right dimension for the satellite
     nRW = sat.numRW
     w0 = params["omega0"]
+    if os.environ.get("WIDE_OMEGA0_ZERO") == "1":
+        w0 = np.zeros(3)
     q0 = np.array([1.0, 0.0, 0.0, 0.0])
     h0 = np.zeros(nRW)
     x0 = np.hstack([w0, q0, h0])
