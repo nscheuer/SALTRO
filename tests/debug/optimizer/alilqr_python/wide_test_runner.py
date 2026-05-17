@@ -86,13 +86,19 @@ def _config_pass(pass_obj, p, *, angle_weight, max_iters, cost_tol):
     pass_obj.reg.reg_init = float(os.environ.get("WIDE_REG_INIT", "0.0"))
     pass_obj.reg.reg_max = 1e30
     pass_obj.reg.reg_scale = 1.6
-    if os.environ.get("WIDE_EIGEN_MOD") == "1":
+    # Default: eigen modification ON with kappa_cap=1e-9 and relative floor.
+    # Empirically (17-scenario sweep 2026-05-16): case 01 PE_fin 60->9 deg,
+    # case 12 PE_fin 123->3 deg, no regressions on previously-good cases,
+    # +13% wall time vs eigen-off.  kc=1e-10 fails case 05; kc=1e-8 has
+    # 60+% wall-time bloat.  Override via WIDE_EIGEN_MOD=0.
+    eigen_mod = os.environ.get("WIDE_EIGEN_MOD", "1") == "1"
+    eigen_relfloor = os.environ.get("WIDE_EIGEN_RELFLOOR", "1") == "1"
+    if eigen_mod:
         pass_obj.reg.use_eigen_modification = True
-        if os.environ.get("WIDE_EIGEN_RELFLOOR") == "1":
+        if eigen_relfloor:
             pass_obj.reg.eigen_reg_use_relative_floor = True
-        kappa_cap = os.environ.get("WIDE_EIGEN_KAPPA_CAP")
-        if kappa_cap is not None:
-            pass_obj.reg.eigen_reg_condition_cap = float(kappa_cap)
+        kappa_cap = float(os.environ.get("WIDE_EIGEN_KAPPA_CAP", "1e-9"))
+        pass_obj.reg.eigen_reg_condition_cap = kappa_cap
     pass_obj.linesearch.max_iters = 24
     pass_obj.linesearch.beta1 = 1e-10; pass_obj.linesearch.beta2 = 5000.0
 
