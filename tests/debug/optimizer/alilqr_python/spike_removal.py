@@ -209,6 +209,9 @@ def detect_spikes(
     tail_skip_entry_threshold_rad: float = 0.5,
     omega_physics_floor_rad_s: float = 0.1,
     omega_alignment_threshold: float = 0.7,
+    max_trajectory_transitions: int = 10,
+    omega_skip_mean_rad_s: float = 0.08,
+    saturation_skip_fraction: float = 0.6,
     verbose: bool = False,
 ) -> list:
     """Detect spike candidate windows in a trajectory.
@@ -290,6 +293,33 @@ def detect_spikes(
 
     if verbose and transitions:
         print(f"  [detect] hemisphere transitions: {transitions}")
+
+    # Trajectory-level tumbling gate: when the trajectory is dominated by
+    # high angular velocity (mean |ω| > omega_skip_mean_rad_s) OR the
+    # actuator is saturated for most of the trajectory
+    # (sat_fraction > saturation_skip_fraction), it's in continuous-tumble
+    # mode (e.g. 13_omega_10x).  Substituting any candidate in such a
+    # trajectory pushes off the feasible manifold and breaks convergence.
+    # Both signals are scale-invariant in N, dt, and goal type (works for
+    # vector pointing or time-varying goals).
+    omega_norms_traj = np.linalg.norm(X[0:3, :], axis=0)
+    mean_omega_traj = float(np.mean(omega_norms_traj[np.isfinite(omega_norms_traj)]))
+    if mean_omega_traj > omega_skip_mean_rad_s:
+        if verbose:
+            print(f"  [detect] reject all candidates: mean ||ω||={np.degrees(mean_omega_traj):.1f}°/s > {np.degrees(omega_skip_mean_rad_s):.1f}°/s (tumbling regime)")
+        return []
+    # Saturation fraction: fraction of knots where any actuator is at
+    # ≥ saturation_threshold of its (AL-scaled) ceiling.
+    sat_count = 0
+    n_knots_u = U.shape[1]
+    for kk in range(n_knots_u):
+        if _is_saturated(U[:, kk], satellite, cnst_cfg.control_limit_scale):
+            sat_count += 1
+    sat_fraction = sat_count / max(1, n_knots_u)
+    if sat_fraction > saturation_skip_fraction:
+        if verbose:
+            print(f"  [detect] reject all candidates: actuator saturated {sat_fraction*100:.0f}% of trajectory > {saturation_skip_fraction*100:.0f}% (physics-limited)")
+        return []
 
     max_window_width = 20
     max_half = max_window_width // 2
@@ -394,31 +424,16 @@ def detect_spikes(
             tau_act = np.asarray(satellite.actuatorTorque(x_k, u_k, B_k))
             if not _is_saturated(u_k, satellite, cnst_cfg.control_limit_scale):
                 continue
-            # Opposes slew error: torque drives ω toward target attitude
-            opposes_err = _torque_opposes_error(
+            # Opposes slew error: torque drives ω toward target attitude.
+            # The "opposes omega" branch was tested 2026-05-17 and found
+            # to be ambiguous (couldn't separate case-13 detumble from
+            # case-3 spike peak with any single threshold).  We rely on
+            # the trajectory-level transition gate above to handle the
+            # tumbling-regime case, so per-knot physics-limit reduces to
+            # the slew-direction check.
+            if _torque_opposes_error(
                 x_k, tau_act, attitude_target[:, ck], satellite
-            )
-            # Strongly opposes ω: α (= J^-1·τ_act) is highly aligned with
-            # -ω̂.  A simple "α·ω < 0" sign check over-rejects real homotopy
-            # spikes whose peak/exit happens to involve mild deceleration.
-            # The alignment threshold captures "the actuator is DEDICATED
-            # to decelerating ω", which is the saturated-detumble pattern
-            # (case 13).  In a real homotopy spike (case 03 peak), α may
-            # have some negative ω component but it's also doing other
-            # things (slew correction) — alignment with -ω̂ is moderate,
-            # not extreme.  Gated by omega_physics_floor since the
-            # alignment metric is unreliable at small ω.
-            omega_k = np.asarray(x_k[0:3])
-            omega_norm = float(np.linalg.norm(omega_k))
-            opposes_omega_strongly = False
-            if omega_norm > omega_physics_floor_rad_s:
-                J_inv = np.asarray(satellite.invInertiaNoRW)
-                alpha = J_inv @ np.asarray(tau_act)
-                alpha_norm = float(np.linalg.norm(alpha))
-                if alpha_norm > 1e-10:
-                    align_neg_omega = -float(np.dot(alpha, omega_k)) / (alpha_norm * omega_norm)
-                    opposes_omega_strongly = align_neg_omega > omega_alignment_threshold
-            if opposes_err or opposes_omega_strongly:
+            ):
                 physics_limited_votes += 1
 
         if physics_limited_votes >= max(1, len(check_knots) // 2 + 1):
@@ -910,6 +925,9 @@ def apply_spike_removal(
     omega_skip_threshold_rad=0.0,
     omega_physics_floor_rad_s=0.1,
     omega_alignment_threshold=0.7,
+    max_trajectory_transitions=10,
+    omega_skip_mean_rad_s=0.08,
+    saturation_skip_fraction=0.6,
     pd_dt_ref=10.0,
     kp_q=2.0,
     kd_w=5.0,
@@ -1063,6 +1081,9 @@ def apply_spike_removal(
         tail_skip_entry_threshold_rad=tail_skip_entry_threshold_rad,
         omega_physics_floor_rad_s=omega_physics_floor_rad_s,
         omega_alignment_threshold=omega_alignment_threshold,
+        max_trajectory_transitions=max_trajectory_transitions,
+        omega_skip_mean_rad_s=omega_skip_mean_rad_s,
+        saturation_skip_fraction=saturation_skip_fraction,
         verbose=verbose,
     )
 
