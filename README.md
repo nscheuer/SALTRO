@@ -1,12 +1,11 @@
 # saltro wide_results gallery
 
-Mobile-friendly view of the wide-test-runner outputs for the `PKMN_antispike` branch baseline. Each scenario has three artifacts:
+Mobile-friendly view of `wide_results/` from the `PKMN_antispike` branch baseline.
+Each scenario: `_final.png`, `_midway.png`, `.gif`.
 
-- `_final.png` — converged trajectory snapshot (PE / quaternion / controls / ω)
-- `_midway.png` — ~10 iteration snapshots showing optimizer evolution
-- `.gif` — full convergence animation
+Last updated: 2026-05-18 10:11:55
 
-Generated 2026-05-18 from baseline commit on `PKMN_antispike`.
+Note: test re-run
 
 ---
 
@@ -14,33 +13,33 @@ Generated 2026-05-18 from baseline commit on `PKMN_antispike`.
 
 ![](wide_results/00_baseline_final.png)
 
-[full midway grid](wide_results/00_baseline_midway.png) · [gif](wide_results/00_baseline.gif)
+[midway](wide_results/00_baseline_midway.png) · [gif](wide_results/00_baseline.gif)
 
-## 01_sat_3_0_mtq — MTQ-only stress (auto-skip)
+## 01_sat_3_0_mtq
 
 ![](wide_results/01_sat_3_0_mtq_final.png)
 
 [midway](wide_results/01_sat_3_0_mtq_midway.png) · [gif](wide_results/01_sat_3_0_mtq.gif)
 
-## 02_sat_0_3_rw — RW-only
+## 02_sat_0_3_rw
 
 ![](wide_results/02_sat_0_3_rw_final.png)
 
 [midway](wide_results/02_sat_0_3_rw_midway.png) · [gif](wide_results/02_sat_0_3_rw.gif)
 
-## 03_sat_3_3_hybrid — 3 MTQ + 3 RW
+## 03_sat_3_3_hybrid
 
 ![](wide_results/03_sat_3_3_hybrid_final.png)
 
 [midway](wide_results/03_sat_3_3_hybrid_midway.png) · [gif](wide_results/03_sat_3_3_hybrid.gif)
 
-## 04_angle_1e2_low — light angle weight
+## 04_angle_1e2_low
 
 ![](wide_results/04_angle_1e2_low_final.png)
 
 [midway](wide_results/04_angle_1e2_low_midway.png) · [gif](wide_results/04_angle_1e2_low.gif)
 
-## 05_angle_1e6_high — heavy angle weight (eigen-mod stress)
+## 05_angle_1e6_high
 
 ![](wide_results/05_angle_1e6_high_final.png)
 
@@ -70,13 +69,13 @@ Generated 2026-05-18 from baseline commit on `PKMN_antispike`.
 
 [midway](wide_results/09_ctrl_0.01x_light_midway.png) · [gif](wide_results/09_ctrl_0.01x_light.gif)
 
-## 10_short_100s_dt1 — physics-bound (short t)
+## 10_short_100s_dt1
 
 ![](wide_results/10_short_100s_dt1_final.png)
 
 [midway](wide_results/10_short_100s_dt1_midway.png) · [gif](wide_results/10_short_100s_dt1.gif)
 
-## 11_long_3000s_dt30 — long dt
+## 11_long_3000s_dt30
 
 ![](wide_results/11_long_3000s_dt30_final.png)
 
@@ -88,7 +87,7 @@ Generated 2026-05-18 from baseline commit on `PKMN_antispike`.
 
 [midway](wide_results/12_omega_5x_midway.png) · [gif](wide_results/12_omega_5x.gif)
 
-## 13_omega_10x — high-tumble stress
+## 13_omega_10x
 
 ![](wide_results/13_omega_10x_final.png)
 
@@ -118,13 +117,13 @@ Generated 2026-05-18 from baseline commit on `PKMN_antispike`.
 
 [midway](wide_results/17_slew_180_midway.png) · [gif](wide_results/17_slew_180.gif)
 
-## 18_omega_10x_rw_aligned — RW axis aligned with spin (stress)
+## 18_omega_10x_rw_aligned
 
 ![](wide_results/18_omega_10x_rw_aligned_final.png)
 
 [midway](wide_results/18_omega_10x_rw_aligned_midway.png) · [gif](wide_results/18_omega_10x_rw_aligned.gif)
 
-## 19_omega_10x_rw_perp — RW perpendicular to spin (stress)
+## 19_omega_10x_rw_perp
 
 ![](wide_results/19_omega_10x_rw_perp_final.png)
 
@@ -136,20 +135,21 @@ Generated 2026-05-18 from baseline commit on `PKMN_antispike`.
 
 [midway](wide_results/20_omega_10x_mtq_only_midway.png) · [gif](wide_results/20_omega_10x_mtq_only.gif)
 
-## 21_vector_point — fixed inertial target vector
+## 21_vector_point
 
 ![](wide_results/21_vector_point_final.png)
 
 [midway](wide_results/21_vector_point_midway.png) · [gif](wide_results/21_vector_point.gif)
 
-## 22_sequential_45_90 — slew to A then to B
+## 22_sequential_45_90
 
 ![](wide_results/22_sequential_45_90_final.png)
 
 [midway](wide_results/22_sequential_45_90_midway.png) · [gif](wide_results/22_sequential_45_90.gif)
 
-## 23_nadir_track — time-varying nadir pointing
+## 23_nadir_track
 
 ![](wide_results/23_nadir_track_final.png)
 
 [midway](wide_results/23_nadir_track_midway.png) · [gif](wide_results/23_nadir_track.gif)
+
