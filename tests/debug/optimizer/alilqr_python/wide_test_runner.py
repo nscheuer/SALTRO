@@ -137,12 +137,61 @@ def run_scenario(name, params):
     h0 = np.zeros(nRW)
     x0 = np.hstack([w0, q0, h0])
 
-    ang = np.radians(params["goal_angle_deg"])
-    qg = np.array([np.cos(ang/2), 0, 0, np.sin(ang/2)])
-    qgoal = np.tile(qg[:, None], (1, 2))
-    bs = np.array([[1, 1], [0, 0], [0, 0]], dtype=float)
     r0 = np.array([7e6, 0, 0]); v0 = np.array([0, 7.5e3, 0])
     jtime = np.array([0.22, 0.22 + params["time_s"] / (36525.0 * 86400.0)])
+
+    goal_type = params.get("goal_type", "quat")
+    if goal_type == "quat":
+        ang = np.radians(params["goal_angle_deg"])
+        qg = np.array([np.cos(ang/2), 0, 0, np.sin(ang/2)])
+        qgoal = np.tile(qg[:, None], (1, 2))
+        bs = np.array([[1, 1], [0, 0], [0, 0]], dtype=float)
+    elif goal_type == "vector":
+        # Vector-pointing: NaN in row 0 signals vector mode; rows 1:4 are
+        # the inertial target direction.  Body x-axis (boresight) tracks
+        # toward this direction.
+        tv = np.asarray(params["target_vec"], dtype=float)
+        tv = tv / np.linalg.norm(tv)
+        qg = np.array([np.nan, tv[0], tv[1], tv[2]])
+        qgoal = np.tile(qg[:, None], (1, 2))
+        bs = np.array([[1, 1], [0, 0], [0, 0]], dtype=float)
+    elif goal_type == "sequential":
+        # Two quaternion goals at different times.
+        ang_a = np.radians(params["goal_a_deg"])
+        ang_b = np.radians(params["goal_b_deg"])
+        qg_a = np.array([np.cos(ang_a/2), 0, 0, np.sin(ang_a/2)])
+        qg_b = np.array([np.cos(ang_b/2), 0, 0, np.sin(ang_b/2)])
+        # jtime: start, switch_time, end.  switch at midpoint by default.
+        switch_frac = float(params.get("switch_frac", 0.5))
+        t_switch = jtime[0] + switch_frac * (jtime[-1] - jtime[0])
+        jtime = np.array([jtime[0], t_switch, jtime[-1]])
+        qgoal = np.column_stack([qg_a, qg_b, qg_b])
+        bs = np.array([[1, 1, 1], [0, 0, 0], [0, 0, 0]], dtype=float)
+    elif goal_type == "nadir":
+        # Time-varying: body x-axis tracks the nadir direction (-r̂(t)).
+        # Pre-compute the orbit to get r(t) per fine knot, then build
+        # per-knot vector pointing target.
+        dt_sec = params["dt"]
+        dt_cent = dt_sec / (36525.0 * 86400.0)
+        jtime_fine = np.arange(jtime[0], jtime[-1] + dt_cent/2, dt_cent)
+        if abs(jtime_fine[-1] - jtime[-1]) > 1e-12:
+            jtime_fine = np.append(jtime_fine, jtime[-1])
+        ok, R_fine, _V, _B, _S, _rho = saltro_py.generate_orbit(
+            r0, v0, jtime_fine, 0, 0, 0, 0, 0
+        )
+        if not ok:
+            raise RuntimeError("nadir orbit pre-compute failed")
+        # Nadir = -r̂ at each knot.
+        R_norm = np.linalg.norm(R_fine, axis=0)
+        nadir = -R_fine / R_norm[None, :]
+        n_fine = nadir.shape[1]
+        qgoal = np.zeros((4, n_fine))
+        qgoal[0, :] = np.nan
+        qgoal[1:4, :] = nadir
+        jtime = jtime_fine
+        bs = np.tile(np.array([[1.0], [0.0], [0.0]]), (1, n_fine))
+    else:
+        raise ValueError(f"unknown goal_type: {goal_type}")
 
     cfg = None
     if params["use_spike"] and os.environ.get("WIDE_NO_SPIKE") != "1":
@@ -183,9 +232,27 @@ def run_scenario(name, params):
         return None
     wall = time.time() - t0
 
-    # Metrics
-    pe = np.array([2*np.degrees(np.arccos(min(abs(float(np.dot(X[3:7,k], qg))), 1)))
-                   for k in range(X.shape[1])])
+    # Metrics — handle quat vs vector goals
+    Nx = X.shape[1]
+    def _pe_at(k):
+        # Use last qgoal column as representative when N_goal < N_traj
+        # (resample zero-order-hold).
+        gk = qgoal[:, min(k * qgoal.shape[1] // Nx, qgoal.shape[1] - 1)]
+        if np.isnan(gk[0]):
+            # Vector pointing: angle between body boresight and target vec
+            qs = X[3:7, k]
+            w, x, y, z = qs
+            C = np.array([
+                [1 - 2*(y*y + z*z), 2*(x*y - w*z),     2*(x*z + w*y)],
+                [2*(x*y + w*z),     1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+                [2*(x*z - w*y),     2*(y*z + w*x),     1 - 2*(x*x + y*y)],
+            ])
+            b_eci = C @ bs[:, min(k, bs.shape[1] - 1)]
+            b_eci = b_eci / max(np.linalg.norm(b_eci), 1e-10)
+            tv = gk[1:4] / max(np.linalg.norm(gk[1:4]), 1e-10)
+            return np.degrees(np.arccos(np.clip(abs(np.dot(b_eci, tv)), 0, 1)))
+        return 2*np.degrees(np.arccos(min(abs(float(np.dot(X[3:7, k], gk))), 1)))
+    pe = np.array([_pe_at(k) for k in range(Nx)])
     q = X[3:7, :]; N = q.shape[1]
     step = np.array([2*np.arccos(min(abs(float(np.dot(q[:,k], q[:,k+1]))), 1)) for k in range(N-1)])
     trav = step.sum()
@@ -206,21 +273,52 @@ def run_scenario(name, params):
     # Use a single timestamp for all three images so they're consistent.
     run_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Save midway snapshot grid
-    save_midway(name, snaps, X, U, ps, sat, qg, r0, v0, jtime, ts=run_ts)
+    save_midway(name, snaps, X, U, ps, sat, qgoal, bs, r0, v0, jtime, ts=run_ts)
     # Save GIF
-    save_gif(name, snaps, ps, sat, qg, ts=run_ts)
+    save_gif(name, snaps, ps, sat, qgoal, bs, ts=run_ts)
     # Save final panel
-    save_final(name, X, U, ps, sat, qg, stop, ts=run_ts)
+    save_final(name, X, U, ps, sat, qgoal, bs, stop, ts=run_ts)
 
     return result
 
 
-def pe_profile(X, qg):
-    return np.array([2*np.degrees(np.arccos(min(abs(float(np.dot(X[3:7,k], qg))), 1)))
-                     for k in range(X.shape[1])])
+def pe_profile(X, qgoal_arr, bs_arr=None):
+    """PE per knot.  Handles quat-mode (qgoal[0] real) and vector-mode
+    (qgoal[0]=NaN, target vec in qgoal[1:4]).  qgoal_arr can be 1-d
+    (single goal), (4, M) with M<N (zero-order-hold resample), or
+    (4, N) per-knot.
+    """
+    Nx = X.shape[1]
+    if qgoal_arr.ndim == 1:
+        qgoal_arr = qgoal_arr[:, None]
+    M = qgoal_arr.shape[1]
+    if bs_arr is None:
+        bs_arr = np.tile(np.array([[1.0], [0.0], [0.0]]), (1, M))
+    elif bs_arr.ndim == 1:
+        bs_arr = bs_arr[:, None]
+    pe = np.zeros(Nx)
+    for k in range(Nx):
+        idx = min(k * M // Nx, M - 1) if M > 1 else 0
+        gk = qgoal_arr[:, idx]
+        bk = bs_arr[:, min(idx, bs_arr.shape[1] - 1)]
+        if np.isnan(gk[0]):
+            qs = X[3:7, k]
+            w, x, y, z = qs
+            C = np.array([
+                [1 - 2*(y*y + z*z), 2*(x*y - w*z),     2*(x*z + w*y)],
+                [2*(x*y + w*z),     1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+                [2*(x*z - w*y),     2*(y*z + w*x),     1 - 2*(x*x + y*y)],
+            ])
+            b_eci = C @ bk
+            b_eci = b_eci / max(np.linalg.norm(b_eci), 1e-10)
+            tv = gk[1:4] / max(np.linalg.norm(gk[1:4]), 1e-10)
+            pe[k] = np.degrees(np.arccos(np.clip(abs(np.dot(b_eci, tv)), 0, 1)))
+        else:
+            pe[k] = 2*np.degrees(np.arccos(min(abs(float(np.dot(X[3:7, k], gk))), 1)))
+    return pe
 
 
-def save_midway(name, snaps, X_final, U_final, ps, sat, qg, r0, v0, jtime, ts=None):
+def save_midway(name, snaps, X_final, U_final, ps, sat, qgoal, bs, r0, v0, jtime, ts=None):
     N = snaps[0]['X'].shape[1]
     t_arr = np.arange(N) * ps.passes[0].dt
     key_iters = sorted(set(i for i in [0, 5, 10, 20, 50, 100, len(snaps)//4, len(snaps)//2, 3*len(snaps)//4, len(snaps)-1]
@@ -233,7 +331,7 @@ def save_midway(name, snaps, X_final, U_final, ps, sat, qg, r0, v0, jtime, ts=No
         axes = axes.reshape(1, 3)
     for row, idx in enumerate(key_iters):
         snap = snaps[idx]
-        pe = pe_profile(snap['X'], qg)
+        pe = pe_profile(snap['X'], qgoal, bs)
         X_s = snap['X']
         U_s = snap['U']
         ax_pe = axes[row, 0]
@@ -258,10 +356,10 @@ def save_midway(name, snaps, X_final, U_final, ps, sat, qg, r0, v0, jtime, ts=No
     fig.savefig(OUT / f"{name}_midway.png", dpi=100); plt.close(fig)
 
 
-def save_final(name, X, U, ps, sat, qg, stop, ts=None):
+def save_final(name, X, U, ps, sat, qgoal, bs, stop, ts=None):
     N = X.shape[1]
     t_arr = np.arange(N) * ps.passes[0].dt
-    pe = pe_profile(X, qg)
+    pe = pe_profile(X, qgoal, bs)
     fig, axes = plt.subplots(2, 2, figsize=(14, 9))
     if ts is None:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -293,7 +391,7 @@ def save_final(name, X, U, ps, sat, qg, stop, ts=None):
     fig.savefig(OUT / f"{name}_final.png", dpi=120); plt.close(fig)
 
 
-def save_gif(name, snaps, ps, sat, qg, ts=None):
+def save_gif(name, snaps, ps, sat, qgoal, bs, ts=None):
     N = snaps[0]['X'].shape[1]
     t_arr = np.arange(N) * ps.passes[0].dt
     n_mtq = sat.numMTQ; n_rw = sat.numRW
@@ -309,7 +407,7 @@ def save_gif(name, snaps, ps, sat, qg, ts=None):
         for ax in axes.flat:
             ax.clear()
         snap = snaps[frame]
-        pe = pe_profile(snap['X'], qg)
+        pe = pe_profile(snap['X'], qgoal, bs)
         X_f = snap['X']; U_f = snap['U']
         J = snap['J']; oi = snap.get('outer_iter', '?')
         # [0,0] PE
@@ -441,6 +539,15 @@ SCENARIOS = [
     # physics-limited reference.
     ("20_omega_10x_mtq_only",   merge(B, sat_fn=create_3_0,
                                       omega0=np.array([0.10, 0.10, 0.10]))),
+
+    # Goal-type ablation: tests the trajectory-level PE-rate gate
+    # doesn't false-fire on non-quat goal types.
+    ("21_vector_point",         merge(B, goal_type="vector",
+                                      target_vec=np.array([0, 0, 1]))),
+    ("22_sequential_45_90",     merge(B, goal_type="sequential",
+                                      goal_a_deg=45.0, goal_b_deg=90.0,
+                                      switch_frac=0.5)),
+    ("23_nadir_track",          merge(B, goal_type="nadir")),
 ]
 
 
