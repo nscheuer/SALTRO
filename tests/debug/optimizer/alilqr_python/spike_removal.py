@@ -210,8 +210,9 @@ def detect_spikes(
     omega_physics_floor_rad_s: float = 0.1,
     omega_alignment_threshold: float = 0.7,
     max_trajectory_transitions: int = 10,
-    omega_skip_mean_rad_s: float = 0.08,
-    saturation_skip_fraction: float = 0.6,
+    omega_skip_mean_rad_s: float = 0.1,
+    pe_rate_skip_threshold_rad_s: float = 0.05,
+    dt: float = 10.0,
     verbose: bool = False,
 ) -> list:
     """Detect spike candidate windows in a trajectory.
@@ -294,31 +295,27 @@ def detect_spikes(
     if verbose and transitions:
         print(f"  [detect] hemisphere transitions: {transitions}")
 
-    # Trajectory-level tumbling gate: when the trajectory is dominated by
-    # high angular velocity (mean |ω| > omega_skip_mean_rad_s) OR the
-    # actuator is saturated for most of the trajectory
-    # (sat_fraction > saturation_skip_fraction), it's in continuous-tumble
-    # mode (e.g. 13_omega_10x).  Substituting any candidate in such a
-    # trajectory pushes off the feasible manifold and breaks convergence.
-    # Both signals are scale-invariant in N, dt, and goal type (works for
-    # vector pointing or time-varying goals).
-    omega_norms_traj = np.linalg.norm(X[0:3, :], axis=0)
-    mean_omega_traj = float(np.mean(omega_norms_traj[np.isfinite(omega_norms_traj)]))
-    if mean_omega_traj > omega_skip_mean_rad_s:
+    # Trajectory-level tumbling gate: mean |Δθ| per knot where θ is the
+    # pointing-error magnitude.  This signal:
+    #   - Is high when the trajectory is tumbling (PE oscillates wildly)
+    #   - Is low for spin-stabilized pointing (high ω but constant PE,
+    #     e.g. when boresight axis = spin axis)
+    #   - Works with vector-pointing, sequential, time-varying goals
+    #     (uses the actual PE per-knot, not absolute ω)
+    # Below threshold → process spike candidates normally.  Above →
+    # trajectory is in tumbling regime, skip substitutions.
+    # Saturation fraction and absolute ω were tested 2026-05-17 and
+    # rejected: case 03 has 96% saturation, and spin-stabilized pointing
+    # can have high ω without high PE rate.
+    theta_clean = theta[~np.isnan(theta)]
+    if theta_clean.size >= 2 and dt > 0:
+        dtheta_per_s = np.abs(np.diff(theta_clean)) / dt
+        mean_pe_rate = float(np.mean(dtheta_per_s))
+    else:
+        mean_pe_rate = 0.0
+    if mean_pe_rate > pe_rate_skip_threshold_rad_s:
         if verbose:
-            print(f"  [detect] reject all candidates: mean ||ω||={np.degrees(mean_omega_traj):.1f}°/s > {np.degrees(omega_skip_mean_rad_s):.1f}°/s (tumbling regime)")
-        return []
-    # Saturation fraction: fraction of knots where any actuator is at
-    # ≥ saturation_threshold of its (AL-scaled) ceiling.
-    sat_count = 0
-    n_knots_u = U.shape[1]
-    for kk in range(n_knots_u):
-        if _is_saturated(U[:, kk], satellite, cnst_cfg.control_limit_scale):
-            sat_count += 1
-    sat_fraction = sat_count / max(1, n_knots_u)
-    if sat_fraction > saturation_skip_fraction:
-        if verbose:
-            print(f"  [detect] reject all candidates: actuator saturated {sat_fraction*100:.0f}% of trajectory > {saturation_skip_fraction*100:.0f}% (physics-limited)")
+            print(f"  [detect] reject all candidates: mean |dPE/dt|={np.degrees(mean_pe_rate):.2f}°/s > {np.degrees(pe_rate_skip_threshold_rad_s):.2f}°/s (tumbling regime)")
         return []
 
     max_window_width = 20
@@ -926,8 +923,8 @@ def apply_spike_removal(
     omega_physics_floor_rad_s=0.1,
     omega_alignment_threshold=0.7,
     max_trajectory_transitions=10,
-    omega_skip_mean_rad_s=0.08,
-    saturation_skip_fraction=0.6,
+    omega_skip_mean_rad_s=0.1,
+    pe_rate_skip_threshold_rad_s=0.05,
     pd_dt_ref=10.0,
     kp_q=2.0,
     kd_w=5.0,
@@ -1083,7 +1080,8 @@ def apply_spike_removal(
         omega_alignment_threshold=omega_alignment_threshold,
         max_trajectory_transitions=max_trajectory_transitions,
         omega_skip_mean_rad_s=omega_skip_mean_rad_s,
-        saturation_skip_fraction=saturation_skip_fraction,
+        pe_rate_skip_threshold_rad_s=pe_rate_skip_threshold_rad_s,
+        dt=dt,
         verbose=verbose,
     )
 
