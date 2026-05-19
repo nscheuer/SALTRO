@@ -313,9 +313,11 @@ def detect_spikes(
         mean_pe_rate = float(np.mean(dtheta_per_s))
     else:
         mean_pe_rate = 0.0
+    if verbose:
+        print(f"  [detect] mean |dPE/dt|={np.degrees(mean_pe_rate):.2f}°/s (gate={np.degrees(pe_rate_skip_threshold_rad_s):.2f}°/s)")
     if mean_pe_rate > pe_rate_skip_threshold_rad_s:
         if verbose:
-            print(f"  [detect] reject all candidates: mean |dPE/dt|={np.degrees(mean_pe_rate):.2f}°/s > {np.degrees(pe_rate_skip_threshold_rad_s):.2f}°/s (tumbling regime)")
+            print(f"  [detect] reject all candidates: tumbling regime")
         return []
 
     max_window_width = 20
