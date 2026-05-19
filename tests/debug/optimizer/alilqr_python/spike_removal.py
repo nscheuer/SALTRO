@@ -120,11 +120,18 @@ def _pointing_error(X, attitude_target, boresight, k):
 
 
 def _find_goal_transitions(attitude_target):
-    """Return set of knot indices where goal changes."""
+    """Return set of knot indices where goal changes.
+
+    Uses equal_nan=True so that vector-pointing goals (qgoal[0]=NaN) which
+    have the same NaN value across knots are correctly detected as the
+    same goal, not as a transition.  Without this, np.allclose treats
+    NaN-NaN as unequal and the entire trajectory gets flagged as a
+    transition zone → all PE NaN → detector disabled."""
     N = attitude_target.shape[1]
     transitions = set()
     for k in range(1, N):
-        if not np.allclose(attitude_target[:, k], attitude_target[:, k-1], atol=1e-9):
+        if not np.allclose(attitude_target[:, k], attitude_target[:, k-1],
+                           atol=1e-9, equal_nan=True):
             transitions.add(k)
     return transitions
 
@@ -314,7 +321,11 @@ def detect_spikes(
     else:
         mean_pe_rate = 0.0
     if verbose:
-        print(f"  [detect] mean |dPE/dt|={np.degrees(mean_pe_rate):.2f}°/s (gate={np.degrees(pe_rate_skip_threshold_rad_s):.2f}°/s)")
+        if theta_clean.size >= 2:
+            t_lo, t_hi = float(theta_clean.min()), float(theta_clean.max())
+            print(f"  [detect] mean |dPE/dt|={np.degrees(mean_pe_rate):.2f}°/s (gate={np.degrees(pe_rate_skip_threshold_rad_s):.2f}°/s) [θ range {np.degrees(t_lo):.0f}–{np.degrees(t_hi):.0f}°, dt={dt:.1f}s, n={theta_clean.size}]")
+        else:
+            print(f"  [detect] mean |dPE/dt|={np.degrees(mean_pe_rate):.2f}°/s (gate={np.degrees(pe_rate_skip_threshold_rad_s):.2f}°/s) [theta_clean.size={theta_clean.size}, dt={dt:.1f}s]")
     if mean_pe_rate > pe_rate_skip_threshold_rad_s:
         if verbose:
             print(f"  [detect] reject all candidates: tumbling regime")
