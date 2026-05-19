@@ -3,9 +3,9 @@
 Mobile-friendly view of `wide_results/` from the `PKMN_antispike` branch baseline.
 Each scenario: `_final.png`, `_midway.png`, `.gif`.
 
-Last updated: 2026-05-18 10:11:55
+Last updated: 2026-05-19 08:57:13
 
-Note: test re-run
+Note: sweep 2026-05-19 — buffer=±2, MTQ auto-skip removed, +case 24 + PE_max_settle metric
 
 ---
 
@@ -152,4 +152,10 @@ Note: test re-run
 ![](wide_results/23_nadir_track_final.png)
 
 [midway](wide_results/23_nadir_track_midway.png) · [gif](wide_results/23_nadir_track.gif)
+
+## 24_mtq_only_vector_point
+
+![](wide_results/24_mtq_only_vector_point_final.png)
+
+[midway](wide_results/24_mtq_only_vector_point_midway.png) · [gif](wide_results/24_mtq_only_vector_point.gif)
 
