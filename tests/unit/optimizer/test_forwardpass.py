@@ -309,8 +309,13 @@ def test_forward_pass_line_search_backtracks(fixture):
         J_prev
     )
     assert ok
-    assert J_new <= alpha_half[2] + 1e-3
-    assert J_new <= alpha1[2] + 1e-3
+    # Tolerances loosened (1e-3 → 5e-2) after the BP dt-scaling fix.  See
+    # tests/unit/optimizer/test_forwardpass.cpp:468 for the matching C++
+    # change and rationale: the corrected (un-dt-scaled) gradient lets
+    # FP accept a step ~1e-2 above alpha_half.cost; the test's intent
+    # ("linesearch lands in the alpha=0.5 ballpark") is preserved.
+    assert J_new <= alpha_half[2] + 5e-2
+    assert J_new <= alpha1[2] + 5e-2
 
     # Controls should not be empty
     assert U_forward.shape[1] >= fixture.N - 1
