@@ -252,22 +252,34 @@ def test_quaternion_derivative_follows_kinematics_equation():
 
 
 def test_pure_x_axis_rotation_changes_quaternion_correctly():
-    """Test that X-axis rotation affects quaternion correctly"""
+    """Pure principal-axis x-spin produces pure q_x rotation.
+
+    The global fixture J is deliberately non-diagonal (see fixture
+    docstring) to catch Hessian-block bugs; that coupling makes
+    ω × (J·ω) ≠ 0 for pure-x spin and quietly pumps energy into
+    y/z. This test specifically verifies the *principal-axis*
+    invariant, so it overrides J to diagonal for this test only.
+    """
     fixture = TestSatelliteDynamicsFixture()
     fixture.setup_method()
-    
+    # Local override: diagonal J makes x a principal axis so
+    # ω × (J·ω) ≡ 0 for ω = [ω_x, 0, 0]. Keep the diagonal magnitudes
+    # from the global fixture so the rotation rate is comparable.
+    fixture.J = np.diag([0.067, 0.071, 0.069])
+    fixture.sat.setInertia(fixture.J)
+
     x0 = np.zeros(fixture.sat.stateDim)
     x0[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.1, 0.0, 0.0])
     x0[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
-    
+
     u_zero = np.zeros(fixture.sat.controlDim)
     x_final = fixture.propagate_steps(x0, u_zero, 10)
-    
+
     q_final = x_final[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4]
-    
+
     # q_x should increase
     assert abs(q_final[1]) > 1e-3
-    # q_y and q_z should remain near zero
+    # q_y and q_z should remain near zero (principal-axis spin → no coupling)
     assert np.isclose(q_final[2], 0.0, atol=1e-6)
     assert np.isclose(q_final[3], 0.0, atol=1e-6)
 
@@ -494,28 +506,54 @@ def test_zero_control_produces_expected_free_body_motion():
 # TEST SECTION 7: RW Momentum Management
 # ============================================================================
 
-def test_rw_momentum_stays_within_bounds_during_control():
-    """Test RW momentum doesn't exceed limits during control"""
+def test_rw_momentum_cost_penalizes_saturation():
+    """Cost gradient activates as RW momentum approaches its limit.
+
+    The dynamics integrates h as a free state — there is no hard clamp.
+    Wheel-saturation is enforced by the optimizer via the cost penalty
+    (rw_AM_weight + RWh_max_mult threshold). This test verifies the
+    relevant mechanism: stageCostJacobians' h-gradient grows sharply
+    once h crosses the RWh_max_mult * h_max threshold.
+
+    Supersedes the prior "PD controller stays within bounds" test,
+    which actually tested a controller property under a marginal
+    scenario, not a dynamics or constraint invariant.
+    """
     fixture = TestSatelliteDynamicsFixture()
     fixture.setup_method()
-    
-    x0 = np.zeros(fixture.sat.stateDim)
-    x0[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.15, 0.1, 0.05])
-    x0[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
-    
-    q_target = np.array([1, 0, 0, 0])
-    kp = 0.00001
-    kd = 0.0001
-    
-    x = x0.copy()
-    for i in range(200):
-        u = fixture.pd_controller(x, q_target, kp, kd)
-        x = fixture.propagate_step(x, u, i)
-        
-        # Check RW momentum limits
-        for j in range(fixture.sat.numRW):
-            h = x[saltro_py.Satellite.RW_MOMENTUM_INDEX + j]
-            assert abs(h) <= fixture.sat.getRW(j).momentumMax * 1.1
+
+    h_max = fixture.sat.getRW(0).momentumMax  # 0.01 per fixture
+
+    cost_cfg = saltro_py.CostConfig()
+    cost_cfg.rw_AM_weight = 1.0
+    cost_cfg.RWh_max_mult = 0.8  # penalty zone above 0.8 * h_max
+    cost_cfg.RWh_ok_mult = 1.0   # mild quadratic below threshold
+
+    def lx_at_h(h_val):
+        x = np.zeros(fixture.sat.stateDim)
+        x[saltro_py.Satellite.QUAT_INDEX] = 1.0  # identity quat
+        x[saltro_py.Satellite.RW_MOMENTUM_INDEX] = h_val
+        u = np.zeros(fixture.sat.controlDim)
+        boresight = np.array([1.0, 0.0, 0.0])
+        attitude_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.array([1e-5, 0.0, 0.0])
+        lx, _, _ = fixture.sat.stageCostJacobians(
+            0, 10, x, u, boresight, attitude_target, B_eci, cost_cfg
+        )
+        return float(lx[saltro_py.Satellite.RW_MOMENTUM_INDEX])
+
+    lx_low  = lx_at_h(0.10 * h_max)   # well below threshold
+    lx_mid  = lx_at_h(0.80 * h_max)   # at threshold
+    lx_high = lx_at_h(0.95 * h_max)   # past threshold, in saturation zone
+
+    # Above the saturation threshold the penalty kicks in hard
+    assert lx_high > 10.0 * abs(lx_low), \
+        f"saturation penalty too weak: lx_low={lx_low}, lx_high={lx_high}"
+    # Gradient sign pushes h back toward zero (positive h → positive lx)
+    assert lx_high > 0.0
+    assert lx_mid > 0.0
+    # Past-threshold gradient strictly exceeds at-threshold gradient
+    assert lx_high > lx_mid
 
 
 def test_control_drives_satellite_to_near_zero_angular_velocity():
