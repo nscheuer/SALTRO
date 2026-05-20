@@ -193,6 +193,16 @@ struct CostConfig {
     double ang_vel_err_dir_N = 0.0;
 
     int ang_cost_func_type = 2;
+
+    /// Optional override for the terminal-knot angle cost function type.
+    /// `-1` (default) means "use `ang_cost_func_type` everywhere", which
+    /// preserves the existing behavior.  Setting this to a non-negative
+    /// value uses that cost type at terminal only, allowing
+    /// stage/terminal split — useful e.g. for case 17 (180° slew) where
+    /// a smooth invariant stage cost frees the mid-trajectory from the
+    /// `q·qg=0` kink, while a kinky terminal cost anchors `q_N → qg`.
+    int terminal_ang_cost_func_type = -1;
+
     bool use_cost_hess = false;
 
     /// Gauss-Newton mode for the angle-cost (q,q) Hessian block. When true,
