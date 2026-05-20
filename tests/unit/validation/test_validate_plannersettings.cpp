@@ -652,17 +652,13 @@ TEST_CASE("Invalid ilqr.grad_tol - negative", "[plannersettings][validation][ilq
     REQUIRE(error_msg == "ilqr.grad_tol invalid");
 }
 
-TEST_CASE("Valid ilqr.grad_tol - zero (disables gradient-based convergence)",
-          "[plannersettings][validation][ilqr]") {
-    // grad_tol=0 means "no gradient-based convergence check"; the validator
-    // and runtime both treat that as a legitimate setting (e.g. wide_test_runner
-    // sets grad_tol=0 explicitly).  Was previously tested as invalid but
-    // that was a test bug.
+TEST_CASE("Invalid ilqr.grad_tol - zero", "[plannersettings][validation][ilqr]") {
     PlannerSettings settings = validSettings();
     settings.passes[0].ilqr.grad_tol = 0.0;
     std::string error_msg;
 
-    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "ilqr.grad_tol invalid");
 }
 
 TEST_CASE("Invalid ilqr.cost_tol - negative", "[plannersettings][validation][ilqr]") {
