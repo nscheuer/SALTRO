@@ -35,12 +35,13 @@ public:
 		: N(n),
 		  settings(),
 		  satellite(makeInertia(), settings),
-		  x0(Satellite::VecX::Zero(satellite.stateDim())),
 		  jtime(Eigen::VectorXd::Zero(N)),
 		  q_goal(Eigen::MatrixXd::Zero(4, N)),
 		  boresight(Eigen::MatrixXd::Zero(3, N)),
 		  attitude_target_traj(Eigen::MatrixXd::Zero(4, N)) {
 		configureSettings();
+		// configureSatellite() resizes x0 to the post-addRW state dimension
+		// (must run before configureTimeline / orbit-gen which reference x0).
 		configureSatellite();
 		configureTimeline();
 		configureTargets();
@@ -236,7 +237,12 @@ private:
 
 		settings.constraints.u_max = Eigen::VectorXd::Constant(satellite.controlDim(), 1.0);
 
-		x0.setZero();
+		// Re-size x0 to the post-addRW state dimension (was initialized in
+		// the constructor body using the post-addRW dim, but a previous
+		// version set it pre-add which made it too small for X.col(0)=x0
+		// downstream).  Explicit re-init here so configureSatellite is
+		// self-contained.
+		x0 = Satellite::VecX::Zero(satellite.stateDim());
 		x0.segment<3>(Satellite::AV_INDEX) = Eigen::Vector3d(0.02, -0.01, 0.015);
 		x0.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
 	}
