@@ -36,6 +36,11 @@ def valid_settings():
     settings.passes[0].auglag = saltro_py.AugLagConfig()
     settings.passes[0].ilqr = saltro_py.ILQRConfig()
     settings.passes[0].reg = saltro_py.RegularizationConfig()
+    # Default RegularizationConfig has reg_init=0 and reg_min=1e-8, which
+    # fails the validator's `reg_min <= reg_init` check.  Bump reg_init so
+    # validSettings() is actually valid.  See the C++ mirror of this fix
+    # at tests/unit/validation/test_validate_plannersettings.cpp.
+    settings.passes[0].reg.reg_init = settings.passes[0].reg.reg_min
     settings.passes[0].linesearch = saltro_py.LineSearchConfig()
     
     return settings
@@ -67,11 +72,15 @@ def test_valid_plannersettings_with_multiple_passes():
     """Valid PlannerSettings with multiple passes should pass"""
     settings = valid_settings()
     settings.num_passes = 2
-    # Copy first pass config to second pass
+    # `settings.passes[1] = settings.passes[0]` runs without error in pybind
+    # but doesn't actually deep-copy the nested reg/cost/auglag/etc. sub-
+    # configs — they revert to the bound `PassConfig` defaults.  Apply the
+    # same reg-init bump as the helper does for passes[0].
     settings.passes[1] = settings.passes[0]
+    settings.passes[1].reg.reg_init = settings.passes[1].reg.reg_min
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
-    assert ok
+
+    assert ok, f"multi-pass should be valid; got: {error_msg}"
 
 
 # ============================================================================
