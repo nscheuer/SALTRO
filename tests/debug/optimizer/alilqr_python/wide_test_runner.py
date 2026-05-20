@@ -73,9 +73,17 @@ def _config_pass(pass_obj, p, *, angle_weight, max_iters, cost_tol):
     c = pass_obj.cost
     c.angle = angle_weight; c.ang_vel = p["ang_vel"]
     c.control_mult = 1.0
-    c.mtq_control_weight = p["mtq_cw"]; c.rw_control_weight = p["rw_cw"]
+    c.mtq_control_weight = float(os.environ.get("WIDE_MTQ_CW", str(p["mtq_cw"])))
+    c.rw_control_weight = float(os.environ.get("WIDE_RW_CW", str(p["rw_cw"])))
     c.ang_cost_func_type = ANG_COST_TYPE; c.use_cost_hess = True
     c.cost_hess_gauss_newton = GAUSS_NEWTON
+    # rw_AM_weight override: when penalizing RW momentum dominates the
+    # trajectory cost (e.g. case 18 where the body could be damped by
+    # absorbing L into the RW, but the cost says "don't"), set this to 0
+    # to let the RW do its physical job.
+    rw_am_override = os.environ.get("WIDE_RW_AM_WEIGHT")
+    if rw_am_override is not None:
+        c.rw_AM_weight = float(rw_am_override)
     c.setTerminalEmphasis(100.0)
     if COSTREF_ENABLED:
         c.ang_vel_err_dir_ratio = COSTREF_BETA
@@ -83,7 +91,22 @@ def _config_pass(pass_obj, p, *, angle_weight, max_iters, cost_tol):
     else:
         # Legacy: w_avang = ang_vel (PhD form). Confirms "legacy" path.
         c.ang_vel_err_dir = c.ang_vel
-    pass_obj.reg.reg_init = float(os.environ.get("WIDE_REG_INIT", "0.0"))
+    # reg_init: default 0, or scale automatically with dt² so the BP's
+    # relative regularization stays roughly constant across time-step
+    # choices.  At dt=10s (reference) the state-coupling term in Q_uu is
+    # baseline; at dt=30 it grows ~9× (control impact d(state)/d(u) ∝ dt,
+    # so d²cost/du² has a dt²-scaled component).  Constant reg_init would
+    # be effectively 9× weaker at dt=30; auto-tune restores parity.
+    # Set WIDE_REG_INIT_AUTO_DT=1 to enable; explicit WIDE_REG_INIT
+    # overrides it.
+    if "WIDE_REG_INIT" in os.environ:
+        pass_obj.reg.reg_init = float(os.environ["WIDE_REG_INIT"])
+    elif os.environ.get("WIDE_REG_INIT_AUTO_DT") == "1":
+        dt_ref = 10.0
+        base_reg = float(os.environ.get("WIDE_REG_INIT_BASE", "1e-8"))
+        pass_obj.reg.reg_init = base_reg * (p["dt"] / dt_ref) ** 2
+    else:
+        pass_obj.reg.reg_init = 0.0
     pass_obj.reg.reg_max = 1e30
     pass_obj.reg.reg_scale = 1.6
     # Default: eigen modification ON with kappa_cap=1e-9 and relative floor.
@@ -548,6 +571,25 @@ SCENARIOS = [
                                       goal_a_deg=45.0, goal_b_deg=90.0,
                                       switch_frac=0.5)),
     ("23_nadir_track",          merge(B, goal_type="nadir")),
+
+    # MTQ-only + vector pointing.  Combines case 01 (no RW) with case 21
+    # (vector goal) to exercise the no-RW + vec-mode interaction.
+    ("24_mtq_only_vector_point", merge(B, sat_fn=create_3_0,
+                                       goal_type="vector",
+                                       target_vec=np.array([0, 0, 1]))),
+
+    # MTQ-only long-duration.  Same MTQ-only sat as case 01 but with
+    # case 11's long time horizon (3000s, dt=30s) — gives the slow MTQ
+    # torque authority more time to drive PE down.
+    ("25_mtq_only_long",        merge(B, sat_fn=create_3_0,
+                                       dt=30.0, time_s=3000.0)),
+
+    # MTQ-only long-duration with fine dt — probe whether dt=30s is too
+    # coarse for the bang-bang MTQ control to integrate correctly against
+    # a rotating B-field.  300 knots instead of 100.
+    ("25b_mtq_only_long_dt10",  merge(B, sat_fn=create_3_0,
+                                       dt=10.0, time_s=3000.0,
+                                       max_iters=300)),
 ]
 
 

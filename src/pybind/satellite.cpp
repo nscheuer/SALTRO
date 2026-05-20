@@ -1052,13 +1052,29 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
 
     const double qdot = q_goal.dot(q);
 
+    // Choose which angle-cost form to use at this knot.  Default (terminal
+    // override = -1) is to use the same type everywhere.  At terminal knot
+    // with a non-negative override, use that instead.
+    const int ang_type = (terminal && cost_cfg.terminal_ang_cost_func_type >= 0)
+                       ? cost_cfg.terminal_ang_cost_func_type
+                       : cost_cfg.ang_cost_func_type;
+
     // ===== CRITICAL FIX: Handle quaternion double-cover =====
-    // Ensure q_goal and q are on the same hemisphere to avoid sign ambiguity
+    // Ensure q_goal and q are on the same hemisphere to avoid sign ambiguity.
+    // Type 6 (option C for case 17): skip per-knot alignment so the cost is
+    // gradient-smooth across qdot=0.  Caller (e.g. wide_test_runner) pre-flips
+    // q_goal based on an initial-hemisphere nudge so the chosen hemisphere
+    // is consistent across the trajectory.
     Vec4 q_goal_aligned = q_goal;
-    if (qdot < 0.0) {
-        q_goal_aligned = -q_goal;
+    double qdot_aligned;
+    if (ang_type == 6) {
+        qdot_aligned = qdot;  // signed; cost uses raw dot product
+    } else {
+        if (qdot < 0.0) {
+            q_goal_aligned = -q_goal;
+        }
+        qdot_aligned = safeAbs(q_goal_aligned.dot(q));
     }
-    const double qdot_aligned = safeAbs(q_goal_aligned.dot(q));
 
     double ang_cost = 0.0;
     if (is_eci_format) {
