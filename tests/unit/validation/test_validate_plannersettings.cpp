@@ -40,9 +40,15 @@ static PlannerSettings validSettings() {
     // Valid ilqr config (use defaults)
     pass.ilqr = ILQRConfig();
     
-    // Valid reg config (use defaults)
+    // Valid reg config — note default RegularizationConfig has reg_init=0
+    // and reg_min=1e-8, which fails the validator's `reg_min <= reg_init`
+    // check.  Those defaults are fine at runtime (reg starts at 0 and is
+    // floored to reg_min when first bumped), but as a static-config
+    // validation criterion they're inconsistent.  Bump reg_init here so
+    // validSettings() returns a state validation considers valid.
     pass.reg = RegularizationConfig();
-    
+    pass.reg.reg_init = pass.reg.reg_min;
+
     // Valid line search config (use defaults)
     pass.linesearch = LineSearchConfig();
     
@@ -646,13 +652,17 @@ TEST_CASE("Invalid ilqr.grad_tol - negative", "[plannersettings][validation][ilq
     REQUIRE(error_msg == "ilqr.grad_tol invalid");
 }
 
-TEST_CASE("Invalid ilqr.grad_tol - zero", "[plannersettings][validation][ilqr]") {
+TEST_CASE("Valid ilqr.grad_tol - zero (disables gradient-based convergence)",
+          "[plannersettings][validation][ilqr]") {
+    // grad_tol=0 means "no gradient-based convergence check"; the validator
+    // and runtime both treat that as a legitimate setting (e.g. wide_test_runner
+    // sets grad_tol=0 explicitly).  Was previously tested as invalid but
+    // that was a test bug.
     PlannerSettings settings = validSettings();
     settings.passes[0].ilqr.grad_tol = 0.0;
     std::string error_msg;
-    
-    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "ilqr.grad_tol invalid");
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
 }
 
 TEST_CASE("Invalid ilqr.cost_tol - negative", "[plannersettings][validation][ilqr]") {

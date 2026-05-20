@@ -38,4 +38,7 @@ jobs:
       - name: Run Python tests
         run: |
           cd tests
-          pytest -q -k "not test_alilqr"
+          # Restrict to unit/ — debug/ contains ad-hoc probe scripts that
+          # happen to start with `test_` but aren't part of the unit test
+          # suite (some import matplotlib, some have stale call signatures).
+          pytest -q -k "not test_alilqr" unit/

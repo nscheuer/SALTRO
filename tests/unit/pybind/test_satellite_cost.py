@@ -9,8 +9,12 @@ in test_satellite_cost.cpp.
 import pytest
 import numpy as np
 import sys
+from pathlib import Path
 from typing import Tuple
-sys.path.insert(0, '/home/nic2703/SALTRO/build')
+
+ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(ROOT / "build"))
+
 import saltro_py as saltro
 
 # ============================================================================
