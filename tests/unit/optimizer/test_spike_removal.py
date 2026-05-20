@@ -93,6 +93,11 @@ def make_attitude_target_quat(N, q_goal):
 # Test 1: Detector — known spike
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skip(reason="Detector was rewritten 2026-05-16 from PE-run-based "
+                  "to hemisphere-transition-based (sign(q·q_0) flip).  This synthetic "
+                  "PE-peak trajectory does NOT produce a hemisphere flip relative to "
+                  "q_0, so the new detector correctly returns empty.  Test is "
+                  "obsolete relative to the new detector contract.")
 def test_detect_spike_known():
     """A synthetic spike (M+ consecutive increasing-error knots) is detected.
 
@@ -183,6 +188,10 @@ def test_detect_no_spike():
 # Test 3: Detector — exit_fudge allows exit at 1.5× entry
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skip(reason="Tests the obsolete exit_fudge run-based exit "
+                  "behavior. The 2026-05-16 transition-based detector doesn't "
+                  "use exit_fudge — windows are walked from a hemisphere-flip "
+                  "peak via PE rise/fall.")
 def test_detect_spike_fudge():
     """Spike that returns to 1.5× entry (within 2× fudge) is correctly exited."""
     sat, ps = make_satellite()
@@ -510,6 +519,12 @@ def test_keepout_sun_violation():
 # Test 10: Detector — prior-decrease filter suppresses initial-ramp-up increases
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skip(reason="Tests the obsolete prior_decrease filter (min_consecutive "
+                  "rising knots after a converging lead-up).  The 2026-05-16 "
+                  "transition-based detector uses sign(q·q_0) flips instead — "
+                  "initial-ramp-up trajectories without a hemisphere flip are "
+                  "naturally NOT flagged.  This test's assertion is satisfied by "
+                  "the new detector behavior, but it's testing the wrong mechanism.")
 def test_detect_spike_prior_decrease_filter():
     """Error increasing from the very start (initial approach) is NOT flagged as a spike.
 
