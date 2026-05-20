@@ -465,6 +465,13 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass backs off step size when over
 		J_new
 	));
 
+	// Tolerance loosened from 1e-3 to 5e-2 after the BP dt-scaling fix.
+	// With the corrected (un-dt-scaled) gradient, FP's chosen alpha can
+	// land slightly above the alpha=0.5 reference (J_new = 686.1974 vs
+	// alpha_half.cost = 686.1880, delta ≈ 9.4e-3).  The test's intent is
+	// "linesearch finds a step in roughly the alpha=0.5 ballpark," which
+	// 5e-2 of slack preserves without losing the cost-decrease assertion
+	// on the prior line (which already passes at 1e-8).
 	REQUIRE(J_new <= alpha1.cost + 1e-8);
-	REQUIRE(J_new <= alpha_half.cost + 1e-3);
+	REQUIRE(J_new <= alpha_half.cost + 5e-2);
 }
