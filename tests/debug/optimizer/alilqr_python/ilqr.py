@@ -4,9 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import saltro_py
-from spike_removal import apply_spike_removal
 
 
 def _augmented_penalty_total(
@@ -110,7 +108,6 @@ def ilqr(
     lambda_aug: list[np.ndarray],
     mu_aug: list[np.ndarray],
     debug: bool = False,
-    spike_removal_cfg: dict | None = None,
     outer_iter: int = 0,
 ) -> tuple[np.ndarray, np.ndarray, str, list, list]:
     passsettings = plannersettings.passes[pass_idx]
@@ -155,13 +152,6 @@ def ilqr(
         reg = max(dreg * reg, reg_min)  # match C++ iLQR.cpp:137-149 — clamp to reg_min, not snap to 0
 
     base_lsl = max(1, int(getattr(passsettings.ilqr, "ls_attempts_lim", 30)))
-    # Post-spike iterations get a modest bump: the substitution perturbs
-    # X, U, so the next BP+FP needs some room to rebuild around a new
-    # trajectory.  If the rebuild requires more than a small multiple of
-    # base_lsl, something else is wrong (bad substitution, stale linearization,
-    # stiff integrator) and more attempts won't fix it — investigate instead.
-    post_spike_lsl = max(base_lsl * 3, 50)
-    spike_occurred_last_iter = False
 
     # Convergence machinery — match C++ iLQR.cpp:220-275.
     #   - Two-tier cost tolerance: `inner_tol = max(ilqr_cost_tol, cost_tol)`.
@@ -178,12 +168,8 @@ def ilqr(
     stagnation_count = 0
 
     for iteration in range(passsettings.ilqr.max_iters):
-
-        effective_lsl = post_spike_lsl if spike_occurred_last_iter else base_lsl
-        spike_occurred_this_iter = False
-
         attempts = 0
-        while reg <= reg_max and attempts < effective_lsl:
+        while reg <= reg_max and attempts < base_lsl:
             attempts += 1
             U_trim = U[:, :X.shape[1] - 1]
             ok_bp, K, d, deltaV = saltro_py.backward_pass(
@@ -216,9 +202,6 @@ def ilqr(
             J_prev_nom = satellite.totalCost(X, U_trim, B, boresight, q_goal, passsettings.cost)
             J_prev = J_prev_nom + _augmented_penalty_total(plannersettings, satellite, X, U, S, lambda_aug, mu_aug)
 
-            # Save nominal controls before forward pass modifies them (needed for spike removal blend)
-            U_bar = U.copy()
-
             ok_fp, X_new, U_new, J_new = saltro_py.forward_pass(
                 satellite,
                 X,
@@ -248,37 +231,6 @@ def ilqr(
 
             X = X_new
             U = U_new
-
-            # Spike removal: detect and replace homotopy artifacts after accepted step.
-            # Gate: if the current trajectory is close to satisfying AL constraints
-            # (max violation within gate_ratio × constraint_tol), skip.  A PD
-            # substitution at this stage would perturb the trajectory enough that
-            # high μ penalties make recovery hard.  Naturally adaptive — scales
-            # with constraint_tol, no fixed iteration threshold.
-            if spike_removal_cfg is not None:
-                from alilqr import max_constraint_violation
-                max_c = max_constraint_violation(plannersettings, satellite, X, U, S)
-                gate_ratio = spike_removal_cfg.get("constraint_gate_ratio", 10.0)
-                gate_thresh = gate_ratio * passsettings.auglag.constraint_tol
-                if max_c < gate_thresh:
-                    if spike_removal_cfg.get("verbose", False):
-                        print(f"[SpikeRemoval] outer={outer_iter} iter={iteration}: "
-                              f"skipping (max_c={max_c:.2e} < {gate_thresh:.2e}, "
-                              f"{gate_ratio}× constraint_tol)")
-                else:
-                    # Strip the gate key before passing through (apply_spike_removal
-                    # doesn't accept it).
-                    cfg_inner = {k: v for k, v in spike_removal_cfg.items()
-                                 if k != "constraint_gate_ratio"}
-                    X, U, spike_happened = apply_spike_removal(
-                        X, U, U_bar, K_list,
-                        satellite, plannersettings, pass_idx,
-                        R, V, B, S, rho, jtime, boresight, q_goal,
-                        iteration=iteration,
-                        **cfg_inner,
-                    )
-                    if spike_happened:
-                        spike_occurred_this_iter = True
 
             delta_J = abs(J_prev - J_new)
 
@@ -336,12 +288,9 @@ def ilqr(
 
             break
 
-        # Update spike tracker for next iteration's ls budget.
-        spike_occurred_last_iter = spike_occurred_this_iter
-
         if reg > reg_max:
             return X, U, "reg_exceeded", snapshots, transitions
-        if attempts >= effective_lsl:
+        if attempts >= base_lsl:
             return X, U, "ls_attempts_exceeded", snapshots, transitions
 
     return X, U, "max_iters", snapshots, transitions
