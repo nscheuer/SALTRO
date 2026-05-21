@@ -520,7 +520,76 @@ def test_disturbances_are_finite_over_full_orbit():
     
     x = np.zeros(fixture.sat.stateDim)
     x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
-    
+
     for i in range(fixture.n_steps):
         tau = fixture.get_disturbance_torque(x, dist, i)
         assert np.all(np.isfinite(tau))
+
+
+# ============================================================================
+# TEST SECTION 8: SRP eclipse + direction sensitivity
+# ============================================================================
+
+def test_srp_torque_is_zero_at_orbit_eclipse_steps():
+    """Stronger than `test_srp_zero_in_eclipse` (which feeds a hand-zeroed
+    sun vector): use a step where `generate_orbit` itself reports S=0
+    because the satellite is in Earth's shadow. The full disturbance
+    pipeline must respect that — no leakage of stale sun state."""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    eclipse_steps = [i for i in range(fixture.n_steps)
+                     if np.linalg.norm(fixture.S[:, i]) == 0.0]
+    assert len(eclipse_steps) > 0, (
+        "fixture orbit has no eclipse steps — extend the orbit or "
+        "select a longer trajectory"
+    )
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_srp = True
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+
+    for step in eclipse_steps[:5]:
+        tau_srp = fixture.get_disturbance_torque(x, dist, step)
+        assert np.allclose(tau_srp, np.zeros(3), atol=1e-15), (
+            f"SRP non-zero at eclipse step {step}: τ={tau_srp}"
+        )
+
+
+def test_srp_torque_responds_to_sun_direction_flip():
+    """The fixture geometry is not face-symmetric (face areas and
+    reflectivities differ across +/- axes). Flipping the sun vector
+    should produce a torque that is NOT simply the negation of the
+    original — confirming the geometry-dependent face contributions
+    are actually being summed (not, e.g., cancelling out)."""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    srp = saltro_py.SRPDisturbance(fixture.geometry)
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_srp = True
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    x_base = x[:7]
+
+    # Off-axis sun: a sun vector along a principal axis produces zero
+    # τ_SRP for face-centered geometry (r × F = 0 because r ∥ F).
+    S_plus = np.array([0.6, 0.5, 0.6])
+    S_plus /= np.linalg.norm(S_plus)
+    S_minus = -S_plus
+
+    tau_plus = srp.torque(x_base, dist, S_plus)
+    tau_minus = srp.torque(x_base, dist, S_minus)
+
+    # Each torque must be non-trivial individually
+    assert np.linalg.norm(tau_plus) > 0.0
+    assert np.linalg.norm(tau_minus) > 0.0
+
+    # And they must NOT be exact negatives (asymmetric geometry)
+    assert not np.allclose(tau_plus, -tau_minus, atol=1e-12), (
+        "τ_plus == -τ_minus implies face-symmetric geometry — but the "
+        "fixture has differing +X / -X face properties"
+    )

@@ -1017,3 +1017,59 @@ def test_hessian_wrt_state_matches_finite_differences_single_component():
             abs_err = abs(analytical - numerical)
             
             assert (rel_err <= rel_tol or abs_err <= abs_tol)
+
+
+def quaternion_error_short_way(q, q_target):
+    """Proper quaternion error: q_err = q_target^{-1} ⊗ q, with short-way
+    sign flip if the scalar part is negative. Returns the 3-vector part."""
+    qt0, qt1, qt2, qt3 = q_target
+    q0, q1, q2, q3 = q
+    qe0 = qt0 * q0 + qt1 * q1 + qt2 * q2 + qt3 * q3
+    qe1 = qt0 * q1 - qt1 * q0 - qt2 * q3 + qt3 * q2
+    qe2 = qt0 * q2 + qt1 * q3 - qt2 * q0 - qt3 * q1
+    qe3 = qt0 * q3 - qt1 * q2 + qt2 * q1 - qt3 * q0
+    if qe0 < 0.0:
+        qe1, qe2, qe3 = -qe1, -qe2, -qe3
+    return np.array([qe1, qe2, qe3])
+
+
+# ============================================================================
+# TEST SECTION 13: Quaternion error formula utility
+# ============================================================================
+
+def test_quaternion_error_short_way_at_identity_target_matches_vector_part():
+    """For q_target = identity, the proper short-way error equals q[1:]
+    (when q[0] >= 0). Documents the regime where the legacy
+    `pd_controller` helper's q[1:] - q_target[1:] simplification is
+    valid."""
+    q = np.array([0.99, 0.05, 0.03, 0.02])
+    q /= np.linalg.norm(q)
+    q_target = np.array([1.0, 0.0, 0.0, 0.0])
+
+    err = quaternion_error_short_way(q, q_target)
+
+    assert np.allclose(err, q[1:], atol=1e-15)
+
+
+def test_quaternion_error_short_way_flips_sign_when_scalar_negative():
+    """When q is on the far hemisphere (q[0] < 0 after q_target_inv ⊗ q),
+    the short-way flip must invert the vector part — otherwise the
+    controller drives the long way around."""
+    q = np.array([-0.5, 0.5, 0.5, 0.5])  # 240° rotation, far hemisphere
+    q /= np.linalg.norm(q)
+    q_target = np.array([1.0, 0.0, 0.0, 0.0])
+
+    err = quaternion_error_short_way(q, q_target)
+
+    # After flip, err = -q[1:]
+    assert np.allclose(err, -q[1:], atol=1e-15)
+
+
+def test_quaternion_error_short_way_zero_at_target():
+    """err(q_target, q_target) == 0 exactly."""
+    rng = np.random.default_rng(20260515)
+    for _ in range(5):
+        q = rng.normal(size=4)
+        q /= np.linalg.norm(q)
+        err = quaternion_error_short_way(q, q)
+        assert np.allclose(err, 0.0, atol=1e-15)
