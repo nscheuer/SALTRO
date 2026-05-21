@@ -600,9 +600,9 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     hess_xx.setZero();
     hess_ux.setZero();
     hess_uu.setZero();
-    
-    // Extract state components
-    Vec3 w = x.segment<3>(AV_INDEX);
+
+    // Extract state components (ω intentionally not extracted: the corrected
+    // ∂²ω̇/∂ω² block below is ω-independent — it's the Hessian of a quadratic).
     Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     Vec7 x_base = x.head<7>();
     x_base.segment<4>(QUAT_INDEX) = q;
@@ -627,41 +627,36 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     // Angular velocity Hessian: ∂²wdot_i/∂x_j∂x_k (indexed by output i = 0,1,2)
     // =========================================================================
     // wdot = invJcom_noRW_ * (tau - w × (Jcom*w + h_rw))
-    
-    // For each output component i of wdot:
+    //
+    // ∂²ω̇_i/∂ω_j∂ω_k: derived from g(ω) = ω × (J·ω). Since g is quadratic in ω,
+    // its Hessian is a CONSTANT tensor (independent of ω). In index form:
+    //   ∂²g_i/∂ω_j∂ω_k = ε_{ijn} J_{nk} + ε_{ikn} J_{nj}
+    // Equivalently, with M(v) := J^{-1}·skew(v)·J,
+    //   ∂²ω̇_i/∂ω_j∂ω_k = -M(e_j)_{ik} - M(e_k)_{ij}
+    // Sanity: for J = c·I, M(e) = skew(e), giving ε_{ijk}+ε_{ikj}=0 — i.e.,
+    // ω × (cω) = 0 has zero Hessian. ✓
+    // (Prior implementation multiplied a constant "d2cross" by ω, which gave
+    //  w-linear output instead of a constant and was also missing terms.)
+    {
+        Mat33 M[3];  // M[v_idx] = invJcom_noRW · skew(e_{v_idx}) · Jcom
+        for (int v = 0; v < 3; ++v) {
+            Vec3 ev = Vec3::Zero(); ev(v) = 1.0;
+            M[v] = invJcom_noRW_ * saltro::math::skewSymmetric(ev) * Jcom_;
+        }
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                for (int k = 0; k < 3; ++k) {
+                    const double hess_val = -M[j](i, k) - M[k](i, j);
+                    hess_xx.slice(AV_INDEX + i)(AV_INDEX + j, AV_INDEX + k) = hess_val;
+                }
+            }
+        }
+    }
+
+    // (Continue with mixed and pure-w blocks that depend on w/h/u.)
     for (int i = 0; i < 3; ++i) {
         Vec3 ei = Vec3::Zero();
         ei(i) = 1.0;
-        
-        // ∂²wdot_i/∂w_j∂w_k: from d/dw_j of [invJcom_noRW * (-w × (Jcom*w))]_i
-        // The cross product w × (Jcom*w) is quadratic in w
-        // d/dw_j d/dw_k of (w × (Jcom*w))_i = ei^T * [skew(e_j)*Jcom + Jcom*skew(e_j)^T] * e_k
-        // where first term acts on w and second on (Jcom*w)
-        
-        for (int j = 0; j < 3; ++j) {
-            Vec3 ej = Vec3::Zero();
-            ej(j) = 1.0;
-            
-            for (int k = 0; k < 3; ++k) {
-                Vec3 ek = Vec3::Zero();
-                ek(k) = 1.0;
-                
-                // Second derivative of cross product: a × b
-                // ∂²(a × b)/∂a_j∂a_k for b = Jcom*w
-                // = -skew(ek)*Jcom + Jcom*skew(ek) applied to ej
-                // ∂²(a × b)/∂a_j∂b_k for a = w, b = Jcom*w
-                // = -skew(ej)*skew(Jcom*ek)
-                
-                Mat33 d2cross = saltro::math::skewSymmetric(ej) * Jcom_ * saltro::math::skewSymmetric(ek)
-                              + saltro::math::skewSymmetric(ej) * saltro::math::skewSymmetric(ek) * Jcom_
-                              - saltro::math::skewSymmetric(saltro::math::skewSymmetric(ej) * Jcom_ * ek);
-                
-                // Apply invJcom_noRW and extract component i
-                Vec3 result = -d2cross * w;
-                double hess_val = ei.dot(invJcom_noRW_ * result);
-                hess_xx.slice(AV_INDEX + i)(AV_INDEX + j, AV_INDEX + k) = hess_val;
-            }
-        }
         
         // ∂²wdot_i/∂w_j∂h_k: from d/dw_j of [invJcom_noRW * (-w × h_rw)]
         // = -d/dw_j of [w × (axis_k * h_k)] = -skew(ej) * axis_k
