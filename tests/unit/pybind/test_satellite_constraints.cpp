@@ -1022,6 +1022,12 @@ TEST_CASE("constraints: maximum actuators", "[satellite][constraints][max_actuat
         axis(i % 3) = 1.0;
         sat.addRW(axis, 0.001, 1e-5, 0.0, 0.01);
     }
+    // Add MAX_NUM_MAGIC magic actuators
+    for (int i = 0; i < saltro::limits::MAX_NUM_MAGIC; ++i) {
+        Vec3 axis = Vec3::Zero();
+        axis(i % 3) = 1.0;
+        sat.addMagic(axis, 0.01);
+    }
 
     int n = sat.stateDim();
     int m = sat.controlDim();
@@ -1031,7 +1037,9 @@ TEST_CASE("constraints: maximum actuators", "[satellite][constraints][max_actuat
     auto cfg = defaultCnstCfg();
 
     auto c = sat.constraints(0, 10, x, u, sunZ(), cfg);
-    int expected = 1 + 1 + 2 * saltro::limits::MAX_NUM_MTQ + 5 * saltro::limits::MAX_NUM_RW;
+    int expected = 1 + 1 + 2 * saltro::limits::MAX_NUM_MTQ
+                         + 5 * saltro::limits::MAX_NUM_RW
+                         + 2 * saltro::limits::MAX_NUM_MAGIC;
     REQUIRE(c.size() == expected);
     REQUIRE(expected == saltro::limits::MAX_CONSTRAINT_DIM);
 }

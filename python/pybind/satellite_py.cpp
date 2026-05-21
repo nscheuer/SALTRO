@@ -1,4 +1,4 @@
-// PYBIND_DEPENDS: actuator MTQ RW plannersettings geometryconfig
+// PYBIND_DEPENDS: actuator MTQ RW Magic plannersettings geometryconfig
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -118,10 +118,35 @@ Raises
 RuntimeError
     If maximum number of RWs already added
 )doc")
+        .def("addMagic", &Satellite::addMagic,
+             py::arg("axis"),
+             py::arg("max_torque"),
+             R"doc(
+Add a "magic" (direct body-torque) actuator to the satellite.
+
+Magic actuators apply a body-frame torque ``τ = u * axis`` directly
+along a fixed body axis, with no environmental dependence and no
+internal momentum-storage state. Useful for modelling thrusters or as
+test fixtures (no MTQ rank deficiency, no RW back-reaction).
+
+Parameters
+----------
+axis : ndarray (3,)
+    Torque axis direction in body frame (will be normalized)
+max_torque : float
+    Maximum torque magnitude (N·m)
+
+Raises
+------
+RuntimeError
+    If maximum number of magic actuators already added
+)doc")
         .def_property_readonly("numMTQ", &Satellite::numMTQ,
                                "Get the number of MTQs")
         .def_property_readonly("numRW", &Satellite::numRW,
                                "Get the number of reaction wheels")
+        .def_property_readonly("numMagic", &Satellite::numMagic,
+                               "Get the number of magic (direct body-torque) actuators")
         
         // Actuator access
         .def("getMTQ",
@@ -168,10 +193,32 @@ Raises
 IndexError
     If index is out of range
 )doc")
-        
+        .def("getMagic",
+             py::overload_cast<int>(&Satellite::getMagic, py::const_),
+             py::arg("i"),
+             py::return_value_policy::reference_internal,
+             R"doc(
+Get the magic (direct body-torque) actuator at the specified index.
+
+Parameters
+----------
+i : int
+    Index of the magic actuator (0-based)
+
+Returns
+-------
+Magic
+    Reference to the magic actuator
+
+Raises
+------
+IndexError
+    If index is out of range
+)doc")
+
         // Dimensions
         .def_property_readonly("controlDim", &Satellite::controlDim,
-                               "Get the control dimension (numMTQ + numRW)")
+                               "Get the control dimension (numMTQ + numRW + numMagic)")
         .def_property_readonly("stateDim", &Satellite::stateDim,
                                "Get the state dimension (7 + numRW)")
         .def_property_readonly("reducedStateDim", &Satellite::reducedStateDim,
