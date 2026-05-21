@@ -4,7 +4,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import saltro_py
+from spike_removal import apply_spike_removal
 
 
 def _augmented_penalty_total(
@@ -34,10 +36,13 @@ def _augmented_penalty_total(
             uk = np.zeros(satellite.controlDim)
 
         ck = np.asarray(satellite.constraints(k, N, xk, uk, S[:, k], cnst_cfg), dtype=float)
-        ck_pos = np.maximum(0.0, ck)
         lam_k = np.asarray(lambda_aug[k], dtype=float)
         mu_k = np.asarray(mu_aug[k], dtype=float)
-        total += float(lam_k @ ck_pos + 0.5 * np.sum(mu_k * ck_pos * ck_pos))
+        # Lambda term always active; mu penalty active when c>0 OR lambda>0
+        for i in range(len(ck)):
+            total += lam_k[i] * ck[i]
+            if ck[i] > 0.0 or lam_k[i] > 0.0:
+                total += 0.5 * mu_k[i] * ck[i] * ck[i]
 
     return total
 
@@ -104,7 +109,9 @@ def ilqr(
     boresight: np.ndarray,
     lambda_aug: list[np.ndarray],
     mu_aug: list[np.ndarray],
-    debug: bool = False
+    debug: bool = False,
+    spike_removal_cfg: dict | None = None,
+    outer_iter: int = 0,
 ) -> tuple[np.ndarray, np.ndarray, str, list, list]:
     passsettings = plannersettings.passes[pass_idx]
     
@@ -123,17 +130,61 @@ def ilqr(
                 "U": U.copy(),
                 "J": J,
                 "q_goal": q_goal.copy(),
-                "boresight": boresight.copy(),
                 "components": components,
                 "R": R.copy(),
                 "B": B.copy(),
             }
         )
 
-    for iteration in range(passsettings.ilqr.max_iters):
-        reg = passsettings.reg.reg_init
+    # Two-variable regularization (rho, drho) matching C++ iLQR.
+    reg = passsettings.reg.reg_init
+    dreg = 0.0
+    reg_scale = passsettings.reg.reg_scale
+    reg_bump = passsettings.reg.reg_bump
+    reg_min = passsettings.reg.reg_min
+    reg_max = passsettings.reg.reg_max
 
-        while reg <= passsettings.reg.reg_max:
+    def increase_reg():
+        nonlocal reg, dreg
+        dreg = max(dreg * reg_scale, reg_scale)
+        reg = max(reg * dreg, reg_min)
+
+    def decrease_reg():
+        nonlocal reg, dreg
+        dreg = min(dreg / reg_scale, 1.0 / reg_scale)
+        reg = max(dreg * reg, reg_min)  # match C++ iLQR.cpp:137-149 — clamp to reg_min, not snap to 0
+
+    base_lsl = max(1, int(getattr(passsettings.ilqr, "ls_attempts_lim", 30)))
+    # Post-spike iterations get a modest bump: the substitution perturbs
+    # X, U, so the next BP+FP needs some room to rebuild around a new
+    # trajectory.  If the rebuild requires more than a small multiple of
+    # base_lsl, something else is wrong (bad substitution, stale linearization,
+    # stiff integrator) and more attempts won't fix it — investigate instead.
+    post_spike_lsl = max(base_lsl * 3, 50)
+    spike_occurred_last_iter = False
+
+    # Convergence machinery — match C++ iLQR.cpp:220-275.
+    #   - Two-tier cost tolerance: `inner_tol = max(ilqr_cost_tol, cost_tol)`.
+    #     Disjunctive convergence (default): exit on ANY of {inner cost, grad}.
+    #     Conjunctive: require BOTH outer-tol cost AND grad.
+    #   - Stagnation counter: increments on `delta_J <= cost_tol` (strict);
+    #     resets otherwise.  Exit when count >= z_count_lim.
+    ilqr_cost_tol_loose = float(getattr(passsettings.ilqr, "ilqr_cost_tol",
+                                         passsettings.ilqr.cost_tol))
+    inner_tol = max(ilqr_cost_tol_loose, passsettings.ilqr.cost_tol)
+    grad_tol = float(getattr(passsettings.ilqr, "grad_tol", 0.0))
+    z_count_lim = int(getattr(passsettings.ilqr, "z_count_lim", 0))
+    conjunctive = bool(getattr(passsettings.ilqr, "conjunctive_convergence", False))
+    stagnation_count = 0
+
+    for iteration in range(passsettings.ilqr.max_iters):
+
+        effective_lsl = post_spike_lsl if spike_occurred_last_iter else base_lsl
+        spike_occurred_this_iter = False
+
+        attempts = 0
+        while reg <= reg_max and attempts < effective_lsl:
+            attempts += 1
             U_trim = U[:, :X.shape[1] - 1]
             ok_bp, K, d, deltaV = saltro_py.backward_pass(
                 satellite,
@@ -152,8 +203,11 @@ def ilqr(
                 reg,
             )
             if not ok_bp:
-                reg *= passsettings.reg.reg_scale
+                increase_reg()
                 continue
+
+            # Decrease reg after successful BP (like original ALTRO)
+            decrease_reg()
 
             K_list = [K[k] for k in range(K.shape[0])]
             d_list = [d[:, k] for k in range(d.shape[1])]
@@ -161,6 +215,9 @@ def ilqr(
             U_trim = U[:, :X.shape[1] - 1]
             J_prev_nom = satellite.totalCost(X, U_trim, B, boresight, q_goal, passsettings.cost)
             J_prev = J_prev_nom + _augmented_penalty_total(plannersettings, satellite, X, U, S, lambda_aug, mu_aug)
+
+            # Save nominal controls before forward pass modifies them (needed for spike removal blend)
+            U_bar = U.copy()
 
             ok_fp, X_new, U_new, J_new = saltro_py.forward_pass(
                 satellite,
@@ -183,14 +240,56 @@ def ilqr(
                 J_prev,
             )
             if not ok_fp:
-                reg *= passsettings.reg.reg_scale
+                # Triple increase: increaseReg + bump + increaseReg
+                increase_reg()
+                reg += reg_bump
+                increase_reg()
                 continue
 
             X = X_new
             U = U_new
 
+            # Spike removal: detect and replace homotopy artifacts after accepted step.
+            # Gate: if the current trajectory is close to satisfying AL constraints
+            # (max violation within gate_ratio × constraint_tol), skip.  A PD
+            # substitution at this stage would perturb the trajectory enough that
+            # high μ penalties make recovery hard.  Naturally adaptive — scales
+            # with constraint_tol, no fixed iteration threshold.
+            if spike_removal_cfg is not None:
+                from alilqr import max_constraint_violation
+                max_c = max_constraint_violation(plannersettings, satellite, X, U, S)
+                gate_ratio = spike_removal_cfg.get("constraint_gate_ratio", 10.0)
+                gate_thresh = gate_ratio * passsettings.auglag.constraint_tol
+                if max_c < gate_thresh:
+                    if spike_removal_cfg.get("verbose", False):
+                        print(f"[SpikeRemoval] outer={outer_iter} iter={iteration}: "
+                              f"skipping (max_c={max_c:.2e} < {gate_thresh:.2e}, "
+                              f"{gate_ratio}× constraint_tol)")
+                else:
+                    # Strip the gate key before passing through (apply_spike_removal
+                    # doesn't accept it).
+                    cfg_inner = {k: v for k, v in spike_removal_cfg.items()
+                                 if k != "constraint_gate_ratio"}
+                    X, U, spike_happened = apply_spike_removal(
+                        X, U, U_bar, K_list,
+                        satellite, plannersettings, pass_idx,
+                        R, V, B, S, rho, jtime, boresight, q_goal,
+                        iteration=iteration,
+                        **cfg_inner,
+                    )
+                    if spike_happened:
+                        spike_occurred_this_iter = True
+
             delta_J = abs(J_prev - J_new)
-            
+
+            # Convergence checks — match C++ iLQR.cpp:227-275.
+            inner_cost_converged = (delta_J <= inner_tol)
+            outer_cost_converged = (delta_J <= passsettings.ilqr.cost_tol)
+            grad_converged = False
+            if grad_tol > 0.0:
+                max_d_norm = max(np.linalg.norm(d_k) for d_k in d_list)
+                grad_converged = (max_d_norm <= grad_tol)
+
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
                 snapshots.append(
@@ -199,7 +298,6 @@ def ilqr(
                         "U": U.copy(),
                         "J": J_new,
                         "q_goal": q_goal.copy(),
-                        "boresight": boresight.copy(),
                         "components": components,
                         "R": R.copy(),
                         "B": B.copy(),
@@ -209,15 +307,41 @@ def ilqr(
                     "bp_ok": True,
                     "fp_ok": True,
                     "act_delta": delta_J,
-                    "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol
+                    "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol,
+                    "inner_cost_converged": inner_cost_converged,
+                    "grad_converged": grad_converged,
+                    "stagnation_count": stagnation_count,
                 })
-            
-            if delta_J <= passsettings.ilqr.cost_tol:
-                return X, U, "converged", snapshots, transitions
-            
+
+            if conjunctive:
+                # Conjunctive: require BOTH outer-tol cost AND grad-ok (grad_tol≤0
+                # treats grad-ok as satisfied).
+                grad_ok = (grad_tol <= 0.0) or grad_converged
+                if outer_cost_converged and grad_ok:
+                    return X, U, "converged", snapshots, transitions
+            else:
+                # Disjunctive (default): exit on ANY of {loose inner cost, grad}.
+                if inner_cost_converged or (grad_tol > 0.0 and grad_converged):
+                    return X, U, "converged", snapshots, transitions
+
+            # Stagnation counter — increments on STRICT cost-tol satisfaction
+            # for `z_count_lim` consecutive iterations.  Prevents burning
+            # max_iters on a flat plateau.
+            if outer_cost_converged:
+                stagnation_count += 1
+                if z_count_lim > 0 and stagnation_count >= z_count_lim:
+                    return X, U, "converged", snapshots, transitions
+            else:
+                stagnation_count = 0
+
             break
 
-        if reg > passsettings.reg.reg_max:
+        # Update spike tracker for next iteration's ls budget.
+        spike_occurred_last_iter = spike_occurred_this_iter
+
+        if reg > reg_max:
             return X, U, "reg_exceeded", snapshots, transitions
-        
+        if attempts >= effective_lsl:
+            return X, U, "ls_attempts_exceeded", snapshots, transitions
+
     return X, U, "max_iters", snapshots, transitions
