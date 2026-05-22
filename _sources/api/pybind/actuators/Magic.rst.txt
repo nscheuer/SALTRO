@@ -1,0 +1,6 @@
+Magic
+=====
+
+.. doxygenfile:: pybind/actuators/Magic.h
+   :project: saltro
+   :path: ../include/saltro

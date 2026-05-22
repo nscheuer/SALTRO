@@ -413,6 +413,7 @@
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
 <li class="toctree-l1 has-children"><a class="reference internal" href="actuators/index.html">actuators</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="actuators/MTQ.html">MTQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="actuators/Magic.html">Magic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="actuators/RW.html">RW</a></li>
 <li class="toctree-l2"><a class="reference internal" href="actuators/actuator.html">actuator</a></li>
 </ul>
@@ -774,6 +775,24 @@
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N9Satellite8addMagicERK4Vec3d">
+<span id="_CPPv3N9Satellite8addMagicERK4Vec3d"></span><span id="_CPPv2N9Satellite8addMagicERK4Vec3d"></span><span id="Satellite::addMagic__Vec3CR.double"></span><span class="target" id="classSatellite_1a5e9f0ee1496eab5ea94652a53098aeb9"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">addMagic</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N9Satellite4Vec3E" title="Satellite::Vec3"><span class="n"><span class="pre">Vec3</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">axis</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_torque</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N9Satellite8addMagicERK4Vec3d" title="Link to this definition">#</a><br /></dt>
+<dd><p>Add a magic (direct body-torque) actuator to the satellite. </p>
+<p><a class="reference internal" href="actuators/Magic.html#classMagic"><span class="std std-ref">Magic</span></a> actuators apply a body-frame torque <span class="math notranslate nohighlight">\(u \cdot \mathbf{a}\)</span> along a fixed body axis with no environmental dependence and no internal momentum-storage state. Used for modelling thrusters or as test fixtures (no <a class="reference internal" href="actuators/MTQ.html#classMTQ"><span class="std std-ref">MTQ</span></a> rank deficiency, no <a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> back-reaction).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>axis</strong> – Unit vector specifying torque direction (body frame). </p></li>
+<li><p><strong>max_torque</strong> – Maximum torque magnitude (N·m). </p></li>
+</ul>
+</dd>
+<dt class="field-even">Throws<span class="colon">:</span></dt>
+<dd class="field-even"><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – If max magic-actuator count exceeded. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK9Satellite6numMTQEv">
 <span id="_CPPv3NK9Satellite6numMTQEv"></span><span id="_CPPv2NK9Satellite6numMTQEv"></span><span id="Satellite::numMTQC"></span><span class="target" id="classSatellite_1afb2821c0f68c55d6c6193e10f6ebb0d7"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">numMTQ</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite6numMTQEv" title="Link to this definition">#</a><br /></dt>
 <dd><p>Get number of magnetorquers. </p>
@@ -796,10 +815,21 @@
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK9Satellite8numMagicEv">
+<span id="_CPPv3NK9Satellite8numMagicEv"></span><span id="_CPPv2NK9Satellite8numMagicEv"></span><span id="Satellite::numMagicC"></span><span class="target" id="classSatellite_1ad4cc4ac9baa590e602a9fcaeab7c7c5f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">numMagic</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite8numMagicEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get number of magic actuators. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of magic actuators. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK9Satellite10controlDimEv">
 <span id="_CPPv3NK9Satellite10controlDimEv"></span><span id="_CPPv2NK9Satellite10controlDimEv"></span><span id="Satellite::controlDimC"></span><span class="target" id="classSatellite_1a78e13aa519d87a7bbc99ddbefe2c7dcb"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">controlDim</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite10controlDimEv" title="Link to this definition">#</a><br /></dt>
 <dd><p>Get total control input dimension. </p>
-<p>Equals <span class="math notranslate nohighlight">\(\text{numMTQ} + \text{numRW}\)</span>.</p>
+<p>Equals <span class="math notranslate nohighlight">\(\text{numMTQ} + \text{numRW} + \text{numMagic}\)</span>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Control dimension. </p>
@@ -883,6 +913,34 @@
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>Reference to <a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a>. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK9Satellite8getMagicEi">
+<span id="_CPPv3NK9Satellite8getMagicEi"></span><span id="_CPPv2NK9Satellite8getMagicEi"></span><span id="Satellite::getMagic__iC"></span><span class="target" id="classSatellite_1af85ddbaa97afabe1945ec9f8603d39ff"></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="actuators/Magic.html#_CPPv45Magic" title="Magic"><span class="n"><span class="pre">Magic</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">getMagic</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">i</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK9Satellite8getMagicEi" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get a magic actuator by index (const). </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>i</strong> – Magic-actuator index. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Const reference to magic actuator. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N9Satellite8getMagicEi">
+<span id="_CPPv3N9Satellite8getMagicEi"></span><span id="_CPPv2N9Satellite8getMagicEi"></span><span id="Satellite::getMagic__i"></span><span class="target" id="classSatellite_1ad05b980b3f0dd50bcc9440ac62b90c64"></span><a class="reference internal" href="actuators/Magic.html#_CPPv45Magic" title="Magic"><span class="n"><span class="pre">Magic</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">getMagic</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">i</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N9Satellite8getMagicEi" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get a magic actuator by index (mutable). </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>i</strong> – Magic-actuator index. </p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reference to magic actuator. </p>
 </dd>
 </dl>
 </dd></dl>
@@ -1195,6 +1253,7 @@
 <li><p><a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> torque upper/lower bounds (2 per <a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a>)</p></li>
 <li><p><a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> momentum upper/lower bounds (2 per <a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a>)</p></li>
 <li><p><a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> stiction proxy (1 per <a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a>)</p></li>
+<li><p><a class="reference internal" href="actuators/Magic.html#classMagic"><span class="std std-ref">Magic</span></a> actuator upper/lower bounds (2 per magic actuator)</p></li>
 </ul>
 </p>
 <p>All constraints are formulated as c &lt;= 0.</p>
@@ -1352,6 +1411,11 @@
 <dd></dd></dl>
 
 <dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N9Satellite16magic_actuators_E">
+<span id="_CPPv3N9Satellite16magic_actuators_E"></span><span id="_CPPv2N9Satellite16magic_actuators_E"></span><span id="Satellite::magic_actuators___std::array:std::unique_ptr:Magic:.saltro::limits::MAX_NUM_MAGIC:"></span><span class="target" id="classSatellite_1a1febc58cd6332490f390a6109afda63d"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">unique_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="actuators/Magic.html#_CPPv45Magic" title="Magic"><span class="n"><span class="pre">Magic</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../constants/constants.html#_CPPv46saltro" title="saltro"><span class="n"><span class="pre">saltro</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../limits.html#_CPPv4N6saltro6limitsE" title="saltro::limits"><span class="n"><span class="pre">limits</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../limits.html#_CPPv4N6saltro6limits13MAX_NUM_MAGICE" title="saltro::limits::MAX_NUM_MAGIC"><span class="n"><span class="pre">MAX_NUM_MAGIC</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">magic_actuators_</span></span></span><a class="headerlink" href="#_CPPv4N9Satellite16magic_actuators_E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N9Satellite8num_mtq_E">
 <span id="_CPPv3N9Satellite8num_mtq_E"></span><span id="_CPPv2N9Satellite8num_mtq_E"></span><span id="Satellite::num_mtq___i"></span><span class="target" id="classSatellite_1ac37dc8a2df15e25867d581506f21d900"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">num_mtq_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N9Satellite8num_mtq_E" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
@@ -1359,6 +1423,11 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N9Satellite7num_rw_E">
 <span id="_CPPv3N9Satellite7num_rw_E"></span><span id="_CPPv2N9Satellite7num_rw_E"></span><span id="Satellite::num_rw___i"></span><span class="target" id="classSatellite_1a41f4a9e784e0103d79761e0bd1f8dd91"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">num_rw_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N9Satellite7num_rw_E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N9Satellite10num_magic_E">
+<span id="_CPPv3N9Satellite10num_magic_E"></span><span id="_CPPv2N9Satellite10num_magic_E"></span><span id="Satellite::num_magic___i"></span><span class="target" id="classSatellite_1aa8b54ad4896dc6f71b1b0dde3e8f79c1"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">num_magic_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N9Satellite10num_magic_E" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 <dl class="cpp var">
@@ -1454,8 +1523,10 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite14geometryConfigEv"><code class="docutils literal notranslate"><span class="pre">geometryConfig()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite6addMTQERK4Vec3d"><code class="docutils literal notranslate"><span class="pre">addMTQ()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite5addRWERK4Vec3dddd"><code class="docutils literal notranslate"><span class="pre">addRW()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite8addMagicERK4Vec3d"><code class="docutils literal notranslate"><span class="pre">addMagic()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite6numMTQEv"><code class="docutils literal notranslate"><span class="pre">numMTQ()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite5numRWEv"><code class="docutils literal notranslate"><span class="pre">numRW()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite8numMagicEv"><code class="docutils literal notranslate"><span class="pre">numMagic()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite10controlDimEv"><code class="docutils literal notranslate"><span class="pre">controlDim()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite8stateDimEv"><code class="docutils literal notranslate"><span class="pre">stateDim()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite15reducedStateDimEv"><code class="docutils literal notranslate"><span class="pre">reducedStateDim()</span></code></a></li>
@@ -1463,6 +1534,8 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite5getRWEi"><code class="docutils literal notranslate"><span class="pre">getRW()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite6getMTQEi"><code class="docutils literal notranslate"><span class="pre">getMTQ()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite5getRWEi"><code class="docutils literal notranslate"><span class="pre">getRW()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite8getMagicEi"><code class="docutils literal notranslate"><span class="pre">getMagic()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite8getMagicEi"><code class="docutils literal notranslate"><span class="pre">getMagic()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite11setSettingsERK15PlannerSettings"><code class="docutils literal notranslate"><span class="pre">setSettings()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite8settingsEv"><code class="docutils literal notranslate"><span class="pre">settings()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK9Satellite14actuatorTorqueERK4VecXRK4VecXRK4Vec3"><code class="docutils literal notranslate"><span class="pre">actuatorTorque()</span></code></a></li>
@@ -1492,8 +1565,10 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite13invJcom_noRW_E"><code class="docutils literal notranslate"><span class="pre">invJcom_noRW_</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite14mtq_actuators_E"><code class="docutils literal notranslate"><span class="pre">mtq_actuators_</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite13rw_actuators_E"><code class="docutils literal notranslate"><span class="pre">rw_actuators_</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite16magic_actuators_E"><code class="docutils literal notranslate"><span class="pre">magic_actuators_</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite8num_mtq_E"><code class="docutils literal notranslate"><span class="pre">num_mtq_</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite7num_rw_E"><code class="docutils literal notranslate"><span class="pre">num_rw_</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite10num_magic_E"><code class="docutils literal notranslate"><span class="pre">num_magic_</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite9settings_E"><code class="docutils literal notranslate"><span class="pre">settings_</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N9Satellite16geometry_config_E"><code class="docutils literal notranslate"><span class="pre">geometry_config_</span></code></a></li>
 </ul>
