@@ -212,8 +212,16 @@ def alilqr(
                 }
             )
 
-        if max_c <= passsettings.auglag.constraint_tol:
+        if max_c <= passsettings.auglag.constraint_tol and stop_reason == "converged":
             stop_reason = f"AL-iLQR converged: max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}"
+            break
+
+        if max_c <= passsettings.auglag.constraint_tol and stop_reason != "converged":
+            stop_reason = (
+                "AL-iLQR did not converge: constraints satisfied "
+                f"(max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}) "
+                f"but inner iLQR returned '{stop_reason}'"
+            )
             break
 
         # Update lambda_k and mu_k elementwise (inequality constraints).
