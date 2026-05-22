@@ -139,9 +139,14 @@ bool alilqr(
 
         const double max_c = max_constraint_violation(settings, satellite, X, U, S);
         max_constraint_violation_out = max_c;
-        if (max_c <= aug.constraint_tol) {
+        if (max_c <= aug.constraint_tol && ilqr_status == ILQRStatus::Converged) {
             status = ALILQRStatus::Converged;
             return true;
+        }
+
+        if (max_c <= aug.constraint_tol && ilqr_status != ILQRStatus::Converged) {
+            status = ALILQRStatus::InnerFailed;
+            return false;
         }
 
         const auto c_list = collect_constraints(settings, satellite, X, U, S);
