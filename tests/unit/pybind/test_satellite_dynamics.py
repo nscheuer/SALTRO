@@ -1280,8 +1280,6 @@ def test_dynamics_torque_free_invariant_under_quaternion_rotation():
                 f"ω̇ depends on q (should not, for torque-free dynamics): "
                 f"q={q}, ω̇={omega_dot}, ref={omega_dot_ref}"
             )
-            
-            assert (rel_err <= rel_tol or abs_err <= abs_tol)
 
 
 def quaternion_error_short_way(q, q_target):
