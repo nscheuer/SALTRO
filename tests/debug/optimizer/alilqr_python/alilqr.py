@@ -212,11 +212,19 @@ def alilqr(
                 }
             )
 
-        if max_c <= passsettings.auglag.constraint_tol:
+        if max_c <= passsettings.auglag.constraint_tol and stop_reason == "converged":
             stop_reason = f"AL-iLQR converged: max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}"
             break
 
-        # Update lambda_k and mu_k elementwise using c_pos to match C++ AL-iLQR.
+        if max_c <= passsettings.auglag.constraint_tol and stop_reason != "converged":
+            stop_reason = (
+                "AL-iLQR did not converge: constraints satisfied "
+                f"(max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}) "
+                f"but inner iLQR returned '{stop_reason}'"
+            )
+            break
+
+        # Update lambda_k and mu_k elementwise (inequality constraints).
         clist = _collect_constraints(plannersettings, satellite, X, U, S)
         for k, ck in enumerate(clist):
             ck_pos = np.maximum(0.0, ck)
