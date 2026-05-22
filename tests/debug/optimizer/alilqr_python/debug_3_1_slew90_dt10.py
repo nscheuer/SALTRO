@@ -16,7 +16,7 @@ def create_planner_settings():
     plannersettings = saltro_py.PlannerSettings()
 
     # Warm-Start
-    plannersettings.init_traj.initcontroller = 1
+    plannersettings.init_traj.initcontroller = 2
     
     # Pass 0 Settings
     plannersettings.num_passes = 1
