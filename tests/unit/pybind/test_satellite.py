@@ -668,3 +668,60 @@ def test_inertia_no_rw_composes_correctly_for_non_orthogonal_rw_axes():
     expected_J_noRW -= J_rw * np.outer(axis2_n, axis2_n)
 
     assert np.allclose(sat.inertiaNoRW, expected_J_noRW, atol=1e-12)
+# ============================================================================
+# actuatorTorque — sum identity
+# ============================================================================
+
+def test_actuator_torque_matches_sum_of_per_actuator_contributions():
+    """Satellite.actuatorTorque(x,u,B) must equal Σ MTQ_i.torque + Σ RW_i.torque.
+    Previously untested — the only public API that aggregates body torque from
+    every actuator. Catches indexing slip-ups (MTQ vs RW ordering in u),
+    sign errors in the cross product, and forgotten actuators."""
+    J = valid_inertia_matrix()
+    sat = saltro_py.Satellite(J, saltro_py.PlannerSettings())
+
+    sat.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+    sat.addMTQ(np.array([0.0, 1.0, 0.0]), 0.2)
+    sat.addMTQ(np.array([0.0, 0.0, 1.0]), 0.2)
+    sat.addRW(np.array([1.0, 0.0, 0.0]), 0.001, 1e-5, 0.0, 0.01)
+    sat.addRW(np.array([0.0, 1.0, 0.0]), 0.001, 1e-5, 0.0, 0.01)
+
+    rng = np.random.default_rng(20260515)
+
+    for trial in range(8):
+        x = np.zeros(sat.stateDim)
+        q = rng.normal(size=4)
+        q /= np.linalg.norm(q)
+        x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = q
+
+        u = np.concatenate([
+            rng.uniform(-0.2, 0.2, sat.numMTQ),
+            rng.uniform(-0.001, 0.001, sat.numRW),
+        ])
+        B_eci = rng.normal(size=3) * 1e-5
+
+        tau_total = sat.actuatorTorque(x, u, B_eci)
+
+        # Reproduce: actuatorTorque accepts B in ECI but each MTQ sees B in body.
+        # The Satellite class rotates B internally; we mirror that here using
+        # the quaternion stored in x.
+        from numpy import dot
+        q0, q1, q2, q3 = q
+        # Rotation matrix from body to ECI (the convention used by saltro)
+        R_eci_body = np.array([
+            [1 - 2*(q2*q2 + q3*q3), 2*(q1*q2 - q0*q3), 2*(q1*q3 + q0*q2)],
+            [2*(q1*q2 + q0*q3), 1 - 2*(q1*q1 + q3*q3), 2*(q2*q3 - q0*q1)],
+            [2*(q1*q3 - q0*q2), 2*(q2*q3 + q0*q1), 1 - 2*(q1*q1 + q2*q2)],
+        ])
+        B_body = R_eci_body.T @ B_eci
+
+        sum_torque = np.zeros(3)
+        x_base = x[:7]
+        for i in range(sat.numMTQ):
+            sum_torque += sat.getMTQ(i).torque(u[i], x_base, B_body)
+        for i in range(sat.numRW):
+            sum_torque += sat.getRW(i).torque(u[sat.numMTQ + i], x_base)
+
+        assert np.allclose(tau_total, sum_torque, atol=1e-14), (
+            f"trial {trial}: tau_total={tau_total}, sum={sum_torque}"
+        )
