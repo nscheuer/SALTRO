@@ -234,6 +234,7 @@ def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=Non
 
     num_mtq = satellite.numMTQ if satellite is not None else 0
     num_rw = satellite.numRW if satellite is not None else 0
+    num_magic = satellite.numMagic if satellite is not None else 0
 
     # Quaternion with goal
     ax_q.plot(t_state, q[0, :], label="q0", linewidth=1.5)
@@ -324,13 +325,19 @@ def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=Non
     ax_mtq.set_ylabel("A m²")
     ax_mtq.grid(True, alpha=0.3)
 
-    # RW control with limits
+    # RW / Magic control with limits
     ax_rw.clear()
-    if num_rw > 0 and n_u > 0:
-        rw_u = U_use[num_mtq:num_mtq + num_rw, :]
-        for i in range(rw_u.shape[0]):
-            ax_rw.plot(t_control, rw_u[i, :], linewidth=1.5, label=f"tau_rw{i}")
-        # Add limits if available
+    if (num_rw > 0 or num_magic > 0) and n_u > 0:
+        if num_rw > 0:
+            rw_u = U_use[num_mtq:num_mtq + num_rw, :]
+            for i in range(rw_u.shape[0]):
+                ax_rw.plot(t_control, rw_u[i, :], linewidth=1.5, label=f"tau_rw{i}")
+        if num_magic > 0:
+            magic_start = num_mtq + num_rw
+            magic_u = U_use[magic_start:magic_start + num_magic, :]
+            for i in range(magic_u.shape[0]):
+                ax_rw.plot(t_control, magic_u[i, :], linewidth=1.5, linestyle="--", label=f"tau_magic{i}")
+
         if satellite is not None:
             for i in range(num_rw):
                 u_max = _read_u_max(satellite.getRW(i))
@@ -339,10 +346,18 @@ def plot_final_trajectory(X: np.ndarray, U: np.ndarray, dt: float, satellite=Non
                 u_max = abs(u_max)
                 ax_rw.axhline(u_max, color="r", linestyle="--", alpha=0.5, linewidth=1)
                 ax_rw.axhline(-u_max, color="r", linestyle="--", alpha=0.5, linewidth=1)
+            for i in range(num_magic):
+                u_max = _read_u_max(satellite.getMagic(i))
+                if u_max is None:
+                    continue
+                u_max = abs(u_max)
+                ax_rw.axhline(u_max, color="C4", linestyle=":", alpha=0.5, linewidth=1)
+                ax_rw.axhline(-u_max, color="C4", linestyle=":", alpha=0.5, linewidth=1)
+
         ax_rw.legend(fontsize=8)
     else:
-        ax_rw.text(0.5, 0.5, "No RW controls", ha="center", va="center", transform=ax_rw.transAxes)
-    ax_rw.set_title("RW Control Inputs")
+        ax_rw.text(0.5, 0.5, "No RW or Magic controls", ha="center", va="center", transform=ax_rw.transAxes)
+    ax_rw.set_title("RW / Magic Control Inputs")
     ax_rw.set_xlabel("Time [s]")
     ax_rw.set_ylabel("N m")
     ax_rw.grid(True, alpha=0.3)

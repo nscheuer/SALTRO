@@ -205,6 +205,10 @@ bool trajOpt(
 		for (int i = 0; i < satellite.numRW(); ++i) {
 			settings_local.constraints.u_max(satellite.numMTQ() + i) = std::abs(satellite.getRW(i).u_max());
 		}
+		for (int i = 0; i < satellite.numMagic(); ++i) {
+			settings_local.constraints.u_max(satellite.numMTQ() + satellite.numRW() + i) =
+				std::abs(satellite.getMagic(i).u_max());
+		}
 	}
 
 	std::string error_msg;

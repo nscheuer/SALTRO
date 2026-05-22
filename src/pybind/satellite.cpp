@@ -93,9 +93,18 @@ void Satellite::addRW(const Vec3& axis, double max_torque, double J, double h0, 
     }
 
     rw_actuators_[num_rw_] = std::make_unique<RW>(axis, max_torque, J, h0, h_max);
-    
+
     ++num_rw_;
     updateInertiaNoRW();
+}
+
+void Satellite::addMagic(const Vec3& axis, double max_torque) {
+    if (num_magic_ >= saltro::limits::MAX_NUM_MAGIC) {
+        throw out_of_range("Exceeded MAX_NUM_MAGIC.");
+    }
+    magic_actuators_[num_magic_] = std::make_unique<Magic>(axis, max_torque);
+
+    ++num_magic_;
 }
 
 const MTQ& Satellite::getMTQ(int i) const {
@@ -124,6 +133,20 @@ RW& Satellite::getRW(int i) {
         throw out_of_range("RW index out of range.");
     }
     return *rw_actuators_[i];
+}
+
+const Magic& Satellite::getMagic(int i) const {
+    if (i < 0 || i >= num_magic_) {
+        throw out_of_range("Magic actuator index out of range.");
+    }
+    return *magic_actuators_[i];
+}
+
+Magic& Satellite::getMagic(int i) {
+    if (i < 0 || i >= num_magic_) {
+        throw out_of_range("Magic actuator index out of range.");
+    }
+    return *magic_actuators_[i];
 }
 
 void Satellite::updateInertiaNoRW() {
@@ -230,7 +253,16 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
             torque += rw.torque(u_i, x_base);
         }
     }
-    
+
+    if (num_magic_ > 0) {
+        for (int i = 0; i < num_magic_; ++i) {
+            int ctrl_idx = num_mtq_ + num_rw_ + i;
+            double u_i = u(ctrl_idx);
+            const Magic& magic = getMagic(i);
+            torque += magic.torque(u_i, x_base);
+        }
+    }
+
     return torque;
 }
 
@@ -461,6 +493,15 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamic
         int ctrl_idx = num_mtq_ + i;
         const RW& rw = getRW(i);
         Vec3 axis_i = rw.axis();
+        jac_u.block<3, 1>(AV_INDEX, ctrl_idx) = invJcom_noRW_ * axis_i;
+    }
+
+    // Magic actuator contribution: tau_magic = axis * u_magic
+    // Same column shape as RW but no h-state coupling and no Newton-3 back-reaction.
+    for (int i = 0; i < num_magic_; ++i) {
+        int ctrl_idx = num_mtq_ + num_rw_ + i;
+        const Magic& magic = getMagic(i);
+        Vec3 axis_i = magic.axis();
         jac_u.block<3, 1>(AV_INDEX, ctrl_idx) = invJcom_noRW_ * axis_i;
     }
     
@@ -1088,6 +1129,12 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
             const double normalized = u(ctrl_idx) / lim;
             control_cost += 0.5 * w_u_mult * cost_cfg.rw_control_weight * normalized * normalized;
         }
+        for (int i = 0; i < num_magic_; ++i) {
+            const int ctrl_idx = num_mtq_ + num_rw_ + i;
+            const double lim = std::max(1e-9, std::abs(getMagic(i).u_max()));
+            const double normalized = u(ctrl_idx) / lim;
+            control_cost += 0.5 * w_u_mult * cost_cfg.magic_control_weight * normalized * normalized;
+        }
     }
 
     double rw_momentum_cost = 0.0;
@@ -1343,13 +1390,21 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             const double normalized = u(i) / lim;
             lu(i) = w_u_mult * cost_cfg.mtq_control_weight * normalized / lim;
         }
-        
+
         // RW control costs
         for (int i = 0; i < num_rw_; ++i) {
             const int ctrl_idx = num_mtq_ + i;
             const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
             const double normalized = u(ctrl_idx) / lim;
             lu(ctrl_idx) = w_u_mult * cost_cfg.rw_control_weight * normalized / lim;
+        }
+
+        // Magic actuator control costs
+        for (int i = 0; i < num_magic_; ++i) {
+            const int ctrl_idx = num_mtq_ + num_rw_ + i;
+            const double lim = std::max(1e-9, std::abs(getMagic(i).u_max()));
+            const double normalized = u(ctrl_idx) / lim;
+            lu(ctrl_idx) = w_u_mult * cost_cfg.magic_control_weight * normalized / lim;
         }
     }
 
@@ -1442,6 +1497,12 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
                 luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.rw_control_weight / (lim * lim);
             }
+
+            for (int i = 0; i < num_magic_; ++i) {
+                const int ctrl_idx = num_mtq_ + num_rw_ + i;
+                const double lim = std::max(1e-9, std::abs(getMagic(i).u_max()));
+                luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.magic_control_weight / (lim * lim);
+            }
         }
 
         return std::make_tuple(lxx, luu, lux);
@@ -1516,12 +1577,19 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
             luu(i, i) += w_u_mult * cost_cfg.mtq_control_weight / (lim * lim);
         }
-        
+
         // RW control costs: diagonal contributions
         for (int i = 0; i < num_rw_; ++i) {
             const int ctrl_idx = num_mtq_ + i;
             const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
             luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.rw_control_weight / (lim * lim);
+        }
+
+        // Magic actuator control costs: diagonal contributions
+        for (int i = 0; i < num_magic_; ++i) {
+            const int ctrl_idx = num_mtq_ + num_rw_ + i;
+            const double lim = std::max(1e-9, std::abs(getMagic(i).u_max()));
+            luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.magic_control_weight / (lim * lim);
         }
     }
 
@@ -1647,7 +1715,9 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     }
 
     const bool has_control_constraints = (k < N - 1);
-    const int n_constraints = 1 + 1 + (has_control_constraints ? (2 * num_mtq_ + 5 * num_rw_) : 0);
+    const int n_constraints = 1 + 1 + (has_control_constraints
+                                           ? (2 * num_mtq_ + 5 * num_rw_ + 2 * num_magic_)
+                                           : 0);
     VecX c(n_constraints);
     c.setZero();
 
@@ -1715,6 +1785,17 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
         c(idx++) = -(u_cmd * h) * (u_cmd * h);
     }
 
+    // Magic-actuator torque bounds (no momentum or stiction terms — no internal state).
+    for (int i = 0; i < num_magic_; ++i) {
+        const int ctrl_idx = num_mtq_ + num_rw_ + i;
+        const double u_cmd = u(ctrl_idx);
+        const double lim_from_cfg = configured_u_max(ctrl_idx);
+        const double lim_from_act = std::abs(getMagic(i).u_max());
+        const double lim = scale * std::max(1e-9, (lim_from_cfg > 0.0 ? lim_from_cfg : lim_from_act));
+        c(idx++) = (u_cmd - lim) / lim;
+        c(idx++) = (-u_cmd - lim) / lim;
+    }
+
     return c;
 }
 
@@ -1736,8 +1817,10 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
     }
 
     const bool has_control_constraints = (k < N - 1);
-    const int n_constraints = 1 + 1 + (has_control_constraints ? (2 * num_mtq_ + 5 * num_rw_) : 0);
-    
+    const int n_constraints = 1 + 1 + (has_control_constraints
+                                           ? (2 * num_mtq_ + 5 * num_rw_ + 2 * num_magic_)
+                                           : 0);
+
     MatX c_u(n_constraints, controlDim());
     MatX c_x(n_constraints, stateDim());
     c_u.setZero();
@@ -1846,6 +1929,21 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
         idx++;
     }
 
+    // 5) Magic-actuator control bound Jacobians (linear in u only; no state coupling).
+    for (int i = 0; i < num_magic_; ++i) {
+        const int ctrl_idx = num_mtq_ + num_rw_ + i;
+        const double lim_from_cfg = configured_u_max(ctrl_idx);
+        const double lim_from_act = std::abs(getMagic(i).u_max());
+        const double lim = scale * std::max(1e-9, (lim_from_cfg > 0.0 ? lim_from_cfg : lim_from_act));
+
+        // Upper bound:  (u - lim) / lim
+        c_u(idx, ctrl_idx) =  1.0 / lim;
+        idx++;
+        // Lower bound: (-u - lim) / lim
+        c_u(idx, ctrl_idx) = -1.0 / lim;
+        idx++;
+    }
+
     return std::make_tuple(c_u, c_x);
 }
 
@@ -1941,6 +2039,9 @@ Satellite::constraintHessians(
         H_ux.slice(idx)(ctrl_idx, state_idx) = -4.0 * u_i * h_i;
         idx++;
     }
+
+    // Magic-actuator bounds are linear in u with no state coupling — zero Hessian.
+    idx += 2 * num_magic_;
 
     return std::make_tuple(H_uu, H_ux, H_xx);
 }

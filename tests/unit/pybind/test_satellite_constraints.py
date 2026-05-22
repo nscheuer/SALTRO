@@ -753,12 +753,15 @@ def test_constraint_hessians_dimension():
     H_uu, H_ux, H_xx = fixture.sat.constraintHessians(0, 10, fixture.nominal_state(),
                                                        fixture.nominal_control(),
                                                        sun_z(), default_cnst_cfg())
-    
-    # Hessians are returned with maximum dimensions, not runtime dimensions
-    # MAX_CONSTRAINT_DIM=30, MAX_CTRL_DIM=8, MAX_STATE_DIM=11
-    assert H_uu.shape == (30, 8, 8)
-    assert H_ux.shape == (30, 8, 11)
-    assert H_xx.shape == (30, 11, 11)
+
+    # Hessians are returned with the compile-time maximum dimensions, not
+    # the runtime ones (slices of size MAX_CONSTRAINT_DIM x MAX_CTRL_DIM x
+    # MAX_CTRL_DIM etc.). Pull those limits from saltro_py so this test
+    # stays correct as new actuator classes (e.g. Magic) shift the maxima.
+    L = saltro_py.limits
+    assert H_uu.shape == (L.MAX_CONSTRAINT_DIM, L.MAX_CTRL_DIM,  L.MAX_CTRL_DIM)
+    assert H_ux.shape == (L.MAX_CONSTRAINT_DIM, L.MAX_CTRL_DIM,  L.MAX_STATE_DIM)
+    assert H_xx.shape == (L.MAX_CONSTRAINT_DIM, L.MAX_STATE_DIM, L.MAX_STATE_DIM)
 
 
 def test_constraint_hessians_finite_difference_H_uu():
@@ -777,7 +780,8 @@ def test_constraint_hessians_finite_difference_H_uu():
     c_u_base, _ = fixture.sat.constraintJacobians(0, 10, x, u, sun_z(), cfg)
     n_constraints = len(c_u_base)
     n_ctrl = fixture.n_ctrl()
-    H_uu_fd = np.zeros((30, 8, 8))
+    L = saltro_py.limits
+    H_uu_fd = np.zeros((L.MAX_CONSTRAINT_DIM, L.MAX_CTRL_DIM, L.MAX_CTRL_DIM))
     
     for i in range(len(u)):
         u_pert = u.copy()
@@ -807,7 +811,8 @@ def test_constraint_hessians_finite_difference_H_ux():
     n_constraints = len(c_u_base)
     n_ctrl = fixture.n_ctrl()
     n_state = fixture.sat.stateDim
-    H_ux_fd = np.zeros((30, 8, 11))
+    L = saltro_py.limits
+    H_ux_fd = np.zeros((L.MAX_CONSTRAINT_DIM, L.MAX_CTRL_DIM, L.MAX_STATE_DIM))
     
     for i in range(len(x)):
         x_pert = x.copy()
@@ -839,7 +844,8 @@ def test_constraint_hessians_finite_difference_H_xx():
     _, c_x_base = fixture.sat.constraintJacobians(0, 10, x, u, sun_z(), cfg)
     n_constraints = len(c_x_base)
     n_state = fixture.sat.stateDim
-    H_xx_fd = np.zeros((30, 11, 11))
+    L = saltro_py.limits
+    H_xx_fd = np.zeros((L.MAX_CONSTRAINT_DIM, L.MAX_STATE_DIM, L.MAX_STATE_DIM))
     
     for i in range(len(x)):
         x_pert = x.copy()
@@ -1396,21 +1402,28 @@ def test_constraints_maximum_actuators():
         axis = np.zeros(3)
         axis[i % 3] = 1.0
         sat.addRW(axis, 0.001, 1e-5, 0.0, 0.01)
-    
+    # Add MAX_NUM_MAGIC magic actuators
+    for i in range(saltro_py.limits.MAX_NUM_MAGIC):
+        axis = np.zeros(3)
+        axis[i % 3] = 1.0
+        sat.addMagic(axis, 0.01)
+
     n = sat.stateDim
     m = sat.controlDim
     h = np.zeros(sat.numRW)
     x = make_state(np.zeros(3), identity_quat(), h)
     u = zero_control(m)
     cfg = default_cnst_cfg()
-    
+
     c = sat.constraints(0, 10, x, u, sun_z(), cfg)
-    expected = 1 + 1 + 2 * saltro_py.limits.MAX_NUM_MTQ + 5 * saltro_py.limits.MAX_NUM_RW
+    expected = (1 + 1
+                + 2 * saltro_py.limits.MAX_NUM_MTQ
+                + 5 * saltro_py.limits.MAX_NUM_RW
+                + 2 * saltro_py.limits.MAX_NUM_MAGIC)
     assert len(c) == expected
-    # Verify this matches the expected max constraint dimension
-    # Note: MAX_CONSTRAINT_DIM may not be exported to Python, so we calculate it
-    max_dim = 1 + 1 + 2 * saltro_py.limits.MAX_NUM_MTQ + 5 * saltro_py.limits.MAX_NUM_RW
-    assert expected == max_dim
+    # Verify this matches the compile-time MAX_CONSTRAINT_DIM (now exposed
+    # via saltro_py.limits).
+    assert expected == saltro_py.limits.MAX_CONSTRAINT_DIM
 
 
 # ============================================================================
