@@ -309,13 +309,32 @@ def test_forward_pass_line_search_backtracks(fixture):
         J_prev
     )
     assert ok
-    # Tolerances loosened (1e-3 → 5e-2) after the BP dt-scaling fix.  See
-    # tests/unit/optimizer/test_forwardpass.cpp:468 for the matching C++
-    # change and rationale: the corrected (un-dt-scaled) gradient lets
-    # FP accept a step ~1e-2 above alpha_half.cost; the test's intent
-    # ("linesearch lands in the alpha=0.5 ballpark") is preserved.
-    assert J_new <= alpha_half[2] + 5e-2
-    assert J_new <= alpha1[2] + 5e-2
+    # Cost-decrease invariant: FP never accepts a step worse than alpha=1
+    # (modulo fp noise).
+    assert J_new <= alpha1[2] + 1e-8
+
+    # FP backtracks deterministically through alpha = {1, 1/2, 1/4, ...}
+    # (forwardpass.cpp: `alpha = std::ldexp(1.0, -iter)`).  Identify the
+    # alpha FP actually accepted by matching J_new against the cost of
+    # each candidate rollout, then assert exact match.  Strict, alpha-aware
+    # replacement for the older "J_new in the alpha=0.5 ballpark" check
+    # that needed a hard-coded slack because post-fix FP can land on
+    # alpha=1 instead of alpha=0.5.
+    max_iters = settings_ls.passes[0].linesearch.max_iters
+    chosen_alpha = None
+    chosen_cost = None
+    for iter_idx in range(max_iters):
+        alpha_cand = 2.0 ** (-iter_idx)
+        rollout = fixture.rollout_with_alpha(
+            alpha_cand, K_list, d_list, X_base, U_base
+        )
+        if abs(rollout[2] - J_new) <= 1e-8 * max(1.0, abs(J_new)):
+            chosen_alpha = alpha_cand
+            chosen_cost = rollout[2]
+            break
+    assert chosen_alpha is not None, \
+        f"J_new={J_new} matched no alpha in the 2^-iter sequence"
+    assert abs(J_new - chosen_cost) <= 1e-8 * max(1.0, abs(J_new))
 
     # Controls should not be empty
     assert U_forward.shape[1] >= fixture.N - 1

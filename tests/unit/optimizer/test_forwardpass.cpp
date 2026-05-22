@@ -465,13 +465,31 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass backs off step size when over
 		J_new
 	));
 
-	// Tolerance loosened from 1e-3 to 5e-2 after the BP dt-scaling fix.
-	// With the corrected (un-dt-scaled) gradient, FP's chosen alpha can
-	// land slightly above the alpha=0.5 reference (J_new = 686.1974 vs
-	// alpha_half.cost = 686.1880, delta ≈ 9.4e-3).  The test's intent is
-	// "linesearch finds a step in roughly the alpha=0.5 ballpark," which
-	// 5e-2 of slack preserves without losing the cost-decrease assertion
-	// on the prior line (which already passes at 1e-8).
+	// Cost-decrease invariant: FP never accepts a step worse than alpha=1
+	// (modulo fp noise).
 	REQUIRE(J_new <= alpha1.cost + 1e-8);
-	REQUIRE(J_new <= alpha_half.cost + 5e-2);
+
+	// FP backtracks deterministically through alpha = {1, 1/2, 1/4, ...}
+	// (forwardpass.cpp: `alpha = std::ldexp(1.0, -iter)`).  Identify the
+	// alpha FP actually accepted by matching J_new against the cost of
+	// each candidate rollout, then assert the match is exact (to fp noise).
+	// This is a strict, alpha-aware version of the older `J_new in the
+	// alpha=0.5 ballpark` check — that check needed a hard-coded slack
+	// because the post-fix linesearch can land on alpha=1 instead of
+	// alpha=0.5; matching against the actual chosen alpha removes the
+	// need for any slack.
+	double chosen_alpha = -1.0;
+	double chosen_cost = std::numeric_limits<double>::quiet_NaN();
+	for (int iter = 0; iter < settings_ls.passes[0].linesearch.max_iters; ++iter) {
+		const double alpha = std::ldexp(1.0, -iter);
+		const auto rollout = rolloutWithAlpha(alpha, K_base, d_scaled, settings_ls,
+		                                      X_base, U_base, env);
+		if (std::abs(rollout.cost - J_new) <= 1e-8 * std::max(1.0, std::abs(J_new))) {
+			chosen_alpha = alpha;
+			chosen_cost = rollout.cost;
+			break;
+		}
+	}
+	REQUIRE(chosen_alpha > 0.0);  // FP's J_new must match some {1, 1/2, ...} alpha
+	REQUIRE(std::abs(J_new - chosen_cost) <= 1e-8 * std::max(1.0, std::abs(J_new)));
 }
