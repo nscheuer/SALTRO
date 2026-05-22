@@ -213,6 +213,21 @@ struct CostConfig {
     int ang_cost_func_type = 2;
     bool use_cost_hess = false;
 
+    /// Gauss-Newton mode for the angle-cost (q,q) Hessian block. When true,
+    /// drop the second-order chain-rule term `f'(c)·d²c/dq²` (which can be
+    /// indefinite in vec mode where `c = bs·R^T·r̂` is degree-2 in q). Keep
+    /// the PwA manifold-curvature correction `−grad_dot_q · I_4` — it's the
+    /// sphere-tangent projection and is PSD when `f'·c < 0`, which holds
+    /// for our cost shapes in the aligned hemisphere.
+    ///
+    /// Effect by mode:
+    ///   - **Vec mode:** drops `f'·d²c/dq²`. Empirically improves convergence
+    ///     dramatically (PE_fin 6-22° → 0.2-6.6° on baseline scenarios).
+    ///   - **Quat mode:** has no `f'·d²d/dq²` term (d = q_g·q is linear in q),
+    ///     so this flag is a no-op.
+    /// Default (false) preserves the current full-Hessian behavior.
+    bool cost_hess_gauss_newton = false;
+
     /// Scale all terminal weights by `k`, preserving ratios with their
     /// stage counterparts.  `k=1` matches stage; `k=100` is strong terminal
     /// emphasis.
