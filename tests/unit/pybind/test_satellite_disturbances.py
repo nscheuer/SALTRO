@@ -249,33 +249,33 @@ def test_individual_disturbances_sum_approximately_to_combined():
 # TEST SECTION 3: Disturbance Behavior Across Orbit
 # ============================================================================
 
-def test_drag_decreases_with_increasing_altitude():
-    """Test drag variation across orbit"""
+def test_drag_is_approximately_constant_along_circular_orbit():
+    """For a circular orbit (constant altitude → constant density) the drag
+    torque magnitude should not vary across the sampled steps. Previously
+    misnamed `test_drag_decreases_with_increasing_altitude`."""
     fixture = TestSatelliteDisturbancesFixture()
     fixture.setup_method()
-    
+
     dist = saltro_py.DisturbanceConfig()
     dist.plan_for_gg = False
     dist.plan_for_aero = True
     dist.plan_for_srp = False
-    
+
     x = np.zeros(fixture.sat.stateDim)
     x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
-    
-    # Collect drag magnitudes at different orbital positions
+
     drag_mags = []
     for i in range(0, min(100, fixture.n_steps), 10):
         tau_drag = fixture.get_disturbance_torque(x, dist, i)
         drag_mags.append(np.linalg.norm(tau_drag))
-    
-    # For circular orbit, drag should be approximately constant
+
     has_variation = False
     for i in range(1, len(drag_mags)):
         variation = abs(drag_mags[i] - drag_mags[0]) / (drag_mags[0] + 1e-12)
         if variation > 0.001:  # More than 0.1% variation
             has_variation = True
             break
-    
+
     assert not has_variation
 
 

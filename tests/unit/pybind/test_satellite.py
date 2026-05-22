@@ -642,6 +642,32 @@ def test_rw_with_different_initial_momentum_values():
     assert sat.getRW(2).momentum == -0.003
 
 
+def test_inertia_no_rw_composes_correctly_for_non_orthogonal_rw_axes():
+    """Existing coverage only validates inertiaNoRW for principal-axis RWs.
+    For non-orthogonal axes the contribution J_rw·â·âᵀ has off-diagonal
+    entries — this test catches mistakes like treating the RW as a scalar
+    inertia per body axis.
+    """
+    J = valid_inertia_matrix()
+    sat = saltro_py.Satellite(J, saltro_py.PlannerSettings())
+
+    J_rw = 2e-5
+    # Tetrahedral / "pyramid" non-orthogonal axis
+    axis = np.array([1.0, 1.0, 1.0]) / np.sqrt(3.0)
+    sat.addRW(axis, 0.001, J_rw, 0.0, 0.01)
+
+    expected_J_noRW = J - J_rw * np.outer(axis, axis)
+
+    assert np.allclose(sat.inertiaNoRW, expected_J_noRW, atol=1e-12)
+    assert np.allclose(sat.invInertiaNoRW, np.linalg.inv(expected_J_noRW), atol=1e-9)
+
+    # Add a second skew axis and check superposition
+    axis2 = np.array([1.0, -1.0, 0.5])
+    axis2_n = axis2 / np.linalg.norm(axis2)
+    sat.addRW(axis2, 0.001, J_rw, 0.0, 0.01)
+    expected_J_noRW -= J_rw * np.outer(axis2_n, axis2_n)
+
+    assert np.allclose(sat.inertiaNoRW, expected_J_noRW, atol=1e-12)
 # ============================================================================
 # actuatorTorque — sum identity
 # ============================================================================
