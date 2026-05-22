@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "configs"))
 
 import saltro_py
-from trajOpt import trajOpt
+from trajOpt import trajOpt, _resample_zero_order_hold
 from sat_3_1_hybrid import create_satellite as create_3_1
 from sat_3_0_mtq    import create_satellite as create_3_0
 from sat_0_3_rw     import create_satellite as create_0_3
@@ -255,12 +255,18 @@ def run_scenario(name, params):
         return None
     wall = time.time() - t0
 
+    # Resample (qgoal, bs) to the same fine grid trajOpt used internally.
+    # Without this, sequential-goal scenarios (case 22) misalign the per-knot
+    # target with X because k * M // Nx assumes equal spacing between coarse
+    # columns, which is wrong whenever switch_frac != (col_idx / (M-1)).
+    _jt_fine, qgoal_fine, bs_fine = _resample_zero_order_hold(
+        jtime, qgoal, bs, ps.passes[0].dt
+    )
+
     # Metrics — handle quat vs vector goals
     Nx = X.shape[1]
     def _pe_at(k):
-        # Use last qgoal column as representative when N_goal < N_traj
-        # (resample zero-order-hold).
-        gk = qgoal[:, min(k * qgoal.shape[1] // Nx, qgoal.shape[1] - 1)]
+        gk = qgoal_fine[:, k]
         if np.isnan(gk[0]):
             # Vector pointing: angle between body boresight and target vec
             qs = X[3:7, k]
@@ -270,7 +276,7 @@ def run_scenario(name, params):
                 [2*(x*y + w*z),     1 - 2*(x*x + z*z), 2*(y*z - w*x)],
                 [2*(x*z - w*y),     2*(y*z + w*x),     1 - 2*(x*x + y*y)],
             ])
-            b_eci = C @ bs[:, min(k, bs.shape[1] - 1)]
+            b_eci = C @ bs_fine[:, k]
             b_eci = b_eci / max(np.linalg.norm(b_eci), 1e-10)
             tv = gk[1:4] / max(np.linalg.norm(gk[1:4]), 1e-10)
             return np.degrees(np.arccos(np.clip(abs(np.dot(b_eci, tv)), 0, 1)))
@@ -296,11 +302,11 @@ def run_scenario(name, params):
     # Use a single timestamp for all three images so they're consistent.
     run_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Save midway snapshot grid
-    save_midway(name, snaps, X, U, ps, sat, qgoal, bs, r0, v0, jtime, ts=run_ts)
+    save_midway(name, snaps, X, U, ps, sat, qgoal_fine, bs_fine, r0, v0, jtime, ts=run_ts)
     # Save GIF
-    save_gif(name, snaps, ps, sat, qgoal, bs, ts=run_ts)
+    save_gif(name, snaps, ps, sat, qgoal_fine, bs_fine, ts=run_ts)
     # Save final panel
-    save_final(name, X, U, ps, sat, qgoal, bs, stop, ts=run_ts)
+    save_final(name, X, U, ps, sat, qgoal_fine, bs_fine, stop, ts=run_ts)
 
     return result
 
@@ -308,22 +314,19 @@ def run_scenario(name, params):
 def pe_profile(X, qgoal_arr, bs_arr=None):
     """PE per knot.  Handles quat-mode (qgoal[0] real) and vector-mode
     (qgoal[0]=NaN, target vec in qgoal[1:4]).  qgoal_arr can be 1-d
-    (single goal), (4, M) with M<N (zero-order-hold resample), or
-    (4, N) per-knot.
+    (single goal) or (4, N) per-knot aligned to X columns.
     """
     Nx = X.shape[1]
     if qgoal_arr.ndim == 1:
-        qgoal_arr = qgoal_arr[:, None]
-    M = qgoal_arr.shape[1]
+        qgoal_arr = np.tile(qgoal_arr[:, None], (1, Nx))
     if bs_arr is None:
-        bs_arr = np.tile(np.array([[1.0], [0.0], [0.0]]), (1, M))
+        bs_arr = np.tile(np.array([[1.0], [0.0], [0.0]]), (1, Nx))
     elif bs_arr.ndim == 1:
-        bs_arr = bs_arr[:, None]
+        bs_arr = np.tile(bs_arr[:, None], (1, Nx))
     pe = np.zeros(Nx)
     for k in range(Nx):
-        idx = min(k * M // Nx, M - 1) if M > 1 else 0
-        gk = qgoal_arr[:, idx]
-        bk = bs_arr[:, min(idx, bs_arr.shape[1] - 1)]
+        gk = qgoal_arr[:, min(k, qgoal_arr.shape[1] - 1)]
+        bk = bs_arr[:, min(k, bs_arr.shape[1] - 1)]
         if np.isnan(gk[0]):
             qs = X[3:7, k]
             w, x, y, z = qs
