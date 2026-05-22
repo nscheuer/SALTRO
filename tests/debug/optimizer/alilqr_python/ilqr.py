@@ -34,13 +34,10 @@ def _augmented_penalty_total(
             uk = np.zeros(satellite.controlDim)
 
         ck = np.asarray(satellite.constraints(k, N, xk, uk, S[:, k], cnst_cfg), dtype=float)
+        ck_pos = np.maximum(0.0, ck)
         lam_k = np.asarray(lambda_aug[k], dtype=float)
         mu_k = np.asarray(mu_aug[k], dtype=float)
-        # Lambda term always active; mu penalty active when c>0 OR lambda>0
-        for i in range(len(ck)):
-            total += lam_k[i] * ck[i]
-            if ck[i] > 0.0 or lam_k[i] > 0.0:
-                total += 0.5 * mu_k[i] * ck[i] * ck[i]
+        total += float(lam_k @ ck_pos + 0.5 * np.sum(mu_k * ck_pos * ck_pos))
 
     return total
 
@@ -108,7 +105,6 @@ def ilqr(
     lambda_aug: list[np.ndarray],
     mu_aug: list[np.ndarray],
     debug: bool = False,
-    outer_iter: int = 0,
 ) -> tuple[np.ndarray, np.ndarray, str, list, list]:
     passsettings = plannersettings.passes[pass_idx]
     
@@ -133,44 +129,10 @@ def ilqr(
             }
         )
 
-    # Two-variable regularization (rho, drho) matching C++ iLQR.
-    reg = passsettings.reg.reg_init
-    dreg = 0.0
-    reg_scale = passsettings.reg.reg_scale
-    reg_bump = passsettings.reg.reg_bump
-    reg_min = passsettings.reg.reg_min
-    reg_max = passsettings.reg.reg_max
-
-    def increase_reg():
-        nonlocal reg, dreg
-        dreg = max(dreg * reg_scale, reg_scale)
-        reg = max(reg * dreg, reg_min)
-
-    def decrease_reg():
-        nonlocal reg, dreg
-        dreg = min(dreg / reg_scale, 1.0 / reg_scale)
-        reg = max(dreg * reg, reg_min)  # match C++ iLQR.cpp:137-149 — clamp to reg_min, not snap to 0
-
-    base_lsl = max(1, int(getattr(passsettings.ilqr, "ls_attempts_lim", 30)))
-
-    # Convergence machinery — match C++ iLQR.cpp:220-275.
-    #   - Two-tier cost tolerance: `inner_tol = max(ilqr_cost_tol, cost_tol)`.
-    #     Disjunctive convergence (default): exit on ANY of {inner cost, grad}.
-    #     Conjunctive: require BOTH outer-tol cost AND grad.
-    #   - Stagnation counter: increments on `delta_J <= cost_tol` (strict);
-    #     resets otherwise.  Exit when count >= z_count_lim.
-    ilqr_cost_tol_loose = float(getattr(passsettings.ilqr, "ilqr_cost_tol",
-                                         passsettings.ilqr.cost_tol))
-    inner_tol = max(ilqr_cost_tol_loose, passsettings.ilqr.cost_tol)
-    grad_tol = float(getattr(passsettings.ilqr, "grad_tol", 0.0))
-    z_count_lim = int(getattr(passsettings.ilqr, "z_count_lim", 0))
-    conjunctive = bool(getattr(passsettings.ilqr, "conjunctive_convergence", False))
-    stagnation_count = 0
-
     for iteration in range(passsettings.ilqr.max_iters):
-        attempts = 0
-        while reg <= reg_max and attempts < base_lsl:
-            attempts += 1
+        reg = passsettings.reg.reg_init
+
+        while reg <= passsettings.reg.reg_max:
             U_trim = U[:, :X.shape[1] - 1]
             ok_bp, K, d, deltaV = saltro_py.backward_pass(
                 satellite,
@@ -189,11 +151,8 @@ def ilqr(
                 reg,
             )
             if not ok_bp:
-                increase_reg()
+                reg *= passsettings.reg.reg_scale
                 continue
-
-            # Decrease reg after successful BP (like original ALTRO)
-            decrease_reg()
 
             K_list = [K[k] for k in range(K.shape[0])]
             d_list = [d[:, k] for k in range(d.shape[1])]
@@ -223,24 +182,13 @@ def ilqr(
                 J_prev,
             )
             if not ok_fp:
-                # Triple increase: increaseReg + bump + increaseReg
-                increase_reg()
-                reg += reg_bump
-                increase_reg()
+                reg *= passsettings.reg.reg_scale
                 continue
 
             X = X_new
             U = U_new
 
             delta_J = abs(J_prev - J_new)
-
-            # Convergence checks — match C++ iLQR.cpp:227-275.
-            inner_cost_converged = (delta_J <= inner_tol)
-            outer_cost_converged = (delta_J <= passsettings.ilqr.cost_tol)
-            grad_converged = False
-            if grad_tol > 0.0:
-                max_d_norm = max(np.linalg.norm(d_k) for d_k in d_list)
-                grad_converged = (max_d_norm <= grad_tol)
 
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
@@ -260,37 +208,14 @@ def ilqr(
                     "fp_ok": True,
                     "act_delta": delta_J,
                     "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol,
-                    "inner_cost_converged": inner_cost_converged,
-                    "grad_converged": grad_converged,
-                    "stagnation_count": stagnation_count,
                 })
 
-            if conjunctive:
-                # Conjunctive: require BOTH outer-tol cost AND grad-ok (grad_tol≤0
-                # treats grad-ok as satisfied).
-                grad_ok = (grad_tol <= 0.0) or grad_converged
-                if outer_cost_converged and grad_ok:
-                    return X, U, "converged", snapshots, transitions
-            else:
-                # Disjunctive (default): exit on ANY of {loose inner cost, grad}.
-                if inner_cost_converged or (grad_tol > 0.0 and grad_converged):
-                    return X, U, "converged", snapshots, transitions
-
-            # Stagnation counter — increments on STRICT cost-tol satisfaction
-            # for `z_count_lim` consecutive iterations.  Prevents burning
-            # max_iters on a flat plateau.
-            if outer_cost_converged:
-                stagnation_count += 1
-                if z_count_lim > 0 and stagnation_count >= z_count_lim:
-                    return X, U, "converged", snapshots, transitions
-            else:
-                stagnation_count = 0
+            if delta_J <= passsettings.ilqr.cost_tol:
+                return X, U, "converged", snapshots, transitions
 
             break
 
-        if reg > reg_max:
+        if reg > passsettings.reg.reg_max:
             return X, U, "reg_exceeded", snapshots, transitions
-        if attempts >= base_lsl:
-            return X, U, "ls_attempts_exceeded", snapshots, transitions
 
     return X, U, "max_iters", snapshots, transitions
