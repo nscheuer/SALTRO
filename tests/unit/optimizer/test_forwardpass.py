@@ -160,6 +160,23 @@ def fixture():
     return ForwardPassFixture()
 
 
+def _find_chosen_alpha(J_new, K_list, d_list, fixture, settings_ls, X_base, U_base):
+    """Scan FP's deterministic halving alpha sequence and return the alpha
+    whose manual rollout cost matches J_new at fp64 precision (1e-12 rel
+    tol), or None if no match.  Mirrors the C++ helper of the same name.
+    """
+    max_iters = settings_ls.passes[0].linesearch.max_iters
+    tol = 1e-12 * max(1.0, abs(J_new))
+    for iter_idx in range(max_iters):
+        alpha_cand = 2.0 ** (-iter_idx)
+        rollout = fixture.rollout_with_alpha(
+            alpha_cand, K_list, d_list, X_base, U_base
+        )
+        if abs(rollout[2] - J_new) <= tol:
+            return alpha_cand
+    return None
+
+
 def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
     X, U = fixture.warm_start()
 
@@ -232,7 +249,13 @@ def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
         assert np.linalg.norm(x_next - X_new[:, k + 1]) < 1e-9
 
 
-def test_forward_pass_line_search_backtracks(fixture):
+def test_forward_pass_J_new_matches_its_accepted_alphas_rollout_cost(fixture):
+    """Self-consistency: FP's reported J_new equals the manual rollout cost
+    at some alpha in {1, 1/2, 1/4, ...} that FP would try.  Engineers an
+    overshooting scenario but does NOT assert FP backed off — just that
+    FP's reported J_new is consistent with its own alpha-backtracking
+    algorithm.
+    """
     X_base, U_base = fixture.warm_start()
 
     U_trim = U_base[:, : fixture.N - 1]
@@ -309,32 +332,68 @@ def test_forward_pass_line_search_backtracks(fixture):
         J_prev
     )
     assert ok
-    # Cost-decrease invariant: FP never accepts a step worse than alpha=1
-    # (modulo fp noise).
+    # Cost-decrease invariant: never worse than alpha=1.
     assert J_new <= alpha1[2] + 1e-8
 
     # FP backtracks deterministically through alpha = {1, 1/2, 1/4, ...}
     # (forwardpass.cpp: `alpha = std::ldexp(1.0, -iter)`).  Identify the
     # alpha FP actually accepted by matching J_new against the cost of
-    # each candidate rollout, then assert exact match.  Strict, alpha-aware
-    # replacement for the older "J_new in the alpha=0.5 ballpark" check
-    # that needed a hard-coded slack because post-fix FP can land on
-    # alpha=1 instead of alpha=0.5.
-    max_iters = settings_ls.passes[0].linesearch.max_iters
-    chosen_alpha = None
-    chosen_cost = None
-    for iter_idx in range(max_iters):
-        alpha_cand = 2.0 ** (-iter_idx)
-        rollout = fixture.rollout_with_alpha(
-            alpha_cand, K_list, d_list, X_base, U_base
-        )
-        if abs(rollout[2] - J_new) <= 1e-8 * max(1.0, abs(J_new)):
-            chosen_alpha = alpha_cand
-            chosen_cost = rollout[2]
-            break
-    assert chosen_alpha is not None, \
-        f"J_new={J_new} matched no alpha in the 2^-iter sequence"
-    assert abs(J_new - chosen_cost) <= 1e-8 * max(1.0, abs(J_new))
+    # each candidate's rollout, then assert exact match at fp64 precision.
+    chosen_alpha = _find_chosen_alpha(
+        J_new, K_list, d_list, fixture, settings_ls, X_base, U_base
+    )
+    assert chosen_alpha is not None
 
     # Controls should not be empty
     assert U_forward.shape[1] >= fixture.N - 1
+
+
+def test_forward_pass_accepts_alpha_1_when_full_step_already_descends(fixture):
+    """Use the unscaled BP step (descends at alpha=1) and assert FP picks
+    alpha=1 exactly — no backtracking needed.
+    """
+    X_base, U_base = fixture.warm_start()
+
+    U_trim = U_base[:, : fixture.N - 1]
+    lambda_aug, mu_aug = make_zero_aug_terms(fixture.satellite, fixture.settings, X_base, U_trim, fixture.S)
+    ok, K, d, deltaV = saltro_py.backward_pass(
+        fixture.satellite,
+        X_base, U_trim,
+        fixture.R, fixture.V, fixture.B, fixture.S, fixture.rho,
+        fixture.boresight, fixture.attitude_target_traj,
+        fixture.settings,
+        lambda_aug, mu_aug,
+        fixture.settings.passes[0].reg.reg_init
+    )
+    assert ok
+
+    cost_cfg = fixture.settings.passes[0].cost
+    J_prev = fixture.satellite.totalCost(
+        X_base, U_trim, fixture.B, fixture.boresight,
+        fixture.attitude_target_traj, cost_cfg
+    )
+
+    K_list = [K[k] for k in range(K.shape[0])]
+    d_list = [d[:, k] for k in range(d.shape[1])]
+
+    # Precondition: alpha=1 with the BP-computed d already descends.
+    alpha1 = fixture.rollout_with_alpha(1.0, K_list, d_list, X_base, U_base)
+    assert alpha1[2] < J_prev
+
+    ok, X_forward, U_forward, J_new = saltro_py.forward_pass(
+        fixture.satellite,
+        X_base, U_base,
+        K_list, d_list, deltaV,
+        fixture.B, fixture.R, fixture.V, fixture.S, fixture.rho,
+        fixture.boresight, fixture.attitude_target_traj,
+        fixture.settings, lambda_aug, mu_aug,
+        fixture.jtime, J_prev
+    )
+    assert ok
+    assert J_new <= alpha1[2] + 1e-8
+
+    chosen_alpha = _find_chosen_alpha(
+        J_new, K_list, d_list, fixture, fixture.settings, X_base, U_base
+    )
+    assert chosen_alpha is not None
+    assert chosen_alpha == 1.0

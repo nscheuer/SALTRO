@@ -60,10 +60,14 @@ void solveRiccattiStep(
 	// across many backward steps (critical for long horizons).
 	P_k = 0.5 * (P_k + Eigen::MatrixXd(P_k.transpose()));
 	
-	p_k = Q_x 
-	  + K_k.transpose() * Q_uu * d_k 
-	  + K_k.transpose() * Q_u 
-	  + Q_ux.transpose() * d_k;
+	// p_k update: the textbook form has 4 terms,
+	//   p_k = Q_x + K^T·Q_uu·d_k + K^T·Q_u + Q_ux^T·d_k,
+	// but d_k = -Q_uu^{-1}·Q_u, so K^T·Q_uu·d_k = -K^T·Q_u and the middle
+	// two cancel exactly in real arithmetic.  In fp64 they cancel only
+	// up to ~eps·||K||·||Q_uu||·||d_k|| of catastrophic-cancellation
+	// noise, which accumulates across the Riccati recursion.  We use
+	// the algebraically equivalent 2-term form to avoid that noise.
+	p_k = Q_x + Q_ux.transpose() * d_k;
 	
 	// Accumulate expected cost reduction
 	deltaV(0) += d_k.dot(Q_u);
