@@ -471,6 +471,23 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass J_new matches its accepted al
 	REQUIRE(chosen_alpha > 0.0);
 }
 
+// NOTE: a deterministic "FP backs off below alpha=1 when alpha=1
+// overshoots" test would be ideal but is hard to construct robustly.
+// Armijo accept/reject at alpha=1 depends on the z ratio
+//   z = (J_prev - J_new) / (-alpha*(deltaV(0) + alpha*deltaV(1)))
+// which depends on (a) how badly alpha=1 overshoots the cost (numerator)
+// and (b) how the quadratic deltaV(1) term interacts with the linear
+// deltaV(0) term after scaling d (denominator).  For the BP-computed
+// d_base we have deltaV(1) = -0.5 * deltaV(0) so after scaling d by s
+// the predicted delta at alpha=1 flips sign at s=2 — making the
+// classic "overshoot triggers backoff" intuition non-deterministic in
+// scaled-d setups.  Engineering a stable scenario requires either
+// custom-crafted d that is descent-only (no Q_uu^{-1} structure) or
+// instrumentation of beta1/beta2 boundaries which becomes brittle.
+//
+// The self-consistency test above + the accept-alpha=1 test below
+// cover the algorithmic invariants we actually depend on.
+
 TEST_CASE_METHOD(ForwardPassFixture, "forward_pass accepts alpha=1 when full step already descends", "[forward_pass][linesearch][no-backtrack]") {
 	// Use the unscaled BP step (which descends at alpha=1 by construction
 	// for a small initial-condition trajectory) and assert FP picks alpha=1
