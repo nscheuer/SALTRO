@@ -38,8 +38,9 @@ def trajOpt(
     dt_sec = plannersettings.passes[0].dt
     jtime_flat, q_goal, boresight = _resample_zero_order_hold(jtime, q_goal, boresight, dt_sec)
     
-    # Generate Orbit
-    ok, R, V, B, S, rho = saltro_py.generate_orbit(r0, v0, jtime_flat, 0, 0, 0, 0, 0)
+    # Match the C++ trajOpt environment models so the Python debug path solves
+    # the same optimization problem as the bound core solver.
+    ok, R, V, B, S, rho = saltro_py.generate_orbit(r0, v0, jtime_flat, 1, 2, 0, 0, 0)
     if not ok:
         raise RuntimeError("generate_orbit failed")
     
