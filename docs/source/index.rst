@@ -49,10 +49,5 @@ Documentation
 .. toctree::
    :maxdepth: 1
 
-   api/limits
-   api/constants/index
-   api/math/index
-   api/optimizer/index
-   api/orbit_generation/index
-   api/pybind/index
-   api/validation/index
+   Code Documentation <code_documentation>
+   Convergence Logic Tree <convergence_logic_tree>

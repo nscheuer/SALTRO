@@ -1,0 +1,223 @@
+.saltro-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 1.25rem 0 1.75rem;
+}
+
+.saltro-pill {
+  border-radius: 999px;
+  color: #17202a;
+  display: inline-flex;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 0.45rem 0.75rem;
+}
+
+.saltro-pill-inner {
+  background: #d8f5e7;
+  border: 1px solid #43b77a;
+}
+
+.saltro-pill-middle {
+  background: #dcecff;
+  border: 1px solid #4d8bd9;
+}
+
+.saltro-pill-outer {
+  background: #f8e1ff;
+  border: 1px solid #b45bd6;
+}
+
+.saltro-tree {
+  display: grid;
+  gap: 1.4rem;
+  margin: 1.5rem 0 2.25rem;
+}
+
+.saltro-layer {
+  border-left: 0.55rem solid;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.35rem 1.5rem rgba(17, 24, 39, 0.08);
+  color: #111827;
+  padding: 1.15rem;
+}
+
+.saltro-layer header {
+  margin-bottom: 1rem;
+}
+
+.saltro-layer h2 {
+  color: #111827;
+  font-size: 1.35rem;
+  margin: 0.15rem 0 0.35rem;
+}
+
+.saltro-layer header p {
+  color: #111827;
+  margin-bottom: 0;
+}
+
+.saltro-layer-name {
+  color: #111827;
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.saltro-outer {
+  background: linear-gradient(90deg, rgba(248, 225, 255, 0.92), rgba(255, 255, 255, 0.72));
+  border-color: #b45bd6;
+}
+
+.saltro-middle {
+  background: linear-gradient(90deg, rgba(220, 236, 255, 0.92), rgba(255, 255, 255, 0.72));
+  border-color: #4d8bd9;
+}
+
+.saltro-inner {
+  background: linear-gradient(90deg, rgba(216, 245, 231, 0.92), rgba(255, 255, 255, 0.72));
+  border-color: #43b77a;
+}
+
+.saltro-steps {
+  counter-reset: saltro-step;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.saltro-steps > li {
+  counter-increment: saltro-step;
+  margin: 0 0 1rem;
+  padding-left: 2.4rem;
+  position: relative;
+}
+
+.saltro-steps > li::before {
+  align-items: center;
+  background: #111827;
+  border-radius: 50%;
+  color: #fff;
+  content: counter(saltro-step);
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  height: 1.6rem;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  top: 0.15rem;
+  width: 1.6rem;
+}
+
+.saltro-node,
+.saltro-outcome,
+.saltro-diagnosis-grid article {
+  background: rgba(55, 65, 81, 0.94);
+  border: 1px solid rgba(17, 24, 39, 0.2);
+  border-radius: 0.45rem;
+  color: #f9fafb;
+  padding: 0.8rem 0.9rem;
+}
+
+.saltro-node code,
+.saltro-outcome code,
+.saltro-diagnosis-grid article code {
+  color: #ffffff;
+}
+
+.saltro-node strong,
+.saltro-outcome strong {
+  color: #ffffff;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.saltro-node p,
+.saltro-outcome p,
+.saltro-diagnosis-grid p {
+  color: #f9fafb;
+  margin-bottom: 0;
+}
+
+.saltro-node-action {
+  border-left: 0.3rem solid #6b7280;
+}
+
+.saltro-node-call {
+  border-left: 0.3rem solid #2563eb;
+}
+
+.saltro-node-decision {
+  border-left: 0.3rem solid #f59e0b;
+}
+
+.saltro-node-stop {
+  border-left: 0.3rem solid #7c3aed;
+}
+
+.saltro-branch {
+  border-left: 2px dashed;
+  margin: 0.5rem 0 0.35rem 1rem;
+  padding: 0.4rem 0 0.25rem 1rem;
+}
+
+.saltro-branch-label {
+  color: #111827;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.saltro-outcomes {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  margin-top: 0.65rem;
+}
+
+.saltro-good {
+  border-left: 0.3rem solid #16a34a;
+}
+
+.saltro-warn {
+  border-left: 0.3rem solid #d97706;
+}
+
+.saltro-bad {
+  border-left: 0.3rem solid #dc2626;
+}
+
+.saltro-diagnosis-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin: 1rem 0 2rem;
+}
+
+.saltro-diagnosis-grid h3 {
+  color: #ffffff;
+  font-size: 1rem;
+  margin: 0 0 0.45rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .saltro-layer {
+    box-shadow: 0 0.35rem 1.5rem rgba(0, 0, 0, 0.25);
+  }
+
+  .saltro-node,
+  .saltro-outcome,
+  .saltro-diagnosis-grid article {
+    background: rgba(17, 24, 39, 0.72);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: #f9fafb;
+  }
+
+  .saltro-pill,
+  .saltro-branch-label {
+    color: #111827;
+  }
+}
