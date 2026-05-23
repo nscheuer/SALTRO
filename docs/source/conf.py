@@ -26,15 +26,16 @@ html_theme_options = {
         "text": "SALTRO",
     },
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
-    
+
     # Empty this list to remove all icons (including GitHub)
-    "icon_links": [], 
+    "icon_links": [],
 
     "show_nav_level": 2,
 }
 html_logo = "_static/rexlab.png"
 html_css_files = [
-    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css",
+    "saltro.css",
 ]
 
 breathe_projects = {
