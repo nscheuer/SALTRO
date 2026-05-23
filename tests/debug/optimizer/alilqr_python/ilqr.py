@@ -104,12 +104,18 @@ def ilqr(
     boresight: np.ndarray,
     lambda_aug: list[np.ndarray],
     mu_aug: list[np.ndarray],
-    debug: bool = False,
-) -> tuple[np.ndarray, np.ndarray, str, list, list]:
+    debug: bool = False
+) -> tuple[np.ndarray, np.ndarray, str, list, list, dict]:
     passsettings = plannersettings.passes[pass_idx]
     
     snapshots = []
     transitions = []
+    info = {
+        "accepted_steps": 0,
+        "iterations": 0,
+        "last_delta_J": np.inf,
+        "final_cost": np.nan,
+    }
     
     # Warm-start snapshot
     if debug:
@@ -130,6 +136,7 @@ def ilqr(
         )
 
     for iteration in range(passsettings.ilqr.max_iters):
+        info["iterations"] = iteration + 1
         reg = passsettings.reg.reg_init
 
         while reg <= passsettings.reg.reg_max:
@@ -189,6 +196,9 @@ def ilqr(
             U = U_new
 
             delta_J = abs(J_prev - J_new)
+            info["accepted_steps"] += 1
+            info["last_delta_J"] = float(delta_J)
+            info["final_cost"] = float(J_new)
 
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
@@ -206,16 +216,17 @@ def ilqr(
                 transitions.append({
                     "bp_ok": True,
                     "fp_ok": True,
+                    "accepted_steps": info["accepted_steps"],
                     "act_delta": delta_J,
                     "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol,
                 })
 
             if delta_J <= passsettings.ilqr.cost_tol:
-                return X, U, "converged", snapshots, transitions
+                return X, U, "converged", snapshots, transitions, info
 
             break
 
         if reg > passsettings.reg.reg_max:
-            return X, U, "reg_exceeded", snapshots, transitions
+            return X, U, "reg_exceeded", snapshots, transitions, info
 
-    return X, U, "max_iters", snapshots, transitions
+    return X, U, "max_iters", snapshots, transitions, info
