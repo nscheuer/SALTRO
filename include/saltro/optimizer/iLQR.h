@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <limits>
 #include <vector>
 #include <saltro/pybind/satellite.h>
 #include <saltro/limits.h>
@@ -14,6 +15,17 @@ enum class ILQRStatus {
 	MaxIterations,
 	// Regularization retry loop exceeded reg_max.
 	RegularizationExceeded,
+};
+
+struct ILQRTelemetry {
+	// Number of forward-pass rollouts accepted by the line search.
+	int accepted_steps = 0;
+	// Number of outer iLQR iterations entered.
+	int iterations = 0;
+	// Absolute cost change from the last accepted forward pass.
+	double last_delta_J = std::numeric_limits<double>::infinity();
+	// Cost reported by the last accepted forward pass.
+	double final_cost = std::numeric_limits<double>::quiet_NaN();
 };
 
 /**
@@ -69,6 +81,27 @@ bool iLQR(
 	const std::vector<Eigen::VectorXd>& mu_aug,
 	ILQRStatus& status,
 	double& J
+);
+
+bool iLQR(
+	const PlannerSettings& settings,
+	const Satellite& satellite,
+	Eigen::Ref<Eigen::MatrixXd> X,
+	Eigen::Ref<Eigen::MatrixXd> U,
+	const Eigen::Ref<const Eigen::MatrixXd>& R,
+	const Eigen::Ref<const Eigen::MatrixXd>& V,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,
+	const Eigen::Ref<const Eigen::VectorXd>& jtime,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+	int pass_idx,
+	const std::vector<Eigen::VectorXd>& lambda_aug,
+	const std::vector<Eigen::VectorXd>& mu_aug,
+	ILQRStatus& status,
+	double& J,
+	ILQRTelemetry& telemetry
 );
 
 bool iLQR(
