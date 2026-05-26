@@ -71,13 +71,13 @@ TEST_CASE("Highly elliptical orbit fails", "[orbitstate][validation][eccentricit
     const bool ok = saltro::validation::validateOrbitState(r0, v0, error_msg);
 
     REQUIRE_FALSE(ok);
-    REQUIRE(error_msg == "orbit is too elliptical for LEO use (eccentricity > 0.2)");
+    REQUIRE(error_msg == "orbit is too elliptical for LEO use (eccentricity > 0.3)");
 }
 
 TEST_CASE("Bound orbit above LEO ceiling fails", "[orbitstate][validation][leo]") {
     Vec3 r0;
     Vec3 v0;
-    makeCircularLEO(3000e3, r0, v0);
+    makeCircularLEO(3500e3, r0, v0);
 
     std::string error_msg;
     const bool ok = saltro::validation::validateOrbitState(r0, v0, error_msg);

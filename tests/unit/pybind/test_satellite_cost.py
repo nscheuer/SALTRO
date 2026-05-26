@@ -9,8 +9,12 @@ in test_satellite_cost.cpp.
 import pytest
 import numpy as np
 import sys
+from pathlib import Path
 from typing import Tuple
-sys.path.insert(0, '/home/nic2703/SALTRO/build')
+
+ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(ROOT / "build"))
+
 import saltro_py as saltro
 
 # ============================================================================
@@ -54,32 +58,19 @@ class SatelliteCostFixture:
         self._generate_orbit()
     
     def _generate_orbit(self):
-        """Generate Sun-synchronous orbit at ~600 km altitude."""
-        # Semi-major axis corresponding to ~600 km altitude
+        """Generate orbit at ~600 km altitude using the real generate_orbit
+        binding. The previous version called a non-existent overload and
+        silently fell back to synthetic R/V/B/S — meaning the entire cost
+        test suite was running against fake orbit data."""
         a = 6978e3
         r0 = np.array([a, 0.0, 0.0])
-        v0 = np.array([0.0, 7.56e3, 0.0])  # Orbital velocity
-        
-        # Generate orbit vectors (importing from saltro if available)
-        try:
-            self.R, self.V, self.B, self.S, self.rho, self.jtime = \
-                saltro.generate_orbit(r0, v0, self.n_steps, self.dt)
-        except (AttributeError, TypeError):
-            # Fallback: create dummy orbit data if generate_orbit is not exposed
-            self.R = np.zeros((3, self.n_steps))
-            self.V = np.zeros((3, self.n_steps))
-            self.B = np.zeros((3, self.n_steps))
-            self.S = np.zeros((3, self.n_steps))
-            self.rho = np.ones(self.n_steps) * 1e-13
-            self.jtime = np.linspace(0, self.n_steps * self.dt, self.n_steps)
-            
-            for i in range(self.n_steps):
-                # Circular orbit: r perpendicular to v
-                angle = 2 * np.pi * i / self.n_steps
-                self.R[:, i] = np.array([a * np.cos(angle), a * np.sin(angle), 0.0])
-                self.V[:, i] = np.array([-7.56e3 * np.sin(angle), 7.56e3 * np.cos(angle), 0.0])
-                self.B[:, i] = np.array([1e-5 * np.cos(angle), 1e-5 * np.sin(angle), 3e-5])
-                self.S[:, i] = np.array([1.0, 0.0, 0.0])  # Sun in +X direction
+        v0 = np.array([0.0, 7.56e3, 0.0])
+
+        self.jtime = np.array([i * self.dt for i in range(self.n_steps)])
+        ok, self.R, self.V, self.B, self.S, self.rho = saltro.generate_orbit(
+            r0, v0, self.jtime, 0, 0, 0, 0, 0
+        )
+        assert ok, "Orbit generation failed"
     
     # ========================================================================
     # Finite Difference Helper Functions

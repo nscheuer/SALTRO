@@ -176,11 +176,9 @@ def alilqr(
     
     for iteration in range(passsettings.auglag.max_outer_iters):
         # Solve AL subproblem with iLQR first (ALTRO style).
-        X, U, stop_reason, snaps, trans = ilqr(
-            plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho,
-            jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug,
-            spike_removal_cfg=spike_removal_cfg,
-            outer_iter=iteration,
+        X, U, stop_reason, snaps, trans, inner_info = ilqr(
+            plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho, 
+            jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug
         )
 
         if debug:
@@ -212,6 +210,9 @@ def alilqr(
                     "max_constraint_violation": max_c,
                     "lambda_max": float(max(np.max(lam) for lam in lambda_aug)) if lambda_aug else 0.0,
                     "mu_max": float(max(np.max(mu) for mu in mu_aug)) if mu_aug else 0.0,
+                    "inner_stop_reason": stop_reason,
+                    "inner_accepted_steps": int(inner_info["accepted_steps"]),
+                    "inner_last_delta_J": float(inner_info["last_delta_J"]),
                 }
             )
 
@@ -227,12 +228,20 @@ def alilqr(
         min_outer = int(getattr(passsettings.auglag, "min_outer_iters", 1))
         constraint_tol_strict = float(getattr(passsettings.auglag, "constraint_tol_strict", 0.0))
         if max_c <= passsettings.auglag.constraint_tol:
-            inner_ok = (stop_reason == "converged")
-            outer_matured = (iteration + 1) >= min_outer
-            strict_path = (constraint_tol_strict > 0.0) and (max_c <= constraint_tol_strict)
-            if strict_path or (inner_ok and outer_matured):
-                stop_reason = f"AL-iLQR converged: max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}"
+            if stop_reason == "converged" or int(inner_info["accepted_steps"]) > 0:
+                stop_reason = (
+                    "AL-iLQR converged: "
+                    f"max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}; "
+                    f"inner iLQR returned '{stop_reason}' after {int(inner_info['accepted_steps'])} accepted step(s)"
+                )
                 break
+
+            stop_reason = (
+                "AL-iLQR did not converge: constraints satisfied "
+                f"(max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}) "
+                f"but inner iLQR returned '{stop_reason}' with no accepted trajectory update"
+            )
+            break
 
         # Update lambda and mu matching C++ alilqr.cpp:
         # Lambda update uses RAW constraint value (not clamped to positive).
@@ -258,6 +267,3 @@ def alilqr(
             break
 
     return X, U, stop_reason, snapshots, transitions
-
-
-        

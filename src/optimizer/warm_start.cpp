@@ -109,6 +109,11 @@ bool warm_start(
             const double umax = std::abs(satellite.getRW(i).u_max());
             uk_scaled(ui) = std::clamp(uk_scaled(ui), -umax, umax);
         }
+        for (int i = 0; i < satellite.numMagic(); ++i) {
+            const int ui = satellite.numMTQ() + satellite.numRW() + i;
+            const double umax = std::abs(satellite.getMagic(i).u_max());
+            uk_scaled(ui) = std::clamp(uk_scaled(ui), -umax, umax);
+        }
 
         U.col(k) = uk_scaled;
 

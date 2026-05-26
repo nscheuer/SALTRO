@@ -109,14 +109,18 @@ def ilqr(
     boresight: np.ndarray,
     lambda_aug: list[np.ndarray],
     mu_aug: list[np.ndarray],
-    debug: bool = False,
-    spike_removal_cfg: dict | None = None,
-    outer_iter: int = 0,
-) -> tuple[np.ndarray, np.ndarray, str, list, list]:
+    debug: bool = False
+) -> tuple[np.ndarray, np.ndarray, str, list, list, dict]:
     passsettings = plannersettings.passes[pass_idx]
     
     snapshots = []
     transitions = []
+    info = {
+        "accepted_steps": 0,
+        "iterations": 0,
+        "last_delta_J": np.inf,
+        "final_cost": np.nan,
+    }
     
     # Warm-start snapshot
     if debug:
@@ -130,19 +134,16 @@ def ilqr(
                 "U": U.copy(),
                 "J": J,
                 "q_goal": q_goal.copy(),
+                "boresight": boresight.copy(),
                 "components": components,
                 "R": R.copy(),
                 "B": B.copy(),
             }
         )
 
-    # Two-variable regularization (rho, drho) matching C++ iLQR.
-    reg = passsettings.reg.reg_init
-    dreg = 0.0
-    reg_scale = passsettings.reg.reg_scale
-    reg_bump = passsettings.reg.reg_bump
-    reg_min = passsettings.reg.reg_min
-    reg_max = passsettings.reg.reg_max
+    for iteration in range(passsettings.ilqr.max_iters):
+        info["iterations"] = iteration + 1
+        reg = passsettings.reg.reg_init
 
     def increase_reg():
         nonlocal reg, dreg
@@ -281,15 +282,10 @@ def ilqr(
                         spike_occurred_this_iter = True
 
             delta_J = abs(J_prev - J_new)
-
-            # Convergence checks — match C++ iLQR.cpp:227-275.
-            inner_cost_converged = (delta_J <= inner_tol)
-            outer_cost_converged = (delta_J <= passsettings.ilqr.cost_tol)
-            grad_converged = False
-            if grad_tol > 0.0:
-                max_d_norm = max(np.linalg.norm(d_k) for d_k in d_list)
-                grad_converged = (max_d_norm <= grad_tol)
-
+            info["accepted_steps"] += 1
+            info["last_delta_J"] = float(delta_J)
+            info["final_cost"] = float(J_new)
+            
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
                 snapshots.append(
@@ -298,6 +294,7 @@ def ilqr(
                         "U": U.copy(),
                         "J": J_new,
                         "q_goal": q_goal.copy(),
+                        "boresight": boresight.copy(),
                         "components": components,
                         "R": R.copy(),
                         "B": B.copy(),
@@ -306,42 +303,20 @@ def ilqr(
                 transitions.append({
                     "bp_ok": True,
                     "fp_ok": True,
+                    "accepted_steps": info["accepted_steps"],
                     "act_delta": delta_J,
                     "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol,
                     "inner_cost_converged": inner_cost_converged,
                     "grad_converged": grad_converged,
                     "stagnation_count": stagnation_count,
                 })
-
-            if conjunctive:
-                # Conjunctive: require BOTH outer-tol cost AND grad-ok (grad_tol≤0
-                # treats grad-ok as satisfied).
-                grad_ok = (grad_tol <= 0.0) or grad_converged
-                if outer_cost_converged and grad_ok:
-                    return X, U, "converged", snapshots, transitions
-            else:
-                # Disjunctive (default): exit on ANY of {loose inner cost, grad}.
-                if inner_cost_converged or (grad_tol > 0.0 and grad_converged):
-                    return X, U, "converged", snapshots, transitions
-
-            # Stagnation counter — increments on STRICT cost-tol satisfaction
-            # for `z_count_lim` consecutive iterations.  Prevents burning
-            # max_iters on a flat plateau.
-            if outer_cost_converged:
-                stagnation_count += 1
-                if z_count_lim > 0 and stagnation_count >= z_count_lim:
-                    return X, U, "converged", snapshots, transitions
-            else:
-                stagnation_count = 0
-
+            
+            if delta_J <= passsettings.ilqr.cost_tol:
+                return X, U, "converged", snapshots, transitions, info
+            
             break
 
-        # Update spike tracker for next iteration's ls budget.
-        spike_occurred_last_iter = spike_occurred_this_iter
-
-        if reg > reg_max:
-            return X, U, "reg_exceeded", snapshots, transitions
-        if attempts >= effective_lsl:
-            return X, U, "ls_attempts_exceeded", snapshots, transitions
-
-    return X, U, "max_iters", snapshots, transitions
+        if reg > passsettings.reg.reg_max:
+            return X, U, "reg_exceeded", snapshots, transitions, info
+        
+    return X, U, "max_iters", snapshots, transitions, info

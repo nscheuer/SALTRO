@@ -94,9 +94,18 @@ void Satellite::addRW(const Vec3& axis, double max_torque, double J, double h0, 
     }
 
     rw_actuators_[num_rw_] = std::make_unique<RW>(axis, max_torque, J, h0, h_max);
-    
+
     ++num_rw_;
     updateInertiaNoRW();
+}
+
+void Satellite::addMagic(const Vec3& axis, double max_torque) {
+    if (num_magic_ >= saltro::limits::MAX_NUM_MAGIC) {
+        throw out_of_range("Exceeded MAX_NUM_MAGIC.");
+    }
+    magic_actuators_[num_magic_] = std::make_unique<Magic>(axis, max_torque);
+
+    ++num_magic_;
 }
 
 const MTQ& Satellite::getMTQ(int i) const {
@@ -125,6 +134,20 @@ RW& Satellite::getRW(int i) {
         throw out_of_range("RW index out of range.");
     }
     return *rw_actuators_[i];
+}
+
+const Magic& Satellite::getMagic(int i) const {
+    if (i < 0 || i >= num_magic_) {
+        throw out_of_range("Magic actuator index out of range.");
+    }
+    return *magic_actuators_[i];
+}
+
+Magic& Satellite::getMagic(int i) {
+    if (i < 0 || i >= num_magic_) {
+        throw out_of_range("Magic actuator index out of range.");
+    }
+    return *magic_actuators_[i];
 }
 
 void Satellite::updateInertiaNoRW() {
@@ -229,7 +252,16 @@ Satellite::Vec3 Satellite::actuatorTorque(const VecX& x, const VecX& u, const Ve
             torque += rw.torque(u_i, x_base);
         }
     }
-    
+
+    if (num_magic_ > 0) {
+        for (int i = 0; i < num_magic_; ++i) {
+            int ctrl_idx = num_mtq_ + num_rw_ + i;
+            double u_i = u(ctrl_idx);
+            const Magic& magic = getMagic(i);
+            torque += magic.torque(u_i, x_base);
+        }
+    }
+
     return torque;
 }
 
@@ -483,6 +515,15 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamic
         int ctrl_idx = num_mtq_ + i;
         const RW& rw = getRW(i);
         Vec3 axis_i = rw.axis();
+        jac_u.block<3, 1>(AV_INDEX, ctrl_idx) = invJcom_noRW_ * axis_i;
+    }
+
+    // Magic actuator contribution: tau_magic = axis * u_magic
+    // Same column shape as RW but no h-state coupling and no Newton-3 back-reaction.
+    for (int i = 0; i < num_magic_; ++i) {
+        int ctrl_idx = num_mtq_ + num_rw_ + i;
+        const Magic& magic = getMagic(i);
+        Vec3 axis_i = magic.axis();
         jac_u.block<3, 1>(AV_INDEX, ctrl_idx) = invJcom_noRW_ * axis_i;
     }
     
@@ -1015,6 +1056,77 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     return std::make_tuple(hess_xx, hess_ux, hess_uu);
 }
 
+namespace {
+
+// ===========================================================================
+// Vector-pointing attitude cost — PhD-planner-style reduced-space formulation.
+//
+// The attitude cost is h(q) = f(c), with c = bs·R(q)ᵀ·r̂ ∈ [-1, 1] the cosine
+// of the boresight-to-target angle.  Following the Generalized_ADCS PhD
+// planner (cost2angQ / ddvTRTudqQ in GeneralUtil.cpp), the cost shape f and
+// the geometry of c are factored into two small helpers, and every attitude-
+// cost derivative is taken in the 3-D attitude tangent space.
+// ===========================================================================
+
+// Cost shape f(c) and its first two derivatives w.r.t. c.
+//   0: 1−c    1: ½(1−c)²    2: acos(c)    3: ½·acos(c)²    4: (1−c)²
+// fpp ≥ 0 for types 0,1,3,4, so the Gauss-Newton Hessian f''·g·gᵀ is PSD by
+// construction; type 2 (acos) is the exception (fpp < 0 for c > 0).
+struct AngCostShape { double f, fp, fpp; };
+
+AngCostShape angCostShape(double c, int type) {
+    const double omc2 = std::max(1.0 - c * c, 1e-12);  // 1 − c²  (floored)
+    const double s = std::sqrt(omc2);                  // √(1 − c²)
+    switch (type) {
+        case 0: return { 1.0 - c, -1.0, 0.0 };
+        case 1: { const double e = 1.0 - c; return { 0.5 * e * e, -e, 1.0 }; }
+        case 2: return { std::acos(c), -1.0 / s, -c / (omc2 * s) };
+        case 3: {
+            const double phi = std::acos(c);
+            return { 0.5 * phi * phi, -phi / s,
+                     1.0 / omc2 - phi * c / (omc2 * s) };
+        }
+        case 4: { const double e = 1.0 - c; return { e * e, -2.0 * e, 2.0 }; }
+        default: return { std::acos(c), -1.0 / s, -c / (omc2 * s) };
+    }
+}
+
+// Reduced-space geometry of c = bs·R(q)ᵀ·r̂.  The gradient and Hessian are
+// expressed in the attitude tangent space (basis W = findWMat(q)); `ddc`
+// carries the "Planning with Attitude" manifold-curvature correction
+// −(∂c/∂q·q)·I₃, exactly as the PhD planner's ddvTRTudqQ.  This is the
+// vector-pointing analogue of cost2angQ.
+struct VecPointingGeom {
+    double c;             // clamped cos(pointing error)
+    Eigen::Vector3d dc;   // ∂c/∂θ   (reduced gradient)
+    Eigen::Matrix3d ddc;  // ∂²c/∂θ² (reduced Hessian, manifold-corrected)
+};
+
+VecPointingGeom vecPointingGeom(const Eigen::Vector4d& q,
+                                const Eigen::Vector3d& bs_unit,
+                                const Eigen::Vector3d& r_eci) {
+    const auto W = saltro::math::findWMat(q);  // 4×3 attitude tangent basis
+
+    // Ambient (ℝ⁴) gradient and Hessian of c.
+    const Eigen::Vector4d dc_amb =
+        saltro::math::drotmatTvecdq(q, r_eci) * bs_unit;
+    const auto H_RTv = saltro::math::ddrotmatTvecdqdq(q, r_eci);
+    Eigen::Matrix4d d2c_amb = Eigen::Matrix4d::Zero();
+    for (int b = 0; b < 3; ++b) d2c_amb += bs_unit(b) * H_RTv[b];
+
+    VecPointingGeom g;
+    g.c  = std::clamp(bs_unit.dot(saltro::math::rotationMatrix(q).transpose()
+                                  * r_eci), -1.0, 1.0);
+    g.dc = W.transpose() * dc_amb;
+    // Project ambient → tangent, then subtract the manifold correction
+    // −(∂c/∂q·q)·I₃.  (∂c/∂q·q = 2c since c is degree-2 homogeneous in q.)
+    g.ddc = W.transpose() * d2c_amb * W
+          - dc_amb.dot(q) * Eigen::Matrix3d::Identity();
+    return g;
+}
+
+}  // namespace
+
 double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                             const Vec3& boresight_body, const Vec4& attitude_target,
                             const Vec3& B_eci, const CostConfig& cost_cfg) const {
@@ -1062,43 +1174,16 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
 
     double ang_cost = 0.0;
     if (is_eci_format) {
-        // Vector-pointing: cost a function of c = bs · R(q)^T · r̂_eci ∈ [-1, 1].
-        // 2-DOF: roll about bs is unconstrained.  No double-cover ambiguity
-        // (cos is monotone on [0, π]).  Mirrors OldPlanner.cpp's veccost path.
+        // Vector-pointing: cost h = f(c), c = bs·R(q)ᵀ·r̂_eci ∈ [-1, 1].
+        // 2-DOF (roll about bs is free); no double-cover ambiguity.  The cost
+        // shape lives in the angCostShape helper (shared with the Jacobian /
+        // Hessian), mirroring the PhD planner's veccost path.
         const Vec3 bs_unit = boresight_body.normalized();
         const Vec3 r_eci = attitude_target.tail(3).normalized();
-        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
-        const double c_val = std::clamp(bs_unit.dot(R_T * r_eci), -1.0, 1.0);
-        switch (cost_cfg.ang_cost_func_type) {
-            case 0:
-                ang_cost = 1.0 - c_val;
-                break;
-            case 1: {
-                const double err = 1.0 - c_val;
-                ang_cost = 0.5 * err * err;
-                break;
-            }
-            case 2:
-                ang_cost = std::acos(c_val);
-                break;
-            case 3: {
-                const double phi = std::acos(c_val);
-                ang_cost = 0.5 * phi * phi;
-                break;
-            }
-            case 4: {
-                // Vector-mode case 4 diverges from quaternion-mode (1 - d²)
-                // because vector-mode c can be negative — quat-mode (1 - d²)
-                // would give zero cost at antipodal alignment.  Use (1 - c)²
-                // for a smooth bowl in [0, 4] over c ∈ [1, -1].
-                const double err = 1.0 - c_val;
-                ang_cost = err * err;
-                break;
-            }
-            default:
-                ang_cost = std::acos(c_val);
-                break;
-        }
+        const double c_val = std::clamp(
+            bs_unit.dot(saltro::math::rotationMatrix(q).transpose() * r_eci),
+            -1.0, 1.0);
+        ang_cost = angCostShape(c_val, cost_cfg.ang_cost_func_type).f;
     } else {
         switch (cost_cfg.ang_cost_func_type) {
             case 0:
@@ -1231,6 +1316,12 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
             const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
             const double normalized = u(ctrl_idx) / lim;
             control_cost += 0.5 * w_u_mult * cost_cfg.rw_control_weight * normalized * normalized;
+        }
+        for (int i = 0; i < num_magic_; ++i) {
+            const int ctrl_idx = num_mtq_ + num_rw_ + i;
+            const double lim = std::max(1e-9, std::abs(getMagic(i).u_max()));
+            const double normalized = u(ctrl_idx) / lim;
+            control_cost += 0.5 * w_u_mult * cost_cfg.magic_control_weight * normalized * normalized;
         }
     }
 
@@ -1442,45 +1533,16 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     
     // Compute derivative of attitude cost w.r.t. q
     if (is_eci_format) {
-        // Vector mode: c = bs·R^T·r̂.  Same f-family as quaternion mode but
-        // applied to c (no |·|; cos is monotone on [0, π]).
-        //   ∂c/∂q   = drotmatTvecdq(q, r̂) · bs        (deg-2 ambient deriv)
-        //   ∂h/∂q   = f'(c) · ∂c/∂q
+        // Vector mode: h = f(c), c = bs·R(q)ᵀ·r̂.  Work in the attitude tangent
+        // space (PhD-style): ∂h/∂θ = f'(c)·∂c/∂θ.  Lift the reduced 3-vector
+        // back to the ambient q-block with W; the backward pass re-projects
+        // with Wᵀ (WᵀW = I₃, so the lift round-trips exactly).
         const Vec3 bs_unit = boresight_body.normalized();
         const Vec3 r_eci = attitude_target.tail(3).normalized();
-        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
-        const double c_val = std::clamp(bs_unit.dot(R_T * r_eci), -1.0, 1.0);
-        double dh_dc = 0.0;
-        switch (cost_cfg.ang_cost_func_type) {
-            case 0:
-                dh_dc = -1.0;
-                break;
-            case 1:
-                dh_dc = -(1.0 - c_val);
-                break;
-            case 2: {
-                const double denom = std::sqrt(1.0 - c_val * c_val + 1e-12);
-                dh_dc = -1.0 / denom;
-                break;
-            }
-            case 3: {
-                const double phi = std::acos(c_val);
-                const double denom = std::sqrt(1.0 - c_val * c_val + 1e-12);
-                dh_dc = -phi / denom;
-                break;
-            }
-            case 4:
-                dh_dc = -2.0 * (1.0 - c_val);
-                break;
-            default: {
-                const double denom = std::sqrt(1.0 - c_val * c_val + 1e-12);
-                dh_dc = -1.0 / denom;
-                break;
-            }
-        }
-        const Mat43 J_rhat = saltro::math::drotmatTvecdq(q, r_eci);
-        const Vec4 dc_dq = J_rhat * bs_unit;
-        lx.segment<4>(QUAT_INDEX) = w_ang_eff * dh_dc * dc_dq;
+        const VecPointingGeom geom = vecPointingGeom(q, bs_unit, r_eci);
+        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+        lx.segment<4>(QUAT_INDEX) =
+            w_ang_eff * f.fp * (saltro::math::findWMat(q) * geom.dc);
     } else {
         double d_ang_cost_dqdot = 0.0;  // ∂(ang_cost)/∂(qdot)
         switch (cost_cfg.ang_cost_func_type) {
@@ -1579,13 +1641,21 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             const double normalized = u(i) / lim;
             lu(i) = w_u_mult * cost_cfg.mtq_control_weight * normalized / lim;
         }
-        
+
         // RW control costs
         for (int i = 0; i < num_rw_; ++i) {
             const int ctrl_idx = num_mtq_ + i;
             const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
             const double normalized = u(ctrl_idx) / lim;
             lu(ctrl_idx) = w_u_mult * cost_cfg.rw_control_weight * normalized / lim;
+        }
+
+        // Magic actuator control costs
+        for (int i = 0; i < num_magic_; ++i) {
+            const int ctrl_idx = num_mtq_ + num_rw_ + i;
+            const double lim = std::max(1e-9, std::abs(getMagic(i).u_max()));
+            const double normalized = u(ctrl_idx) / lim;
+            lu(ctrl_idx) = w_u_mult * cost_cfg.magic_control_weight * normalized / lim;
         }
     }
 
@@ -1688,6 +1758,12 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
                 luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.rw_control_weight / (lim * lim);
             }
+
+            for (int i = 0; i < num_magic_; ++i) {
+                const int ctrl_idx = num_mtq_ + num_rw_ + i;
+                const double lim = std::max(1e-9, std::abs(getMagic(i).u_max()));
+                luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.magic_control_weight / (lim * lim);
+            }
         }
 
         return std::make_tuple(lxx, luu, lux);
@@ -1720,72 +1796,32 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     // reduced-state machinery, and the −(grad·q)·I_4 correction is applied
     // here on the q-block.
     if (is_eci_format) {
-        // Vector mode.
-        //   c = bs · R(q)^T · r̂  ∈ [-1, 1]
-        //   ∂c/∂q   = drotmatTvecdq(q, r̂) · bs            (4-vec, deg-2 ambient)
-        //   ∂²c/∂q² = Σ_b bs_b · ddrotmatTvecdqdq(q, r̂)[b] (4×4)
-        //   ∂h/∂q   = f'(c) · ∂c/∂q
-        //   ∂²h/∂q² = f''(c) · (∂c/∂q)(∂c/∂q)^T + f'(c) · ∂²c/∂q²
-        //   ∂h/∂q · q = f'(c) · 2c   (Euler deg-2 on raw_R^T·r̂ at unit q)
+        // Vector mode: reduced-space angle Hessian, PhD-style.  c = bs·R(q)ᵀ·r̂,
+        // h = f(c).  In the attitude tangent space the Hessian splits cleanly:
+        //
+        //   Gauss-Newton:  H = f''(c)·(∂c/∂θ)(∂c/∂θ)ᵀ
+        //                  — a rank-1 outer product, PSD by construction
+        //                    wherever f'' ≥ 0 (types 0,1,3,4).
+        //   Full (GN off): H += f'(c)·∂²c/∂θ²
+        //                  — the chain-rule term.  ∂²c/∂θ² (geom.ddc) already
+        //                    carries the Planning-with-Attitude manifold
+        //                    correction, so this branch is the exact Hessian.
+        //
+        // The cost_hess_gauss_newton flag selects between them: with the flag
+        // OFF the full (exact) Hessian is returned; ON gives the GN form.
         const Vec3 bs_unit = boresight_body.normalized();
         const Vec3 r_eci = attitude_target.tail(3).normalized();
-        const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
-        const double c_val = std::clamp(bs_unit.dot(R_T * r_eci), -1.0, 1.0);
-        const double one_minus_c2 = std::max(1.0 - c_val * c_val, 1e-12);
-        const double sqrt_omc2 = std::sqrt(one_minus_c2);
+        const VecPointingGeom geom = vecPointingGeom(q, bs_unit, r_eci);
+        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
 
-        double dh_dc = 0.0, d2h_dc2 = 0.0;
-        switch (cost_cfg.ang_cost_func_type) {
-            case 0:  // h = 1 - c
-                dh_dc = -1.0;
-                d2h_dc2 = 0.0;
-                break;
-            case 1:  // h = ½(1-c)²
-                dh_dc = -(1.0 - c_val);
-                d2h_dc2 = 1.0;
-                break;
-            case 2:  // h = acos(c)
-                dh_dc = -1.0 / sqrt_omc2;
-                d2h_dc2 = -c_val / (one_minus_c2 * sqrt_omc2);
-                break;
-            case 3: {  // h = ½·acos(c)²
-                const double phi = std::acos(c_val);
-                dh_dc = -phi / sqrt_omc2;
-                d2h_dc2 = 1.0 / one_minus_c2 - phi * c_val / (one_minus_c2 * sqrt_omc2);
-                break;
-            }
-            case 4:  // h = (1-c)²
-                dh_dc = -2.0 * (1.0 - c_val);
-                d2h_dc2 = 2.0;
-                break;
-            default:
-                dh_dc = -1.0 / sqrt_omc2;
-                d2h_dc2 = -c_val / (one_minus_c2 * sqrt_omc2);
-                break;
-        }
-
-        const Mat43 J_rhat = saltro::math::drotmatTvecdq(q, r_eci);
-        const Vec4 dc_dq = J_rhat * bs_unit;
-        const std::array<Eigen::Matrix4d, 3> H_RTv =
-            saltro::math::ddrotmatTvecdqdq(q, r_eci);
-        Eigen::Matrix4d d2c_dq2 = Eigen::Matrix4d::Zero();
-        for (int b = 0; b < 3; ++b) {
-            d2c_dq2 += bs_unit(b) * H_RTv[b];
-        }
-
-        // GN drops only the second-order chain-rule term `f'·d²c/dq²` (which
-        // can be indefinite). The PwA correction `−grad_dot_q·I_4` is the
-        // manifold-curvature term and is PSD when (`f'·c < 0`), which holds
-        // for our cost shapes in the aligned hemisphere — keep it always.
-        Eigen::Matrix4d Hqq_ang = d2h_dc2 * (dc_dq * dc_dq.transpose());
+        Eigen::Matrix3d H_red = f.fpp * (geom.dc * geom.dc.transpose());
         if (!cost_cfg.cost_hess_gauss_newton) {
-            Hqq_ang += dh_dc * d2c_dq2;
+            H_red += f.fp * geom.ddc;  // full exact Hessian
         }
-        lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) += w_ang_eff * Hqq_ang;
-        // PwA correction: −(grad·q)·I_4.  ∂h_amb/∂q · q = f'(c) · 2c.
-        const double grad_dot_q = dh_dc * 2.0 * c_val;
-        lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) -= w_ang_eff * grad_dot_q
-            * Eigen::Matrix<double, 4, 4>::Identity();
+        // Lift reduced 3×3 → ambient q-block; the BP re-projects with Wᵀ.
+        const auto W = saltro::math::findWMat(q);
+        lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) +=
+            w_ang_eff * (W * H_red * W.transpose());
     } else {
         // Quaternion mode: h(q) = f(d) where d = q_g_aligned · q.
         //   ∂h/∂q   = f'(d) · q_g
@@ -1971,12 +2007,19 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             const double lim = std::max(1e-9, std::abs(getMTQ(i).u_max()));
             luu(i, i) += w_u_mult * cost_cfg.mtq_control_weight / (lim * lim);
         }
-        
+
         // RW control costs: diagonal contributions
         for (int i = 0; i < num_rw_; ++i) {
             const int ctrl_idx = num_mtq_ + i;
             const double lim = std::max(1e-9, std::abs(getRW(i).u_max()));
             luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.rw_control_weight / (lim * lim);
+        }
+
+        // Magic actuator control costs: diagonal contributions
+        for (int i = 0; i < num_magic_; ++i) {
+            const int ctrl_idx = num_mtq_ + num_rw_ + i;
+            const double lim = std::max(1e-9, std::abs(getMagic(i).u_max()));
+            luu(ctrl_idx, ctrl_idx) += w_u_mult * cost_cfg.magic_control_weight / (lim * lim);
         }
     }
 
@@ -2102,7 +2145,9 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     }
 
     const bool has_control_constraints = (k < N - 1);
-    const int n_constraints = 1 + 1 + (has_control_constraints ? (2 * num_mtq_ + 5 * num_rw_) : 0);
+    const int n_constraints = 1 + 1 + (has_control_constraints
+                                           ? (2 * num_mtq_ + 5 * num_rw_ + 2 * num_magic_)
+                                           : 0);
     VecX c(n_constraints);
     c.setZero();
 
@@ -2170,6 +2215,17 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
         c(idx++) = -(u_cmd * h) * (u_cmd * h);
     }
 
+    // Magic-actuator torque bounds (no momentum or stiction terms — no internal state).
+    for (int i = 0; i < num_magic_; ++i) {
+        const int ctrl_idx = num_mtq_ + num_rw_ + i;
+        const double u_cmd = u(ctrl_idx);
+        const double lim_from_cfg = configured_u_max(ctrl_idx);
+        const double lim_from_act = std::abs(getMagic(i).u_max());
+        const double lim = scale * std::max(1e-9, (lim_from_cfg > 0.0 ? lim_from_cfg : lim_from_act));
+        c(idx++) = (u_cmd - lim) / lim;
+        c(idx++) = (-u_cmd - lim) / lim;
+    }
+
     return c;
 }
 
@@ -2191,8 +2247,10 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
     }
 
     const bool has_control_constraints = (k < N - 1);
-    const int n_constraints = 1 + 1 + (has_control_constraints ? (2 * num_mtq_ + 5 * num_rw_) : 0);
-    
+    const int n_constraints = 1 + 1 + (has_control_constraints
+                                           ? (2 * num_mtq_ + 5 * num_rw_ + 2 * num_magic_)
+                                           : 0);
+
     MatX c_u(n_constraints, controlDim());
     MatX c_x(n_constraints, stateDim());
     c_u.setZero();
@@ -2301,6 +2359,21 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
         idx++;
     }
 
+    // 5) Magic-actuator control bound Jacobians (linear in u only; no state coupling).
+    for (int i = 0; i < num_magic_; ++i) {
+        const int ctrl_idx = num_mtq_ + num_rw_ + i;
+        const double lim_from_cfg = configured_u_max(ctrl_idx);
+        const double lim_from_act = std::abs(getMagic(i).u_max());
+        const double lim = scale * std::max(1e-9, (lim_from_cfg > 0.0 ? lim_from_cfg : lim_from_act));
+
+        // Upper bound:  (u - lim) / lim
+        c_u(idx, ctrl_idx) =  1.0 / lim;
+        idx++;
+        // Lower bound: (-u - lim) / lim
+        c_u(idx, ctrl_idx) = -1.0 / lim;
+        idx++;
+    }
+
     return std::make_tuple(c_u, c_x);
 }
 
@@ -2396,6 +2469,9 @@ Satellite::constraintHessians(
         H_ux.slice(idx)(ctrl_idx, state_idx) = -4.0 * u_i * h_i;
         idx++;
     }
+
+    // Magic-actuator bounds are linear in u with no state coupling — zero Hessian.
+    idx += 2 * num_magic_;
 
     return std::make_tuple(H_uu, H_ux, H_xx);
 }

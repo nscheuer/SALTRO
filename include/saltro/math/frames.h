@@ -28,8 +28,8 @@ double gmst_rad(double jcentury);
  * inertial (ECI) frame to the Earth-centered Earth-fixed (ECEF) frame using the
  * Greenwich Mean Sidereal Time angle:
  * \f[
- * \mathbf{C}_{\text{ECI}\rightarrow\text{ECEF}} =
- * \mathbf{R}_z\!\bigl(\theta_{\mathrm{GMST}}\bigr)
+ * \\mathbf{C}_{\text{ECI}\rightarrow\text{ECEF}} =
+ * \\mathbf{R}_z\!\bigl(-\theta_{\mathrm{GMST}}\bigr)
  * \f]
  *
  * @param jcentury Julian centuries since J2000.
@@ -43,8 +43,8 @@ Eigen::Matrix3d eci_to_ecef_dcm(double jcentury);
  * Computes the rotation matrix that transforms a vector from the Earth-centered
  * Earth-fixed (ECEF) frame to the Earth-centered inertial (ECI) frame:
  * \f[
- * \mathbf{C}_{\text{ECEF}\rightarrow\text{ECI}} =
- * \mathbf{R}_z\!\bigl(-\theta_{\mathrm{GMST}}\bigr)
+ * \\mathbf{C}_{\text{ECEF}\rightarrow\text{ECI}} =
+ * \\mathbf{R}_z\!\bigl(+\theta_{\mathrm{GMST}}\bigr)
  * \f]
  *
  * @param jcentury Julian centuries since J2000.

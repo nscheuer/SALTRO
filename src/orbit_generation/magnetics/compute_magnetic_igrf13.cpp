@@ -36,6 +36,26 @@ static inline void legendre(
     }
 }
 
+static inline void schmidt_factors(
+    int nmax,
+    double S[14][14]
+) {
+    for (int n = 0; n <= nmax; ++n) {
+        for (int m = 0; m <= nmax; ++m) {
+            S[n][m] = 0.0;
+        }
+    }
+
+    S[0][0] = 1.0;
+    for (int n = 1; n <= nmax; ++n) {
+        S[n][0] = S[n - 1][0] * (2.0 * n - 1.0) / static_cast<double>(n);
+        for (int m = 1; m <= n; ++m) {
+            const double k = (m == 1) ? 2.0 : 1.0;
+            S[n][m] = S[n][m - 1] * std::sqrt(k * (n - m + 1.0) / (n + m));
+        }
+    }
+}
+
 bool compute_magnetic_igrf13(
     const Eigen::Matrix<double,3,saltro::limits::MAX_LENGTH_TRAJ>& R,
     const Eigen::Matrix<double,1,saltro::limits::MAX_LENGTH_TRAJ>& jtime,
@@ -45,6 +65,14 @@ bool compute_magnetic_igrf13(
 ){
     constexpr int NMAX = saltro::constants::IGRF13::NMAX;
     const double a = saltro::constants::IGRF13::EARTH_REFERENCE_RADIUS;
+    constexpr double EPS_SIN_THETA = 1e-10;
+
+    static double S[14][14];
+    static bool S_init = false;
+    if (!S_init) {
+        schmidt_factors(NMAX, S);
+        S_init = true;
+    }
 
     for(int k=0; k<jtime_length; ++k){
 
@@ -73,7 +101,8 @@ bool compute_magnetic_igrf13(
             continue;
         }
 
-        const double theta = std::acos(z/r);
+        const double zr = z / r;
+        const double theta = std::acos(std::max(-1.0, std::min(1.0, zr)));
         const double phi   = std::atan2(y,x);
 
         double P[14][14]{};
@@ -81,35 +110,49 @@ bool compute_magnetic_igrf13(
 
         legendre(NMAX, theta, P, dP);
 
+        const double cphi = std::cos(phi);
+        const double sphi = std::sin(phi);
+        double cos_m[14]{};
+        double sin_m[14]{};
+        cos_m[0] = 1.0;
+        sin_m[0] = 0.0;
+        for (int m = 1; m <= NMAX; ++m) {
+            cos_m[m] = cos_m[m - 1] * cphi - sin_m[m - 1] * sphi;
+            sin_m[m] = sin_m[m - 1] * cphi + cos_m[m - 1] * sphi;
+        }
+
         double Br = 0.0;
         double Bt = 0.0;
         double Bp = 0.0;
 
-        for(int n=1; n<=NMAX; ++n){
+        const double ar = a / r;
+        double rn = ar * ar * ar; // n=1 -> (a/r)^(n+2)
 
-            const double rn = std::pow(a/r, n+2);
+        for(int n=1; n<=NMAX; ++n){
 
             for(int m=0; m<=n; ++m){
 
                 const double g = saltro::constants::IGRF13::G[n][m];
                 const double h = saltro::constants::IGRF13::H[n][m];
 
-                const double cos_m = std::cos(m*phi);
-                const double sin_m = std::sin(m*phi);
+                const double s_nm = S[n][m];
+                const double p_nm = P[n][m] / s_nm;
+                const double dp_nm = dP[n][m] / s_nm;
+                const double tmp = g * cos_m[m] + h * sin_m[m];
 
-                const double tmp = g*cos_m + h*sin_m;
-
-                Br += rn*(n+1)*tmp*P[n][m];
-                Bt -= rn*tmp*dP[n][m];
+                Br += rn * (n + 1) * tmp * p_nm;
+                Bt -= rn * tmp * dp_nm;
 
                 if(m>0){
-                    Bp += rn*m*(g*sin_m - h*cos_m)*P[n][m];
+                    Bp += rn * m * (g * sin_m[m] - h * cos_m[m]) * p_nm;
                 }
             }
+
+            rn *= ar;
         }
 
         const double st = std::sin(theta);
-        if(std::abs(st) > 1e-12)
+        if(std::abs(st) > EPS_SIN_THETA)
             Bp /= st;
         else
             Bp = 0.0;

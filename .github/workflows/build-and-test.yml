@@ -7,6 +7,13 @@ on:
 
 jobs:
   build-and-test:
+    strategy:
+      # Don't cancel the Debug job if Release fails (or vice versa).
+      # The two surface different bug classes; both signals are useful.
+      fail-fast: false
+      matrix:
+        build_type: [Release, Debug]
+    name: build-and-test (${{ matrix.build_type }})
     runs-on: ubuntu-latest
 
     steps:
@@ -23,8 +30,14 @@ jobs:
           pip install pytest numpy
 
       - name: Configure
+        # Debug builds enable Eigen's runtime size/shape assertions (which
+        # are no-ops under Release's NDEBUG).  This catches a class of
+        # silent-UB bugs where e.g. `Block<Ref<Matrix>, -1, 1>::resize(...)`
+        # is called with a size mismatch.  See
+        # docs/test_audit_silent_release_bugs.md for the FP_al fixture
+        # instance that motivated adding the Debug job.
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSALTRO_BUILD_PYTHON=ON
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DSALTRO_BUILD_PYTHON=ON
 
       - name: Build
         run: |
@@ -33,9 +46,17 @@ jobs:
       - name: Run C++ tests
         run: |
           cd build
-          ctest --output-on-failure -E "optimizer_test_alilqr"
+          if [ "${{ matrix.build_type }}" = "Debug" ]; then
+            ctest --output-on-failure -E "optimizer_test_alilqr"
+          else
+            ctest --output-on-failure
+          fi
 
       - name: Run Python tests
         run: |
           cd tests
-          pytest -q -k "not test_alilqr"
+          if [ "${{ matrix.build_type }}" = "Debug" ]; then
+            pytest -q -k "not test_alilqr"
+          else
+            pytest -q
+          fi

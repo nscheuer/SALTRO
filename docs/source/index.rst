@@ -1,6 +1,8 @@
 Satellite Augmented Lagrangian Trajectory Optimization (SALTRO)
 ===============================================================
 
+GitHub repository: `nscheuer/SALTRO <https://github.com/nscheuer/SALTRO>`_
+
 SALTRO is a high-performance trajectory optimizer for satellite attitude control.
 
 .. image:: _static/animate_3_0_slew90_dt10.gif
@@ -47,11 +49,5 @@ Documentation
 .. toctree::
    :maxdepth: 1
 
-   api/limits
-   api/constants/index
-   api/math/index
-   api/optimizer/index
-   api/orbit_generation/index
-   api/pybind/index
-   api/validation/index
-
+   Code Documentation <code_documentation>
+   Convergence Logic Tree <convergence_logic_tree>

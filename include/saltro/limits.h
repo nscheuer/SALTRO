@@ -44,12 +44,24 @@ namespace saltro::limits {
     
     /**
      * @brief Maximum number of reaction wheels (RW) on the satellite.
-     * 
+     *
      * Defines the upper limit for momentum storage wheels on the satellite.
      * Used for pre-allocation of angular momentum state vectors.
      */
     inline constexpr int MAX_NUM_RW     = 4;
-    
+
+    /**
+     * @brief Maximum number of "magic" (direct body-torque) actuators.
+     *
+     * Magic actuators apply a torque ``tau = u * axis`` directly along their
+     * body axis, with no environmental dependence and no momentum-storage
+     * state. They are typically used to model thrusters or as test
+     * fixtures (idealised body-torque commanders without the
+     * ``m x B`` rank deficiency of an MTQ or the back-reaction inertia of
+     * a reaction wheel).
+     */
+    inline constexpr int MAX_NUM_MAGIC  = 4;
+
     /**
      * @brief Maximum number of geometric faces for disturbance computation.
      * 
@@ -77,19 +89,22 @@ namespace saltro::limits {
     
     /**
      * @brief Derived maximum control input dimension.
-     * 
-     * Equals \f$\text{MAX\_NUM\_MTQ} + \text{MAX\_NUM\_RW}\f$, the total number
-     * of control channels (magnetorquer dipoles + reaction wheel torques).
+     *
+     * Equals \f$\text{MAX\_NUM\_MTQ} + \text{MAX\_NUM\_RW} + \text{MAX\_NUM\_MAGIC}\f$,
+     * the total number of control channels (magnetorquer dipoles +
+     * reaction wheel torques + magic actuator body torques).
      */
-    inline constexpr int MAX_CTRL_DIM          = MAX_NUM_MTQ + MAX_NUM_RW;                         //  8
-    
+    inline constexpr int MAX_CTRL_DIM          = MAX_NUM_MTQ + MAX_NUM_RW + MAX_NUM_MAGIC;         // 12
+
     /**
      * @brief Derived maximum constraint dimension.
-     * 
-     * Equals \f$1 + 1 + 2 \cdot \text{MAX\_NUM\_MTQ} + 5 \cdot \text{MAX\_NUM\_RW}\f$.
-     * Accounts for: angular velocity bound (1), sun pointing constraint (1),
-     * MTQ dipole bounds (2 per MTQ), and RW constraints: torque limit, momentum limits,
-     * and friction (5 per RW).
+     *
+     * Equals \f$1 + 1 + 2 \cdot \text{MAX\_NUM\_MTQ} + 5 \cdot \text{MAX\_NUM\_RW}
+     * + 2 \cdot \text{MAX\_NUM\_MAGIC}\f$. Accounts for: angular velocity bound
+     * (1), sun pointing constraint (1), MTQ dipole bounds (2 per MTQ), RW
+     * constraints: torque + momentum + friction (5 per RW), and magic
+     * actuator torque bounds (2 per magic actuator -- upper/lower).
      */
-    inline constexpr int MAX_CONSTRAINT_DIM    = 1 + 1 + 2 * MAX_NUM_MTQ + 5 * MAX_NUM_RW;        // 30
+    inline constexpr int MAX_CONSTRAINT_DIM    =
+        1 + 1 + 2 * MAX_NUM_MTQ + 5 * MAX_NUM_RW + 2 * MAX_NUM_MAGIC;                              // 38
 }

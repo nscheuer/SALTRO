@@ -24,6 +24,59 @@ def _compute_pointing_error_deg(q, q_goal):
     return err_deg
 
 
+def _boresight_eci(q_b2i: np.ndarray, bore_body_unit: np.ndarray) -> np.ndarray:
+    q0, q1, q2, q3 = q_b2i
+    r = np.array(
+        [
+            [q0**2 + q1**2 - q2**2 - q3**2, 2 * (q1 * q2 - q0 * q3), 2 * (q1 * q3 + q0 * q2)],
+            [2 * (q1 * q2 + q0 * q3), q0**2 - q1**2 + q2**2 - q3**2, 2 * (q2 * q3 - q0 * q1)],
+            [2 * (q1 * q3 - q0 * q2), 2 * (q2 * q3 + q0 * q1), q0**2 - q1**2 - q2**2 + q3**2],
+        ],
+        dtype=float,
+    )
+    out = r @ bore_body_unit
+    nrm = np.linalg.norm(out)
+    return out / max(nrm, 1e-15)
+
+
+def _vec_angle_deg(u: np.ndarray, v: np.ndarray) -> float:
+    u = np.asarray(u, dtype=float).reshape(3)
+    v = np.asarray(v, dtype=float).reshape(3)
+    u = u / max(np.linalg.norm(u), 1e-15)
+    v = v / max(np.linalg.norm(v), 1e-15)
+    d = float(np.clip(np.dot(u, v), -1.0, 1.0))
+    return float(np.degrees(np.arccos(d)))
+
+
+def _compute_pointing_error_deg_mixed(q, q_goal, boresight=None):
+    n = q.shape[1]
+    err_deg = np.full(n, np.nan, dtype=float)
+    for k in range(n):
+        row = q_goal[:, k]
+        if not np.isnan(row[0]):
+            q_err = _quat_multiply(_quat_inverse(row), q[:, k])
+            err_deg[k] = 2.0 * np.arctan2(np.linalg.norm(q_err[1:]), abs(q_err[0])) * 180.0 / np.pi
+            continue
+
+        if boresight is None:
+            continue
+
+        target_vec = row[1:4]
+        if np.linalg.norm(target_vec) <= 0.0:
+            continue
+
+        bore = boresight[:, k] if boresight.ndim == 2 else boresight
+        if np.linalg.norm(bore) <= 0.0:
+            continue
+
+        bore_unit = bore / np.linalg.norm(bore)
+        target_unit = target_vec / np.linalg.norm(target_vec)
+        bore_i = _boresight_eci(q[:, k], bore_unit)
+        err_deg[k] = _vec_angle_deg(bore_i, target_unit)
+
+    return err_deg
+
+
 def _quat_inverse(q):
     return np.array([q[0], -q[1], -q[2], -q[3]])
 
@@ -188,6 +241,7 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         x = snap["X"]
         u = snap["U"]
         q_goal = snap["q_goal"]
+        boresight = snap.get("boresight", None)
         components = snap.get("components", None)
 
         q = x[3:7, :]
@@ -204,17 +258,22 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         mtq_u = u[0:num_mtq, :] if num_mtq > 0 else np.zeros((0, n_u))
         rw_u = u[num_mtq:num_mtq + num_rw, :] if num_rw > 0 else np.zeros((0, n_u))
 
-        pe = _compute_pointing_error_deg(q, q_goal)
+        pe = _compute_pointing_error_deg_mixed(q, q_goal, boresight=boresight)
 
         ax_q.clear()
         ax_q.plot(t_state, q[0, :], label="q0")
         ax_q.plot(t_state, q[1, :], label="q1")
         ax_q.plot(t_state, q[2, :], label="q2")
         ax_q.plot(t_state, q[3, :], label="q3")
-        ax_q.plot(t_state, q_goal[0, :], "--", alpha=0.6, label="q0 goal")
-        ax_q.plot(t_state, q_goal[1, :], "--", alpha=0.6, label="q1 goal")
-        ax_q.plot(t_state, q_goal[2, :], "--", alpha=0.6, label="q2 goal")
-        ax_q.plot(t_state, q_goal[3, :], "--", alpha=0.6, label="q3 goal")
+        if np.any(np.isnan(q_goal[0, :])):
+            ax_q.plot(t_state, q_goal[1, :], "--", alpha=0.6, label="target x")
+            ax_q.plot(t_state, q_goal[2, :], "--", alpha=0.6, label="target y")
+            ax_q.plot(t_state, q_goal[3, :], "--", alpha=0.6, label="target z")
+        else:
+            ax_q.plot(t_state, q_goal[0, :], "--", alpha=0.6, label="q0 goal")
+            ax_q.plot(t_state, q_goal[1, :], "--", alpha=0.6, label="q1 goal")
+            ax_q.plot(t_state, q_goal[2, :], "--", alpha=0.6, label="q2 goal")
+            ax_q.plot(t_state, q_goal[3, :], "--", alpha=0.6, label="q3 goal")
         ax_q.set_title("Quaternion")
         ax_q.set_xlabel("Time [s]")
         ax_q.set_ylabel("q")
@@ -246,7 +305,10 @@ def launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol):
         ax_h.grid(True, alpha=0.3)
 
         ax_pe.clear()
-        ax_pe.plot(t_state, pe, "o-", color="C3", markersize=3)
+        if np.all(np.isnan(pe)):
+            ax_pe.text(0.5, 0.5, "Pointing error unavailable", ha="center", va="center", transform=ax_pe.transAxes)
+        else:
+            ax_pe.plot(t_state, pe, "o-", color="C3", markersize=3)
         ax_pe.set_title("Pointing Error")
         ax_pe.set_xlabel("Time [s]")
         ax_pe.set_ylabel("deg")

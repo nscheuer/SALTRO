@@ -8,6 +8,7 @@
 #include <saltro/pybind/actuators/actuator.h>
 #include <saltro/pybind/actuators/RW.h>
 #include <saltro/pybind/actuators/MTQ.h>
+#include <saltro/pybind/actuators/Magic.h>
 #include <saltro/limits.h>
 #include <saltro/pybind/plannersettings.h>
 #include <saltro/math/angles.h>
@@ -193,7 +194,7 @@ public:
     
     /**
      * @brief Add a reaction wheel to the satellite.
-     * 
+     *
      * @param axis Unit vector specifying wheel spin axis (body frame).
      * @param max_torque Maximum torque output (N·m).
      * @param J Wheel moment of inertia (kg·m²).
@@ -202,29 +203,50 @@ public:
      * @throws std::runtime_error If max RW count exceeded.
      */
     void addRW(const Vec3& axis, double max_torque, double J, double h0, double h_max);
-    
+
+    /**
+     * @brief Add a magic (direct body-torque) actuator to the satellite.
+     *
+     * Magic actuators apply a body-frame torque \f$u \cdot \mathbf{a}\f$ along
+     * a fixed body axis with no environmental dependence and no internal
+     * momentum-storage state. Used for modelling thrusters or as test
+     * fixtures (no MTQ rank deficiency, no RW back-reaction).
+     *
+     * @param axis Unit vector specifying torque direction (body frame).
+     * @param max_torque Maximum torque magnitude (N·m).
+     * @throws std::runtime_error If max magic-actuator count exceeded.
+     */
+    void addMagic(const Vec3& axis, double max_torque);
+
     /**
      * @brief Get number of magnetorquers.
-     * 
+     *
      * @return Number of MTQs.
      */
     int numMTQ() const { return num_mtq_; }
-    
+
     /**
      * @brief Get number of reaction wheels.
-     * 
+     *
      * @return Number of RWs.
      */
     int numRW() const { return num_rw_; }
 
     /**
+     * @brief Get number of magic actuators.
+     *
+     * @return Number of magic actuators.
+     */
+    int numMagic() const { return num_magic_; }
+
+    /**
      * @brief Get total control input dimension.
-     * 
-     * Equals \f$\text{numMTQ} + \text{numRW}\f$.
-     * 
+     *
+     * Equals \f$\text{numMTQ} + \text{numRW} + \text{numMagic}\f$.
+     *
      * @return Control dimension.
      */
-    int controlDim() const { return num_mtq_ + num_rw_; }
+    int controlDim() const { return num_mtq_ + num_rw_ + num_magic_; }
     
     /**
      * @brief Get full state dimension.
@@ -270,11 +292,27 @@ public:
     
     /**
      * @brief Get a reaction wheel by index (mutable).
-     * 
+     *
      * @param i RW index.
      * @return Reference to RW.
      */
     RW& getRW(int i);
+
+    /**
+     * @brief Get a magic actuator by index (const).
+     *
+     * @param i Magic-actuator index.
+     * @return Const reference to magic actuator.
+     */
+    const Magic& getMagic(int i) const;
+
+    /**
+     * @brief Get a magic actuator by index (mutable).
+     *
+     * @param i Magic-actuator index.
+     * @return Reference to magic actuator.
+     */
+    Magic& getMagic(int i);
 
     /**
      * @brief Set planner settings.
@@ -544,7 +582,8 @@ public:
         *    - RW torque upper/lower bounds (2 per RW)
         *    - RW momentum upper/lower bounds (2 per RW)
         *    - RW stiction proxy (1 per RW)
-        * 
+        *    - Magic actuator upper/lower bounds (2 per magic actuator)
+        *
         * All constraints are formulated as c <= 0.
      * 
      * @param k Time step.
@@ -594,8 +633,10 @@ private:
 
     std::array<std::unique_ptr<MTQ>, saltro::limits::MAX_NUM_MTQ> mtq_actuators_;
     std::array<std::unique_ptr<RW>, saltro::limits::MAX_NUM_RW> rw_actuators_;
+    std::array<std::unique_ptr<Magic>, saltro::limits::MAX_NUM_MAGIC> magic_actuators_;
     int num_mtq_ = 0;
     int num_rw_ = 0;
+    int num_magic_ = 0;
 
     PlannerSettings settings_;
     saltro::disturbances::GeometryConfig geometry_config_;

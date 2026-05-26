@@ -753,12 +753,15 @@ def test_constraint_hessians_dimension():
     H_uu, H_ux, H_xx = fixture.sat.constraintHessians(0, 10, fixture.nominal_state(),
                                                        fixture.nominal_control(),
                                                        sun_z(), default_cnst_cfg())
-    
-    # Hessians are returned with maximum dimensions, not runtime dimensions
-    # MAX_CONSTRAINT_DIM=30, MAX_CTRL_DIM=8, MAX_STATE_DIM=11
-    assert H_uu.shape == (30, 8, 8)
-    assert H_ux.shape == (30, 8, 11)
-    assert H_xx.shape == (30, 11, 11)
+
+    # Hessians are returned with the compile-time maximum dimensions, not
+    # the runtime ones (slices of size MAX_CONSTRAINT_DIM x MAX_CTRL_DIM x
+    # MAX_CTRL_DIM etc.). Pull those limits from saltro_py so this test
+    # stays correct as new actuator classes (e.g. Magic) shift the maxima.
+    L = saltro_py.limits
+    assert H_uu.shape == (L.MAX_CONSTRAINT_DIM, L.MAX_CTRL_DIM,  L.MAX_CTRL_DIM)
+    assert H_ux.shape == (L.MAX_CONSTRAINT_DIM, L.MAX_CTRL_DIM,  L.MAX_STATE_DIM)
+    assert H_xx.shape == (L.MAX_CONSTRAINT_DIM, L.MAX_STATE_DIM, L.MAX_STATE_DIM)
 
 
 def test_constraint_hessians_finite_difference_H_uu():
@@ -777,7 +780,8 @@ def test_constraint_hessians_finite_difference_H_uu():
     c_u_base, _ = fixture.sat.constraintJacobians(0, 10, x, u, sun_z(), cfg)
     n_constraints = len(c_u_base)
     n_ctrl = fixture.n_ctrl()
-    H_uu_fd = np.zeros((30, 8, 8))
+    L = saltro_py.limits
+    H_uu_fd = np.zeros((L.MAX_CONSTRAINT_DIM, L.MAX_CTRL_DIM, L.MAX_CTRL_DIM))
     
     for i in range(len(u)):
         u_pert = u.copy()
@@ -807,7 +811,8 @@ def test_constraint_hessians_finite_difference_H_ux():
     n_constraints = len(c_u_base)
     n_ctrl = fixture.n_ctrl()
     n_state = fixture.sat.stateDim
-    H_ux_fd = np.zeros((30, 8, 11))
+    L = saltro_py.limits
+    H_ux_fd = np.zeros((L.MAX_CONSTRAINT_DIM, L.MAX_CTRL_DIM, L.MAX_STATE_DIM))
     
     for i in range(len(x)):
         x_pert = x.copy()
@@ -839,7 +844,8 @@ def test_constraint_hessians_finite_difference_H_xx():
     _, c_x_base = fixture.sat.constraintJacobians(0, 10, x, u, sun_z(), cfg)
     n_constraints = len(c_x_base)
     n_state = fixture.sat.stateDim
-    H_xx_fd = np.zeros((30, 11, 11))
+    L = saltro_py.limits
+    H_xx_fd = np.zeros((L.MAX_CONSTRAINT_DIM, L.MAX_STATE_DIM, L.MAX_STATE_DIM))
     
     for i in range(len(x)):
         x_pert = x.copy()
@@ -1396,21 +1402,28 @@ def test_constraints_maximum_actuators():
         axis = np.zeros(3)
         axis[i % 3] = 1.0
         sat.addRW(axis, 0.001, 1e-5, 0.0, 0.01)
-    
+    # Add MAX_NUM_MAGIC magic actuators
+    for i in range(saltro_py.limits.MAX_NUM_MAGIC):
+        axis = np.zeros(3)
+        axis[i % 3] = 1.0
+        sat.addMagic(axis, 0.01)
+
     n = sat.stateDim
     m = sat.controlDim
     h = np.zeros(sat.numRW)
     x = make_state(np.zeros(3), identity_quat(), h)
     u = zero_control(m)
     cfg = default_cnst_cfg()
-    
+
     c = sat.constraints(0, 10, x, u, sun_z(), cfg)
-    expected = 1 + 1 + 2 * saltro_py.limits.MAX_NUM_MTQ + 5 * saltro_py.limits.MAX_NUM_RW
+    expected = (1 + 1
+                + 2 * saltro_py.limits.MAX_NUM_MTQ
+                + 5 * saltro_py.limits.MAX_NUM_RW
+                + 2 * saltro_py.limits.MAX_NUM_MAGIC)
     assert len(c) == expected
-    # Verify this matches the expected max constraint dimension
-    # Note: MAX_CONSTRAINT_DIM may not be exported to Python, so we calculate it
-    max_dim = 1 + 1 + 2 * saltro_py.limits.MAX_NUM_MTQ + 5 * saltro_py.limits.MAX_NUM_RW
-    assert expected == max_dim
+    # Verify this matches the compile-time MAX_CONSTRAINT_DIM (now exposed
+    # via saltro_py.limits).
+    assert expected == saltro_py.limits.MAX_CONSTRAINT_DIM
 
 
 # ============================================================================
@@ -1560,15 +1573,165 @@ def test_constraint_jacobians_sun_row_has_entries_only_in_q_columns():
     """Test sun Jacobian row has entries only in q-columns"""
     fixture = ConstraintFixture()
     fixture.setup_method()
-    
+
     x0 = fixture.nominal_state()
     u0 = fixture.nominal_control()
     sun = np.array([0.5, 0.3, 0.8])
-    
+
     c_u, c_x = fixture.sat.constraintJacobians(0, 10, x0, u0, sun, default_cnst_cfg())
-    
+
     # Sun constraint (row 1): only columns 3,4,5,6 (quaternion) should be non-zero
     for j in range(0, 3):
         assert np.isclose(c_x[1, j], 0.0, atol=1e-14)
     for j in range(7, fixture.sat.stateDim):
         assert np.isclose(c_x[1, j], 0.0, atol=1e-14)
+
+
+# ============================================================================
+# SECTION 25 — Sun-avoidance Jacobian near the active/passive boundary
+# ============================================================================
+
+def test_sun_jacobian_matches_fd_just_inside_active_region():
+    """FD-validate the sun-constraint Jacobian when the constraint is just
+    barely active (c ≈ 0+). This is the regime where sign-flip bugs in the
+    rotation-matrix derivative are most likely to bite: at exactly the
+    limit angle the quaternion Jacobian must be sign-consistent on both
+    sides of the boundary."""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg = default_cnst_cfg()
+    angle = cfg.sun_limit_angle
+
+    # Sun sits just past the limit angle from +X in the XZ plane: c > 0 by ε
+    eps_angle = 1e-3
+    sun_eci = np.array([np.cos(angle - eps_angle), 0.0, np.sin(angle - eps_angle)])
+
+    x0 = fixture.nominal_state()
+    u0 = fixture.nominal_control()
+    k, N = 0, 10
+
+    c0 = fixture.sat.constraints(k, N, x0, u0, sun_eci, cfg)
+    # We expect c[1] (sun row) to be small but non-zero
+    assert abs(c0[1]) < 1e-2
+
+    _, c_x = fixture.sat.constraintJacobians(k, N, x0, u0, sun_eci, cfg)
+
+    eps = 1e-7
+    qi = saltro_py.Satellite.QUAT_INDEX
+    for j in range(qi, qi + 4):
+        xp = x0.copy()
+        xm = x0.copy()
+        xp[j] += eps
+        xm[j] -= eps
+        normalize_quat_in_state(xp)
+        normalize_quat_in_state(xm)
+
+        cp = fixture.sat.constraints(k, N, xp, u0, sun_eci, cfg)
+        cm = fixture.sat.constraints(k, N, xm, u0, sun_eci, cfg)
+        fd = (cp[1] - cm[1]) / (2.0 * eps)
+
+        assert np.isclose(c_x[1, j], fd, atol=1e-5), (
+            f"sun Jacobian quaternion column j={j}: ana={c_x[1, j]:.4e}, "
+            f"fd={fd:.4e}, c0[1]={c0[1]:.4e}"
+        )
+
+
+def test_sun_jacobian_matches_fd_just_outside_active_region():
+    """Mirror of the inside-boundary test for the passive (c < 0) side. With
+    a sane formulation the analytic Jacobian must remain consistent with
+    FD here too — a regression would surface as a discontinuity at the
+    boundary."""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg = default_cnst_cfg()
+    angle = cfg.sun_limit_angle
+
+    eps_angle = 1e-3
+    sun_eci = np.array([np.cos(angle + eps_angle), 0.0, np.sin(angle + eps_angle)])
+
+    x0 = fixture.nominal_state()
+    u0 = fixture.nominal_control()
+    k, N = 0, 10
+
+    c0 = fixture.sat.constraints(k, N, x0, u0, sun_eci, cfg)
+    # c[1] should be small negative (constraint passively satisfied by ε)
+    assert c0[1] < 0.0
+    assert abs(c0[1]) < 1e-2
+
+    _, c_x = fixture.sat.constraintJacobians(k, N, x0, u0, sun_eci, cfg)
+
+    eps = 1e-7
+    qi = saltro_py.Satellite.QUAT_INDEX
+    for j in range(qi, qi + 4):
+        xp = x0.copy()
+        xm = x0.copy()
+        xp[j] += eps
+        xm[j] -= eps
+        normalize_quat_in_state(xp)
+        normalize_quat_in_state(xm)
+
+        cp = fixture.sat.constraints(k, N, xp, u0, sun_eci, cfg)
+        cm = fixture.sat.constraints(k, N, xm, u0, sun_eci, cfg)
+        fd = (cp[1] - cm[1]) / (2.0 * eps)
+
+        assert np.isclose(c_x[1, j], fd, atol=1e-5), (
+            f"sun Jacobian quaternion column j={j}: ana={c_x[1, j]:.4e}, "
+            f"fd={fd:.4e}, c0[1]={c0[1]:.4e}"
+        )
+
+
+# ============================================================================
+# SECTION 26 — Stiction Hessian at non-zero RW momentum
+# ============================================================================
+
+def test_stiction_hessian_fd_at_nonzero_momentum():
+    """The existing stiction Hessian test (Section 22) only covers x=0 (zero
+    momentum). The stiction term is roughly `h_rw^2 * w_rw_local` so its
+    second derivative w.r.t. h is non-zero everywhere — verify FD agreement
+    at several non-zero h values."""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg = default_cnst_cfg()
+    u0 = fixture.nominal_control()
+    sun = sun_z()
+    k, N = 0, 10
+
+    rng = np.random.default_rng(20260515)
+
+    for trial in range(4):
+        h = rng.uniform(-fixture.rw_hmax * 0.8, fixture.rw_hmax * 0.8,
+                        size=fixture.n_rw())
+        w = rng.uniform(-0.05, 0.05, size=3)
+        x0 = make_state(w, identity_quat(), h)
+
+        _, _, H_xx = fixture.sat.constraintHessians(k, N, x0, u0, sun, cfg)
+
+        # FD: differentiate the constraint Jacobian's c_x rows w.r.t. x.
+        # H_xx[i][a, b] = ∂²c_i/∂x_a ∂x_b
+        eps = 5e-6
+        nx = fixture.sat.stateDim
+        n_c = len(fixture.sat.constraints(k, N, x0, u0, sun, cfg))
+
+        # Pick the stiction rows: per RW, the last of the 5 RW-related rows.
+        # Layout: AV(1) + sun(1) + MTQ_bounds(2*n_mtq) + per-RW(2 torque, 2
+        # momentum, 1 stiction). Stiction row offset = 4 within each RW block.
+        rw_block_start = 2 + 2 * fixture.n_mtq()
+        stiction_rows = [rw_block_start + 5 * r + 4 for r in range(fixture.n_rw())]
+
+        # Subset the FD to the h-block (cheap) — diagonal entries only.
+        h_start = saltro_py.Satellite.RW_MOMENTUM_INDEX
+        for row in stiction_rows:
+            for j in range(h_start, h_start + fixture.n_rw()):
+                xp = x0.copy(); xm = x0.copy()
+                xp[j] += eps; xm[j] -= eps
+                _, c_xp = fixture.sat.constraintJacobians(k, N, xp, u0, sun, cfg)
+                _, c_xm = fixture.sat.constraintJacobians(k, N, xm, u0, sun, cfg)
+                fd = (c_xp[row, j] - c_xm[row, j]) / (2.0 * eps)
+                ana = H_xx[row][j, j]
+                assert np.isclose(ana, fd, atol=1e-3, rtol=1e-2), (
+                    f"trial {trial}, row {row}, j {j}: "
+                    f"ana={ana:.4e}, fd={fd:.4e}, h={h}"
+                )

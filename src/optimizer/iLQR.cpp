@@ -91,8 +91,10 @@ bool iLQR(
 	const std::vector<Eigen::VectorXd>& lambda_aug,
 	const std::vector<Eigen::VectorXd>& mu_aug,
 	ILQRStatus& status,
-	double& J
+	double& J,
+	ILQRTelemetry& telemetry
 ) {
+	telemetry = ILQRTelemetry{};
 	const CostConfig& cost_cfg = settings.passes[pass_idx].cost;
 	const ILQRConfig& ilqr_cfg = settings.passes[pass_idx].ilqr;
 	const RegularizationConfig& reg_cfg = settings.passes[pass_idx].reg;
@@ -286,6 +288,48 @@ bool iLQR(
 
 	status = ILQRStatus::MaxIterations;
 	return false;
+}
+
+bool iLQR(
+	const PlannerSettings& settings,
+	const Satellite& satellite,
+	Eigen::Ref<Eigen::MatrixXd> X,
+	Eigen::Ref<Eigen::MatrixXd> U,
+	const Eigen::Ref<const Eigen::MatrixXd>& R,
+	const Eigen::Ref<const Eigen::MatrixXd>& V,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,
+	const Eigen::Ref<const Eigen::VectorXd>& jtime,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+	int pass_idx,
+	const std::vector<Eigen::VectorXd>& lambda_aug,
+	const std::vector<Eigen::VectorXd>& mu_aug,
+	ILQRStatus& status,
+	double& J
+) {
+	ILQRTelemetry telemetry;
+	return iLQR(
+		settings,
+		satellite,
+		X,
+		U,
+		R,
+		V,
+		B,
+		S,
+		rho,
+		jtime,
+		boresight,
+		attitude_target,
+		pass_idx,
+		lambda_aug,
+		mu_aug,
+		status,
+		J,
+		telemetry
+	);
 }
 
 bool iLQR(

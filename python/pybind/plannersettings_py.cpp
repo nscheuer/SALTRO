@@ -144,11 +144,18 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("spike_removal", &PassConfig::spike_removal)
         .def_readwrite("dt", &PassConfig::dt);
 
+    py::class_<TVLQRSettings>(m, "TVLQRSettings")
+        .def(py::init<>())
+        .def_readwrite("dt_tvlqr", &TVLQRSettings::dt_tvlqr)
+        .def_readwrite("tvlqr_len", &TVLQRSettings::tvlqr_len)
+        .def_readwrite("tvlqr_overlap", &TVLQRSettings::tvlqr_overlap);
+
     py::class_<PlannerSettings>(m, "PlannerSettings")
         .def(py::init<>())
         .def_readwrite("constraints", &PlannerSettings::constraints)
         .def_readwrite("disturbances", &PlannerSettings::disturbances)
         .def_readwrite("init_traj", &PlannerSettings::init_traj)
+        .def_readwrite("tvlqr", &PlannerSettings::tvlqr)
         .def_readwrite("num_passes", &PlannerSettings::num_passes)
         .def_readwrite("passes", &PlannerSettings::passes);
 }

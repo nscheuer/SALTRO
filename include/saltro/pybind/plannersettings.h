@@ -158,12 +158,36 @@ struct CostConfig {
     /// 3 DOF are constrained there). Default is current behavior.
     double ang_vel_roll_ratio = 1.0;
 
-    /// PSD-fraction knob β ∈ [0, 1) for the Lyapunov α·err_dir^T·(ω-ω_ff)
-    /// crossterm. The realized scale is α = β · √(c.angle · λ_min(W_ω)),
-    /// keeping the block-quadratic in (q_e_v, ω_e) PSD by construction.
-    /// 0 (default) disables the crossterm entirely. If `ang_vel_err_dir`
+    /// PSD-fraction knob β ∈ [0, 2) for the Lyapunov `α · err_dir · ω`
+    /// crossterm.  Realized scale is `α = β · √(c.angle · λ_min(W_ω))`,
+    /// keeping the (q_e_v, ω_e) block-quadratic PSD by construction.
+    /// 0 (default) disables the crossterm entirely.  If `ang_vel_err_dir`
     /// is set nonzero, the back-compat path overrides α with that raw
     /// value and ignores this ratio.
+    ///
+    /// Derivation (Schur complement bound):
+    /// The total (q_e_v, ω_e) block-quadratic with the angle cost,
+    /// ω cost, and this crossterm is
+    ///
+    ///   ½ [q_e_v; ω_e]^T · [ w_ang · I        ½α · D^T ] · [q_e_v]
+    ///                      [ ½α · D           W_ω      ]   [ω_e]
+    ///
+    /// where D = ∂err_dir/∂q_e_v and W_ω is the ω cost matrix
+    /// (`w_av · I` in quat mode; `w_av · (roll·bs·bs^T + (I − bs·bs^T))`
+    /// in vec mode with `ang_vel_roll_ratio` reduction).  The Schur
+    /// complement of the bottom-right block is PSD iff
+    ///
+    ///   w_ang · I − ¼ α² · D^T · W_ω^{-1} · D ≽ 0
+    ///   ⟺  α² · λ_max(D^T · W_ω^{-1} · D) ≤ 4 · w_ang.
+    ///
+    /// Since `err_dir` is a cross-product of unit vectors, ‖D‖ ≤ 1, so
+    /// λ_max(D^T · W_ω^{-1} · D) ≤ 1 / λ_min(W_ω).  The conservative
+    /// bound that always holds is therefore
+    ///
+    ///   α ≤ 2 · √(w_ang · λ_min(W_ω)).
+    ///
+    /// Setting α = β · √(w_ang · λ_min(W_ω)) with β ∈ [0, 2) is PSD by
+    /// construction.  FD-tested in `test_satellite_cost_omega_ff.py` at β=0.5.
     double ang_vel_err_dir_ratio = 0.0;
 
     double mtq_control_weight = 1e3;
@@ -512,6 +536,25 @@ struct PassConfig {
 };
 
 /**
+ * @brief TVLQR gain-generation configuration.
+ *
+ * Controls the backward-pass discretization and chunking window used when
+ * generating tracking gains from an optimized trajectory.
+ *
+ * @param dt_tvlqr Fixed TVLQR gain discretization step. SALTRO currently
+ *                 uses the planner pass dt and keeps this at 0.0.
+ * @param tvlqr_len Chunk duration in seconds for gain computation.
+ * @param tvlqr_overlap Overlap duration in seconds between consecutive chunks.
+ */
+struct TVLQRSettings {
+    double dt_tvlqr;
+    double tvlqr_len = 60.0;
+    double tvlqr_overlap = 15.0;
+
+    TVLQRSettings() : dt_tvlqr(0.0) {}
+};
+
+/**
  * @brief Top-level planner settings.
  *
  * Aggregates all configuration parameters required by the ALTRO optimizer.
@@ -534,6 +577,7 @@ struct PlannerSettings {
     ConstraintConfig constraints;
     DisturbanceConfig disturbances;
     InitTrajConfig init_traj;
+    TVLQRSettings tvlqr;
 
     int num_passes = 0;
     std::array<PassConfig, MAX_OUTER_PASSES> passes;
