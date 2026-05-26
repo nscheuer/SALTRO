@@ -1069,9 +1069,23 @@ namespace {
 // ===========================================================================
 
 // Cost shape f(c) and its first two derivatives w.r.t. c.
-//   0: 1−c    1: ½(1−c)²    2: acos(c)    3: ½·acos(c)²    4: (1−c)²
-// fpp ≥ 0 for types 0,1,3,4, so the Gauss-Newton Hessian f''·g·gᵀ is PSD by
-// construction; type 2 (acos) is the exception (fpp < 0 for c > 0).
+//   0: 1−c                       linear; f'=−1; f''=0 (no curvature for GN)
+//   1: ½(1−c)²                   convex quadratic; f'=−(1−c); f''=1
+//   2: acos(c)                   ABSOLUTE angle; f''<0 for c>0 (NOT PSD)
+//   3: ½·acos(c)²                squared angle; f'' diverges at c=±1
+//   4: (1−c)²                    PSD f''=2 but f'(c=1)=0 — flat near alignment
+//   5: (1−c) + (1−c)² = (1−c)(2−c)
+//        linear-plus-quadratic blend with the failure mode of each piece
+//        removed:
+//          • Like 0, has constant non-vanishing pull at alignment:
+//            f'(c=1) = −1.
+//          • Like 4, has bounded constant Hessian f''=2 (PSD by construction,
+//            no singularity at c=±1).
+//        The linear term keeps the gradient alive when the quadratic flattens
+//        out near c=1, so iLQR retains drive toward exact alignment even
+//        with a strong warm start that is already close. The quadratic term
+//        provides Gauss-Newton curvature info for fine convergence.
+// fpp ≥ 0 for types 0,1,3,4,5; type 2 (acos) is the exception (fpp < 0 for c > 0).
 struct AngCostShape { double f, fp, fpp; };
 
 AngCostShape angCostShape(double c, int type) {
@@ -1087,6 +1101,13 @@ AngCostShape angCostShape(double c, int type) {
                      1.0 / omc2 - phi * c / (omc2 * s) };
         }
         case 4: { const double e = 1.0 - c; return { e * e, -2.0 * e, 2.0 }; }
+        case 5: {
+            // f  = (1-c) + (1-c)^2
+            // f' = -1 - 2(1-c) = 2c - 3
+            // f''= 2
+            const double e = 1.0 - c;
+            return { e + e * e, 2.0 * c - 3.0, 2.0 };
+        }
         default: return { std::acos(c), -1.0 / s, -c / (omc2 * s) };
     }
 }
@@ -1210,6 +1231,14 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                 // unusable in practice.
                 const double err = 1.0 - qdot_aligned;
                 ang_cost = err * err;
+                break;
+            }
+            case 5: {
+                // (1-d) + (1-d)² = (1-d)(2-d). Matches vec mode case 5 shape.
+                // PSD f''=2 like case 4 but with non-vanishing gradient at
+                // d=1 (alignment): f'(d) = -1 - 2(1-d) = 2d - 3, f'(1) = -1.
+                const double err = 1.0 - qdot_aligned;
+                ang_cost = err + err * err;
                 break;
             }
             default:
@@ -1568,6 +1597,10 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 4:  // ang_cost = (1 - |qdot|)^2
                 d_ang_cost_dqdot = -2.0 * (1.0 - qdot_aligned);
                 break;
+            case 5:  // ang_cost = (1 - |qdot|) + (1 - |qdot|)^2 = (1 - d)(2 - d)
+                //   d/dd [ (1-d) + (1-d)² ] = -1 - 2(1-d) = 2d - 3
+                d_ang_cost_dqdot = 2.0 * qdot_aligned - 3.0;
+                break;
             default:
                 d_ang_cost_dqdot = -1.0 / std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
                 break;
@@ -1851,6 +1884,9 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 4:
                 d2h_dd2 = 2.0;  // h = (1-d)² → d²h/dd² = 2 (was -2 for old 1-d² form)
                 break;
+            case 5:
+                d2h_dd2 = 2.0;  // h = (1-d) + (1-d)² → d²h/dd² = 2 (linear term contributes 0)
+                break;
             default:
                 d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
                 break;
@@ -1869,6 +1905,7 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 break;
             }
             case 4: dh_dd = -2.0 * (1.0 - d); break;  // h = (1-d)² → dh/dd = -2(1-d)
+            case 5: dh_dd = 2.0 * d - 3.0; break;     // h = (1-d) + (1-d)² → dh/dd = 2d - 3
             default: dh_dd = -1.0 / sqrt_omd2; break;
         }
         // Quat mode: PwA correction always applied (it's the manifold-
