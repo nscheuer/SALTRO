@@ -395,7 +395,7 @@ def _vec_only_cfg(ang_cost_func_type):
     return cfg
 
 
-@pytest.mark.parametrize("act", [0, 1, 2, 3, 4])
+@pytest.mark.parametrize("act", [0, 1, 2, 3, 4, 5])
 def test_vec_ang_cost_grad_fd(act):
     sat = _make_satellite()
     x, u = _nominal_state(sat)
@@ -414,7 +414,7 @@ def test_vec_ang_cost_grad_fd(act):
                                 err_msg=f"[act={act}] q-grad mismatch")
 
 
-@pytest.mark.parametrize("act", [0, 1, 2, 3, 4])
+@pytest.mark.parametrize("act", [0, 1, 2, 3, 4, 5])
 def test_vec_ang_cost_hess_qq_fd(act):
     """(q,q) Hessian projected to tangent plane vs FD."""
     sat = _make_satellite()
@@ -478,3 +478,71 @@ def test_vec_ang_cost_no_synthetic_q_roll_invariance():
     c_rolled = sat.stageCost(0, 100, x_rolled, u, _BORESIGHT, _TARGET_VEC, _B_ECI, cfg)
     assert abs(c0) < 1e-8
     assert abs(c_rolled) < 1e-8, f"Roll about boresight should leave cost at 0, got {c_rolled}"
+
+
+# ============================================================================
+# afc=5 linear-plus-quadratic: direct value check (cost vs analytic formula).
+# ============================================================================
+
+def test_afc5_linquad_cost_values_match_analytic_formula():
+    """afc=5 cost f(c) = (1-c) + (1-c)^2 at known c values."""
+    sat = _make_satellite()
+    cfg = _vec_only_cfg(5)
+    cfg.angle = 1.0          # raw unit scaling
+    cfg.angle_N = 1.0
+
+    # State: q=identity, ω=0, h=0.
+    x = np.zeros(sat.stateDim)
+    x[saltro.Satellite.QUAT_INDEX] = 1.0
+
+    boresight = np.array([0., 0., 1.])
+    B_eci = np.array([0., 0., 0.])
+    u = np.zeros(sat.controlDim)
+
+    def vgoal(v): return np.array([np.nan, v[0], v[1], v[2]])
+
+    cases = [
+        ("aligned   (c=+1)",  [0., 0.,  1.], 0.0),
+        ("90°       (c= 0)",  [1., 0.,  0.], 2.0),
+        ("180°      (c=-1)",  [0., 0., -1.], 6.0),
+    ]
+    for label, r_eci, expected in cases:
+        got = sat.stageCost(0, 100, x, u, boresight, vgoal(r_eci), B_eci, cfg)
+        np.testing.assert_allclose(got, expected, atol=1e-9,
+                                    err_msg=f"afc=5 stageCost mismatch [{label}]")
+
+
+def test_afc5_gradient_nonvanishing_at_alignment():
+    """afc=5 gradient must NOT vanish at alignment (the whole point vs afc=4)."""
+    sat = _make_satellite()
+    cfg5 = _vec_only_cfg(5)
+    cfg5.angle = 1.0
+    cfg4 = _vec_only_cfg(4)
+    cfg4.angle = 1.0
+
+    # Near-aligned state: q tilted ε about +x → c ≈ 1 - O(ε²).
+    eps = 1e-3
+    x = np.zeros(sat.stateDim)
+    x[saltro.Satellite.QUAT_INDEX] = np.cos(eps / 2)
+    x[saltro.Satellite.QUAT_INDEX + 1] = np.sin(eps / 2)
+
+    boresight = np.array([0., 0., 1.])
+    B_eci = np.array([0., 0., 0.])
+    u = np.zeros(sat.controlDim)
+    target = np.array([np.nan, 0., 0., 1.])   # ECI +z (vec mode)
+
+    g5, _, _ = sat.stageCostJacobians(0, 100, x, u, boresight, target, B_eci, cfg5)
+    g4, _, _ = sat.stageCostJacobians(0, 100, x, u, boresight, target, B_eci, cfg4)
+
+    # |q-gradient(afc=5)| should be substantially larger than |q-grad(afc=4)|
+    # at near-alignment because afc=5 keeps the linear (1-c) term active.
+    g5_q_norm = np.linalg.norm(g5[3:7])
+    g4_q_norm = np.linalg.norm(g4[3:7])
+    assert g5_q_norm > 0.0
+    assert g4_q_norm > 0.0
+    # afc=5's gradient near alignment is dominated by the linear term ⟹ much
+    # larger than afc=4's (which scales as (1-c) ≈ O(ε²) here).
+    assert g5_q_norm > 10.0 * g4_q_norm, (
+        f"afc=5 gradient at near-alignment should dominate afc=4's "
+        f"(linear term keeps it active); got |g5|={g5_q_norm:.3e}, "
+        f"|g4|={g4_q_norm:.3e}")
