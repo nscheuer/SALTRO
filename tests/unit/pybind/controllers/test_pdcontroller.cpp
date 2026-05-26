@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <memory>
+#include <random>
 
 #include <Eigen/Dense>
 
@@ -159,6 +160,89 @@ TEST_CASE("PDController vec goal handles antipodal singularity finitely",
     const Satellite::VecX u = pd.find_u(x, B_eci, q_goal_vec, boresight);
     REQUIRE(u.size() == 4);
     REQUIRE(u.allFinite());
+}
+
+// ----------------------------------------------------------------------------
+// Random seeded sample: confirm the actuator torque the PD allocates points in
+// the same direction as the analytic τ_des = +kp·(bs×Rᵀr̂_eci) − kd·ω.
+//
+// We can't assert τ_actual ≈ τ_des because the allocator's authority-weighted
+// Tikhonov regularization damps off-RW-axis components heavily (a known
+// behavior of the antispike-line PDController; not introduced by this PR).
+// What we CAN assert is direction agreement (cos-similarity > 0) and finite-
+// ness across a randomized sweep of (q, ω, r̂_eci, bs, B).  A pre-fix run
+// would produce τ_actual = 0 (the safety guard returns u = 0), giving NaN
+// cos-similarity.
+// ----------------------------------------------------------------------------
+TEST_CASE("PDController vec goal produces direction-correct torque on random samples",
+          "[controller][pd][vec][seeded]") {
+    constexpr unsigned SEED = 20260526u;
+    constexpr int NUM_SAMPLES = 20;
+
+    std::mt19937 rng(SEED);
+    std::normal_distribution<double> normal(0.0, 1.0);
+    std::uniform_real_distribution<double> w_dist(-0.05, 0.05);
+    std::uniform_real_distribution<double> b_dist(1.0e-4, 2.0e-3);
+
+    auto randomUnit = [&]() {
+        Eigen::Vector3d v(normal(rng), normal(rng), normal(rng));
+        return v.norm() > 1e-9 ? Eigen::Vector3d(v / v.norm())
+                               : Eigen::Vector3d::UnitZ();
+    };
+
+    auto sat = makeSimpleSatellite();
+    controller::PDController pd(*sat);
+
+    int direction_correct = 0;
+    for (int i = 0; i < NUM_SAMPLES; ++i) {
+        // Random q (proper unit quaternion)
+        const Eigen::Vector3d axis = randomUnit();
+        const double angle = normal(rng) * PI;
+        Eigen::Vector4d q;
+        q(0) = std::cos(0.5 * angle);
+        q.segment<3>(1) = axis * std::sin(0.5 * angle);
+        q.normalize();
+
+        // Random ω, B, target direction, boresight
+        const Eigen::Vector3d omega(w_dist(rng), w_dist(rng), w_dist(rng));
+        const Eigen::Vector3d B_eci =
+            Eigen::Vector3d(normal(rng), normal(rng), normal(rng)).normalized() * b_dist(rng);
+        const Eigen::Vector3d r_eci = randomUnit();
+        const Eigen::Vector3d bs = randomUnit();
+
+        const Satellite::VecX x = makeState(omega, q);
+        const Eigen::Vector4d q_goal_vec(std::nan(""), r_eci(0), r_eci(1), r_eci(2));
+
+        // Analytic τ_des in the body frame.
+        const Eigen::Matrix3d R = saltro::math::rotationMatrix(q);
+        const Eigen::Vector3d r_body = R.transpose() * r_eci;
+        const Eigen::Vector3d tau_des =
+            pd.kp_q() * bs.cross(r_body) - pd.kd_w() * omega;
+        // Skip samples where τ_des is degenerate (cross product ~ 0 and ω ~ 0).
+        if (tau_des.norm() < 1e-12) continue;
+        const Eigen::Vector3d tau_des_hat = tau_des / tau_des.norm();
+
+        // What did the controller actually produce, and what torque does the
+        // satellite's actuator model say that command realizes (in body frame)?
+        const Satellite::VecX u = pd.find_u(x, B_eci, q_goal_vec, bs);
+        REQUIRE(u.allFinite());
+        const Eigen::Vector3d tau_actual = sat->actuatorTorque(x, u, B_eci);
+        REQUIRE(tau_actual.allFinite());
+
+        if (tau_actual.norm() > 1e-15) {
+            const double cos_sim = tau_actual.dot(tau_des_hat) / tau_actual.norm();
+            // The Tikhonov-damped projection should at least share the
+            // half-plane with the analytic τ_des.  cos_sim > 0 ⟺ the
+            // realized torque has positive component along the demanded
+            // direction.  Pre-fix this would have been NaN (u = 0 →
+            // tau_actual = 0 → division-by-zero check fails).
+            if (cos_sim > 0.0) ++direction_correct;
+        }
+    }
+
+    // Allow a few degenerate samples (near-antipodal r_eci/bs, near-zero
+    // tau_des due to small ω, etc.).  Most should be direction-correct.
+    REQUIRE(direction_correct >= NUM_SAMPLES * 3 / 4);
 }
 
 // ----------------------------------------------------------------------------
