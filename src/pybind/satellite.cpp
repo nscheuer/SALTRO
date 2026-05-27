@@ -1281,11 +1281,85 @@ namespace {
 //   0: 1−c    1: ½(1−c)²    2: acos(c)    3: ½·acos(c)²
 // fpp ≥ 0 for types 0,1,3, so the Gauss-Newton Hessian f''·g·gᵀ is PSD by
 // construction; type 2 (acos) is the exception (fpp < 0 for c > 0).
+//
+// === Taylor protection for type 3 at c = +1 =====================================
+//
+// f(c) = ½·acos²(c) is smooth at c = +1 (it's just ½·θ², θ = pointing angle).
+// But the c-coordinate formula has a removable 0/0 singularity:
+//
+//   f'(c)  = -acos(c) / √(1−c²)             →  −0/0   at c = 1
+//   f''(c) = 1/(1−c²) − acos(c)·c / [(1−c²)·√(1−c²)] →  ∞ − ∞  at c = 1
+//
+// L'Hôpital limits: f'(c=1) = −1 and f''(c=1) = 1/3.  Near c = +1, the
+// Taylor expansion (in omz = 1 − c) is:
+//   f(c)   ≈ omz + omz²/6 − omz³/90 + 4·omz⁴/2835
+//   f'(c)  ≈ −1 − omz/3 + omz²/30 − 2·omz³/567
+//   f''(c) ≈ 1/3 − omz/15 + omz²/189
+//
+// We switch from the exact c-formula to the Taylor formula when (1 − c) drops
+// below kTaylorThresholdLow, and linearly blend in [kTaylorThresholdLow,
+// kTaylorThresholdHigh].  This mirrors the OldPlanner cost2ang regularization
+// (acos_limitL / acos_limitH thresholds) used in the Generalized_ADCS PhD
+// planner; it handles the catastrophic-cancellation regime where the exact
+// formula computes ∞ − ∞ in double precision.
+//
+// At c = −1, type 3 has a *genuine* cusp (acos(c)|_{c=−1} = π, not 0; the cost
+// gradient diverges as −π / √(1+c)).  Taylor protection cannot remove that —
+// it's a real non-smooth point on the cost surface, not a coordinate artifact.
+// Same for type 2 (acos) at both c = +1 and c = −1.
 struct AngCostShape { double f, fp, fpp; };
+
+inline AngCostShape angCostShape3Taylor(double omz) {
+    // f(c) = ½·acos²(1 − omz), expanded in omz around 0.
+    //   f   = omz + omz²/6 − omz³/90 + 4·omz⁴/2835
+    //   f'  = −(1 + omz/3 − omz²/30 + 2·omz³/567)   (NB: d/dc = −d/d(omz))
+    //   f'' = 1/3 − omz/15 + omz²/189
+    const double omz2 = omz * omz;
+    const double omz3 = omz2 * omz;
+    const double omz4 = omz2 * omz2;
+    return {
+        omz + omz2 / 6.0 - omz3 / 90.0 + 4.0 * omz4 / 2835.0,
+        -(1.0 + omz / 3.0 - omz2 / 30.0 + 2.0 * omz3 / 567.0),
+        1.0 / 3.0 - omz / 15.0 + omz2 / 189.0
+    };
+}
 
 AngCostShape angCostShape(double c, int type) {
     const double omc2 = std::max(1.0 - c * c, 1e-12);  // 1 − c²  (floored)
     const double s = std::sqrt(omc2);                  // √(1 − c²)
+
+    // Taylor protection at c = +1 for type 3.  Thresholds chosen so the
+    // catastrophic-cancellation regime (1 − c² near double-precision floor)
+    // is fully handled by Taylor, with a blend zone where the exact form is
+    // still accurate.
+    constexpr double kTaylorThresholdLow  = 1e-6;
+    constexpr double kTaylorThresholdHigh = 1e-4;
+
+    if (type == 3 && c > 0.0) {
+        const double omz = 1.0 - c;
+        if (omz < kTaylorThresholdHigh) {
+            const AngCostShape taylor = angCostShape3Taylor(omz);
+            if (omz < kTaylorThresholdLow) {
+                return taylor;
+            }
+            // Linear blend between Taylor (at omz = low) and exact (at omz = high).
+            const double blend = (omz - kTaylorThresholdLow) /
+                                 (kTaylorThresholdHigh - kTaylorThresholdLow);
+            const double phi_e = std::acos(c);
+            const AngCostShape exact = {
+                0.5 * phi_e * phi_e,
+                -phi_e / s,
+                1.0 / omc2 - phi_e * c / (omc2 * s)
+            };
+            return {
+                (1.0 - blend) * taylor.f   + blend * exact.f,
+                (1.0 - blend) * taylor.fp  + blend * exact.fp,
+                (1.0 - blend) * taylor.fpp + blend * exact.fpp
+            };
+        }
+        // else: fall through to the exact-formula switch below
+    }
+
     switch (type) {
         case 0: return { 1.0 - c, -1.0, 0.0 };
         case 1: { const double e = 1.0 - c; return { 0.5 * e * e, -e, 1.0 }; }
