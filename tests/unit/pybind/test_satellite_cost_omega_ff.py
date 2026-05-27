@@ -479,3 +479,38 @@ def test_vec_ang_cost_no_synthetic_q_roll_invariance():
     c_rolled = sat.stageCost(0, 100, x_rolled, u, _BORESIGHT, _TARGET_VEC, _B_ECI, cfg)
     assert abs(c0) < 1e-8
     assert abs(c_rolled) < 1e-8, f"Roll about boresight should leave cost at 0, got {c_rolled}"
+
+
+# ============================================================================
+# afc=3 Taylor protection at c=+1: cost matches ½·θ² across full angle range.
+# ============================================================================
+
+def test_afc3_taylor_matches_half_theta_squared_near_alignment():
+    """afc=3 cost should equal ½·θ² for θ ∈ [0.001°, 179°]. Taylor protection
+    handles the c→1 numerical edge; outside that range the exact formula
+    is fine via cancellation. The test verifies the Taylor doesn't introduce
+    error in the regime where the exact formula already works."""
+    sat = _make_satellite()
+    cfg = _vec_only_cfg(3)
+    cfg.angle = 1.0
+    cfg.angle_N = 1.0
+
+    x = np.zeros(sat.stateDim)
+    x[saltro.Satellite.QUAT_INDEX] = 1.0
+    boresight = np.array([0., 0., 1.])
+    B_eci = np.array([0., 0., 0.])
+    u = np.zeros(sat.controlDim)
+
+    def vgoal(v): return np.array([np.nan, v[0], v[1], v[2]])
+
+    # θ values spanning the realistic pointing-error range plus extremes
+    # near the c = +1 singularity to verify Taylor protection.
+    for theta_deg in [0.001, 0.01, 0.1, 1.0, 10.0, 60.0, 120.0, 179.0]:
+        theta = np.deg2rad(theta_deg)
+        r_eci = np.array([np.sin(theta), 0.0, np.cos(theta)])
+        cost = sat.stageCost(0, 100, x, u, boresight, vgoal(r_eci), B_eci, cfg)
+        expected = 0.5 * theta * theta
+        np.testing.assert_allclose(
+            cost, expected, rtol=1e-6, atol=1e-20,
+            err_msg=f"afc=3 cost at θ={theta_deg}° differs from ½·θ²: "
+                    f"got {cost:.6e}, expected {expected:.6e}")
