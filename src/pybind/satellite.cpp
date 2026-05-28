@@ -1779,8 +1779,16 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
 
         const double h = x(RW_MOMENTUM_INDEX + i);
         const double h_lim = std::max(1e-9, std::abs(getRW(i).momentumMax()));
-        c(idx++) = (h - h_lim) / h_lim;
-        c(idx++) = (-h - h_lim) / h_lim;
+        // Rescale the constraint normalization to keep the Jacobian magnitude
+        // 1/h_scale bounded. For small h_lim (e.g. 2 mN·m·s = 0.002 N·m·s),
+        // 1/h_lim = 500 makes the GN AL Hessian (μ · (1/h_lim)² = μ · 2.5e5)
+        // blow up Q_xx as μ ramps through AL outer iterations and walks
+        // iLQR's Newton step away from the cost minimum. See issue #31.
+        // h_scale is a floor on the normalization that keeps (1/h_scale)²
+        // capped at 100 regardless of the physical wheel size.
+        const double h_scale = std::max(h_lim, 0.1);
+        c(idx++) = (h - h_lim) / h_scale;
+        c(idx++) = (-h - h_lim) / h_scale;
 
         c(idx++) = -(u_cmd * h) * (u_cmd * h);
     }
@@ -1910,13 +1918,14 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
         idx++;
         
         const double h_lim = std::max(1e-9, std::abs(getRW(i).momentumMax()));
-        
-        // RW momentum upper bound
-        c_x(idx, state_idx) = 1.0 / h_lim;
+        const double h_scale = std::max(h_lim, 0.1);   // see Satellite::constraints (issue #31)
+
+        // RW momentum upper bound:  ∂c/∂h = 1/h_scale
+        c_x(idx, state_idx) = 1.0 / h_scale;
         idx++;
-        
-        // RW momentum lower bound
-        c_x(idx, state_idx) = -1.0 / h_lim;
+
+        // RW momentum lower bound:  ∂c/∂h = -1/h_scale
+        c_x(idx, state_idx) = -1.0 / h_scale;
         idx++;
         
         // RW stiction: -(u*h)²
