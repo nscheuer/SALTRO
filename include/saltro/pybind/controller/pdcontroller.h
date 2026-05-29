@@ -66,10 +66,17 @@ public:
     void setGains(double kp_q, double kd_w);
     /// Set RW preference: 0 = MTQ-only, 1 = equal weight.
     void setRWScale(double rw_scale);
+    /// Set a constant body-frame feedforward torque added to τ_des before
+    /// allocation. Used to pre-cancel a known body-fixed disturbance (e.g. the
+    /// propulsion torque): pass −τ_prop so the warm-start actuates against it
+    /// instead of letting ω drift. The allocation's scale-to-max-saturation
+    /// then fits the combined demand into the actuator envelope.
+    void setFeedforwardTorque(const Eigen::Vector3d& tau_ff);
 
     double kp_q() const { return kp_q_; }
     double kd_w() const { return kd_w_; }
     double rwScale() const { return rw_scale_; }
+    Eigen::Vector3d feedforwardTorque() const { return tau_ff_; }
 
 protected:
     /**
@@ -84,6 +91,7 @@ private:
     double kp_q_ = 0.0;
     double kd_w_ = 0.0;
     double rw_scale_ = 1.0;
+    Eigen::Vector3d tau_ff_ = Eigen::Vector3d::Zero();
 };
 
 }

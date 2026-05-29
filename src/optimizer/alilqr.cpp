@@ -1,9 +1,14 @@
 #include <saltro/optimizer/alilqr.h>
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <limits>
 #include <vector>
 
 #include <saltro/optimizer/iLQR.h>
+#include <saltro/pybind/plannersettings.h>
+#include <saltro/pybind/satellite.h>
 
 namespace saltro::optimizer {
 
@@ -98,18 +103,56 @@ bool alilqr(
 )
 {
     const auto& aug = settings.passes[pass_idx].auglag;
+    const int NUM_FAMILIES = static_cast<int>(ConstraintFamily::NumFamilies);
+
+    // Per-family AL config: if the user provided vectors of the right size
+    // (NumFamilies), use them; otherwise fall back to the scalar values.
+    auto per_family_or_default = [&NUM_FAMILIES](
+        const std::vector<double>& v, double fallback
+    ) -> std::vector<double> {
+        if (static_cast<int>(v.size()) == NUM_FAMILIES) return v;
+        return std::vector<double>(NUM_FAMILIES, fallback);
+    };
+    const auto p_init_f  = per_family_or_default(aug.penalty_init_per_family,  aug.penalty_init);
+    const auto p_max_f   = per_family_or_default(aug.penalty_max_per_family,   aug.penalty_max);
+    const auto p_scale_f = per_family_or_default(aug.penalty_scale_per_family, aug.penalty_scale);
 
     auto c0 = collect_constraints(settings, satellite, X, U, S);
     std::vector<Eigen::VectorXd> lambda_aug;
     std::vector<Eigen::VectorXd> mu_aug;
-    lambda_aug.reserve(c0.size());
-    mu_aug.reserve(c0.size());
+    std::vector<std::vector<int>> family_id;  // family_id[k][i] = family of constraint i at step k
+    const int N_steps = static_cast<int>(c0.size());
+    lambda_aug.reserve(N_steps);
+    mu_aug.reserve(N_steps);
+    family_id.reserve(N_steps);
 
-    const double mu_init = aug.penalty_init / aug.penalty_scale;
-    for (const auto& c_k : c0) {
-        lambda_aug.push_back(Eigen::VectorXd::Constant(c_k.size(), aug.lag_mult_init));
-        mu_aug.push_back(Eigen::VectorXd::Constant(c_k.size(), mu_init));
+    for (int k = 0; k < N_steps; ++k) {
+        const auto& c_k = c0[static_cast<size_t>(k)];
+        const bool is_terminal = (k == N_steps - 1);
+        const int nc = static_cast<int>(c_k.size());
+
+        std::vector<int> fams(static_cast<size_t>(nc));
+        Eigen::VectorXd mu_init_vec = Eigen::VectorXd::Zero(nc);
+        for (int i = 0; i < nc; ++i) {
+            const int f = satellite.constraintFamily(i, is_terminal);
+            fams[static_cast<size_t>(i)] = f;
+            const double pinit_f =
+                (f >= 0 && f < NUM_FAMILIES) ? p_init_f[static_cast<size_t>(f)] : aug.penalty_init;
+            const double pscale_f =
+                (f >= 0 && f < NUM_FAMILIES) ? p_scale_f[static_cast<size_t>(f)] : aug.penalty_scale;
+            // Mirror original behavior: start at pinit / pscale so first ramp lands at pinit.
+            mu_init_vec(i) = (pscale_f > 0.0) ? (pinit_f / pscale_f) : pinit_f;
+        }
+
+        lambda_aug.push_back(Eigen::VectorXd::Constant(nc, aug.lag_mult_init));
+        mu_aug.push_back(std::move(mu_init_vec));
+        family_id.push_back(std::move(fams));
     }
+
+    // Per-family violation tracking (for conditional ramping). Initial value
+    // ∞ means "first iter always treats it as not-yet-contracting" (i.e. ramp).
+    std::vector<double> max_c_family_prev(NUM_FAMILIES,
+                                          std::numeric_limits<double>::infinity());
 
     for (int outer_iter = 0; outer_iter < aug.max_outer_iters; ++outer_iter) {
         double J = 0.0;
@@ -171,6 +214,60 @@ bool alilqr(
         }
 
         const auto c_list = collect_constraints(settings, satellite, X, U, S);
+
+        // Per-family max violation at this outer iter. Used to gate ramping
+        // (only ramp families that aren't contracting).
+        std::vector<double> max_c_family(NUM_FAMILIES, 0.0);
+        for (size_t k = 0; k < c_list.size(); ++k) {
+            const auto& c_k = c_list[k];
+            const auto& fams = family_id[k];
+            for (int i = 0; i < c_k.size(); ++i) {
+                const double v = std::max(0.0, c_k(i));
+                const int f = fams[static_cast<size_t>(i)];
+                if (f >= 0 && f < NUM_FAMILIES && v > max_c_family[f]) {
+                    max_c_family[f] = v;
+                }
+            }
+        }
+
+        if (std::getenv("SALTRO_AL_DEBUG")) {
+            double mu_rwm = -1.0, lam_rwm = 0.0;
+            for (size_t k = 0; k < c_list.size() && mu_rwm < 0.0; ++k) {
+                const auto& fams = family_id[k];
+                for (int i = 0; i < static_cast<int>(fams.size()); ++i)
+                    if (fams[static_cast<size_t>(i)] == 4) {
+                        mu_rwm = mu_aug[k](i); lam_rwm = lambda_aug[k](i); break;
+                    }
+            }
+            // also report the MAX lambda over all RWMomentum entries (the binding knot)
+            double lam_rwm_max = 0.0;
+            for (size_t k = 0; k < c_list.size(); ++k) {
+                const auto& fams = family_id[k];
+                for (int i = 0; i < static_cast<int>(fams.size()); ++i)
+                    if (fams[static_cast<size_t>(i)] == 4 && lambda_aug[k](i) > lam_rwm_max)
+                        lam_rwm_max = lambda_aug[k](i);
+            }
+            std::fprintf(stderr,
+                "[AL] outer=%d ilqr=%d acc=%d it=%d J=%.3e max_c=%.3e | RWmom=%.4e | mu_RWmom=%.3e lam_RWmom_max=%.3e\n",
+                outer_iter, static_cast<int>(ilqr_status),
+                ilqr_telemetry.accepted_steps, ilqr_telemetry.iterations,
+                ilqr_telemetry.final_cost, max_c,
+                max_c_family[4], mu_rwm, lam_rwm_max);
+        }
+
+        // Conditional ramp decision per family. If contraction_ratio ≤ 0,
+        // always ramp (original behavior). Otherwise ramp only if family
+        // violation didn't contract sufficiently.
+        std::vector<bool> ramp_family(NUM_FAMILIES, true);
+        if (aug.family_contraction_ratio > 0.0) {
+            for (int f = 0; f < NUM_FAMILIES; ++f) {
+                const double prev = max_c_family_prev[static_cast<size_t>(f)];
+                ramp_family[f] = (max_c_family[f] > aug.family_contraction_ratio * prev);
+            }
+        }
+        // Record this iter's violations for the next iter's contraction check.
+        for (int f = 0; f < NUM_FAMILIES; ++f) max_c_family_prev[f] = max_c_family[f];
+
         bool any_mu_below_max = false;
         for (size_t k = 0; k < c_list.size(); ++k) {
             // Lambda update uses RAW constraint value (not clamped to positive).
@@ -180,9 +277,22 @@ bool alilqr(
                                 .cwiseMin(aug.lag_mult_max);
             // For inequality constraints, lambda must stay non-negative
             lambda_aug[k] = lambda_aug[k].cwiseMax(0.0);
-            mu_aug[k] = (mu_aug[k] * aug.penalty_scale).cwiseMin(aug.penalty_max);
+
+            // Per-family ramp: each entry of mu_aug[k] uses its family's scale and cap.
+            // Skip scaling for families that contracted (ramp_family[f] == false).
+            const auto& fams = family_id[k];
             for (int i = 0; i < mu_aug[k].size(); ++i) {
-                if (mu_aug[k](i) < aug.penalty_max) {
+                const int f = fams[static_cast<size_t>(i)];
+                const double pmax_f =
+                    (f >= 0 && f < NUM_FAMILIES) ? p_max_f[static_cast<size_t>(f)] : aug.penalty_max;
+                const double pscale_f =
+                    (f >= 0 && f < NUM_FAMILIES) ? p_scale_f[static_cast<size_t>(f)] : aug.penalty_scale;
+                const bool do_ramp =
+                    (f >= 0 && f < NUM_FAMILIES) ? ramp_family[static_cast<size_t>(f)] : true;
+                if (do_ramp) {
+                    mu_aug[k](i) = std::min(mu_aug[k](i) * pscale_f, pmax_f);
+                }
+                if (mu_aug[k](i) < pmax_f) {
                     any_mu_below_max = true;
                 }
             }

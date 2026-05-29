@@ -20,6 +20,11 @@ static constexpr int MAX_OUTER_PASSES = 2;
  */
 struct InitTrajConfig {
     int initcontroller = 0;
+    /// Multiplier on the PD warm-start gains (initcontroller==3). <1 softens the
+    /// warm-start so it doesn't drive large ω at coarse dt (which destabilizes
+    /// the explicit-RK4 rollout → NaN quaternion → warm_start failure). 1.0 =
+    /// auto-tuned gains (default).
+    double pd_gain_scale = 1.0;
 };
 
 /**
@@ -91,6 +96,12 @@ struct DisturbanceConfig {
 
 struct ConstraintConfig {
     double control_limit_scale = 0.75;
+    /// Margin on the hard RW-momentum constraint: |h| ≤ rw_momentum_limit_scale·h_max.
+    /// <1 leaves headroom below saturation for corrective maneuvers while flying the
+    /// trajectory (the momentum analogue of control_limit_scale for torque).  This is
+    /// the field the RWAM-cost comments reference; the planner sets it from the cost's
+    /// RWh_max_mult.  Default 1.0 = bind exactly at h_max (no margin).
+    double rw_momentum_limit_scale = 1.0;
     /// Stack-allocated bounded control limit vector (no heap allocation).
     Eigen::Matrix<double, Eigen::Dynamic, 1, 0, saltro::limits::MAX_CTRL_DIM, 1> u_max;
     double wmax = 20.0 * M_PI / 180.0;
@@ -270,6 +281,22 @@ struct CostConfig {
  * @param total_cost_tol Total cost convergence tolerance
  */
 
+/// Constraint families for per-family AL penalty management.
+/// Each constraint in `Satellite::constraints()` belongs to one family;
+/// the AL outer loop tracks μ and violation contraction per-family rather
+/// than per-(constraint, timestep) so that families with different physical
+/// scales can be enforced at appropriate strengths without one dominating.
+enum class ConstraintFamily : int {
+    AngularVelocity = 0,   ///< (|ω|² - ω_max²)/ω_max²  (vec-pointing: bound mostly for sensor/safety)
+    SunAvoidance    = 1,   ///< sun_body.x() - cos(sun_limit)
+    MTQSaturation   = 2,   ///< |u_mtq| - lim   (clipped physically anyway; AL just keeps optimizer honest)
+    RWTorqueSat     = 3,   ///< |u_rw| - tau_lim
+    RWMomentum      = 4,   ///< |h| - h_max  (the binding constraint for spinning maneuvers; needs tight enforcement)
+    RWStiction      = 5,   ///< -(u·h)²  (always ≤ 0 by construction; vacuous family)
+    MagicTorqueSat  = 6,
+    NumFamilies     = 7,
+};
+
 struct AugLagConfig {
     int max_outer_iters = 30;
 
@@ -289,9 +316,26 @@ struct AugLagConfig {
     double lag_mult_init = 0.0;
     double lag_mult_max = 1e20;
 
+    /// Global AL penalty knobs (used as defaults when per-family overrides are
+    /// empty). `penalty_max = 1e16` is the historical ALTRO default; values in
+    /// 1e2..1e6 are usually more appropriate to prevent μ-runaway-past-feasibility.
     double penalty_init = 1e-1;
     double penalty_max = 1e16;
     double penalty_scale = 10.0;
+
+    /// Per-family overrides for μ initialization and capping. If `size() ==
+    /// (int)ConstraintFamily::NumFamilies`, the i-th entry applies to family i;
+    /// otherwise the global scalar above is used for all families.
+    /// Empty by default → fully backward-compatible (single global μ behavior).
+    std::vector<double> penalty_init_per_family;
+    std::vector<double> penalty_max_per_family;
+    std::vector<double> penalty_scale_per_family;
+
+    /// Per-family conditional ramping: if family violation isn't contracting
+    /// (max_c_new > contraction_ratio · max_c_prev), ramp μ_family by scale_family.
+    /// Otherwise leave μ_family alone (avoid over-ramping past feasibility).
+    /// Set ≤ 0 (default) to disable conditional ramping (always ramp every outer iter).
+    double family_contraction_ratio = 0.0;
 
     double constraint_tol = 0.002;
     double total_cost_tol = 1e-2;
@@ -328,6 +372,11 @@ struct ILQRConfig {
     /// cost_tol; we default to 10×. Set ≤ cost_tol to disable the 2-tier
     /// behavior (treat inner and outer identically).
     double ilqr_cost_tol = 1e0;
+    /// ALTRO-style relative cost-improvement tolerance: |ΔJ|/max(|J|,1) < tol.
+    /// Robust to cost scale, which the absolute cost_tol is not (e.g. when
+    /// angle_weight=1e6 makes J ~ 1e8, |ΔJ|=1 is well past convergence but
+    /// cost_tol=0.1 never fires). Set ≤ 0 to disable. Howell et al. 2019.
+    double rel_cost_tol = 0.0;
     int z_count_lim = 10;
 
     /// Maximum number of backward+forward-pass retries within a single
@@ -398,6 +447,18 @@ struct RegularizationConfig {
 
     int reg_min_cond = 2;
     double rand_add_ratio = 0.0;
+
+    /// Symmetric Jacobi (diagonal) equilibration of Q_uu_reg before the
+    /// Cholesky solve in the standard (non-eigen) backward pass.  With
+    /// D = diag(1/sqrt(Q_uu_reg_ii)), factor Â = D·Q_uu_reg·D (unit diagonal)
+    /// and recover via Q_uu_reg^{-1} = D·Â^{-1}·D.  SOLUTION-PRESERVING (same
+    /// K, d in exact arithmetic) — it only collapses the condition number that
+    /// arises from heterogeneous actuator scales (RW-torque penalty
+    /// μ·(1/τ_lim)² ≫ MTQ ~O(1)), so the accurate Newton step is recovered
+    /// instead of being lost to reg-bump thrash.  Regularization is unchanged
+    /// (still added to Q_uu first); if the scaled factor still fails the
+    /// caller's PD check, ρ is bumped as before.  Default off.
+    bool equilibrate_quu = false;
 
     bool use_dynamics_hess = false;
     bool use_constraint_hess = false;

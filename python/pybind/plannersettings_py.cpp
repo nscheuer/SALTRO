@@ -9,7 +9,8 @@ namespace py = pybind11;
 void bind_plannersettings(py::module_& m) {
     py::class_<InitTrajConfig>(m, "InitTrajConfig")
         .def(py::init<>())
-        .def_readwrite("initcontroller", &InitTrajConfig::initcontroller);
+        .def_readwrite("initcontroller", &InitTrajConfig::initcontroller)
+        .def_readwrite("pd_gain_scale", &InitTrajConfig::pd_gain_scale);
 
     py::class_<DisturbanceConfig>(m, "DisturbanceConfig")
         .def(py::init<>())
@@ -30,6 +31,7 @@ void bind_plannersettings(py::module_& m) {
     py::class_<ConstraintConfig>(m, "ConstraintConfig")
         .def(py::init<>())
         .def_readwrite("control_limit_scale", &ConstraintConfig::control_limit_scale)
+        .def_readwrite("rw_momentum_limit_scale", &ConstraintConfig::rw_momentum_limit_scale)
         .def_readwrite("u_max", &ConstraintConfig::u_max)
         .def_readwrite("wmax", &ConstraintConfig::wmax)
         .def_readwrite("sun_limit_angle", &ConstraintConfig::sun_limit_angle);
@@ -64,6 +66,17 @@ void bind_plannersettings(py::module_& m) {
              "k=1 matches stage; k=100 is strong terminal emphasis. "
              "Always prefer this over editing individual terminal fields.");
 
+    py::enum_<ConstraintFamily>(m, "ConstraintFamily")
+        .value("AngularVelocity", ConstraintFamily::AngularVelocity)
+        .value("SunAvoidance",    ConstraintFamily::SunAvoidance)
+        .value("MTQSaturation",   ConstraintFamily::MTQSaturation)
+        .value("RWTorqueSat",     ConstraintFamily::RWTorqueSat)
+        .value("RWMomentum",      ConstraintFamily::RWMomentum)
+        .value("RWStiction",      ConstraintFamily::RWStiction)
+        .value("MagicTorqueSat",  ConstraintFamily::MagicTorqueSat)
+        .value("NumFamilies",     ConstraintFamily::NumFamilies)
+        .export_values();
+
     py::class_<AugLagConfig>(m, "AugLagConfig")
         .def(py::init<>())
         .def_readwrite("max_outer_iters", &AugLagConfig::max_outer_iters)
@@ -74,6 +87,10 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("penalty_init", &AugLagConfig::penalty_init)
         .def_readwrite("penalty_max", &AugLagConfig::penalty_max)
         .def_readwrite("penalty_scale", &AugLagConfig::penalty_scale)
+        .def_readwrite("penalty_init_per_family",  &AugLagConfig::penalty_init_per_family)
+        .def_readwrite("penalty_max_per_family",   &AugLagConfig::penalty_max_per_family)
+        .def_readwrite("penalty_scale_per_family", &AugLagConfig::penalty_scale_per_family)
+        .def_readwrite("family_contraction_ratio", &AugLagConfig::family_contraction_ratio)
         .def_readwrite("constraint_tol", &AugLagConfig::constraint_tol)
         .def_readwrite("total_cost_tol", &AugLagConfig::total_cost_tol);
 
@@ -83,6 +100,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("grad_tol", &ILQRConfig::grad_tol)
         .def_readwrite("cost_tol", &ILQRConfig::cost_tol)
         .def_readwrite("ilqr_cost_tol", &ILQRConfig::ilqr_cost_tol)
+        .def_readwrite("rel_cost_tol", &ILQRConfig::rel_cost_tol)
         .def_readwrite("z_count_lim", &ILQRConfig::z_count_lim)
         .def_readwrite("ls_attempts_lim", &ILQRConfig::ls_attempts_lim)
         .def_readwrite("max_cost", &ILQRConfig::max_cost)
@@ -100,6 +118,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("reg_bump", &RegularizationConfig::reg_bump)
         .def_readwrite("reg_min_cond", &RegularizationConfig::reg_min_cond)
         .def_readwrite("rand_add_ratio", &RegularizationConfig::rand_add_ratio)
+        .def_readwrite("equilibrate_quu", &RegularizationConfig::equilibrate_quu)
         .def_readwrite("use_dynamics_hess", &RegularizationConfig::use_dynamics_hess)
         .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess)
         .def_readwrite("psd_clip_quu_ddp", &RegularizationConfig::psd_clip_quu_ddp)

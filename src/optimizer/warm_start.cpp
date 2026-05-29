@@ -36,6 +36,25 @@ bool warm_start(
         return false;
     }
 
+    // initcontroller == 4: use the caller-provided X/U as the warm-start
+    // trajectory verbatim (do NOT regenerate). Enables coarse-to-fine: the
+    // caller resamples a coarse solve onto this grid, writes it into X/U, and
+    // calls trajOpt with initcontroller=4 so the fine pass refines it.
+    // We validate sizes and quaternion norms; force x0 at k=0; renormalize quats.
+    if (settings.init_traj.initcontroller == 4) {
+        if (X.rows() < Satellite::QUAT_INDEX + 4 || X.cols() < N || U.cols() < N) {
+            return false;
+        }
+        X.col(0) = x0;  // pin initial state
+        for (int k = 0; k < N; ++k) {
+            Eigen::Vector4d q = X.col(k).segment<4>(Satellite::QUAT_INDEX);
+            const double qn = q.norm();
+            if (!std::isfinite(qn) || qn <= 1e-9) return false;
+            X.col(k).segment<4>(Satellite::QUAT_INDEX) = q / qn;
+        }
+        return true;
+    }
+
     std::unique_ptr<controller::Controller> active_controller;
     switch (settings.init_traj.initcontroller) {
         case 0:
@@ -52,9 +71,23 @@ bool warm_start(
         case 2:
             active_controller = std::make_unique<controller::IntegratedBdotController>(satellite);
             break;
-        case 3:
-            active_controller = std::make_unique<controller::PDController>(satellite);
+        case 3: {
+            auto pd = std::make_unique<controller::PDController>(satellite);
+            // Optional gain softening for coarse-dt stability (see InitTrajConfig).
+            const double gs = settings.init_traj.pd_gain_scale;
+            if (std::isfinite(gs) && gs > 0.0 && gs != 1.0) {
+                pd->setGains(gs * pd->kp_q(), gs * pd->kd_w());
+            }
+            // Pre-cancel the planned body-fixed propulsion torque so the
+            // warm-start actuates against it rather than letting ω drift over a
+            // coarse horizon. τ_ff = −τ_prop (body frame); allocation clamps it
+            // into the actuator envelope.
+            if (settings.disturbances.plan_for_prop) {
+                pd->setFeedforwardTorque(-settings.disturbances.prop_torque);
+            }
+            active_controller = std::move(pd);
             break;
+        }
         default:
             return false;
     }
@@ -129,13 +162,18 @@ bool warm_start(
             R.col(k), B.col(k), S.col(k), V.col(k), rho_k
         );
 
-        // Sanity check: dynamicsStepRK4 skips normalization silently on
-        // degenerate quaternions.  Reject the warm-start if that happened.
+        // Quaternion sanity + renormalization. At coarse dt (e.g. 10s) RK4 can
+        // leave the quaternion norm deviated by more than the old 1e-6 reject
+        // tolerance after a large per-step rotation — that's expected, not a
+        // failure. Only reject on a TRULY degenerate quaternion (norm ~0 or
+        // non-finite); otherwise renormalize and continue. This is what lets a
+        // coarse warm-start succeed (prerequisite for coarse-to-fine).
         if (x_next.size() >= Satellite::QUAT_INDEX + 4) {
             const double qn = x_next.segment<4>(Satellite::QUAT_INDEX).norm();
-            if (!std::isfinite(qn) || std::abs(qn - 1.0) > 1e-6) {
+            if (!std::isfinite(qn) || qn < 1e-6) {
                 return false;
             }
+            x_next.segment<4>(Satellite::QUAT_INDEX) /= qn;
         }
 
         X.col(k + 1) = x_next;

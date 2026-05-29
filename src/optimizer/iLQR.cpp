@@ -207,6 +207,8 @@ bool iLQR(
 				continue;
 			}
 
+			++telemetry.accepted_steps;
+
 			// Spike removal: detect and replace homotopy artifacts after accepted step
 			const auto& spike_cfg = settings.passes[pass_idx].spike_removal;
 			if (spike_cfg.enabled) {
@@ -227,19 +229,36 @@ bool iLQR(
 			// If ilqr_cost_tol <= cost_tol we disable the 2-tier behavior
 			// and treat them identically.
 			const double delta_J = std::abs(J_prev - J);
+			telemetry.iterations = iteration + 1;
+			telemetry.last_delta_J = delta_J;
+			telemetry.final_cost = J;
 			const double inner_tol = std::max(ilqr_cfg.ilqr_cost_tol, ilqr_cfg.cost_tol);
 			const bool inner_cost_converged = (delta_J <= inner_tol);
 			const bool outer_cost_converged = (delta_J <= ilqr_cfg.cost_tol);
 
+			// ALTRO gradient test (Howell et al. 2019): max_k ||d_k||_∞ < ε_grad.
+			// Use L∞ (max absolute component) rather than L2 — for a control
+			// feedforward d_k with heterogeneous units (MTQ vs RW), L∞ directly
+			// bounds the per-channel step size, while L2 averages across them.
 			bool grad_converged = false;
 			if (ilqr_cfg.grad_tol > 0.0) {
-				double max_d_norm = 0.0;
+				double max_d_inf = 0.0;
 				for (int kk = 0; kk < N - 1; ++kk) {
-					const double dnorm = d[kk].norm();
-					if (dnorm > max_d_norm) max_d_norm = dnorm;
+					const double dinf = d[kk].lpNorm<Eigen::Infinity>();
+					if (dinf > max_d_inf) max_d_inf = dinf;
 				}
-				grad_converged = (max_d_norm <= ilqr_cfg.grad_tol);
+				grad_converged = (max_d_inf <= ilqr_cfg.grad_tol);
 			}
+
+			// ALTRO-style relative cost convergence: |ΔJ| / max(|J_prev|, 1) < tol.
+			// Robust to cost scale (the absolute `cost_tol` is meaningless when
+			// J ~ 1e8 with angle_weight=1e6; we'd never see ΔJ < 1.0 even at
+			// genuine optimality). Howell et al. 2019 "ALTRO" eq. 9.
+			// rel_cost_tol <= 0 disables this path.
+			const double J_scale = std::max(std::abs(J_prev), 1.0);
+			const double rel_delta = delta_J / J_scale;
+			const bool rel_cost_converged =
+				(ilqr_cfg.rel_cost_tol > 0.0) && (rel_delta <= ilqr_cfg.rel_cost_tol);
 
 			if (ilqr_cfg.conjunctive_convergence) {
 				// Conjunctive: require ALL conditions to hold (cost AND grad).
@@ -247,16 +266,15 @@ bool iLQR(
 				// wants a fully-settled inner solve. grad_tol=0 disables that
 				// requirement (treated as satisfied).
 				const bool grad_ok = (ilqr_cfg.grad_tol <= 0.0) || grad_converged;
-				if (outer_cost_converged && grad_ok) {
+				if ((outer_cost_converged || rel_cost_converged) && grad_ok) {
 					status = ILQRStatus::Converged;
 					return true;
 				}
 			} else {
 				// Disjunctive (literature-standard for inner): ANY of
-				// {loose cost, grad, stagnation} fires break. Uses LOOSE
-				// ilqr_cost_tol for the cost path — inner doesn't need to
-				// match the outer strict tol.
-				if (inner_cost_converged || (ilqr_cfg.grad_tol > 0.0 && grad_converged)) {
+				// {loose cost, relative cost, grad, stagnation} fires break.
+				if (inner_cost_converged || rel_cost_converged
+					|| (ilqr_cfg.grad_tol > 0.0 && grad_converged)) {
 					status = ILQRStatus::Converged;
 					return true;
 				}

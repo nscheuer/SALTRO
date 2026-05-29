@@ -9,6 +9,16 @@
 
 namespace saltro::controller {
 
+namespace {
+
+/// Vector-goal sentinel: q_goal[0] = NaN means the remaining three entries are
+/// the inertial-frame target direction r̂_eci (see Satellite::stageCost).
+inline bool isECIFormat(const Eigen::Vector4d& q_goal) {
+    return std::isnan(q_goal(0));
+}
+
+}  // namespace
+
 PDController::PDController(const Satellite& satellite)
     : Controller(satellite) {
     autoTuneGains();
@@ -21,6 +31,10 @@ void PDController::setGains(double kp_q, double kd_w) {
 
 void PDController::setRWScale(double rw_scale) {
     rw_scale_ = std::clamp(rw_scale, 0.0, 1.0);
+}
+
+void PDController::setFeedforwardTorque(const Eigen::Vector3d& tau_ff) {
+    tau_ff_ = tau_ff.allFinite() ? tau_ff : Eigen::Vector3d::Zero();
 }
 
 void PDController::autoTuneGains() {
@@ -38,8 +52,6 @@ Satellite::VecX PDController::find_u(
     const Eigen::Vector4d& q_goal,
     const Eigen::Vector3d& boresight_body
 ) const {
-    (void)boresight_body;
-
     const int n_mtq = satellite_.numMTQ();
     const int n_rw = satellite_.numRW();
     const int nu = n_mtq + n_rw;
@@ -53,8 +65,60 @@ Satellite::VecX PDController::find_u(
     const double qn = q.norm();
     if (!std::isfinite(qn) || qn <= 1e-12) return u;
 
-    const Eigen::Vector4d q_err = saltro::math::quatError(q_goal, q);
-    const Eigen::Vector3d tau_des = -kp_q_ * q_err.tail<3>() - kd_w_ * omega;
+    // Compute desired body-frame torque.  Two cases:
+    //
+    // (a) Quaternion goal (`q_goal` = unit quaternion):  classic
+    //         τ_des = −k_p · q_err.vec − k_d · ω
+    //     where `q_err = quatError(q_goal, q)` and the vector part of the
+    //     error quaternion is, for small errors, ≈ ½·θ_err·axis.
+    //
+    // (b) Vector goal (`q_goal[0] = NaN`, `q_goal[1:4] = r̂_eci`):  pure
+    //     boresight-pointing.  Drive `bs_body` → `R(q)^T · r̂_eci = r_body`.
+    //     The body-frame torque that rotates `bs` toward `r_body` is the
+    //     cross-product `bs × r_body` (magnitude `sin(θ_err)`, direction
+    //     perpendicular to both):
+    //         τ_des = +k_p · (bs × r_body) − k_d · ω.
+    //     Note the sign vs case (a): the vec error vector points TOWARD the
+    //     goal, while q_err.vec points AWAY (hence the minus in case (a)).
+    //
+    // Without this branch, calling PDController with a vector goal feeds
+    // `NaN` through `quatError` → `τ_des = NaN` → the `!u_raw.allFinite()`
+    // guard returns `u = 0` at every knot, silently degenerating to the
+    // ZeroController behavior.
+    Eigen::Vector3d tau_des;
+    if (isECIFormat(q_goal)) {
+        Eigen::Vector3d r_eci = q_goal.tail<3>();
+        const double rn = r_eci.norm();
+        if (!std::isfinite(rn) || rn <= 1e-12) return u;
+        r_eci /= rn;
+
+        Eigen::Vector3d bs = boresight_body;
+        const double bsn = bs.norm();
+        if (!std::isfinite(bsn) || bsn <= 1e-12) return u;
+        bs /= bsn;
+
+        // r_body = R(q)^T · r̂_eci  (target direction expressed in body frame)
+        const Eigen::Matrix3d R_T = saltro::math::rotationMatrix(q).transpose();
+        const Eigen::Vector3d r_body = R_T * r_eci;
+
+        // Anisotropic damping: vec-pointing is a 2-DOF goal (roll about bs is
+        // unconstrained), so damping ω along bs is geometrically wrong — it
+        // suppresses the body-spin DOF the planner may want to exploit for
+        // gyroscopic disturbance averaging (e.g., body-fixed prop torque).
+        // Damp only the perpendicular-to-bs component.
+        const Eigen::Vector3d omega_perp = omega - bs * bs.dot(omega);
+        tau_des = kp_q_ * bs.cross(r_body) - kd_w_ * omega_perp;
+    } else {
+        const Eigen::Vector4d q_err = saltro::math::quatError(q_goal, q);
+        tau_des = -kp_q_ * q_err.tail<3>() - kd_w_ * omega;
+    }
+
+    // Feedforward counter-disturbance: add the constant body-frame term (set via
+    // setFeedforwardTorque, e.g. −τ_prop). The least-squares allocation below
+    // realizes as much of (τ_des + τ_ff) as the actuator envelope allows. This
+    // keeps a coarse warm-start from accumulating ω against an uncompensated
+    // body-fixed disturbance (the divergence that breaks coarse-dt integration).
+    tau_des += tau_ff_;
 
     // Numerical actuator Jacobian J = ∂τ/∂u  (3 × nu) via finite differences.
     const Eigen::VectorXd u_zero = Eigen::VectorXd::Zero(nu);

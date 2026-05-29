@@ -58,8 +58,22 @@ void solveRiccattiStepEigen(
 	    + K_k.transpose() * Q_u
 	    + Q_ux.transpose() * d_k;
 
+	// CRITICAL (2026-05-27): expected-cost-reduction uses the MODIFIED quadratic
+	// model that produced d_k, not the original Q_uu. Using original Q_uu here
+	// is inconsistent because along negative-eigenvalue directions of Q_uu the
+	// prediction is unboundedly negative (predicts a "free reduction"), causing
+	// the line search z-test (z = (J_prev - J_new) / -ΔV) to reject every step
+	// (z ≪ 1 because actual reduction is bounded by higher-order terms while
+	// predicted is huge). Reg then ramps to reg_max and BP fails entirely.
+	//
+	// Math: in the eigenbasis with d̂_i = -g_i/|λ_i| (where g_i = (V^T Q_u)_i),
+	//   d_k^T·Q_uu·d_k     = Σ_i g_i²/λ_i        (mixed signs, can be negative)
+	//   d_k^T·H_mod·d_k    = Σ_i g_i²/|λ_i|      (always positive, bounded)
+	// Using H_mod gives the model-consistent prediction -½·Σ_i g_i²/|λ_i| at α=1.
+	const Eigen::VectorXd Vt_dk = V_eig.transpose() * d_k;
+	const double quad_mod = (lambda_mod.array() * Vt_dk.array().square()).sum();
 	deltaV(0) += d_k.dot(Q_u);
-	deltaV(1) += 0.5 * d_k.dot(Q_uu * d_k);
+	deltaV(1) += 0.5 * quad_mod;
 }
 
 /**
@@ -85,17 +99,39 @@ void solveRiccattiStep(
 	std::vector<Eigen::VectorXd>& d,
 	Eigen::Ref<Eigen::Vector2d> deltaV,
 	Eigen::Ref<Eigen::VectorXd> p_k,
-	Eigen::Ref<Eigen::MatrixXd> P_k
+	Eigen::Ref<Eigen::MatrixXd> P_k,
+	bool equilibrate
 ) {
-	// Compute Q_uu_reg^{-1} using LLT
-	Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
-	
-	// Solve for feedback gain K_k = -(Q_uu + ρI)^{-1} * Q_ux
-	Eigen::MatrixXd K_k = -llt.solve(Q_ux);
+	// Compute K_k = -Q_uu_reg^{-1}·Q_ux and d_k = -Q_uu_reg^{-1}·Q_u.
+	Eigen::MatrixXd K_k;
+	Eigen::VectorXd d_k;
+	if (equilibrate) {
+		// Symmetric Jacobi (diagonal) equilibration: with
+		// D = diag(1/sqrt(Q_uu_reg_ii)), factor Â = D·Q_uu_reg·D (unit
+		// diagonal) and recover Q_uu_reg^{-1} = D·Â^{-1}·D.  Solution-
+		// preserving (same K, d in exact arithmetic); only collapses the
+		// condition number from heterogeneous actuator scales so the accurate
+		// step survives finite precision.  Q_uu_reg is PD (caller verified via
+		// LLT) and D is real-invertible, so Â is PD by congruence.
+		const int nu_local = static_cast<int>(Q_uu_reg.rows());
+		Eigen::VectorXd s = Q_uu_reg.diagonal().cwiseAbs().cwiseSqrt();
+		for (int j = 0; j < nu_local; ++j) s(j) = (s(j) > 1e-150) ? 1.0 / s(j) : 1.0;
+		Eigen::MatrixXd A_hat = s.asDiagonal() * Q_uu_reg * s.asDiagonal();
+		A_hat = 0.5 * (A_hat + Eigen::MatrixXd(A_hat.transpose()));
+		Eigen::LLT<Eigen::MatrixXd> llt(A_hat);
+		Eigen::MatrixXd K_scaled = llt.solve(Eigen::MatrixXd(s.asDiagonal() * Q_ux));
+		Eigen::VectorXd d_scaled = llt.solve(Eigen::VectorXd(s.asDiagonal() * Q_u));
+		K_k = -(s.asDiagonal() * K_scaled);
+		d_k = -(s.asDiagonal() * d_scaled);
+	} else {
+		// Compute Q_uu_reg^{-1} using LLT
+		Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
+		// Solve for feedback gain K_k = -(Q_uu + ρI)^{-1} * Q_ux
+		K_k = -llt.solve(Q_ux);
+		// Solve for feedforward term d_k = -(Q_uu + ρI)^{-1} * Q_u
+		d_k = -llt.solve(Q_u);
+	}
 	K[k] = K_k;
-	
-	// Solve for feedforward term d_k = -(Q_uu + ρI)^{-1} * Q_u
-	Eigen::VectorXd d_k = -llt.solve(Q_u);
 	d[k] = d_k;
 	
 	// Use UNREGULARIZED Q_uu for Riccati value function propagation.
@@ -175,7 +211,12 @@ bool backwardPass(
 	
 	// Minimal disturbance config for linearization
 	DisturbanceConfig dist_config;
-	
+
+	// Diagnostic: track Q_uu indefiniteness + feedforward magnitude across knots.
+	const bool bp_eig_dbg = (std::getenv("SALTRO_BP_EIG") != nullptr);
+	double bp_min_eig = 1e300; int bp_min_eig_k = -1, bp_min_eig_ctrl = -1, bp_n_indef = 0;
+	double bp_max_dn = 0.0; int bp_max_dk = -1, bp_max_dctrl = -1; Eigen::VectorXd bp_worst_d;
+
 	// Backward loop: k from N-2 down to 0
 	for (int k = N - 2; k >= 0; --k) {
 		// Extract trajectory data at time k
@@ -435,6 +476,19 @@ bool backwardPass(
 		// Diagnostic: copy Q_uu (un-regularized, post-symmetrization).
 		if (Q_uu_out) (*Q_uu_out)[static_cast<std::size_t>(k)] = Q_uu;
 
+		// Diagnostic: report indefiniteness of the UNREGULARIZED Q_uu (the one
+		// used for P_k and ΔV).  A negative eigenvalue here means the iLQR step
+		// is an ascent direction along that mode → forward pass cannot descend.
+		if (bp_eig_dbg) {
+			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es_dbg(Q_uu);
+			const double me = es_dbg.eigenvalues().minCoeff();
+			if (me < -1e-9) ++bp_n_indef;
+			if (me < bp_min_eig) {
+				bp_min_eig = me; bp_min_eig_k = k;
+				es_dbg.eigenvectors().col(0).cwiseAbs().maxCoeff(&bp_min_eig_ctrl);
+			}
+		}
+
 		const auto& reg_cfg = settings.passes[0].reg;
 		if (reg_cfg.use_eigen_modification) {
 			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(Q_uu);
@@ -483,12 +537,26 @@ bool backwardPass(
 				return false;
 			}
 
-			solveRiccattiStep(Q_uu_reg, Q_uu, Q_u, Q_ux, Q_xx, Q_x, k, K, d, deltaV, p_k, P_k);
+			solveRiccattiStep(Q_uu_reg, Q_uu, Q_u, Q_ux, Q_xx, Q_x, k, K, d, deltaV, p_k, P_k,
+			                  reg_cfg.equilibrate_quu);
 			SALTRO_OPT_DLOG("[BP] k=" << k << " reg=" << reg << " ||d||=" << d[k].norm());
 		}
+		if (bp_eig_dbg) {
+			int didx = 0; const double dn = d[k].cwiseAbs().maxCoeff(&didx);
+			if (dn > bp_max_dn) { bp_max_dn = dn; bp_max_dk = k; bp_max_dctrl = didx; bp_worst_d = d[k]; }
+		}
+	}
+	if (bp_eig_dbg) {
+		std::cout << "[BP-EIG] reg=" << reg << " min_eig(Q_uu)=" << bp_min_eig
+		          << " @k=" << bp_min_eig_k << " neg-mode_ctrl=" << bp_min_eig_ctrl
+		          << " n_indef=" << bp_n_indef << "/" << (N - 1)
+		          << " | max|d|_inf=" << bp_max_dn << " @k=" << bp_max_dk
+		          << " ctrl=" << bp_max_dctrl;
+		if (bp_worst_d.size() > 0) std::cout << " d=" << bp_worst_d.transpose();
+		std::cout << std::endl;
 	}
 	SALTRO_OPT_DLOG("[BP] success dV1=" << deltaV(0) << " dV2=" << deltaV(1));
-	
+
 	return true;
 
 } 

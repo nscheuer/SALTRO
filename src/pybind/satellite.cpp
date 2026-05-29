@@ -297,11 +297,7 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
         torque += srp.torque(x_base, dist, S_body);
     }
 
-    // Constant body-fixed propulsion torque (e.g. off-axis thruster). The
-    // DisturbanceConfig struct already exposes plan_for_prop and prop_torque,
-    // but the dispatch in disturbanceTorque() previously had no branch that
-    // applied them — they were dead settings. ∂τ/∂x = 0 and ∂τ/∂u = 0 so no
-    // dynamicsJacobians/dynamicsHessians changes are required.
+    // Apply body-fixed constant propulsion torque (PR #27).
     if (dist.plan_for_prop) {
         torque += dist.prop_torque;
     }
@@ -1078,28 +1074,88 @@ namespace {
 // ===========================================================================
 
 // Cost shape f(c) and its first two derivatives w.r.t. c.
-//   0: 1−c                       linear; f'=−1; f''=0 (no curvature for GN)
-//   1: ½(1−c)²                   convex quadratic; f'=−(1−c); f''=1
-//   2: acos(c)                   ABSOLUTE angle; f''<0 for c>0 (NOT PSD)
-//   3: ½·acos(c)²                squared angle; f'' diverges at c=±1
-//   4: (1−c)²                    PSD f''=2 but f'(c=1)=0 — flat near alignment
-//   5: (1−c) + (1−c)² = (1−c)(2−c)
-//        linear-plus-quadratic blend with the failure mode of each piece
-//        removed:
-//          • Like 0, has constant non-vanishing pull at alignment:
-//            f'(c=1) = −1.
-//          • Like 4, has bounded constant Hessian f''=2 (PSD by construction,
-//            no singularity at c=±1).
-//        The linear term keeps the gradient alive when the quadratic flattens
-//        out near c=1, so iLQR retains drive toward exact alignment even
-//        with a strong warm start that is already close. The quadratic term
-//        provides Gauss-Newton curvature info for fine convergence.
-// fpp ≥ 0 for types 0,1,3,4,5; type 2 (acos) is the exception (fpp < 0 for c > 0).
+//   0: 1−c    1: ½(1−c)²    2: acos(c)    3: ½·acos(c)²    4: (1−c)²
+// fpp ≥ 0 for types 0,1,3,4, so the Gauss-Newton Hessian f''·g·gᵀ is PSD by
+// construction; type 2 (acos) is the exception (fpp < 0 for c > 0).
+//
+// === Taylor protection for type 3 at c = +1 =====================================
+//
+// f(c) = ½·acos²(c) is smooth at c = +1 (it's just ½·θ², θ = pointing angle).
+// But the c-coordinate formula has a removable 0/0 singularity:
+//
+//   f'(c)  = -acos(c) / √(1−c²)             →  −0/0   at c = 1
+//   f''(c) = 1/(1−c²) − acos(c)·c / [(1−c²)·√(1−c²)] →  ∞ − ∞  at c = 1
+//
+// L'Hôpital limits: f'(c=1) = −1 and f''(c=1) = 1/3.  Near c = +1, the
+// Taylor expansion (in omz = 1 − c) is:
+//   f(c)   ≈ omz + omz²/6 − omz³/90 + 4·omz⁴/2835
+//   f'(c)  ≈ −1 − omz/3 + omz²/30 − 2·omz³/567
+//   f''(c) ≈ 1/3 − omz/15 + omz²/189
+//
+// We switch from the exact c-formula to the Taylor formula when (1 − c) drops
+// below kTaylorThresholdLow, and linearly blend in [kTaylorThresholdLow,
+// kTaylorThresholdHigh].  This mirrors the OldPlanner cost2ang regularization
+// (acos_limitL / acos_limitH thresholds) used in the Generalized_ADCS PhD
+// planner; it handles the catastrophic-cancellation regime where the exact
+// formula computes ∞ − ∞ in double precision.
+//
+// At c = −1, type 3 has a *genuine* cusp (acos(c)|_{c=−1} = π, not 0; the cost
+// gradient diverges as −π / √(1+c)).  Taylor protection cannot remove that —
+// it's a real non-smooth point on the cost surface, not a coordinate artifact.
+// Same for type 2 (acos) at both c = +1 and c = −1.
 struct AngCostShape { double f, fp, fpp; };
+
+inline AngCostShape angCostShape3Taylor(double omz) {
+    // f(c) = ½·acos²(1 − omz), expanded in omz around 0.
+    //   f   = omz + omz²/6 − omz³/90 + 4·omz⁴/2835
+    //   f'  = −(1 + omz/3 − omz²/30 + 2·omz³/567)   (NB: d/dc = −d/d(omz))
+    //   f'' = 1/3 − omz/15 + omz²/189
+    const double omz2 = omz * omz;
+    const double omz3 = omz2 * omz;
+    const double omz4 = omz2 * omz2;
+    return {
+        omz + omz2 / 6.0 - omz3 / 90.0 + 4.0 * omz4 / 2835.0,
+        -(1.0 + omz / 3.0 - omz2 / 30.0 + 2.0 * omz3 / 567.0),
+        1.0 / 3.0 - omz / 15.0 + omz2 / 189.0
+    };
+}
 
 AngCostShape angCostShape(double c, int type) {
     const double omc2 = std::max(1.0 - c * c, 1e-12);  // 1 − c²  (floored)
     const double s = std::sqrt(omc2);                  // √(1 − c²)
+
+    // Taylor protection at c = +1 for type 3.  Thresholds chosen so the
+    // catastrophic-cancellation regime (1 − c² near double-precision floor)
+    // is fully handled by Taylor, with a blend zone where the exact form is
+    // still accurate.
+    constexpr double kTaylorThresholdLow  = 1e-6;
+    constexpr double kTaylorThresholdHigh = 1e-4;
+
+    if (type == 3 && c > 0.0) {
+        const double omz = 1.0 - c;
+        if (omz < kTaylorThresholdHigh) {
+            const AngCostShape taylor = angCostShape3Taylor(omz);
+            if (omz < kTaylorThresholdLow) {
+                return taylor;
+            }
+            // Linear blend between Taylor (at omz = low) and exact (at omz = high).
+            const double blend = (omz - kTaylorThresholdLow) /
+                                 (kTaylorThresholdHigh - kTaylorThresholdLow);
+            const double phi_e = std::acos(c);
+            const AngCostShape exact = {
+                0.5 * phi_e * phi_e,
+                -phi_e / s,
+                1.0 / omc2 - phi_e * c / (omc2 * s)
+            };
+            return {
+                (1.0 - blend) * taylor.f   + blend * exact.f,
+                (1.0 - blend) * taylor.fp  + blend * exact.fp,
+                (1.0 - blend) * taylor.fpp + blend * exact.fpp
+            };
+        }
+        // else: fall through to the exact-formula switch below
+    }
+
     switch (type) {
         case 0: return { 1.0 - c, -1.0, 0.0 };
         case 1: { const double e = 1.0 - c; return { 0.5 * e * e, -e, 1.0 }; }
@@ -1110,13 +1166,6 @@ AngCostShape angCostShape(double c, int type) {
                      1.0 / omc2 - phi * c / (omc2 * s) };
         }
         case 4: { const double e = 1.0 - c; return { e * e, -2.0 * e, 2.0 }; }
-        case 5: {
-            // f  = (1-c) + (1-c)^2
-            // f' = -1 - 2(1-c) = 2c - 3
-            // f''= 2
-            const double e = 1.0 - c;
-            return { e + e * e, 2.0 * c - 3.0, 2.0 };
-        }
         default: return { std::acos(c), -1.0 / s, -c / (omc2 * s) };
     }
 }
@@ -1242,14 +1291,6 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                 ang_cost = err * err;
                 break;
             }
-            case 5: {
-                // (1-d) + (1-d)² = (1-d)(2-d). Matches vec mode case 5 shape.
-                // PSD f''=2 like case 4 but with non-vanishing gradient at
-                // d=1 (alignment): f'(d) = -1 - 2(1-d) = 2d - 3, f'(1) = -1.
-                const double err = 1.0 - qdot_aligned;
-                ang_cost = err + err * err;
-                break;
-            }
             default:
                 ang_cost = std::acos(qdot_aligned);
                 break;
@@ -1370,14 +1411,18 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
         const double z = std::abs(h);
         const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
 
-        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        // Knee (thesis c_H2): soft penalty begins at RWh_ok_mult·h_max. The hard
+        // |h|≤h_max constraint (with its own margin) is enforced separately;
+        // RWh_max_mult no longer keys this cost (it was the wrong param — see
+        // ConstraintConfig.rw_momentum_limit_scale).
+        // Saturation knee at c_h2 = RWh_ok_mult·h_max (thesis c_H2).  Flat below
+        // the knee, quadratic above — keeps the slew's needed momentum (|h|→h_max)
+        // cheap, unlike an always-on softplus which over-penalizes it.
+        const double h_thresh = std::clamp(cost_cfg.RWh_ok_mult, 0.0, 1.0) * h_max;
         const double denom_high = std::max(1e-9, h_max - h_thresh);
         if (z > h_thresh) {
             const double over = (z - h_thresh) / denom_high;
             rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * over * over;
-        } else {
-            const double scaled = z / h_max;
-            rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * scaled * scaled;
         }
 
         const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
@@ -1606,10 +1651,6 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 4:  // ang_cost = (1 - |qdot|)^2
                 d_ang_cost_dqdot = -2.0 * (1.0 - qdot_aligned);
                 break;
-            case 5:  // ang_cost = (1 - |qdot|) + (1 - |qdot|)^2 = (1 - d)(2 - d)
-                //   d/dd [ (1-d) + (1-d)² ] = -1 - 2(1-d) = 2d - 3
-                d_ang_cost_dqdot = 2.0 * qdot_aligned - 3.0;
-                break;
             default:
                 d_ang_cost_dqdot = -1.0 / std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
                 break;
@@ -1653,16 +1694,18 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
 
         // RW momentum penalty: soft penalty in saturation and stiction regions
-        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        // Knee (thesis c_H2): soft penalty begins at RWh_ok_mult·h_max. The hard
+        // |h|≤h_max constraint (with its own margin) is enforced separately;
+        // RWh_max_mult no longer keys this cost (it was the wrong param — see
+        // ConstraintConfig.rw_momentum_limit_scale).
+        const double h_thresh = std::clamp(cost_cfg.RWh_ok_mult, 0.0, 1.0) * h_max;
         const double denom_high = std::max(1e-9, h_max - h_thresh);
         const double sign_h = safeSign(h);
-        
+
+        // Flat below the knee (see stageCost): no momentum gradient there.
         if (z > h_thresh) {
             const double over = (z - h_thresh) / denom_high;
             lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * sign_h * over / denom_high;
-        } else {
-            const double scaled = z / h_max;
-            lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * sign_h * scaled / h_max;
         }
 
         // Stiction penalty
@@ -1893,9 +1936,6 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 4:
                 d2h_dd2 = 2.0;  // h = (1-d)² → d²h/dd² = 2 (was -2 for old 1-d² form)
                 break;
-            case 5:
-                d2h_dd2 = 2.0;  // h = (1-d) + (1-d)² → d²h/dd² = 2 (linear term contributes 0)
-                break;
             default:
                 d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
                 break;
@@ -1914,7 +1954,6 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 break;
             }
             case 4: dh_dd = -2.0 * (1.0 - d); break;  // h = (1-d)² → dh/dd = -2(1-d)
-            case 5: dh_dd = 2.0 * d - 3.0; break;     // h = (1-d) + (1-d)² → dh/dd = 2d - 3
             default: dh_dd = -1.0 / sqrt_omd2; break;
         }
         // Quat mode: PwA correction always applied (it's the manifold-
@@ -2023,16 +2062,17 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
 
         // Angular momentum saturation penalty
-        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
+        // Knee (thesis c_H2): soft penalty begins at RWh_ok_mult·h_max. The hard
+        // |h|≤h_max constraint (with its own margin) is enforced separately;
+        // RWh_max_mult no longer keys this cost (it was the wrong param — see
+        // ConstraintConfig.rw_momentum_limit_scale).
+        const double h_thresh = std::clamp(cost_cfg.RWh_ok_mult, 0.0, 1.0) * h_max;
         const double denom_high = std::max(1e-9, h_max - h_thresh);
+        // Flat below the knee (see stageCost): no momentum curvature there.
         if (z > h_thresh) {
             const double d2_over_dz2 = 1.0 / (denom_high * denom_high);
-            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
+            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) +=
                 cost_cfg.rw_AM_weight * d2_over_dz2;
-        } else {
-            const double d2_scaled_dz2 = 1.0 / (h_max * h_max);
-            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
-                cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * d2_scaled_dz2;
         }
 
         // Stiction penalty second derivative
@@ -2233,6 +2273,9 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     const double scale = (std::isfinite(cnst_cfg.control_limit_scale) && cnst_cfg.control_limit_scale > 0.0)
                              ? cnst_cfg.control_limit_scale
                              : 1.0;
+    const double mom_scale = (std::isfinite(cnst_cfg.rw_momentum_limit_scale) && cnst_cfg.rw_momentum_limit_scale > 0.0)
+                                 ? cnst_cfg.rw_momentum_limit_scale
+                                 : 1.0;
 
     for (int i = 0; i < num_mtq_; ++i) {
         const double u_cmd = u(i);
@@ -2254,9 +2297,18 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
         c(idx++) = (-u_cmd - tau_lim) / tau_lim;
 
         const double h = x(RW_MOMENTUM_INDEX + i);
-        const double h_lim = std::max(1e-9, std::abs(getRW(i).momentumMax()));
-        c(idx++) = (h - h_lim) / h_lim;
-        c(idx++) = (-h - h_lim) / h_lim;
+        const double h_lim = mom_scale * std::max(1e-9, std::abs(getRW(i).momentumMax()));
+        // Normalize by h_lim so the violation is in fractional units (|h|/h_lim − 1),
+        // matching how the RW *torque* constraint is normalized by tau_lim. A prior
+        // floor h_scale=max(h_lim,0.1) (issue #31, to bound 1/h_scale) divided a
+        // 2× momentum violation down to ~0.03, so the AL could not enforce it at
+        // ANY μ (verified: |h| immovable from 1e5→1e8 penalty). The torque
+        // constraint already runs with a LARGER Jacobian (1/tau_lim ≈ 6667 vs
+        // 1/h_lim = 500) and binds fine, so the feared Hessian blow-up does not
+        // materialize here.
+        const double h_scale = h_lim;
+        c(idx++) = (h - h_lim) / h_scale;
+        c(idx++) = (-h - h_lim) / h_scale;
 
         c(idx++) = -(u_cmd * h) * (u_cmd * h);
     }
@@ -2273,6 +2325,39 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     }
 
     return c;
+}
+
+int Satellite::constraintFamily(int constraint_idx, bool is_terminal) const {
+    // Mirrors the layout in Satellite::constraints().
+    // Always present (k=N-1 stops here):
+    if (constraint_idx == 0) return static_cast<int>(ConstraintFamily::AngularVelocity);
+    if (constraint_idx == 1) return static_cast<int>(ConstraintFamily::SunAvoidance);
+    if (is_terminal) return -1;
+
+    int idx = 2;
+    // MTQ saturation: 2 per MTQ (upper, lower)
+    if (constraint_idx < idx + 2 * num_mtq_) {
+        return static_cast<int>(ConstraintFamily::MTQSaturation);
+    }
+    idx += 2 * num_mtq_;
+
+    // RW block: per RW, 2 torque-sat + 2 momentum-bound + 1 stiction = 5 constraints
+    for (int i = 0; i < num_rw_; ++i) {
+        if (constraint_idx < idx + 2) return static_cast<int>(ConstraintFamily::RWTorqueSat);
+        idx += 2;
+        if (constraint_idx < idx + 2) return static_cast<int>(ConstraintFamily::RWMomentum);
+        idx += 2;
+        if (constraint_idx < idx + 1) return static_cast<int>(ConstraintFamily::RWStiction);
+        idx += 1;
+    }
+
+    // Magic actuator saturation: 2 per Magic
+    if (constraint_idx < idx + 2 * num_magic_) {
+        return static_cast<int>(ConstraintFamily::MagicTorqueSat);
+    }
+    idx += 2 * num_magic_;
+
+    return -1;  // out of range
 }
 
 std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
@@ -2352,6 +2437,9 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
     const double scale = (std::isfinite(cnst_cfg.control_limit_scale) && cnst_cfg.control_limit_scale > 0.0)
                              ? cnst_cfg.control_limit_scale
                              : 1.0;
+    const double mom_scale = (std::isfinite(cnst_cfg.rw_momentum_limit_scale) && cnst_cfg.rw_momentum_limit_scale > 0.0)
+                                 ? cnst_cfg.rw_momentum_limit_scale
+                                 : 1.0;
 
     // 3) MTQ control bound Jacobians
     for (int i = 0; i < num_mtq_; ++i) {
@@ -2385,14 +2473,15 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
         c_u(idx, ctrl_idx) = -1.0 / tau_lim;
         idx++;
         
-        const double h_lim = std::max(1e-9, std::abs(getRW(i).momentumMax()));
-        
-        // RW momentum upper bound
-        c_x(idx, state_idx) = 1.0 / h_lim;
+        const double h_lim = mom_scale * std::max(1e-9, std::abs(getRW(i).momentumMax()));
+        const double h_scale = h_lim;   // fractional-violation normalization (see Satellite::constraints)
+
+        // RW momentum upper bound:  ∂c/∂h = 1/h_scale
+        c_x(idx, state_idx) = 1.0 / h_scale;
         idx++;
-        
-        // RW momentum lower bound
-        c_x(idx, state_idx) = -1.0 / h_lim;
+
+        // RW momentum lower bound:  ∂c/∂h = -1/h_scale
+        c_x(idx, state_idx) = -1.0 / h_scale;
         idx++;
         
         // RW stiction: -(u*h)²

@@ -19,7 +19,9 @@ py::tuple trajOpt_py(
 	const Eigen::Vector3d& v0,
 	const Eigen::Ref<const Eigen::VectorXd>& jtime,
 	const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
-	const Eigen::Ref<const Eigen::MatrixXd>& boresight
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& X_warm = Eigen::MatrixXd(),
+	const Eigen::Ref<const Eigen::MatrixXd>& U_warm = Eigen::MatrixXd()
 )
 {
 	const int N = static_cast<int>(jtime.size());
@@ -38,6 +40,17 @@ py::tuple trajOpt_py(
 
 	Eigen::MatrixXd X(state_dim, saltro::limits::MAX_LENGTH_TRAJ);
 	Eigen::MatrixXd U(input_dim, saltro::limits::MAX_LENGTH_TRAJ);
+
+	// Optional caller-provided warm-start trajectory (for coarse-to-fine, etc.).
+	// Copied into the internal buffers; honored only if settings.init_traj.
+	// initcontroller == 4 (warm_start() then preserves these instead of
+	// regenerating). Must already be on this call's N-knot grid.
+	if (X_warm.rows() == state_dim && X_warm.cols() >= N) {
+		X.leftCols(N) = X_warm.leftCols(N);
+	}
+	if (U_warm.rows() == input_dim && U_warm.cols() >= N) {
+		U.leftCols(N) = U_warm.leftCols(N);
+	}
 	const int reduced_state_dim = satellite.reducedStateDim();
 	Eigen::MatrixXd K(input_dim, reduced_state_dim * saltro::limits::MAX_LENGTH_TRAJ);
 	int N_out = N;
@@ -84,8 +97,14 @@ void bind_trajOpt(py::module_& m)
 		py::arg("jtime"),
 		py::arg("q_goal"),
 		py::arg("boresight"),
+		py::arg("X_warm") = Eigen::MatrixXd(),
+		py::arg("U_warm") = Eigen::MatrixXd(),
 		R"doc(
 Run trajectory optimization.
+
+Optional X_warm/U_warm provide a caller-supplied warm-start trajectory on the
+N-knot grid; honored only when settings.init_traj.initcontroller == 4. Used for
+coarse-to-fine: solve coarse, ZOH-resample onto the fine grid, pass here.
 
 Parameters
 ----------
