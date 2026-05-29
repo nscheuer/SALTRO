@@ -10,11 +10,14 @@ right way to hold pointing under an overwhelming body-fixed propulsion torque is
 time-averages to ~zero in inertial space. The wheel then only has to handle the
 residual, so its momentum stays inside budget.
 
-Result (this config, ok=True, fully feasible, unseeded):
-    PE_fin ~ 0.16 deg,  PE_m30 ~ 0.08 deg          (pointing nailed)
-    <wz>_m30 ~ 12.6 deg/s                           (spinning; > 8.6 deg/s min gyro-balance)
-    |h|_max ~ 1.70 mN*m*s  (<= 2.0 limit, w/ margin)
-    MTQ_max ~ 0.56 * u_max,  RW_max ~ 0.56 * u_max  (both feasible)
+Result (this config = 325x MTQ + 3x running angle; ok=True, fully feasible, unseeded):
+    PE_fin ~ 0.12 deg,  PE_ss(t>=300s) ~ 0.115 +- 0.06 deg  (pointing nailed)
+    t(<1 deg) = 151 s  from PE_0 = 179.4 deg (antipode)
+    <wz>_ss ~ 13.8 deg/s  (1.6x the 8.6 deg/s gyro-balance minimum)
+    spin axis = body +z to 0.09 deg (= boresight)
+    |h|_max = 1.70 mN*m*s  (= 0.85 * h_max margin bind)
+    MTQ_max = 0.56 * u_max,  RW_max = 0.56 * u_max  (both feasible)
+    MTQ jag = 5.3% (clean sinusoid at the ~26 s spin period)
 
 WHY IT WORKS (the recipe — every ingredient matters)
 ----------------------------------------------------
@@ -31,26 +34,34 @@ WHY IT WORKS (the recipe — every ingredient matters)
    which only DDP carries. psd_clip drops the one spurious -5e13 RW-RW eigenvalue that
    RK4 cross-stage chaining produces (else it corrupts the step).
 
-3. HIGH penalty_max (1e12).
+3. HIGH penalty_max (1e15, safe ceiling).
    *** OPPOSITE of the no-prop slew, which needs high penalty too but for a different
    reason. *** For the spin, the GN-era finding was that high penalty_max DESTROYS the
    solution (mu swamps the cost -> tumbling), so they capped it at 100. But that left
    MTQ violated ~36x. With FULL NEWTON the landscape changes: high penalty no longer
    tips into the tumbling basin, and it now forces MTQ + RW + |h| all to feasibility
    while the spin survives. The MTQ<->|h| "sharing" tradeoff dissolves at high pmax.
+   Sweep (2026-05): pmax 1e12..1e15 give BIT-IDENTICAL ok=True results -- the AL exits
+   on convergence before the cap binds, so 1e15 is a safe ceiling, not a tuned value.
 
-4. NORMALIZED control weights  (mtq_w = 1/u_mtq_max^2 ~ 3.08,  rw_w = 1/u_rw_max^2 ~ 2.5e7).
-   Bryson scaling. With raw uniform weights the wheel had a ~1e7x cost-per-torque
-   advantage and hoarded momentum; normalizing balances MTQ vs RW usage.
+4. NORMALIZED + HIGH MTQ control weight  (mtq_w = 1000 ~ 325x Bryson;  rw_w = 2.5e7 = 1/u_rw_max^2).
+   Bryson scaling balances MTQ vs RW (raw uniform weights let the wheel's ~1e7x cost-
+   per-torque advantage hoard momentum). The 325x MTQ multiplier is for COMMAND SMOOTHNESS:
+   the peak is constraint-pinned at 0.56 by the |h| margin regardless of weight, but the
+   bulk smooths monotonically (jag 23% -> 5% as weight goes 1x -> 325x). The spin itself
+   is discovered across the full range (1x..325x), so the multiplier is presentational.
 
 5. roll-free angular-velocity cost  (ang_vel_roll_ratio = 0).
    The goal is vec-pointing (2-DOF); roll about the boresight is unconstrained, so the
    spin DOF must not be penalized or the maneuver can't exist.
 
-6. HIGH running = terminal angle weight  (angle = angle_N = 1e7).
+6. HIGH angle weights, RUNNING > TERMINAL  (angle = 3e7 = 3x angle_N = 1e7).
    Pins the boresight anti-ram THROUGHOUT, so the only feasible spin is about the
-   boresight (smearing the body-x prop). High w_ang + low... (now high) pmax is what
-   first produced the unseeded spin.
+   boresight (smearing the body-x prop). 3x running over terminal front-loads the
+   acquisition (PE < 1 deg at 151 s vs 293 s at 1x running) and also pulls the spin
+   toward minimal. The running-angle band is NARROW: 10x running breaks the maneuver
+   (|h| past physical, MTQ 41x over); 30x collapses to no-spin hoarding (|h|=28).
+   3x is the safe ceiling.
 
 7. rw_momentum_limit_scale = 0.85  (the RW-momentum constraint MARGIN).
    Binds |h| at 0.85*h_max = 1.7 mN*m*s, leaving headroom below saturation (the
@@ -69,6 +80,12 @@ HISTORY: see ADCS_wt/SPINNING_MANEUVER_*.md and BACKLOG.md. The GN-era runs got 
 unseeded spin but with MTQ ~36x over (BACKLOG STATUS). Full Newton (validated first on
 the no-prop slew) was the missing antipode-escape + step-taming force the DIAGNOSIS
 predicted (sec 6.3). This file is the converged, fully-feasible culmination.
+
+DISCOVERY ROBUSTNESS: The spinning solution emerges across the full control-weight range
+(mtq_w 1x..325x; jag drops monotonically 23% -> 5%, peak pinned at 0.56 by the |h| margin)
+and across the safe running-angle range (1x..3x of terminal). Ingredients (1-3, 5, 7)
+ENABLE the discovery; the 325x weight + 3x angle here are PRESENTATION choices (command
+smoothness, fast acquisition) -- they do not enable the spin, they only refine its rendering.
 
 RUN:  PYTHONPATH=<Generalized_ADCS> python autonomous_spin.py
 """
@@ -160,14 +177,14 @@ def make_settings():
     p.aug_lag.max_outer_iters = 35
     p.aug_lag.penalty_init = 0.01
     p.aug_lag.penalty_scale = 3.0
-    p.aug_lag.penalty_max = 1e12                               # ingredient 3 (HIGH)
+    p.aug_lag.penalty_max = 1e15                               # ingredient 3 (HIGH; safe ceiling)
     p.reg = RegularizationConfig(); p.reg.reg_init = 1e-3
     p.reg.use_dynamics_hess = 1                                # ingredient 2 (DDP)
     p.reg.psd_clip_quu_ddp = 1                                 # ingredient 2 (psd-clip)
-    p.cost = CostConfig(angle=1e7, angle_N=1e7,               # ingredient 6
+    p.cost = CostConfig(angle=3e7, angle_N=1e7,               # ingredient 6 (3x running for fast acquisition)
                         ang_vel=1e2, ang_vel_N=1e2,
                         control_mult=1.0,
-                        mtq_control_weight=3.08,               # ingredient 4 (1/u_mtq_max^2)
+                        mtq_control_weight=1000.0,             # ingredient 4 (325x Bryson, smooth commands)
                         rw_control_weight=2.5e7,               # ingredient 4 (1/u_rw_max^2)
                         ang_cost_func_type=3, use_cost_hess=1)
     # Set every flag on the C++ objects directly so this file does not depend on the
