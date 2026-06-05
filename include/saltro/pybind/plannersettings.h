@@ -294,6 +294,36 @@ struct LineSearchConfig {
 };
 
 /**
+ * @brief Spike removal configuration.
+ *
+ * Controls the homotopy-artifact spike detection and removal system
+ * that runs after each accepted iLQR forward pass.
+ */
+struct SpikeRemovalConfig {
+    bool enabled = false;
+    int start_at_iter = 2;
+    int max_intervention_iters = 5;
+    int blend_len = 30;
+    int goal_switch_buffer = 15;
+    int min_consecutive = 7;
+    double exit_fudge = 2.0;
+    int min_prior_decrease_knots = 10;
+    double min_spike_ratio = 3.0;
+    /// Maximum spike window size (knots). Larger spikes are skipped.
+    /// 0 = no limit.
+    int max_spike_knots = 0;
+    double kp_q = 0.3;
+    double kd_w = 2.0;
+    /// Relative weight of RW vs MTQ in the PD substitution allocator.
+    /// -1.0 = auto (numRW / (numMTQ + numRW)) — recommended, prevents
+    /// zero-control on RW-only sats and under-uses MTQ on RW-heavy configs.
+    /// 0.0 = MTQ-only; 1.0 = RW equal-priority.
+    double rw_scale = -1.0;
+    double omega_max = 0.0;
+    bool verbose = false;
+};
+
+/**
  * @brief Per-pass optimization configuration.
  *
  * Each ALTRO outer pass may use different cost weights, regularization,
@@ -304,6 +334,7 @@ struct LineSearchConfig {
  * @param ilqr iLQR configuration
  * @param reg Regularization configuration
  * @param linesearch Line search configuration
+ * @param spike_removal Spike detection/removal configuration
  * @param dt Timestep used for discretization
  */
 struct PassConfig {
@@ -312,6 +343,7 @@ struct PassConfig {
     ILQRConfig ilqr;
     RegularizationConfig reg;
     LineSearchConfig linesearch;
+    SpikeRemovalConfig spike_removal;
     double dt = 1.0;
 };
 
