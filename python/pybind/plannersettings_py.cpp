@@ -96,6 +96,24 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("beta1", &LineSearchConfig::beta1)
         .def_readwrite("beta2", &LineSearchConfig::beta2);
 
+    py::class_<SpikeRemovalConfig>(m, "SpikeRemovalConfig")
+        .def(py::init<>())
+        .def_readwrite("enabled", &SpikeRemovalConfig::enabled)
+        .def_readwrite("start_at_iter", &SpikeRemovalConfig::start_at_iter)
+        .def_readwrite("max_intervention_iters", &SpikeRemovalConfig::max_intervention_iters)
+        .def_readwrite("blend_len", &SpikeRemovalConfig::blend_len)
+        .def_readwrite("goal_switch_buffer", &SpikeRemovalConfig::goal_switch_buffer)
+        .def_readwrite("min_consecutive", &SpikeRemovalConfig::min_consecutive)
+        .def_readwrite("exit_fudge", &SpikeRemovalConfig::exit_fudge)
+        .def_readwrite("min_prior_decrease_knots", &SpikeRemovalConfig::min_prior_decrease_knots)
+        .def_readwrite("min_spike_ratio", &SpikeRemovalConfig::min_spike_ratio)
+        .def_readwrite("max_spike_knots", &SpikeRemovalConfig::max_spike_knots)
+        .def_readwrite("kp_q", &SpikeRemovalConfig::kp_q)
+        .def_readwrite("kd_w", &SpikeRemovalConfig::kd_w)
+        .def_readwrite("rw_scale", &SpikeRemovalConfig::rw_scale)
+        .def_readwrite("omega_max", &SpikeRemovalConfig::omega_max)
+        .def_readwrite("verbose", &SpikeRemovalConfig::verbose);
+
     py::class_<PassConfig>(m, "PassConfig")
         .def(py::init<>())
         .def_readwrite("cost", &PassConfig::cost)
@@ -103,6 +121,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ilqr", &PassConfig::ilqr)
         .def_readwrite("reg", &PassConfig::reg)
         .def_readwrite("linesearch", &PassConfig::linesearch)
+        .def_readwrite("spike_removal", &PassConfig::spike_removal)
         .def_readwrite("dt", &PassConfig::dt);
 
     py::class_<TVLQRSettings>(m, "TVLQRSettings")

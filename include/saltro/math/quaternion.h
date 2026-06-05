@@ -41,6 +41,54 @@ Vec4 normalizeQuat(const Vec4& q);
 Mat33 rotationMatrix(const Vec4& q);
 
 /**
+ * @brief Compute the quaternion conjugate.
+ *
+ * For a unit quaternion, the conjugate equals the inverse:
+ * \f[
+ * \mathbf{q}^* = [q_0, -q_1, -q_2, -q_3]^T
+ * \f]
+ *
+ * @param q Input quaternion.
+ * @return Conjugate quaternion.
+ */
+Vec4 quatConj(const Vec4& q);
+
+/**
+ * @brief Hamilton product of two quaternions.
+ *
+ * Computes \f$\mathbf{q}_1 \otimes \mathbf{q}_2\f$ using Hamilton's convention,
+ * scalar-first (\f$q = [q_0, \mathbf{q}_v]^T\f$).  Equivalent to the
+ * left-multiplication matrix form \f$L(\mathbf{q}_1) \mathbf{q}_2\f$ where
+ * \f$L(\mathbf{q}_1) = [\mathbf{q}_1 \mid W(\mathbf{q}_1)]\f$ (4×4).  Implemented
+ * via `findWMat` for the non-scalar columns.
+ *
+ * @param q1 Left-hand quaternion.
+ * @param q2 Right-hand quaternion.
+ * @return Product \f$\mathbf{q}_1 \otimes \mathbf{q}_2\f$ (4-vector).
+ */
+Vec4 quatMult(const Vec4& q1, const Vec4& q2);
+
+/**
+ * @brief Full SO(3) rotation angle from an error quaternion.
+ *
+ * Given an error quaternion \f$\mathbf{q}_e = \mathbf{q}_a^{-1} \otimes \mathbf{q}_b\f$,
+ * returns the full rotation angle in SO(3):
+ * \f[
+ * \theta = 2 \arccos(|q_{e,0}|)
+ * \f]
+ * The absolute value handles the double cover so q and -q give the same angle.
+ *
+ * NOTE: the attitude cost functions in Satellite::stageCost inline
+ * \f$\arccos(|q_{goal} \cdot q|)\f$ — the half-angle — because their analytic
+ * gradient needs the raw dot product.  This helper returns the full rotation
+ * angle, which is the standard convention for user-facing pointing error.
+ *
+ * @param q_err Error quaternion.
+ * @return Full rotation angle in radians, in [0, π].
+ */
+double quatAngle(const Vec4& q_err);
+
+/**
  * @brief Compute the W matrix for quaternion kinematics.
  * 
  * Returns the 4×3 matrix that relates angular velocity to quaternion rate:
