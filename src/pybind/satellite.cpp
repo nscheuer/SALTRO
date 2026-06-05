@@ -2,6 +2,7 @@
 #include <saltro/pybind/disturbances/dragdisturbance.h>
 #include <saltro/pybind/disturbances/ggdisturbance.h>
 #include <saltro/pybind/disturbances/srpdisturbance.h>
+#include <saltro/math/integrators/rk4.h>
 
 #include <stdexcept>
 #include <cmath>
@@ -365,7 +366,34 @@ Satellite::VecX Satellite::dynamics(const VecX& x, const VecX& u, const Disturba
     return xdot;
 }
 
-std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamicsJacobians(const VecX& x, const VecX& u, 
+Satellite::VecX Satellite::dynamicsStepRK4(
+    const VecX& x, const VecX& u, double dt,
+    const DisturbanceConfig& dist,
+    const Vec3& R_eci, const Vec3& B_eci,
+    const Vec3& S_eci, const Vec3& V_eci,
+    int rho
+) const {
+    VecX x_next;
+    rk4_step<VecX>(
+        [&](double /*t*/, const VecX& x_state, VecX& dxdt) {
+            dxdt = dynamics(x_state, u, dist, R_eci, B_eci, S_eci, V_eci, rho);
+        },
+        x, 0.0, dt, x_next
+    );
+
+    // Renormalize quaternion to counteract integration drift.
+    if (x_next.size() >= QUAT_INDEX + 4) {
+        const Vec4 q = x_next.segment<4>(QUAT_INDEX);
+        const double qn = q.norm();
+        if (std::isfinite(qn) && qn > 1e-10) {
+            x_next.segment<4>(QUAT_INDEX) = q / qn;
+        }
+    }
+
+    return x_next;
+}
+
+std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamicsJacobians(const VecX& x, const VecX& u,
                                                    const DisturbanceConfig& dist,
                                                    const Vec3& R_eci, const Vec3& B_eci,
                                                    const Vec3& S_eci, const Vec3& V_eci) const {
