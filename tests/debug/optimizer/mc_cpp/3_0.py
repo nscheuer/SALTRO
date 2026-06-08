@@ -236,6 +236,12 @@ def run_monte_carlo(num_sims=NUM_SIMS, seed=300, rate_std=0.0):
     jtime, q_goal, boresight, r0, v0 = _mission()
     results = []
     last_satellite = None
+    run_length_steps = int(round(HORIZON_SECONDS / DT_SECONDS))
+
+    print(
+        f"{MISSION_NAME}: num_sims={num_sims}, run_length={HORIZON_SECONDS:.0f}s "
+        f"({run_length_steps} steps), dt={DT_SECONDS:.2f}s"
+    )
 
     for run_idx in range(num_sims):
         plannersettings = create_planner_settings()
@@ -264,6 +270,12 @@ def run_monte_carlo(num_sims=NUM_SIMS, seed=300, rate_std=0.0):
             f"run {run_idx + 1:02d}/{num_sims}: "
             f"elapsed={elapsed:.3f}s, w0={np.array2string(x0[:3], precision=4)}"
         )
+
+    avg_elapsed = float(np.mean([result["elapsed"] for result in results])) if results else 0.0
+    print(
+        f"average elapsed={avg_elapsed:.3f}s over {len(results)} runs "
+        f"(run_length={HORIZON_SECONDS:.0f}s, dt={DT_SECONDS:.2f}s)"
+    )
 
     return results, last_satellite, q_goal
 
