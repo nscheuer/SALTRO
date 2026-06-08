@@ -27,13 +27,15 @@ def create_planner_settings():
     plannersettings = saltro_py.PlannerSettings()
 
     plannersettings.init_traj.initcontroller = 2
+    plannersettings.constraints.control_limit_scale = 1.0
+    plannersettings.constraints.sun_limit_angle = 0.0
 
     plannersettings.num_passes = 1
     plannersettings.passes[0].dt = DT_SECONDS
     plannersettings.passes[0].ilqr.cost_tol = 1e-5
     plannersettings.passes[0].ilqr.max_iters = 20
 
-    plannersettings.passes[0].auglag.max_outer_iters = 20
+    plannersettings.passes[0].auglag.max_outer_iters = 30
     plannersettings.passes[0].auglag.constraint_tol = 1e-3
 
     cost = plannersettings.passes[0].cost
@@ -42,7 +44,7 @@ def create_planner_settings():
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
-    cost.mtq_control_weight = 1e-1
+    cost.mtq_control_weight = 1.0
     cost.rw_control_weight = 1.0
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
