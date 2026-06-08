@@ -17,6 +17,10 @@ DT_SECONDS = 10.0
 HORIZON_SECONDS = 5000.0
 NUM_SIMS = 10
 MISSION_NAME = "3 MTQ + 3 RW"
+EARTH_RADIUS_M = 6378136.3
+MU_EARTH_M3_S2 = 3.986004418e14
+MIN_ALTITUDE_M = 400e3
+MAX_ALTITUDE_M = 600e3
 
 
 def create_planner_settings():
@@ -110,15 +114,31 @@ def _canonicalize_quaternions(X):
     return X
 
 
+def _random_unit_vector(rng):
+    vec = rng.normal(size=3)
+    return vec / np.linalg.norm(vec)
+
+
+def _random_quaternion(rng):
+    q = rng.normal(size=4)
+    q /= np.linalg.norm(q)
+    if q[0] < 0.0:
+        q *= -1.0
+    return q
+
+
 def _common_stack(arrays):
     n = min(arr.shape[1] for arr in arrays)
     return np.stack([arr[:, :n] for arr in arrays], axis=0)
 
 
-def _series(results, num_mtq, num_rw, q_goal):
+def _series(results, num_mtq, num_rw):
     Xs = _common_stack([_canonicalize_quaternions(result["X"]) for result in results])
     Us = _common_stack([result["U"] for result in results])
-    pointing = np.stack([_pointing_error_deg(Xs[i], q_goal) for i in range(Xs.shape[0])], axis=0)[:, None, :]
+    pointing = np.stack(
+        [_pointing_error_deg(Xs[i], results[i]["q_goal"]) for i in range(Xs.shape[0])],
+        axis=0,
+    )[:, None, :]
 
     series = [
         ("Quaternion", Xs[:, 3:7, :], ["q0", "q1", "q2", "q3"], "q", DT_SECONDS),
@@ -135,12 +155,12 @@ def _series(results, num_mtq, num_rw, q_goal):
     return series
 
 
-def _plot_spaghetti(results, satellite, q_goal, title):
+def _plot_spaghetti(results, satellite, title):
     import matplotlib.pyplot as plt
 
     num_mtq = _count(satellite, "numMTQ")
     num_rw = _count(satellite, "numRW")
-    series = _series(results, num_mtq, num_rw, q_goal)
+    series = _series(results, num_mtq, num_rw)
     fig, axes = plt.subplots(3, 2, figsize=(14, 12), constrained_layout=True)
     axes = axes.ravel()
 
@@ -169,12 +189,12 @@ def _plot_spaghetti(results, satellite, q_goal, title):
     return fig
 
 
-def _plot_mean_sigma(results, satellite, q_goal, title):
+def _plot_mean_sigma(results, satellite, title):
     import matplotlib.pyplot as plt
 
     num_mtq = _count(satellite, "numMTQ")
     num_rw = _count(satellite, "numRW")
-    series = _series(results, num_mtq, num_rw, q_goal)
+    series = _series(results, num_mtq, num_rw)
     fig, axes = plt.subplots(3, 2, figsize=(14, 12), constrained_layout=True)
     axes = axes.ravel()
 
@@ -206,34 +226,39 @@ def _plot_mean_sigma(results, satellite, q_goal, title):
     return fig
 
 
-def _mission():
+def _mission(rng):
     jtime = np.array([0.22, 0.22 + HORIZON_SECONDS / (36525.0 * 86400.0)])
-    q_goal = np.array([
-        [np.sqrt(2.0) / 2.0, np.sqrt(2.0) / 2.0],
-        [0.0, 0.0],
-        [0.0, 0.0],
-        [np.sqrt(2.0) / 2.0, np.sqrt(2.0) / 2.0],
-    ])
+    q_goal_final = _random_quaternion(rng)
+    q_goal = np.column_stack((q_goal_final, q_goal_final))
     boresight = np.array([
         [1.0, 1.0],
         [0.0, 0.0],
         [0.0, 0.0],
     ])
-    r0 = np.array([7000e3, 0.0, 0.0])
-    v0 = np.array([0.0, 7.5e3, 0.0])
+    altitude_m = rng.uniform(MIN_ALTITUDE_M, MAX_ALTITUDE_M)
+    orbit_radius_m = EARTH_RADIUS_M + altitude_m
+    r_hat = _random_unit_vector(rng)
+    tangent_seed = _random_unit_vector(rng)
+    v_hat = np.cross(r_hat, tangent_seed)
+    while np.linalg.norm(v_hat) < 1e-8:
+        tangent_seed = _random_unit_vector(rng)
+        v_hat = np.cross(r_hat, tangent_seed)
+    v_hat /= np.linalg.norm(v_hat)
+    circular_speed = np.sqrt(MU_EARTH_M3_S2 / orbit_radius_m)
+    r0 = orbit_radius_m * r_hat
+    v0 = circular_speed * v_hat
     return jtime, q_goal, boresight, r0, v0
 
 
 def _initial_state(rng, num_rw, rate_std):
     w0 = rng.normal(0.0, rate_std, size=3)
-    q0 = np.array([1.0, 0.0, 0.0, 0.0])
+    q0 = _random_quaternion(rng)
     h0 = np.zeros(num_rw)
     return np.hstack((w0, q0, h0))
 
 
 def run_monte_carlo(num_sims=NUM_SIMS, seed=330, rate_std=0.0):
     rng = np.random.default_rng(seed)
-    jtime, q_goal, boresight, r0, v0 = _mission()
     results = []
     last_satellite = None
     run_length_steps = int(round(HORIZON_SECONDS / DT_SECONDS))
@@ -244,6 +269,7 @@ def run_monte_carlo(num_sims=NUM_SIMS, seed=330, rate_std=0.0):
     )
 
     for run_idx in range(num_sims):
+        jtime, q_goal, boresight, r0, v0 = _mission(rng)
         plannersettings = create_planner_settings()
         satellite = create_satellite(plannersettings)
         num_rw = _count(satellite, "numRW")
@@ -264,11 +290,23 @@ def run_monte_carlo(num_sims=NUM_SIMS, seed=330, rate_std=0.0):
         if not ok:
             raise RuntimeError(f"trajOpt failed on run {run_idx + 1}/{num_sims}")
 
-        results.append({"X": np.asarray(X), "U": np.asarray(U), "x0": x0, "elapsed": elapsed})
+        results.append(
+            {
+                "X": np.asarray(X),
+                "U": np.asarray(U),
+                "x0": x0,
+                "elapsed": elapsed,
+                "q_goal": q_goal,
+                "r0": r0,
+                "v0": v0,
+            }
+        )
         last_satellite = satellite
+        altitude_km = (np.linalg.norm(r0) - EARTH_RADIUS_M) / 1e3
         print(
             f"run {run_idx + 1:02d}/{num_sims}: "
-            f"elapsed={elapsed:.3f}s, w0={np.array2string(x0[:3], precision=4)}"
+            f"elapsed={elapsed:.3f}s, alt={altitude_km:.1f}km, "
+            f"w0={np.array2string(x0[:3], precision=4)}"
         )
 
     avg_elapsed = float(np.mean([result["elapsed"] for result in results])) if results else 0.0
@@ -277,7 +315,7 @@ def run_monte_carlo(num_sims=NUM_SIMS, seed=330, rate_std=0.0):
         f"(run_length={HORIZON_SECONDS:.0f}s, dt={DT_SECONDS:.2f}s)"
     )
 
-    return results, last_satellite, q_goal
+    return results, last_satellite
 
 
 def parse_args():
@@ -297,11 +335,11 @@ def main():
 
         matplotlib.use("Agg")
 
-    results, satellite, q_goal = run_monte_carlo(args.num_sims, args.seed, args.rate_std)
-    title = f"{MISSION_NAME}, 90 deg slew, {HORIZON_SECONDS:.0f}s horizon, dt={DT_SECONDS:.0f}s"
+    results, satellite = run_monte_carlo(args.num_sims, args.seed, args.rate_std)
+    title = f"{MISSION_NAME}, random circular LEO and attitudes, {HORIZON_SECONDS:.0f}s horizon, dt={DT_SECONDS:.0f}s"
     figs = [
-        _plot_spaghetti(results, satellite, q_goal, title),
-        _plot_mean_sigma(results, satellite, q_goal, title),
+        _plot_spaghetti(results, satellite, title),
+        _plot_mean_sigma(results, satellite, title),
     ]
 
     if args.save_dir is not None:
