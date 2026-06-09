@@ -588,6 +588,132 @@ TEST_CASE("Invalid auglag.penalty_scale - one", "[plannersettings][validation][a
     REQUIRE(error_msg == "auglag.penalty_scale invalid");
 }
 
+TEST_CASE("Valid auglag per-family penalty vectors - empty", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.penalty_init_per_family.clear();
+    settings.passes[0].auglag.penalty_max_per_family.clear();
+    settings.passes[0].auglag.penalty_scale_per_family.clear();
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Valid auglag per-family penalty vectors - length NumFamilies", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    const size_t num_families = static_cast<size_t>(ConstraintFamily::NumFamilies);
+    settings.passes[0].auglag.penalty_init_per_family.assign(num_families, 1e-1);
+    settings.passes[0].auglag.penalty_max_per_family.assign(num_families, 1e8);
+    settings.passes[0].auglag.penalty_scale_per_family.assign(num_families, 10.0);
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Invalid auglag.penalty_init_per_family - wrong length", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.penalty_init_per_family.assign(3, 1e-1);
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.penalty_init_per_family invalid");
+}
+
+TEST_CASE("Invalid auglag.penalty_max_per_family - wrong length", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.penalty_max_per_family.assign(
+        static_cast<size_t>(ConstraintFamily::NumFamilies) + 1, 1e8);
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.penalty_max_per_family invalid");
+}
+
+TEST_CASE("Invalid auglag.penalty_scale_per_family - wrong length", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.penalty_scale_per_family.assign(1, 10.0);
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.penalty_scale_per_family invalid");
+}
+
+TEST_CASE("Invalid auglag.penalty_init_per_family - zero entry", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.penalty_init_per_family.assign(
+        static_cast<size_t>(ConstraintFamily::NumFamilies), 1e-1);
+    settings.passes[0].auglag.penalty_init_per_family[4] = 0.0;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.penalty_init_per_family invalid");
+}
+
+TEST_CASE("Invalid auglag.penalty_max_per_family - negative entry", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.penalty_max_per_family.assign(
+        static_cast<size_t>(ConstraintFamily::NumFamilies), 1e8);
+    settings.passes[0].auglag.penalty_max_per_family[0] = -1.0;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.penalty_max_per_family invalid");
+}
+
+TEST_CASE("Invalid auglag.penalty_scale_per_family - NaN entry", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.penalty_scale_per_family.assign(
+        static_cast<size_t>(ConstraintFamily::NumFamilies), 10.0);
+    settings.passes[0].auglag.penalty_scale_per_family[6] = std::numeric_limits<double>::quiet_NaN();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.penalty_scale_per_family invalid");
+}
+
+TEST_CASE("Invalid auglag.penalty_init_per_family - infinity entry", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.penalty_init_per_family.assign(
+        static_cast<size_t>(ConstraintFamily::NumFamilies), 1e-1);
+    settings.passes[0].auglag.penalty_init_per_family[2] = std::numeric_limits<double>::infinity();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.penalty_init_per_family invalid");
+}
+
+TEST_CASE("Valid auglag.family_contraction_ratio - zero, positive, negative", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    settings.passes[0].auglag.family_contraction_ratio = 0.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+
+    settings.passes[0].auglag.family_contraction_ratio = 0.5;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+
+    // Negative disables conditional ramping (same as zero) and is allowed.
+    settings.passes[0].auglag.family_contraction_ratio = -1.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Invalid auglag.family_contraction_ratio - NaN", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.family_contraction_ratio = std::numeric_limits<double>::quiet_NaN();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.family_contraction_ratio invalid");
+}
+
+TEST_CASE("Invalid auglag.family_contraction_ratio - infinity", "[plannersettings][validation][auglag][per_family]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.family_contraction_ratio = std::numeric_limits<double>::infinity();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.family_contraction_ratio invalid");
+}
+
 TEST_CASE("Invalid auglag.constraint_tol - negative", "[plannersettings][validation][auglag]") {
     PlannerSettings settings = validSettings();
     settings.passes[0].auglag.constraint_tol = -0.1;
