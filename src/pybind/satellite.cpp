@@ -1157,7 +1157,9 @@ AngCostShape angCostShape(double c, int type) {
         // NOTE: type 4 ((1-c)²) was removed: it is exactly type 1 with the
         // constant 2 absorbed into the angle weight. Migrate by using type 1
         // (½(1-c)²) with doubled angle weight.
-        default: return { std::acos(c), -1.0 / s, -c / (omc2 * s) };
+        // Unreachable for validated settings (validation rejects types
+        // outside {0,1,2,3}); throw instead of silently running acos.
+        default: throw invalid_argument("ang_cost_func_type invalid");
     }
 }
 
@@ -1275,9 +1277,8 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
             // NOTE: type 4 ((1-d)²) was removed: it is exactly type 1 with the
             // constant 2 absorbed into the angle weight. Migrate by using type 1
             // (0.5*(1-d)²) with doubled angle weight.
-            default:
-                ang_cost = std::acos(qdot_aligned);
-                break;
+            // Unreachable for validated settings; no silent acos fallback.
+            default: throw invalid_argument("ang_cost_func_type invalid");
         }
     }
 
@@ -1629,9 +1630,8 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 break;
             }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
-            default:
-                d_ang_cost_dqdot = -1.0 / std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
-                break;
+            // Unreachable for validated settings; no silent acos fallback.
+            default: throw invalid_argument("ang_cost_func_type invalid");
         }
 
         // ∂(qdot)/∂q where qdot = q_goal · q  →  ∂(qdot)/∂q = q_goal (as col).
@@ -1910,9 +1910,8 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 break;
             }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
-            default:
-                d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
-                break;
+            // Unreachable for validated settings; no silent acos fallback.
+            default: throw invalid_argument("ang_cost_func_type invalid");
         }
         lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) += w_ang_eff * d2h_dd2
             * (q_goal_aligned * q_goal_aligned.transpose());
@@ -1928,7 +1927,8 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 break;
             }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
-            default: dh_dd = -1.0 / sqrt_omd2; break;
+            // Unreachable for validated settings; no silent acos fallback.
+            default: throw invalid_argument("ang_cost_func_type invalid");
         }
         // Quat mode: PwA correction always applied (it's the manifold-
         // curvature term, PSD when f'·d < 0 which is the aligned-hemisphere
