@@ -92,7 +92,8 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("reg_min_cond", &RegularizationConfig::reg_min_cond)
         .def_readwrite("rand_add_ratio", &RegularizationConfig::rand_add_ratio)
         .def_readwrite("use_dynamics_hess", &RegularizationConfig::use_dynamics_hess)
-        .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess);
+        .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess)
+        .def_readwrite("psd_clamp_lxx", &RegularizationConfig::psd_clamp_lxx);
 
     py::class_<LineSearchConfig>(m, "LineSearchConfig")
         .def(py::init<>())

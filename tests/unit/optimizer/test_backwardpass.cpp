@@ -601,3 +601,107 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass K and d have consistent nor
 		REQUIRE(dk_norm < 1e6);
 	}
 }
+
+TEST_CASE_METHOD(BackwardPassFixture, "backward_pass psd_clamp_lxx diagnostic flag", "[backward_pass][psd_clamp_lxx]") {
+	// psd_clamp_lxx is a TESTING/DIAGNOSTIC knob (default false). This test
+	// guards:
+	//  1. Regression: with the flag at its default (untouched settings) the
+	//     result is bitwise-identical to the flag explicitly set to false.
+	//  2. Flag on, well-conditioned problem: backward pass still succeeds
+	//     and results stay finite.
+	//  3. Flag on, indefinite-lxx scenario (analytic cost Hessian with the
+	//     concave raw-acos shape, heavy stage angle weight, large attitude
+	//     error): backward pass succeeds and results stay finite.
+	constexpr int N_test = 5;
+
+	PlannerSettings settings_test = settings;
+	settings_test.num_passes = 1;
+	settings_test.passes[0].dt = 0.5;
+
+	Satellite satellite_test(
+		Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal(), settings_test
+	);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitX(), 0.2);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitY(), 0.2);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitZ(), 0.2);
+	satellite_test.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+	satellite_test.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+	satellite_test.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+	Eigen::MatrixXd X(satellite_test.stateDim(), N_test);
+	Eigen::MatrixXd U(satellite_test.controlDim(), N_test - 1);
+	Eigen::MatrixXd R_test(3, N_test);
+	Eigen::MatrixXd V_test(3, N_test);
+	Eigen::MatrixXd B_test(3, N_test);
+	Eigen::MatrixXd S_test(3, N_test);
+	Eigen::MatrixXd rho_test(1, N_test);
+	Eigen::MatrixXd boresight_test(3, N_test);
+
+	// Deterministic trajectory (no Random) so repeated runs are comparable.
+	for (int k = 0; k < N_test; ++k) {
+		X.col(k) = x0;
+		if (k < N_test - 1) U.col(k).setZero();
+
+		R_test.col(k) = Eigen::Vector3d(7000e3, 0.0, 0.0);
+		V_test.col(k) = Eigen::Vector3d(0.0, 7500.0, 0.0);
+		B_test.col(k) = Eigen::Vector3d(2.5e-5, -1.5e-5, 3.0e-5);
+		S_test.col(k) = Eigen::Vector3d(1.0, 0.1, -0.05).normalized();
+		rho_test(0, k) = 0.0;
+		boresight_test.col(k) = Eigen::Vector3d::UnitX();
+	}
+
+	// Quaternion attitude target 120 deg about x away from the (identity)
+	// state quaternion, so d = q_goal . q = 0.5 and the raw-acos shape
+	// (type 2) has strongly negative curvature f''(d) < 0.
+	Eigen::Vector4d attitude_target_test(0.5, std::sqrt(3.0) / 2.0, 0.0, 0.0);
+	Eigen::MatrixXd attitude_target_test_traj = makeAttitudeTraj(attitude_target_test, N_test);
+
+	const int nu_t = satellite_test.controlDim();
+	const int nxr_t = satellite_test.reducedStateDim();
+
+	auto runBP = [&](bool set_flag, bool flag_value, bool indefinite_cost,
+	                 std::vector<Eigen::MatrixXd>& K, std::vector<Eigen::VectorXd>& d) {
+		PlannerSettings s = settings_test;
+		if (set_flag) {
+			s.passes[0].reg.psd_clamp_lxx = flag_value;
+		}
+		if (indefinite_cost) {
+			s.passes[0].cost.use_cost_hess = true;
+			s.passes[0].cost.ang_cost_func_type = 2;  // raw acos: concave in d
+			s.passes[0].cost.angle = 1e5;             // heavy stage angle weight
+			s.passes[0].cost.angle_N = 0.0;           // keep terminal P_N PSD (clamp covers stage lxx only)
+		}
+		K.assign(N_test - 1, Eigen::MatrixXd::Zero(nu_t, nxr_t));
+		d.assign(N_test - 1, Eigen::VectorXd::Zero(nu_t));
+		Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
+		return optimizer::backwardPass(
+			satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test, boresight_test, attitude_target_test_traj, s, s.passes[0].reg.reg_init, K, d, deltaV
+		);
+	};
+
+	// 1. Regression guard: default flag (untouched RegularizationConfig)
+	//    must be bitwise-identical to flag explicitly off.
+	std::vector<Eigen::MatrixXd> K_default, K_off, K_on, K_diag;
+	std::vector<Eigen::VectorXd> d_default, d_off, d_on, d_diag;
+
+	REQUIRE(runBP(false, false, false, K_default, d_default));
+	REQUIRE(runBP(true, false, false, K_off, d_off));
+	for (int k = 0; k < N_test - 1; ++k) {
+		REQUIRE((K_default[k].array() == K_off[k].array()).all());
+		REQUIRE((d_default[k].array() == d_off[k].array()).all());
+	}
+
+	// 2. Flag on, well-conditioned problem: succeeds, finite.
+	REQUIRE(runBP(true, true, false, K_on, d_on));
+	for (int k = 0; k < N_test - 1; ++k) {
+		REQUIRE(K_on[k].allFinite());
+		REQUIRE(d_on[k].allFinite());
+	}
+
+	// 3. Flag on, indefinite-lxx scenario: succeeds, finite.
+	REQUIRE(runBP(true, true, true, K_diag, d_diag));
+	for (int k = 0; k < N_test - 1; ++k) {
+		REQUIRE(K_diag[k].allFinite());
+		REQUIRE(d_diag[k].allFinite());
+	}
+}

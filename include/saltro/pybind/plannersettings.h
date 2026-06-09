@@ -339,6 +339,13 @@ struct ILQRConfig {
  *
  * @param use_dynamics_hess Use second derivatives of dynamics
  * @param use_constraint_hess Use second derivatives of constraints
+ * @param psd_clamp_lxx TESTING/DIAGNOSTIC aid only -- NOT recommended for
+ *        production. When true, the backward pass eigen-clamps each stage
+ *        cost Hessian lxx to PSD (negative eigenvalues zeroed). Useful to
+ *        prove that an indefinite cost Hessian is the culprit when a solve
+ *        fails, but it runs an eigendecomposition per knot (slow) and masks
+ *        model problems rather than fixing them. Default false; when false
+ *        the backward pass is bitwise-identical to the unflagged code.
  */
 struct RegularizationConfig {
     double reg_init = 1e-2;
@@ -352,6 +359,7 @@ struct RegularizationConfig {
 
     bool use_dynamics_hess = false;
     bool use_constraint_hess = false;
+    bool psd_clamp_lxx = false;
 };
 
 /**
