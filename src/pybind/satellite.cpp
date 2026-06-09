@@ -2799,6 +2799,39 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     return c;
 }
 
+int Satellite::constraintFamily(int constraint_idx, bool is_terminal) const {
+    // Mirrors the layout in Satellite::constraints().
+    // Always present (k=N-1 stops here):
+    if (constraint_idx == 0) return static_cast<int>(ConstraintFamily::AngularVelocity);
+    if (constraint_idx == 1) return static_cast<int>(ConstraintFamily::SunAvoidance);
+    if (is_terminal) return -1;
+
+    int idx = 2;
+    // MTQ saturation: 2 per MTQ (upper, lower)
+    if (constraint_idx < idx + 2 * num_mtq_) {
+        return static_cast<int>(ConstraintFamily::MTQSaturation);
+    }
+    idx += 2 * num_mtq_;
+
+    // RW block: per RW, 2 torque-sat + 2 momentum-bound + 1 stiction = 5 constraints
+    for (int i = 0; i < num_rw_; ++i) {
+        if (constraint_idx < idx + 2) return static_cast<int>(ConstraintFamily::RWTorqueSat);
+        idx += 2;
+        if (constraint_idx < idx + 2) return static_cast<int>(ConstraintFamily::RWMomentum);
+        idx += 2;
+        if (constraint_idx < idx + 1) return static_cast<int>(ConstraintFamily::RWStiction);
+        idx += 1;
+    }
+
+    // Magic actuator saturation: 2 per Magic
+    if (constraint_idx < idx + 2 * num_magic_) {
+        return static_cast<int>(ConstraintFamily::MagicTorqueSat);
+    }
+    idx += 2 * num_magic_;
+
+    return -1;  // out of range
+}
+
 std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
     int k, int N, const VecX& x, const VecX& u,
     const Vec3& sun_eci, const ConstraintConfig& cnst_cfg) const {
