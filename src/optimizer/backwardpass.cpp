@@ -305,7 +305,8 @@ bool backwardPass(
 			}
 		}
 		
-		// Clamp lxx to PSD: non-convex cost functions (e.g. ang_cost_func_type=4)
+		// Clamp lxx to PSD: non-convex cost functions (e.g. ang_cost_func_type=2,
+		// raw acos, which is concave in d)
 		// can produce indefinite Hessians whose negative eigenvalues compound
 		// through the Riccati recursion, making P_k and then Q_uu indefinite.
 		// {

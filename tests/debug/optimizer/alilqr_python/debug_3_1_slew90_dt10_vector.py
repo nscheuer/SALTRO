@@ -30,7 +30,7 @@ def create_planner_settings():
 
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
-    cost.angle = 1e2
+    cost.angle = 2e2  # doubled: was 1e2 with type 4 = (1-c)^2 == 2x type 1
     cost.ang_vel = 1e1
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
@@ -43,11 +43,14 @@ def create_planner_settings():
     cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
-    cost.angle_N = 1e2
+    cost.angle_N = 2e2  # doubled: was 1e2 with type 4
     cost.ang_vel_N = 1e1
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 4
+    # Bounded-curvature cost (type 1 = 0.5*(1-c)^2, weights doubled to match the
+    # removed type 4 = (1-c)^2): unlike acos^2 (type 3) it has no antipodal
+    # curvature blow-up, so a >90 deg slew stays well-conditioned.
+    cost.ang_cost_func_type = 1
     cost.use_cost_hess = True
     cost.cost_hess_gauss_newton = True
 

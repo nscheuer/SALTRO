@@ -1137,8 +1137,8 @@ namespace {
 // ===========================================================================
 
 // Cost shape f(c) and its first two derivatives w.r.t. c.
-//   0: 1−c    1: ½(1−c)²    2: acos(c)    3: ½·acos(c)²    4: (1−c)²
-// fpp ≥ 0 for types 0,1,3,4, so the Gauss-Newton Hessian f''·g·gᵀ is PSD by
+//   0: 1−c    1: ½(1−c)²    2: acos(c)    3: ½·acos(c)²
+// fpp ≥ 0 for types 0,1,3, so the Gauss-Newton Hessian f''·g·gᵀ is PSD by
 // construction; type 2 (acos) is the exception (fpp < 0 for c > 0).
 struct AngCostShape { double f, fp, fpp; };
 
@@ -1154,7 +1154,9 @@ AngCostShape angCostShape(double c, int type) {
             return { 0.5 * phi * phi, -phi / s,
                      1.0 / omc2 - phi * c / (omc2 * s) };
         }
-        case 4: { const double e = 1.0 - c; return { e * e, -2.0 * e, 2.0 }; }
+        // NOTE: type 4 ((1-c)²) was removed: it is exactly type 1 with the
+        // constant 2 absorbed into the angle weight. Migrate by using type 1
+        // (½(1-c)²) with doubled angle weight.
         default: return { std::acos(c), -1.0 / s, -c / (omc2 * s) };
     }
 }
@@ -1270,16 +1272,9 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                 ang_cost = 0.5 * phi * phi;
                 break;
             }
-            case 4: {
-                // (1-d)² with d = qdot_aligned ∈ [0,1] (post-hemisphere-flip).
-                // Matches vec mode case 4 shape. Convex Hessian (f''=2),
-                // f'(d) = -2(1-d). Replaces former `1-d²` which had concave
-                // Hessian (f''=-2) and zero gradient at d=0 (90° error) —
-                // unusable in practice.
-                const double err = 1.0 - qdot_aligned;
-                ang_cost = err * err;
-                break;
-            }
+            // NOTE: type 4 ((1-d)²) was removed: it is exactly type 1 with the
+            // constant 2 absorbed into the angle weight. Migrate by using type 1
+            // (0.5*(1-d)²) with doubled angle weight.
             default:
                 ang_cost = std::acos(qdot_aligned);
                 break;
@@ -1633,9 +1628,7 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 d_ang_cost_dqdot = -phi / denom;  // Always negative
                 break;
             }
-            case 4:  // ang_cost = (1 - |qdot|)^2
-                d_ang_cost_dqdot = -2.0 * (1.0 - qdot_aligned);
-                break;
+            // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             default:
                 d_ang_cost_dqdot = -1.0 / std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
                 break;
@@ -1869,7 +1862,7 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         //
         //   Gauss-Newton:  H = f''(c)·(∂c/∂θ)(∂c/∂θ)ᵀ
         //                  — a rank-1 outer product, PSD by construction
-        //                    wherever f'' ≥ 0 (types 0,1,3,4).
+        //                    wherever f'' ≥ 0 (types 0,1,3).
         //   Full (GN off): H += f'(c)·∂²c/∂θ²
         //                  — the chain-rule term.  ∂²c/∂θ² (geom.ddc) already
         //                    carries the Planning-with-Attitude manifold
@@ -1916,9 +1909,7 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 d2h_dd2 = 1.0 / one_minus_d2 - phi * d / (one_minus_d2 * sqrt_omd2);
                 break;
             }
-            case 4:
-                d2h_dd2 = 2.0;  // h = (1-d)² → d²h/dd² = 2 (was -2 for old 1-d² form)
-                break;
+            // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             default:
                 d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
                 break;
@@ -1936,7 +1927,7 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 dh_dd = -phi2 / sqrt_omd2;
                 break;
             }
-            case 4: dh_dd = -2.0 * (1.0 - d); break;  // h = (1-d)² → dh/dd = -2(1-d)
+            // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             default: dh_dd = -1.0 / sqrt_omd2; break;
         }
         // Quat mode: PwA correction always applied (it's the manifold-
