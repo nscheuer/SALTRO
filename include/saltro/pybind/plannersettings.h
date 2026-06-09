@@ -140,7 +140,18 @@ struct ConstraintConfig {
  * @param ang_vel_mag_N Terminal angular velocity magnitude weight
  * @param ang_vel_err_dir_N Terminal angular velocity direction weight
  *
- * @param ang_cost_func_type Type of orientation error cost function used
+ * @param ang_cost_func_type Type of orientation error cost function used,
+ *        as a shape f(d) of the inner alignment scalar d -- in quaternion
+ *        mode d = q_goal . q (post hemisphere-alignment, so d in [0, 1]);
+ *        in vector-pointing mode d = c = bs . R(q)^T r_hat (cosine of the
+ *        boresight-to-target angle):
+ *        - 0: 1 - d            (linear)
+ *        - 1: 0.5 * (1 - d)^2  (quadratic, convex)
+ *        - 2: acos(d)          (raw angle)
+ *        - 3: 0.5 * acos(d)^2  (squared angle)
+ *        Type 4 ((1 - d)^2) was REMOVED: it is exactly type 1 with the
+ *        constant 2 absorbed into the angle weight. Migrate by using type 1
+ *        with doubled angle weights (2 * 0.5*(1-d)^2 == (1-d)^2).
  * @param use_cost_hess If true, use analytic Hessians of cost
  */
 struct CostConfig {
