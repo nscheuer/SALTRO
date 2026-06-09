@@ -646,13 +646,12 @@ TEST_CASE("Invalid ilqr.grad_tol - negative", "[plannersettings][validation][ilq
     REQUIRE(error_msg == "ilqr.grad_tol invalid");
 }
 
-TEST_CASE("Invalid ilqr.grad_tol - zero", "[plannersettings][validation][ilqr]") {
+TEST_CASE("Valid ilqr.grad_tol - zero disables gradient check", "[plannersettings][validation][ilqr]") {
     PlannerSettings settings = validSettings();
     settings.passes[0].ilqr.grad_tol = 0.0;
     std::string error_msg;
-    
-    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "ilqr.grad_tol invalid");
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
 }
 
 TEST_CASE("Invalid ilqr.cost_tol - negative", "[plannersettings][validation][ilqr]") {
