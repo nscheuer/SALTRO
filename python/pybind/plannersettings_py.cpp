@@ -94,7 +94,8 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("rand_add_ratio", &RegularizationConfig::rand_add_ratio)
         .def_readwrite("use_dynamics_hess", &RegularizationConfig::use_dynamics_hess)
         .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess)
-        .def_readwrite("psd_clip_quu_ddp", &RegularizationConfig::psd_clip_quu_ddp);
+        .def_readwrite("psd_clip_quu_ddp", &RegularizationConfig::psd_clip_quu_ddp)
+        .def_readwrite("psd_clamp_lxx", &RegularizationConfig::psd_clamp_lxx);
 
     py::class_<LineSearchConfig>(m, "LineSearchConfig")
         .def(py::init<>())

@@ -305,18 +305,26 @@ bool backwardPass(
 			}
 		}
 		
-		// Clamp lxx to PSD: non-convex cost functions (e.g. ang_cost_func_type=2,
-		// raw acos, which is concave in d)
-		// can produce indefinite Hessians whose negative eigenvalues compound
-		// through the Riccati recursion, making P_k and then Q_uu indefinite.
-		// {
-		// 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(lxx);
-		// 	Eigen::VectorXd eigvals = eig.eigenvalues();
-		// 	if (eigvals(0) < 0.0) {
-		// 		eigvals = eigvals.cwiseMax(0.0);
-		// 		lxx = eig.eigenvectors() * eigvals.asDiagonal() * eig.eigenvectors().transpose();
-		// 	}
-		// }
+		// Optional PSD clamp on lxx (reg.psd_clamp_lxx): non-convex cost
+		// functions (e.g. ang_cost_func_type=2, raw acos, which is concave
+		// in d) can produce indefinite Hessians whose negative eigenvalues
+		// compound through the Riccati recursion, making P_k and then Q_uu
+		// indefinite.
+		//
+		// TESTING/DIAGNOSTIC aid only -- NOT recommended for production.
+		// Turning it on proves that an indefinite cost Hessian is the
+		// culprit when a solve fails, but the eigendecomposition per knot is
+		// slow and clamping masks model problems rather than fixing them.
+		// Default false: the clamp is skipped and behavior is identical to
+		// the unflagged backward pass.
+		if (settings.passes[0].reg.psd_clamp_lxx) {
+			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(lxx);
+			Eigen::VectorXd eigvals = eig.eigenvalues();
+			if (eigvals(0) < 0.0) {
+				eigvals = eigvals.cwiseMax(0.0);
+				lxx = eig.eigenvectors() * eigvals.asDiagonal() * eig.eigenvectors().transpose();
+			}
+		}
 		
 		// Step 3: Compute exact discrete-time dynamics Jacobians using RK4 (full state)
 		Eigen::MatrixXd A_k_full = Eigen::MatrixXd::Zero(nx, nx);
