@@ -20,6 +20,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <Eigen/Dense>
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -375,11 +376,16 @@ TEST_CASE_METHOD(ConstraintFixture,
     "[satellite][constraints][rw_momentum]") {
     auto c = sat.constraints(0, 10, nominalState(), nominalControl(), sunZ(), defaultCnstCfg());
     int rw_start = 2 + 2 * n_mtq();
+    // Momentum constraints normalize by h_scale = max(h_lim, 0.1), not h_lim
+    // (issue #31: floor keeps the AL Hessian bounded for small wheels), so at
+    // zero momentum c = -h_lim / h_scale rather than -1.
+    const double h_scale = std::max(rw_hmax, 0.1);
+    const double expected = -rw_hmax / h_scale;
     for (int i = 0; i < n_rw(); ++i) {
         int upper_idx = rw_start + 5 * i + 2;
         int lower_idx = rw_start + 5 * i + 3;
-        REQUIRE(c(upper_idx) == Catch::Approx(-1.0));
-        REQUIRE(c(lower_idx) == Catch::Approx(-1.0));
+        REQUIRE(c(upper_idx) == Catch::Approx(expected));
+        REQUIRE(c(lower_idx) == Catch::Approx(expected));
     }
 }
 
