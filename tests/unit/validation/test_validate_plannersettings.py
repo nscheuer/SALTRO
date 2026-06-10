@@ -399,24 +399,23 @@ def test_invalid_cost_rw_stic_weight_negative():
     assert error_msg == "cost.rw_stic_weight invalid"
 
 
-def test_invalid_cost_rwh_max_mult_negative():
-    """Negative cost.RWh_max_mult should fail"""
+def test_invalid_cost_rwh_desat_mult_negative():
+    """Negative cost.RWh_desat_mult should fail"""
     settings = valid_settings()
-    settings.passes[0].cost.RWh_max_mult = -0.1
+    settings.passes[0].cost.RWh_desat_mult = -0.1
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
+
     assert not ok
-    assert error_msg == "cost.RWh_max_mult invalid"
+    assert error_msg == "cost.RWh_desat_mult invalid"
 
 
-def test_invalid_cost_rwh_max_mult_exceeds_one():
-    """cost.RWh_max_mult exceeding 1.0 should fail"""
+def test_valid_cost_rwh_desat_mult_above_one():
+    """cost.RWh_desat_mult above 1.0 is allowed (weight scale, not a fraction)"""
     settings = valid_settings()
-    settings.passes[0].cost.RWh_max_mult = 1.1
+    settings.passes[0].cost.RWh_desat_mult = 2.5
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
-    assert not ok
-    assert error_msg == "cost.RWh_max_mult invalid"
+
+    assert ok, error_msg
 
 
 def test_invalid_cost_rwh_stiction_mult_negative():

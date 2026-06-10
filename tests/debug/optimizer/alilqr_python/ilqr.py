@@ -68,7 +68,7 @@ def compute_cost_components(X, U, satellite, attitude_target_traj, boresight, B,
         cfg.magic_control_weight = cost_cfg.magic_control_weight if comp_name == "control" else 0.0
         cfg.rw_AM_weight = cost_cfg.rw_AM_weight if comp_name == "rw_momentum" else 0.0
         cfg.rw_stic_weight = cost_cfg.rw_stic_weight if comp_name == "rw_momentum" else 0.0
-        cfg.RWh_max_mult = cost_cfg.RWh_max_mult if comp_name == "rw_momentum" else 0.0
+        cfg.RWh_desat_mult = cost_cfg.RWh_desat_mult if comp_name == "rw_momentum" else 0.0
         cfg.RWh_stiction_mult = cost_cfg.RWh_stiction_mult if comp_name == "rw_momentum" else 0.0
         cfg.RWh_ok_mult = cost_cfg.RWh_ok_mult if comp_name == "rw_momentum" else 0.0
         cfg.ang_cost_func_type = cost_cfg.ang_cost_func_type

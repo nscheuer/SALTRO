@@ -135,9 +135,30 @@ struct ConstraintConfig {
  * @param rw_AM_weight Reaction wheel angular momentum penalty
  * @param rw_stic_weight Reaction wheel stiction penalty
  *
- * @param RWh_max_mult Multiplier when wheel momentum near saturation
- * @param RWh_stiction_mult Multiplier for stiction region
- * @param RWh_ok_mult Multiplier when wheel is within safe region
+ * @param RWh_ok_mult Knee of the momentum soft cost, as a fraction of h_max
+ *        (default 0.5: free* region below 50% of saturation, steep quadratic
+ *        above it; *free up to the desat term below). The hard ceiling does
+ *        NOT live in this cost -- enforce it with
+ *        ConstraintConfig::rw_momentum_limit_scale (the AL momentum
+ *        constraint), tuned per-family via AugLagConfig. Cost shapes,
+ *        constraint enforces.
+ * @param RWh_desat_mult Gentle desaturation quadratic applied over the whole
+ *        momentum range: 0.5*rw_AM_weight*RWh_desat_mult*(h/h_max)^2. Default
+ *        0 (off). Together with the stiction cost this implements
+ *        bias-momentum parking: the net potential has stable minima at
+ *          h* = (w_stic/h_stic) / (rw_AM_weight*desat/h_max^2 + w_stic/h_stic^2),
+ *        with h_stic = RWh_stiction_mult*h_max, so the wheel idles at a bias
+ *        speed instead of crossing zero. The special case
+ *          rw_stic_weight = rw_AM_weight*RWh_desat_mult*(h_stic/h_max)^2
+ *        parks at h* = h_stic/2. All weights stay independent -- this is a
+ *        tuning recipe, not a coupling.
+ * @param RWh_stiction_mult Stiction band as a fraction of h_max: below
+ *        RWh_stiction_mult*h_max the kinked-quadratic stiction cost pushes
+ *        |h| away from zero (wheels at rest may not restart). Deliberately
+ *        kinked at h = 0: a smoothed peak would inject genuine negative
+ *        curvature and create a zero-gradient point a wheel can sit on; the
+ *        kink contributes no curvature to the quadratic model, and the
+ *        subgradient at exactly h = 0 is 0.
  *
  * @param angle_N Terminal orientation weight
  * @param ang_vel_N Terminal angular velocity weight
@@ -200,9 +221,9 @@ struct CostConfig {
     double rw_AM_weight = 1e4;
     double rw_stic_weight = 1.0;
 
-    double RWh_max_mult = 0.8;
     double RWh_stiction_mult = 0.01;
     double RWh_ok_mult = 0.5;
+    double RWh_desat_mult = 0.0;
 
     /// Terminal weights.  **Principle**: preserve the stage ratios.  If you
     /// set `angle_N` high without matching `ang_vel_N`, the optimizer chases
