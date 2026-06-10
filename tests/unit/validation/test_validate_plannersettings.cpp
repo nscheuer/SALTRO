@@ -375,22 +375,23 @@ TEST_CASE("Invalid cost.rw_stic_weight - negative", "[plannersettings][validatio
     REQUIRE(error_msg == "cost.rw_stic_weight invalid");
 }
 
-TEST_CASE("Invalid cost.RWh_max_mult - negative", "[plannersettings][validation][cost]") {
+TEST_CASE("Invalid cost.RWh_desat_mult - negative", "[plannersettings][validation][cost]") {
     PlannerSettings settings = validSettings();
-    settings.passes[0].cost.RWh_max_mult = -0.1;
+    settings.passes[0].cost.RWh_desat_mult = -0.1;
     std::string error_msg;
     
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "cost.RWh_max_mult invalid");
+    REQUIRE(error_msg == "cost.RWh_desat_mult invalid");
 }
 
-TEST_CASE("Invalid cost.RWh_max_mult - exceeds 1.0", "[plannersettings][validation][cost]") {
+TEST_CASE("Valid cost.RWh_desat_mult - above 1.0 is allowed", "[plannersettings][validation][cost]") {
+    // Unlike the *_mult fraction knobs, desat is a weight scale, not a
+    // fraction of h_max -- values above 1 are legitimate.
     PlannerSettings settings = validSettings();
-    settings.passes[0].cost.RWh_max_mult = 1.1;
+    settings.passes[0].cost.RWh_desat_mult = 2.5;
     std::string error_msg;
     
-    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "cost.RWh_max_mult invalid");
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
 }
 
 TEST_CASE("Invalid cost.RWh_stiction_mult - negative", "[plannersettings][validation][cost]") {

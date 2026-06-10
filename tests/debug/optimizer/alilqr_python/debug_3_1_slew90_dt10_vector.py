@@ -45,7 +45,6 @@ def create_planner_settings():
     # angle Hessian already covers all three q-tangent directions.
     cost.rw_AM_weight = 1e4
     cost.rw_stic_weight = 0.0
-    cost.RWh_max_mult = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.0
     cost.angle_N = 1e2

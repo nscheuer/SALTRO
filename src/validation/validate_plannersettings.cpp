@@ -127,8 +127,8 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
-            if (pass.cost.RWh_max_mult < 0.0 || pass.cost.RWh_max_mult > 1.0 || !std::isfinite(pass.cost.RWh_max_mult)) {
-                error_msg = "cost.RWh_max_mult invalid";
+            if (pass.cost.RWh_desat_mult < 0.0 || !std::isfinite(pass.cost.RWh_desat_mult)) {
+                error_msg = "cost.RWh_desat_mult invalid";
                 return false;
             }
 
