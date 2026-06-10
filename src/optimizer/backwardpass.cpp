@@ -116,7 +116,57 @@ bool backwardPass(
 	
 	Eigen::VectorXd p_k = G_N * p_N_full;
 	Eigen::MatrixXd P_k = G_N * P_N_full * G_N.transpose();
-	
+
+	// Fold the terminal-knot (k = N-1) AL constraint terms into the cost-to-go
+	// seed. The forward-pass merit and the alilqr multiplier update both price
+	// constraints at the terminal knot, so the quadratic model must see them
+	// too; otherwise a terminal violation is an unexplainable merit offset the
+	// line search can never optimize away. There is no control at the terminal
+	// knot (the merit evaluates it with u = 0 and constraints(N-1, N, ...)
+	// drops the actuator rows), so only the state terms enter: c_x^T w into
+	// p_k and the active-set Gauss-Newton mu * c_x c_x^T terms into P_k.
+	// Semantics must match the in-loop AL block below and the FP merit:
+	// lambda gradient always on (signed c); mu terms when c > 0 OR lambda > 0.
+	if (!lambda_aug.empty() && !mu_aug.empty()
+			&& (N - 1) < static_cast<int>(lambda_aug.size())
+			&& (N - 1) < static_cast<int>(mu_aug.size())) {
+		const int kT = N - 1;
+		const Eigen::VectorXd u_zero = Eigen::VectorXd::Zero(satellite.controlDim());
+		const Eigen::Vector3d S_final = S.col(kT);
+		const Eigen::VectorXd c_T = satellite.constraints(kT, N, x_final, u_zero, S_final, cnst_cfg);
+		if (lambda_aug[kT].size() == c_T.size() && mu_aug[kT].size() == c_T.size()) {
+			auto [cT_u, cT_x_full] = satellite.constraintJacobians(kT, N, x_final, u_zero, S_final, cnst_cfg);
+			(void)cT_u;  // No control exists at the terminal knot.
+			const Eigen::MatrixXd c_x = cT_x_full * G_N.transpose();
+
+			Eigen::VectorXd w = Eigen::VectorXd::Zero(c_T.size());
+			for (int i = 0; i < c_T.size(); ++i) {
+				const double li = lambda_aug[kT](i);
+				const double ci = c_T(i);
+				w(i) = li;
+				if (ci > 0.0 || li > 0.0) {
+					w(i) += mu_aug[kT](i) * ci;
+				}
+			}
+			p_k.noalias() += c_x.transpose() * w;
+
+			for (int i = 0; i < c_T.size(); ++i) {
+				if (c_T(i) <= 0.0 && lambda_aug[kT](i) <= 0.0) {
+					continue;
+				}
+				const double mu_i = mu_aug[kT](i);
+				if (!std::isfinite(mu_i) || mu_i <= 0.0) {
+					continue;
+				}
+				const Eigen::VectorXd cx_i = c_x.row(i).transpose();
+				P_k.noalias() += mu_i * (cx_i * cx_i.transpose());
+			}
+			// Keep the seed exactly symmetric (rank-1 updates are symmetric in
+			// exact arithmetic; this guards against numerical asymmetry).
+			P_k = 0.5 * (P_k + Eigen::MatrixXd(P_k.transpose()));
+		}
+	}
+
 	// Linearize with the same disturbance config the forward pass rolls out
 	// (forwardpass.cpp uses settings.disturbances). A default-constructed
 	// config here makes A_k/B_k disagree with the actual rollout whenever any
