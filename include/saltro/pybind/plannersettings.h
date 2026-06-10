@@ -144,7 +144,12 @@ struct ConstraintConfig {
  *        constraint enforces.
  * @param RWh_desat_mult Gentle desaturation quadratic applied over the whole
  *        momentum range: 0.5*rw_AM_weight*RWh_desat_mult*(h/h_max)^2. Default
- *        0 (off). Together with the stiction cost this implements
+ *        0.05, NOT 0: a perfectly flat free band (zero value, gradient AND
+ *        curvature below the knee) lets the first inner solve exploit the
+ *        wheel and over-commit before the AL penalties ramp, which was
+ *        observed to grind the outer loop to MaxOuterIterations on the
+ *        3MTQ+1RW vector-slew case. A small desat keeps the wheel direction
+ *        informed without strangling it. Together with the stiction cost this implements
  *        bias-momentum parking: the net potential has stable minima at
  *          h* = (w_stic/h_stic) / (rw_AM_weight*desat/h_max^2 + w_stic/h_stic^2),
  *        with h_stic = RWh_stiction_mult*h_max, so the wheel idles at a bias
@@ -223,7 +228,7 @@ struct CostConfig {
 
     double RWh_stiction_mult = 0.01;
     double RWh_ok_mult = 0.5;
-    double RWh_desat_mult = 0.0;
+    double RWh_desat_mult = 0.05;
 
     /// Terminal weights.  **Principle**: preserve the stage ratios.  If you
     /// set `angle_N` high without matching `ang_vel_N`, the optimizer chases

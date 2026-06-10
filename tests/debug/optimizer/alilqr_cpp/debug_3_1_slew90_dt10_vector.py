@@ -37,7 +37,8 @@ def create_planner_settings():
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
     cost.RWh_stiction_mult = 0.0
-    cost.RWh_ok_mult = 0.0
+    cost.RWh_ok_mult = 0.5   # free band below 50% h_max (validated: wheel used ~11%)
+    cost.RWh_desat_mult = 0.05  # REQUIRED: flat free band grinds the outer loop (see plannersettings.h)
     cost.angle_N = 1e2
     cost.ang_vel_N = 1e1
     cost.ang_vel_mag_N = 0.0
