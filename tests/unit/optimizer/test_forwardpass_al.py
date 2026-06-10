@@ -57,8 +57,10 @@ def augmented_penalty_total(settings, satellite, X, U, S, lambda_aug, mu_aug):
         mu = np.asarray(mu_aug[k], dtype=float)
         if lam.shape[0] != ck.shape[0] or mu.shape[0] != ck.shape[0]:
             continue
-        ck_pos = np.maximum(0.0, ck)
-        total += float(lam @ ck_pos + 0.5 * np.sum(mu * ck_pos * ck_pos))
+        # Mirror the forward-pass merit exactly: lambda term always active
+        # with signed c; mu penalty when c > 0 OR lambda > 0.
+        warm = (ck > 0.0) | (lam > 0.0)
+        total += float(lam @ ck + 0.5 * np.sum(np.where(warm, mu * ck * ck, 0.0)))
     return total
 
 
