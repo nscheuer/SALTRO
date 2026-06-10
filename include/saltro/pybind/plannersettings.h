@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <cmath>
+#include <vector>
 #include <Eigen/Dense>
 #include <saltro/limits.h>
 
@@ -193,15 +194,47 @@ struct CostConfig {
  * @param total_cost_tol Total cost convergence tolerance
  */
 
+/// Constraint families for per-family AL penalty management.
+/// Each constraint in `Satellite::constraints()` belongs to one family;
+/// the AL outer loop tracks μ and violation contraction per-family rather
+/// than per-(constraint, timestep) so that families with different physical
+/// scales can be enforced at appropriate strengths without one dominating.
+enum class ConstraintFamily : int {
+    AngularVelocity = 0,   ///< (|ω|² - ω_max²)/ω_max²  (vec-pointing: bound mostly for sensor/safety)
+    SunAvoidance    = 1,   ///< sun_body.x() - cos(sun_limit)
+    MTQSaturation   = 2,   ///< |u_mtq| - lim   (clipped physically anyway; AL just keeps optimizer honest)
+    RWTorqueSat     = 3,   ///< |u_rw| - tau_lim
+    RWMomentum      = 4,   ///< |h| - h_max  (the binding constraint for spinning maneuvers; needs tight enforcement)
+    RWStiction      = 5,   ///< -(u·h)²  (always ≤ 0 by construction; vacuous family)
+    MagicTorqueSat  = 6,
+    NumFamilies     = 7,
+};
+
 struct AugLagConfig {
     int max_outer_iters = 30;
 
     double lag_mult_init = 0.0;
     double lag_mult_max = 1e20;
 
+    /// Global AL penalty knobs (used as defaults when per-family overrides are
+    /// empty).
     double penalty_init = 1e-1;
     double penalty_max = 1e16;
     double penalty_scale = 10.0;
+
+    /// Per-family overrides for μ initialization, capping, and ramping. If
+    /// `size() == (int)ConstraintFamily::NumFamilies`, the i-th entry applies
+    /// to family i; otherwise the global scalar above is used for all families.
+    /// Empty by default → fully backward-compatible (single global μ behavior).
+    std::vector<double> penalty_init_per_family;
+    std::vector<double> penalty_max_per_family;
+    std::vector<double> penalty_scale_per_family;
+
+    /// Per-family conditional ramping: if family violation isn't contracting
+    /// (max_c_new > contraction_ratio · max_c_prev), ramp μ_family by scale_family.
+    /// Otherwise leave μ_family alone (avoid over-ramping past feasibility).
+    /// Set ≤ 0 (default) to disable conditional ramping (always ramp every outer iter).
+    double family_contraction_ratio = 0.0;
 
     double constraint_tol = 0.002;
     double total_cost_tol = 1e-2;

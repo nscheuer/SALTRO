@@ -208,6 +208,41 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
+            // Per-family AL penalty overrides: each vector must be empty
+            // (fall back to the scalar above) or exactly NumFamilies long
+            // with finite positive entries.
+            {
+                const size_t num_families = static_cast<size_t>(ConstraintFamily::NumFamilies);
+                const std::vector<double>* per_family_vecs[3] = {
+                    &pass.auglag.penalty_init_per_family,
+                    &pass.auglag.penalty_max_per_family,
+                    &pass.auglag.penalty_scale_per_family,
+                };
+                const char* per_family_errors[3] = {
+                    "auglag.penalty_init_per_family invalid",
+                    "auglag.penalty_max_per_family invalid",
+                    "auglag.penalty_scale_per_family invalid",
+                };
+                for (int v = 0; v < 3; ++v) {
+                    const auto& vec = *per_family_vecs[v];
+                    if (!vec.empty() && vec.size() != num_families) {
+                        error_msg = per_family_errors[v];
+                        return false;
+                    }
+                    for (const double entry : vec) {
+                        if (entry <= 0.0 || !std::isfinite(entry)) {
+                            error_msg = per_family_errors[v];
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            if (!std::isfinite(pass.auglag.family_contraction_ratio)) {
+                error_msg = "auglag.family_contraction_ratio invalid";
+                return false;
+            }
+
             if (pass.auglag.constraint_tol <= 0.0 || !std::isfinite(pass.auglag.constraint_tol)) {
                 error_msg = "auglag.constraint_tol invalid";
                 return false;

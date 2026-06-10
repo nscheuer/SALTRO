@@ -64,6 +64,10 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("penalty_init", &AugLagConfig::penalty_init)
         .def_readwrite("penalty_max", &AugLagConfig::penalty_max)
         .def_readwrite("penalty_scale", &AugLagConfig::penalty_scale)
+        .def_readwrite("penalty_init_per_family", &AugLagConfig::penalty_init_per_family)
+        .def_readwrite("penalty_max_per_family", &AugLagConfig::penalty_max_per_family)
+        .def_readwrite("penalty_scale_per_family", &AugLagConfig::penalty_scale_per_family)
+        .def_readwrite("family_contraction_ratio", &AugLagConfig::family_contraction_ratio)
         .def_readwrite("constraint_tol", &AugLagConfig::constraint_tol)
         .def_readwrite("total_cost_tol", &AugLagConfig::total_cost_tol);
 
