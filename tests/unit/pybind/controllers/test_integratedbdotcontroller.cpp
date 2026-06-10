@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <random>
 
@@ -27,9 +28,40 @@ constexpr int N = static_cast<int>(SIM_SECONDS / DT_SECONDS) + 1;
 constexpr double TUMBLE_STOP_THRESHOLD = 0.5 * DEG2RAD;
 constexpr unsigned SEED = 20260302u;
 
+// std::uniform_real_distribution / std::normal_distribution are
+// implementation-defined: libc++ (macOS) and libstdc++ (Linux CI) draw
+// DIFFERENT sequences from the same mt19937 seed, so this Monte Carlo was
+// silently testing different satellites per platform (and one libc++ draw --
+// 2 MTQ + 1 RW under the constant B field -- cannot reach the detumble
+// threshold: MTQs produce no torque along a constant B, so the parallel
+// component is the lone RW's job). These portable draws make the cases
+// bit-identical everywhere.
+double portableUniform01(std::mt19937& rng) {
+	const std::uint64_t hi = rng();
+	const std::uint64_t lo = rng();
+	const std::uint64_t mantissa = ((hi << 21) ^ lo) & ((1ull << 53) - 1);
+	return static_cast<double>(mantissa) * (1.0 / 9007199254740992.0);  // 2^-53
+}
+
+double portableUniform(std::mt19937& rng, double lo, double hi) {
+	return lo + (hi - lo) * portableUniform01(rng);
+}
+
+int portableUniformInt(std::mt19937& rng, int lo, int hi) {
+	const int span = hi - lo + 1;
+	const int v = lo + static_cast<int>(portableUniform01(rng) * span);
+	return std::min(v, hi);
+}
+
+double portableNormal(std::mt19937& rng) {
+	// Box-Muller; u1 nudged away from 0 so log() stays finite.
+	const double u1 = std::max(portableUniform01(rng), 1e-16);
+	const double u2 = portableUniform01(rng);
+	return std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * M_PI * u2);
+}
+
 Eigen::Vector3d randomUnitVector(std::mt19937& rng) {
-	std::normal_distribution<double> normal(0.0, 1.0);
-	Eigen::Vector3d v(normal(rng), normal(rng), normal(rng));
+	Eigen::Vector3d v(portableNormal(rng), portableNormal(rng), portableNormal(rng));
 	const double n = v.norm();
 	if (n < 1e-12) {
 		return Eigen::Vector3d::UnitX();
@@ -38,13 +70,10 @@ Eigen::Vector3d randomUnitVector(std::mt19937& rng) {
 }
 
 Eigen::Matrix3d randomInertia(std::mt19937& rng) {
-	std::uniform_real_distribution<double> mass_dist(4.0, 60.0);
-	std::uniform_real_distribution<double> size_dist(0.10, 0.55);
-
-	const double mass = mass_dist(rng);
-	const double lx = size_dist(rng);
-	const double ly = size_dist(rng);
-	const double lz = size_dist(rng);
+	const double mass = portableUniform(rng, 4.0, 60.0);
+	const double lx = portableUniform(rng, 0.10, 0.55);
+	const double ly = portableUniform(rng, 0.10, 0.55);
+	const double lz = portableUniform(rng, 0.10, 0.55);
 
 	Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
 	J(0, 0) = (mass / 12.0) * (ly * ly + lz * lz);
@@ -77,12 +106,8 @@ void makeRandomSatelliteCase(
 
 	const double Javg = std::max(1e-6, J.trace() / 3.0);
 
-	std::uniform_int_distribution<int> n_mtq_dist(2, 3);
-	std::uniform_int_distribution<int> n_rw_dist(1, 3);
-	std::uniform_real_distribution<double> scale_dist(0.7, 1.4);
-
-	const int n_mtq = n_mtq_dist(rng);
-	const int n_rw = n_rw_dist(rng);
+	const int n_mtq = portableUniformInt(rng, 2, 3);
+	const int n_rw = portableUniformInt(rng, 1, 3);
 
 	const double mtq_base = std::clamp(0.8 * std::sqrt(Javg), 0.03, 0.35);
 	const double rw_torque_base = std::clamp(0.006 * Javg, 8e-5, 8e-3);
@@ -90,15 +115,15 @@ void makeRandomSatelliteCase(
 
 	for (int i = 0; i < n_mtq; ++i) {
 		const Eigen::Vector3d axis = randomUnitVector(rng);
-		const double max_dipole = std::clamp(mtq_base * scale_dist(rng), 0.02, 0.40);
+		const double max_dipole = std::clamp(mtq_base * portableUniform(rng, 0.7, 1.4), 0.02, 0.40);
 		satellite->addMTQ(axis, max_dipole);
 	}
 
 	for (int i = 0; i < n_rw; ++i) {
 		const Eigen::Vector3d axis = randomUnitVector(rng);
-		const double max_torque = std::clamp(rw_torque_base * scale_dist(rng), 5e-5, 0.010);
-		const double rw_J = std::clamp(0.015 * Javg * scale_dist(rng), 5e-6, 2e-3);
-		const double h_max = std::clamp(rw_hmax_base * scale_dist(rng), 0.004, 0.16);
+		const double max_torque = std::clamp(rw_torque_base * portableUniform(rng, 0.7, 1.4), 5e-5, 0.010);
+		const double rw_J = std::clamp(0.015 * Javg * portableUniform(rng, 0.7, 1.4), 5e-6, 2e-3);
+		const double h_max = std::clamp(rw_hmax_base * portableUniform(rng, 0.7, 1.4), 0.004, 0.16);
 		satellite->addRW(axis, max_torque, rw_J, 0.0, h_max);
 	}
 }
@@ -106,12 +131,10 @@ void makeRandomSatelliteCase(
 Satellite::VecX randomInitialState(const Satellite& satellite, std::mt19937& rng) {
 	Satellite::VecX x0 = Satellite::VecX::Zero(satellite.stateDim());
 
-	std::uniform_real_distribution<double> w_mag_dist(4.0 * DEG2RAD, 15.0 * DEG2RAD);
-	const double w_mag = w_mag_dist(rng);
+	const double w_mag = portableUniform(rng, 4.0 * DEG2RAD, 15.0 * DEG2RAD);
 	x0.segment<3>(Satellite::AV_INDEX) = w_mag * randomUnitVector(rng);
 
-	std::uniform_real_distribution<double> angle_dist(-PI, PI);
-	const double angle = angle_dist(rng);
+	const double angle = portableUniform(rng, -PI, PI);
 	const Eigen::Vector3d axis = randomUnitVector(rng);
 	Eigen::Vector4d q;
 	q(0) = std::cos(0.5 * angle);
