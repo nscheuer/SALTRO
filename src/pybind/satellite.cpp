@@ -2,6 +2,7 @@
 #include <saltro/pybind/disturbances/dragdisturbance.h>
 #include <saltro/pybind/disturbances/ggdisturbance.h>
 #include <saltro/pybind/disturbances/srpdisturbance.h>
+#include <saltro/math/integrators/rk4.h>
 
 #include <stdexcept>
 #include <cmath>
@@ -163,9 +164,7 @@ void Satellite::updateInertiaNoRW() {
 }
 
 std::pair<Satellite::Vec4, bool> Satellite::processAttitudeTarget(
-    const Vec4& attitude_target, const Vec3& boresight_body, const Vec4& q_current_unused) const {
-    (void)q_current_unused;  // Not used in current implementation
-
+    const Vec4& attitude_target, const Vec3& boresight_body) const {
     // "No goal" sentinels:
     // 1) ECI sentinel [nan, 0, 0, 0]
     // 2) Quaternion sentinel [0, 0, 0, 0]
@@ -280,12 +279,8 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
     Vec3 R_body = R_T * R_eci;
     // S_eci is spacecraft-to-Sun; keep eclipse zeroing intact in body frame.
     Vec3 S_body = R_T * S_eci;
-    Mat34 dV_dq = saltro::math::drotmatTvecdq(q, V_eci).transpose();
-    auto d2V_dq2 = saltro::math::ddrotmatTvecdqdq(q, V_eci);
     (void)B_eci;
     (void)rho;
-    (void)dV_dq;
-    (void)d2V_dq2;
 
     if (dist.plan_for_aero) {
         saltro::disturbances::DragDisturbance drag(geometry_config_);
@@ -342,7 +337,34 @@ Satellite::VecX Satellite::dynamics(const VecX& x, const VecX& u, const Disturba
     return xdot;
 }
 
-std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamicsJacobians(const VecX& x, const VecX& u, 
+Satellite::VecX Satellite::dynamicsStepRK4(
+    const VecX& x, const VecX& u, double dt,
+    const DisturbanceConfig& dist,
+    const Vec3& R_eci, const Vec3& B_eci,
+    const Vec3& S_eci, const Vec3& V_eci,
+    int rho
+) const {
+    VecX x_next;
+    rk4_step<VecX>(
+        [&](double /*t*/, const VecX& x_state, VecX& dxdt) {
+            dxdt = dynamics(x_state, u, dist, R_eci, B_eci, S_eci, V_eci, rho);
+        },
+        x, 0.0, dt, x_next
+    );
+
+    // Renormalize quaternion to counteract integration drift.
+    if (x_next.size() >= QUAT_INDEX + 4) {
+        const Vec4 q = x_next.segment<4>(QUAT_INDEX);
+        const double qn = q.norm();
+        if (std::isfinite(qn) && qn > 1e-10) {
+            x_next.segment<4>(QUAT_INDEX) = q / qn;
+        }
+    }
+
+    return x_next;
+}
+
+std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamicsJacobians(const VecX& x, const VecX& u,
                                                    const DisturbanceConfig& dist,
                                                    const Vec3& R_eci, const Vec3& B_eci,
                                                    const Vec3& S_eci, const Vec3& V_eci) const {
@@ -1034,6 +1056,81 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     return std::make_tuple(hess_xx, hess_ux, hess_uu);
 }
 
+namespace {
+
+// ===========================================================================
+// Vector-pointing attitude cost — PhD-planner-style reduced-space formulation.
+//
+// The attitude cost is h(q) = f(c), with c = bs·R(q)ᵀ·r̂ ∈ [-1, 1] the cosine
+// of the boresight-to-target angle.  Following the Generalized_ADCS PhD
+// planner (cost2angQ / ddvTRTudqQ in GeneralUtil.cpp), the cost shape f and
+// the geometry of c are factored into two small helpers, and every attitude-
+// cost derivative is taken in the 3-D attitude tangent space.
+// ===========================================================================
+
+// Cost shape f(c) and its first two derivatives w.r.t. c.
+//   0: 1−c    1: ½(1−c)²    2: acos(c)    3: ½·acos(c)²
+// fpp ≥ 0 for types 0,1,3, so the Gauss-Newton Hessian f''·g·gᵀ is PSD by
+// construction; type 2 (acos) is the exception (fpp < 0 for c > 0).
+struct AngCostShape { double f, fp, fpp; };
+
+AngCostShape angCostShape(double c, int type) {
+    const double omc2 = std::max(1.0 - c * c, 1e-12);  // 1 − c²  (floored)
+    const double s = std::sqrt(omc2);                  // √(1 − c²)
+    switch (type) {
+        case 0: return { 1.0 - c, -1.0, 0.0 };
+        case 1: { const double e = 1.0 - c; return { 0.5 * e * e, -e, 1.0 }; }
+        case 2: return { std::acos(c), -1.0 / s, -c / (omc2 * s) };
+        case 3: {
+            const double phi = std::acos(c);
+            return { 0.5 * phi * phi, -phi / s,
+                     1.0 / omc2 - phi * c / (omc2 * s) };
+        }
+        // NOTE: type 4 ((1-c)²) was removed: it is exactly type 1 with the
+        // constant 2 absorbed into the angle weight. Migrate by using type 1
+        // (½(1-c)²) with doubled angle weight.
+        // Unreachable for validated settings (validation rejects types
+        // outside {0,1,2,3}); throw instead of silently running acos.
+        default: throw invalid_argument("ang_cost_func_type invalid");
+    }
+}
+
+// Reduced-space geometry of c = bs·R(q)ᵀ·r̂.  The gradient and Hessian are
+// expressed in the attitude tangent space (basis W = findWMat(q)); `ddc`
+// carries the "Planning with Attitude" manifold-curvature correction
+// −(∂c/∂q·q)·I₃, exactly as the PhD planner's ddvTRTudqQ.  This is the
+// vector-pointing analogue of cost2angQ.
+struct VecPointingGeom {
+    double c;             // clamped cos(pointing error)
+    Eigen::Vector3d dc;   // ∂c/∂θ   (reduced gradient)
+    Eigen::Matrix3d ddc;  // ∂²c/∂θ² (reduced Hessian, manifold-corrected)
+};
+
+VecPointingGeom vecPointingGeom(const Eigen::Vector4d& q,
+                                const Eigen::Vector3d& bs_unit,
+                                const Eigen::Vector3d& r_eci) {
+    const auto W = saltro::math::findWMat(q);  // 4×3 attitude tangent basis
+
+    // Ambient (ℝ⁴) gradient and Hessian of c.
+    const Eigen::Vector4d dc_amb =
+        saltro::math::drotmatTvecdq(q, r_eci) * bs_unit;
+    const auto H_RTv = saltro::math::ddrotmatTvecdqdq(q, r_eci);
+    Eigen::Matrix4d d2c_amb = Eigen::Matrix4d::Zero();
+    for (int b = 0; b < 3; ++b) d2c_amb += bs_unit(b) * H_RTv[b];
+
+    VecPointingGeom g;
+    g.c  = std::clamp(bs_unit.dot(saltro::math::rotationMatrix(q).transpose()
+                                  * r_eci), -1.0, 1.0);
+    g.dc = W.transpose() * dc_amb;
+    // Project ambient → tangent, then subtract the manifold correction
+    // −(∂c/∂q·q)·I₃.  (∂c/∂q·q = 2c since c is degree-2 homogeneous in q.)
+    g.ddc = W.transpose() * d2c_amb * W
+          - dc_amb.dot(q) * Eigen::Matrix3d::Identity();
+    return g;
+}
+
+}  // namespace
+
 double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                             const Vec3& boresight_body, const Vec4& attitude_target,
                             const Vec3& B_eci, const CostConfig& cost_cfg) const {
@@ -1061,7 +1158,7 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     
     // Process attitude_target to handle both ECI vector and quaternion formats
-    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body, q);
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body);
     
     // Disable angle cost if ECI target is invalid
     double w_ang_eff = w_ang;
@@ -1080,33 +1177,120 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
     const double qdot_aligned = safeAbs(q_goal_aligned.dot(q));
 
     double ang_cost = 0.0;
-    switch (cost_cfg.ang_cost_func_type) {
-        case 0:
-            ang_cost = 1.0 - qdot_aligned;
-            break;
-        case 1: {
-            const double err = 1.0 - qdot_aligned;
-            ang_cost = 0.5 * err * err;
-            break;
+    if (is_eci_format) {
+        // Vector-pointing: cost h = f(c), c = bs·R(q)ᵀ·r̂_eci ∈ [-1, 1].
+        // 2-DOF (roll about bs is free); no double-cover ambiguity.  The cost
+        // shape lives in the angCostShape helper (shared with the Jacobian /
+        // Hessian), mirroring the PhD planner's veccost path.
+        const Vec3 bs_unit = boresight_body.normalized();
+        const Vec3 r_eci = attitude_target.tail(3).normalized();
+        const double c_val = std::clamp(
+            bs_unit.dot(saltro::math::rotationMatrix(q).transpose() * r_eci),
+            -1.0, 1.0);
+        ang_cost = angCostShape(c_val, cost_cfg.ang_cost_func_type).f;
+    } else {
+        switch (cost_cfg.ang_cost_func_type) {
+            case 0:
+                ang_cost = 1.0 - qdot_aligned;
+                break;
+            case 1: {
+                const double err = 1.0 - qdot_aligned;
+                ang_cost = 0.5 * err * err;
+                break;
+            }
+            case 2:
+                ang_cost = std::acos(qdot_aligned);
+                break;
+            case 3: {
+                const double phi = std::acos(qdot_aligned);
+                ang_cost = 0.5 * phi * phi;
+                break;
+            }
+            // NOTE: type 4 ((1-d)²) was removed: it is exactly type 1 with the
+            // constant 2 absorbed into the angle weight. Migrate by using type 1
+            // (0.5*(1-d)²) with doubled angle weight.
+            // Unreachable for validated settings; no silent acos fallback.
+            default: throw invalid_argument("ang_cost_func_type invalid");
         }
-        case 2:
-            ang_cost = std::acos(qdot_aligned);
-            break;
-        case 3: {
-            const double phi = std::acos(qdot_aligned);
-            ang_cost = 0.5 * phi * phi;
-            break;
-        }
-        case 4:
-            ang_cost = 1.0 - qdot_aligned * qdot_aligned;
-            break;
-        default:
-            ang_cost = std::acos(qdot_aligned);
-            break;
     }
 
     const Mat43 W = saltro::math::findWMat(q);
-    const double cross_cost = -safeSign(qdot_aligned) * (q_goal_aligned.transpose() * W * w)(0) * w_avang;
+
+    // ω-related terms.  Two paths:
+    //  - back-compat: when `ang_vel_err_dir(_N)` is nonzero, use the legacy
+    //    `−sign(qdot)·(q_g^T·W·ω)·w_avang` cross-cost and uniform |ω|² cost.
+    //    No feedforward (ω_ref ignored).
+    //  - new path: ω_ff = R(q_e)·ω_ref with q_e = q^*·q_g_aligned. Quadratic
+    //    becomes ½·w_av·|ω−ω_ff|². If `ang_vel_err_dir_ratio` > 0, add a
+    //    PSD-bounded Lyapunov crossterm α·err_dir^T·(ω−ω_ff) where
+    //    err_dir = −sign(qdot)·(W^T·q_g_aligned), α = β·√(angle·ang_vel).
+    //    With ω_ref=0 and ratio=0 (defaults), this reduces to ½·w_av·|ω|².
+    double quad_omega_cost = 0.0;
+    double cross_cost = 0.0;
+    // Legacy `w_avang` cross-cost is well-defined only in quaternion mode (uses
+    // q_goal_aligned, which in vec mode is a synthetic min-rotation quaternion
+    // — semantically incorrect). In vec mode, route w_avang through the
+    // new path with alpha = w_avang, err_dir = (R^T·r̂)×bs.  This matches
+    // PhD's veccostJacobians linear form `w_avang · ω · (R^T·r̂×bs)`.
+    //
+    // NOTE: ω_ff feed-forward tracking was removed (was always zero in
+    // production — BP never passed nonzero `omega_ref`).  All cross-cost
+    // forms are linear in ω with ω_ff = 0.
+    const bool quat_legacy = (w_avang != 0.0) && !is_eci_format;
+    if (quat_legacy) {
+        quad_omega_cost = 0.5 * w_av * w.squaredNorm();
+        cross_cost = -safeSign(qdot_aligned) * (q_goal_aligned.transpose() * W * w)(0) * w_avang;
+    } else {
+        // New path. Mode-aware err_dir; ω_ff = 0.
+        Vec3 err_dir  = Vec3::Zero();
+        double alpha  = 0.0;
+        if (is_eci_format) {
+            // Vector mode.
+            //   err_dir = (R^T · r̂_eci) × bs  (tangent descent, perp to bs).
+            //   α from raw `w_avang` (legacy coefficient) when set, else from
+            //   `β · √(angle · λ_min(W_ω))` (PSD-bounded auto coefficient).
+            //   λ_min(W_ω) = w_av · roll_ratio.
+            const Vec3 bs_unit = boresight_body.normalized();
+            const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+            if (w_avang != 0.0) {
+                alpha = w_avang;
+                const Vec3 r_body = R_T * attitude_target.tail(3).normalized();
+                err_dir = r_body.cross(bs_unit);
+            } else if (cost_cfg.ang_vel_err_dir_ratio > 0.0 && w_av > 0.0 && w_ang_eff > 0.0) {
+                const double lam_min = w_av * cost_cfg.ang_vel_roll_ratio;
+                alpha = cost_cfg.ang_vel_err_dir_ratio * std::sqrt(w_ang_eff * lam_min);
+                const Vec3 r_body = R_T * attitude_target.tail(3).normalized();
+                err_dir = r_body.cross(bs_unit);
+            }
+        } else {
+            // Quaternion mode.
+            //   err_dir = -sign(qdot) · (W^T · q_g_aligned).
+            //   α = β · √(angle · ang_vel)  (W_ω = w_av · I, λ_min = w_av).
+            if (cost_cfg.ang_vel_err_dir_ratio > 0.0 && w_av > 0.0 && w_ang_eff > 0.0) {
+                alpha = cost_cfg.ang_vel_err_dir_ratio * std::sqrt(w_ang_eff * w_av);
+                err_dir = -safeSign(qdot_aligned) * (W.transpose() * q_goal_aligned).head<3>();
+            }
+        }
+        quad_omega_cost = 0.5 * w_av * w.squaredNorm();
+        if (alpha > 0.0) {
+            cross_cost = alpha * err_dir.dot(w);
+        }
+    }
+
+    // Vector-mode axis-aware ω-cost reduction. Boresight pointing is 2-DOF;
+    // roll about bs is unconstrained, so reduce W_ω's eigenvalue along bs
+    // by (1 − roll_ratio). Default roll_ratio=1 → no-op (uniform |ω|²).
+    //   W_ω = w_av · (roll · bs·bsᵀ + (I − bs·bsᵀ))
+    //       = w_av · I − w_av · (1 − roll) · bs·bsᵀ
+    //   ½·ωᵀ·W_ω·ω = ½·w_av·|ω|² − ½·w_av·(1 − roll)·(bs·ω)²
+    // The reduction targets ω directly (not dw): roll about bs is irrelevant
+    // for boresight pointing regardless of any tracking ω_ff.
+    if (is_eci_format && cost_cfg.ang_vel_roll_ratio < 1.0) {
+        const double roll_factor = 1.0 - cost_cfg.ang_vel_roll_ratio;
+        const Vec3 bs_unit = boresight_body.normalized();
+        const double bs_dot_w = bs_unit.dot(w);
+        quad_omega_cost -= 0.5 * w_av * roll_factor * bs_dot_w * bs_dot_w;
+    }
 
     double state_mag_cost = 0.0;
     const double b_norm = safeNorm(B_eci);
@@ -1161,7 +1345,7 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
         }
     }
 
-    const double state_cost = 0.5 * w_av * w.squaredNorm() + w_ang_eff * ang_cost;
+    const double state_cost = quad_omega_cost + w_ang_eff * ang_cost;
     return state_cost + cross_cost + state_mag_cost + control_cost + rw_momentum_cost + rw_stiction_cost;
 }
 
@@ -1175,7 +1359,6 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     int k, int N, const VecX& x, const VecX& u,
     const Vec3& boresight_body, const Vec4& attitude_target,
     const Vec3& B_eci, const CostConfig& cost_cfg) const {
-    
     if (N <= 0) {
         throw invalid_argument("N must be positive in stageCostJacobians().");
     }
@@ -1207,7 +1390,7 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
     
     // Process attitude_target to handle both ECI vector and quaternion formats
-    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body, q);
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body);
     
     // Disable angle cost if ECI target is invalid
     double w_ang_eff = w_ang;
@@ -1232,14 +1415,103 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     // Now qdot_aligned >= 0 always, and q_goal_aligned is on the same hemisphere as q
 
     // =====================================================================
-    // Gradient w.r.t. angular velocity w: ∂L/∂w
+    // Gradient w.r.t. ω and q from the ω-related stage cost terms.
+    // Two paths:
+    //  - back-compat (`w_avang != 0`): legacy formulas. ω_ff ignored.
+    //  - new path: full chain rule through ω_ff(q) and the optional
+    //    α · err_dir^T · (ω − ω_ff) crossterm. Reduces to legacy default
+    //    (½·w_av·|ω|², no crossterm) when ω_ref=0 and ratio=0.
+    // The ω-contribution `g_w_om` is assigned to `lx[AV]` here; the q-side
+    // `g_q_om` is added to `lx[QUAT]` after the ang_cost gradient is set.
     // =====================================================================
-    lx.segment<3>(AV_INDEX) = w_av * w;
-
-    // From cross_cost = -sign(qdot) * (q_goal^T * W * w) * w_avang
-    // ∂cross_cost/∂w = -sign(qdot) * (W^T * q_goal) * w_avang
     const Mat43 W = saltro::math::findWMat(q);
-    lx.segment<3>(AV_INDEX) += -safeSign(qdot_aligned) * (W.transpose() * q_goal_aligned).head<3>() * w_avang;
+    Vec3 g_w_om;
+    Vec4 g_q_om;
+    {
+        // Legacy back-compat applies only in quat mode (uses q_goal_aligned).
+        // In vec mode, route w_avang through the new path's vec branch with
+        // alpha = w_avang, ω_ff = 0 — matches PhD's linear veccostJacobians.
+        const bool back_compat = (w_avang != 0.0) && !is_eci_format;
+        if (back_compat) {
+            const Vec3 cross_grad_w =
+                -safeSign(qdot_aligned) * (W.transpose() * q_goal_aligned).head<3>() * w_avang;
+            g_w_om = w_av * w + cross_grad_w;
+            // ∂(cross_cost)/∂q via d_qgoal_W_w_dq:
+            //   cross = -sign · (q_g^T · W(q) · w) · w_avang
+            //   ∂/∂q_k = -sign · w_avang · q_g^T · (∂W/∂q_k) · w
+            const double g0 = q_goal_aligned(0), g1 = q_goal_aligned(1);
+            const double g2 = q_goal_aligned(2), g3 = q_goal_aligned(3);
+            const double ww0 = w(0), ww1 = w(1), ww2 = w(2);
+            Vec4 d_qgoal_W_w_dq;
+            d_qgoal_W_w_dq(0) =  g1*ww0 + g2*ww1 + g3*ww2;
+            d_qgoal_W_w_dq(1) = -g0*ww0 - g2*ww2 + g3*ww1;
+            d_qgoal_W_w_dq(2) = -g0*ww1 + g1*ww2 - g3*ww0;
+            d_qgoal_W_w_dq(3) = -g0*ww2 - g1*ww1 + g2*ww0;
+            g_q_om = -safeSign(qdot_aligned) * w_avang * d_qgoal_W_w_dq;
+        } else {
+            // New path. Mode-aware err_dir(q) and its q-Jacobian; ω_ff = 0.
+            Vec3 err_dir  = Vec3::Zero();
+            double alpha  = 0.0;
+            Eigen::Matrix<double, 3, 4> derr_dir_dq  = Eigen::Matrix<double, 3, 4>::Zero();
+
+            if (is_eci_format) {
+                // Vector mode. err_dir = (R^T·r̂) × bs.
+                //   derr_dir_dq = -S · (drotmatTvecdq(q, r̂))^T,  S = skew(bs).
+                const Vec3 bs_unit = boresight_body.normalized();
+                const Mat33 S = saltro::math::skewSymmetric(bs_unit);
+                const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+                if (w_avang != 0.0) {
+                    // PhD veccostJacobians form: α = w_avang.
+                    alpha = w_avang;
+                } else if (cost_cfg.ang_vel_err_dir_ratio > 0.0 && w_av > 0.0 && w_ang_eff > 0.0) {
+                    const double lam_min = w_av * cost_cfg.ang_vel_roll_ratio;
+                    alpha = cost_cfg.ang_vel_err_dir_ratio * std::sqrt(w_ang_eff * lam_min);
+                }
+                if (alpha > 0.0) {
+                    const Vec3 r_eci_norm = attitude_target.tail(3).normalized();
+                    err_dir = (R_T * r_eci_norm).cross(bs_unit);
+                    const Mat43 J_rhat = saltro::math::drotmatTvecdq(q, r_eci_norm);
+                    derr_dir_dq = -S * J_rhat.transpose();
+                }
+            } else {
+                // Quaternion mode.
+                //   err_dir = -sign(qdot) · (W^T · q_g_aligned).
+                //   α = β · √(angle · ang_vel)  (W_ω = w_av · I, λ_min = w_av).
+                if (cost_cfg.ang_vel_err_dir_ratio > 0.0 && w_av > 0.0 && w_ang_eff > 0.0) {
+                    alpha = cost_cfg.ang_vel_err_dir_ratio * std::sqrt(w_ang_eff * w_av);
+                    err_dir = -safeSign(qdot_aligned) * (W.transpose() * q_goal_aligned).head<3>();
+                    // ∂err_dir/∂q via the analytic W-derivative.
+                    const double s = safeSign(qdot_aligned);
+                    const double g0 = q_goal_aligned(0), g1 = q_goal_aligned(1);
+                    const double g2 = q_goal_aligned(2), g3 = q_goal_aligned(3);
+                    derr_dir_dq << -s*g1,  s*g0,  s*g3, -s*g2,
+                                   -s*g2, -s*g3,  s*g0,  s*g1,
+                                   -s*g3,  s*g2, -s*g1,  s*g0;
+                }
+            }
+            // Linear-in-ω cross + quadratic-in-ω cost.  ω_ff = 0.
+            //   ∂(quad)/∂ω = w_av · ω
+            //   ∂(cross)/∂ω = α · err_dir
+            //   ∂(cross)/∂q = α · (∂err_dir/∂q)^T · ω
+            g_w_om = w_av * w + alpha * err_dir;
+            g_q_om.setZero();
+            if (alpha > 0.0) {
+                g_q_om = alpha * (derr_dir_dq.transpose() * w);
+            }
+        }
+    }
+
+    // Vector-mode axis-aware ω-grad reduction (mirrors stageCost addend).
+    // ∂/∂ω of −½·w_av·(1−roll)·(bs·ω)² = −w_av·(1−roll)·(bs·ω)·bs.
+    // bs doesn't depend on q, so no q-grad contribution.
+    if (is_eci_format && cost_cfg.ang_vel_roll_ratio < 1.0) {
+        const double roll_factor = 1.0 - cost_cfg.ang_vel_roll_ratio;
+        const Vec3 bs_unit = boresight_body.normalized();
+        const double bs_dot_w = bs_unit.dot(w);
+        g_w_om -= w_av * roll_factor * bs_dot_w * bs_unit;
+    }
+
+    lx.segment<3>(AV_INDEX) = g_w_om;
 
     // From state_mag_cost = w_avmag * |w · b_body|
     const double b_norm = safeNorm(B_eci);
@@ -1256,79 +1528,52 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     // =====================================================================
     
     // Compute derivative of attitude cost w.r.t. q
-    double d_ang_cost_dqdot = 0.0;  // ∂(ang_cost)/∂(qdot)
-    switch (cost_cfg.ang_cost_func_type) {
-        case 0:  // ang_cost = 1 - |qdot|
-            d_ang_cost_dqdot = -1.0;  // Always negative since qdot_aligned >= 0
-            break;
-        case 1: {  // ang_cost = 0.5 * (1 - |qdot|)^2
-            const double err = 1.0 - qdot_aligned;  // Use aligned value
-            d_ang_cost_dqdot = -err;  // Always negative
-            break;
+    if (is_eci_format) {
+        // Vector mode: h = f(c), c = bs·R(q)ᵀ·r̂.  Work in the attitude tangent
+        // space (PhD-style): ∂h/∂θ = f'(c)·∂c/∂θ.  Lift the reduced 3-vector
+        // back to the ambient q-block with W; the backward pass re-projects
+        // with Wᵀ (WᵀW = I₃, so the lift round-trips exactly).
+        const Vec3 bs_unit = boresight_body.normalized();
+        const Vec3 r_eci = attitude_target.tail(3).normalized();
+        const VecPointingGeom geom = vecPointingGeom(q, bs_unit, r_eci);
+        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+        lx.segment<4>(QUAT_INDEX) =
+            w_ang_eff * f.fp * (saltro::math::findWMat(q) * geom.dc);
+    } else {
+        double d_ang_cost_dqdot = 0.0;  // ∂(ang_cost)/∂(qdot)
+        switch (cost_cfg.ang_cost_func_type) {
+            case 0:  // ang_cost = 1 - |qdot|
+                d_ang_cost_dqdot = -1.0;  // Always negative since qdot_aligned >= 0
+                break;
+            case 1: {  // ang_cost = 0.5 * (1 - |qdot|)^2
+                const double err = 1.0 - qdot_aligned;  // Use aligned value
+                d_ang_cost_dqdot = -err;  // Always negative
+                break;
+            }
+            case 2: {  // ang_cost = acos(|qdot|)
+                const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
+                d_ang_cost_dqdot = -1.0 / denom;  // Always negative
+                break;
+            }
+            case 3: {  // ang_cost = 0.5 * acos(|qdot|)^2
+                const double phi = std::acos(qdot_aligned);
+                const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
+                d_ang_cost_dqdot = -phi / denom;  // Always negative
+                break;
+            }
+            // NOTE: type 4 ((1-d)²) removed -- see stageCost().
+            // Unreachable for validated settings; no silent acos fallback.
+            default: throw invalid_argument("ang_cost_func_type invalid");
         }
-        case 2: {  // ang_cost = acos(|qdot|)
-            const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
-            d_ang_cost_dqdot = -1.0 / denom;  // Always negative
-            break;
-        }
-        case 3: {  // ang_cost = 0.5 * acos(|qdot|)^2
-            const double phi = std::acos(qdot_aligned);
-            const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
-            d_ang_cost_dqdot = -phi / denom;  // Always negative
-            break;
-        }
-        case 4:  // ang_cost = 1 - |qdot|^2
-            d_ang_cost_dqdot = -2.0 * qdot_aligned;  // Always non-positive
-            break;
-        default:
-            d_ang_cost_dqdot = -1.0 / std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
-            break;
+
+        // ∂(qdot)/∂q where qdot = q_goal · q  →  ∂(qdot)/∂q = q_goal (as col).
+        const Vec4 dqdot_dq = q_goal_aligned;
+        // ∂L/∂q from attitude cost.
+        lx.segment<4>(QUAT_INDEX) = w_ang_eff * d_ang_cost_dqdot * dqdot_dq;
     }
 
-    // ∂(qdot)/∂q where qdot = q_goal · q
-    // = q_goal (as a row vector, or column in Jacobian context)
-    Vec4 dqdot_dq = q_goal_aligned;  // Use aligned quaternion
-    
-    // ∂L/∂q from attitude cost: w_ang * ∂(ang_cost)/∂(qdot) * ∂(qdot)/∂q
-    lx.segment<4>(QUAT_INDEX) = w_ang_eff * d_ang_cost_dqdot * dqdot_dq;
-
-    // ∂(cross_cost)/∂q = ∂/∂q[-sign(qdot) * (q_goal^T * W * w) * w_avang]
-    // = -sign(qdot)*w_avang * ∂(q_goal^T * W * w)/∂q
-    // where W depends on q
-    // W = 0.5*[[-q1, -q2, -q3], [q0, -q3, q2], [q3, q0, -q1], [-q2, q1, q0]]^T (4x3)
-    // ∂(W^T * q_goal)/∂q_j is a 3D vector
-    // For each component j, compute ∂(W^T * q_goal)/∂q_j · w
-    // This is complex, so use finite difference approach or compute analytically
-    // Let me compute it analytically by noting:
-    // (q_goal^T * W * w) = sum_i (q_goal_i * W_i,: * w) where W_i,: is i-th row of W
-    // For W matrix structure:
-    Vec4 d_qgoal_W_w_dq = Vec4::Zero();
-    {
-        // The W matrix is 4x3. We compute how (q_goal^T * W * w) changes with each q component.
-        // W(q) is linear in q, so we can compute its derivatives directly.
-        // W = 0.5 * [[-q(1), -q(2), -q(3)],
-        //            [q(0), -q(3), q(2)],
-        //            [q(3), q(0), -q(1)],
-        //            [-q(2), q(1), q(0)]]  (in quaternion [q0, q1, q2, q3] form)
-        // Each row i of W depends on q as: W_i = 0.5 * (linear combination of q components)
-        // ∂(W^T * q_goal)/∂q_j gives a 3D vector
-        // We need to compute how (q_goal^T * W * w) changes
-        
-        // Use numerical differentiation for simplicity and robustness
-        const double eps = 1e-8;
-        Vec4 q_pert = q;
-        double f0 = (q_goal_aligned.transpose() * W * w)(0);
-        
-        for (int j = 0; j < 4; ++j) {
-            q_pert = q;
-            q_pert(j) += eps;
-            q_pert.normalize();
-            const Mat43 W_pert = saltro::math::findWMat(q_pert);
-            const double f_pert = (q_goal_aligned.transpose() * W_pert * w)(0);
-            d_qgoal_W_w_dq(j) = (f_pert - f0) / eps;
-        }
-    }
-    lx.segment<4>(QUAT_INDEX) += -safeSign(qdot_aligned) * w_avang * d_qgoal_W_w_dq;
+    // ω-related q-grad contribution (already computed above as `g_q_om`).
+    lx.segment<4>(QUAT_INDEX) += g_q_om;
 
     // ∂(state_mag_cost)/∂q = ∂(w_avmag * |w · b_body|)/∂q
     // = w_avmag * sign(w · b_body) * ∂(w · b_body)/∂q
@@ -1349,7 +1594,6 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     }
 
     // NOTE: Quaternion projection is applied at the END (see below), not here.
-    // Applying it twice would corrupt the Hessian finite difference computation.
 
     // =====================================================================
     // Gradient w.r.t. RW momentum h: ∂L/∂h
@@ -1436,7 +1680,6 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     int k, int N, const VecX& x, const VecX& u,
     const Vec3& boresight_body, const Vec4& attitude_target,
     const Vec3& B_eci, const CostConfig& cost_cfg) const {
-
     if (N <= 0) {
         throw invalid_argument("N must be positive in stageCostHessians().");
     }
@@ -1468,7 +1711,7 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
 
     // Process attitude_target to handle both ECI vector and quaternion formats
-    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body, q);
+    auto [q_goal, is_eci_format] = processAttitudeTarget(attitude_target, boresight_body);
     
     // Disable angle cost if ECI target is invalid
     double w_ang_eff = w_ang;
@@ -1476,10 +1719,21 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         w_ang_eff = 0.0;
     }
 
-    (void)w_ang_eff;  // Used in numerical differentiation
+    // Quaternion alignment: ensure q_goal is on the same hemisphere as q
+    const double qdot = q_goal.dot(q);
+    Vec4 q_goal_aligned = q_goal;
+    if (qdot < 0.0) {
+        q_goal_aligned = -q_goal;
+    }
+    const double qdot_aligned = std::abs(qdot);  // always >= 0
+
+    // KNOWN GAP: state-magnitude cost `w_avmag · |ω · b_body|` (gradient is
+    // computed in stageCostJacobians but the (ω,ω) and (q,q) Hessian addends
+    // are NOT implemented here.  When `use_cost_hess=true` and `ang_vel_mag`
+    // is nonzero, the BP's quadratic model is missing this term's curvature.
+    // Acceptable in current production (default `ang_vel_mag = 0`); fix if
+    // ever activated.
     (void)w_avmag;
-    (void)w_avang;
-    (void)w;
     (void)B_eci;
 
     // If cost Hessians are disabled, keep only control quadratic curvature.
@@ -1514,27 +1768,194 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     // From 0.5 * w_av * ‖w‖² → ∂²L/∂w² = w_av * I_3
     lxx.block<3, 3>(AV_INDEX, AV_INDEX) += w_av * Mat33::Identity();
 
-    // =====================================================================
-    // Hessian w.r.t. quaternion: ∂²L/∂q² (attitude terms)
-    // =====================================================================
-    // This is complex and depends on ang_cost_func_type. 
-    // For robustness, use numerical differentiation of the gradient.
-    {
-        const double eps = 1e-8;
-        VecX x_pert = x;
-        auto lx_base = stageCostJacobians(k, N, x, u, boresight_body, attitude_target, B_eci, cost_cfg);
-        VecX grad_base = std::get<0>(lx_base);
+    // Vector-mode axis-aware ω-Hessian reduction (mirrors stageCost +
+    // stageCostJacobians addends).
+    //   ∂²/∂ω² of −½·w_av·(1 − roll)·(bs·ω)² = −w_av·(1 − roll)·bs·bsᵀ.
+    if (is_eci_format && cost_cfg.ang_vel_roll_ratio < 1.0) {
+        const double roll_factor = 1.0 - cost_cfg.ang_vel_roll_ratio;
+        const Vec3 bs_unit = boresight_body.normalized();
+        lxx.block<3, 3>(AV_INDEX, AV_INDEX) -= w_av * roll_factor
+            * (bs_unit * bs_unit.transpose());
+    }
 
-        for (int j = 0; j < 4; ++j) {
-            x_pert = x;
-            x_pert(QUAT_INDEX + j) += eps;
-            // CRITICAL: Normalize the perturbed quaternion before computing gradient
-            x_pert.segment<4>(QUAT_INDEX).normalize();
-            auto lx_pert = stageCostJacobians(k, N, x_pert, u, boresight_body, attitude_target, B_eci, cost_cfg);
-            VecX grad_pert = std::get<0>(lx_pert);
+    // =====================================================================
+    // Hessian w.r.t. quaternion: ∂²L/∂q² (attitude terms) — ANALYTIC
+    // =====================================================================
+    // Per Jackson/Tracy/Manchester "Planning with Attitude" (2020), for a
+    // scalar cost h(q) on S³ with q ∈ R⁴, the manifold Hessian is
+    //   ∂²h_red/∂q² = G^T · ∂²h_amb/∂q² · G − I_3 · (∂h_amb/∂q · q)
+    // We compute the ambient (R⁴) Hessian and the (∂h_amb/∂q · q) scalar;
+    // the G-projection is implicit when this lxx feeds into the BP's
+    // reduced-state machinery, and the −(grad·q)·I_4 correction is applied
+    // here on the q-block.
+    if (is_eci_format) {
+        // Vector mode: reduced-space angle Hessian, PhD-style.  c = bs·R(q)ᵀ·r̂,
+        // h = f(c).  In the attitude tangent space the Hessian splits cleanly:
+        //
+        //   Gauss-Newton:  H = f''(c)·(∂c/∂θ)(∂c/∂θ)ᵀ
+        //                  — a rank-1 outer product, PSD by construction
+        //                    wherever f'' ≥ 0 (types 0,1,3).
+        //   Full (GN off): H += f'(c)·∂²c/∂θ²
+        //                  — the chain-rule term.  ∂²c/∂θ² (geom.ddc) already
+        //                    carries the Planning-with-Attitude manifold
+        //                    correction, so this branch is the exact Hessian.
+        //
+        // The cost_hess_gauss_newton flag selects between them: with the flag
+        // OFF the full (exact) Hessian is returned; ON gives the GN form.
+        const Vec3 bs_unit = boresight_body.normalized();
+        const Vec3 r_eci = attitude_target.tail(3).normalized();
+        const VecPointingGeom geom = vecPointingGeom(q, bs_unit, r_eci);
+        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
 
-            VecX d_grad = (grad_pert - grad_base) / eps;
-            lxx.col(QUAT_INDEX + j) += d_grad;
+        Eigen::Matrix3d H_red = f.fpp * (geom.dc * geom.dc.transpose());
+        if (!cost_cfg.cost_hess_gauss_newton) {
+            H_red += f.fp * geom.ddc;  // full exact Hessian
+        }
+        // Lift reduced 3×3 → ambient q-block; the BP re-projects with Wᵀ.
+        const auto W = saltro::math::findWMat(q);
+        lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) +=
+            w_ang_eff * (W * H_red * W.transpose());
+    } else {
+        // Quaternion mode: h(q) = f(d) where d = q_g_aligned · q.
+        //   ∂h/∂q   = f'(d) · q_g
+        //   ∂²h/∂q² = f''(d) · q_g · q_g^T
+        //   ∂h/∂q · q = f'(d) · d   (Euler deg-1)
+        const double d = qdot_aligned;
+        const double d2 = d * d;
+        const double one_minus_d2 = std::max(1.0 - d2, 1e-12);
+        const double sqrt_omd2 = std::sqrt(one_minus_d2);
+
+        double d2h_dd2 = 0.0;
+        switch (cost_cfg.ang_cost_func_type) {
+            case 0:
+                d2h_dd2 = 0.0;
+                break;
+            case 1:
+                d2h_dd2 = 1.0;
+                break;
+            case 2:
+                d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
+                break;
+            case 3: {
+                const double phi = std::acos(std::clamp(d, 0.0, 1.0));
+                d2h_dd2 = 1.0 / one_minus_d2 - phi * d / (one_minus_d2 * sqrt_omd2);
+                break;
+            }
+            // NOTE: type 4 ((1-d)²) removed -- see stageCost().
+            // Unreachable for validated settings; no silent acos fallback.
+            default: throw invalid_argument("ang_cost_func_type invalid");
+        }
+        lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) += w_ang_eff * d2h_dd2
+            * (q_goal_aligned * q_goal_aligned.transpose());
+
+        double dh_dd = 0.0;
+        switch (cost_cfg.ang_cost_func_type) {
+            case 0: dh_dd = -1.0; break;
+            case 1: dh_dd = -(1.0 - d); break;
+            case 2: dh_dd = -1.0 / sqrt_omd2; break;
+            case 3: {
+                const double phi2 = std::acos(std::clamp(d, 0.0, 1.0));
+                dh_dd = -phi2 / sqrt_omd2;
+                break;
+            }
+            // NOTE: type 4 ((1-d)²) removed -- see stageCost().
+            // Unreachable for validated settings; no silent acos fallback.
+            default: throw invalid_argument("ang_cost_func_type invalid");
+        }
+        // Quat mode: PwA correction always applied (it's the manifold-
+        // curvature term, PSD when f'·d < 0 which is the aligned-hemisphere
+        // case for our cost shapes). GN flag has no effect here because
+        // quat mode has no `f'·d²d/dq²` chain term to drop (d is linear in q).
+        const double grad_dot_q = dh_dd * d;
+        lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) -= w_ang_eff * grad_dot_q
+            * Eigen::Matrix<double, 4, 4>::Identity();
+    }
+
+    // =====================================================================
+    // ω-related Hessian contributions — branched on path.
+    //
+    // Quat-mode legacy (`w_avang != 0` AND quaternion mode): cross_cost is
+    // bilinear in (q, ω). (q,q) Hessian is identically zero.  The (ω,q)
+    // cross-Hessian is analytically nonzero but intentionally skipped here to
+    // preserve existing behavior.
+    //
+    // All other paths (vec mode regardless of w_avang, or quat mode with
+    // w_avang == 0): full Hessian of
+    //   ½·w_av·|ω-ω_ff(q)|² + α·err_dir(q)^T·(ω-ω_ff(q)).
+    //   In vec-mode legacy (w_avang != 0 + is_eci_format), α = w_avang and
+    //   ω_ff = 0 (matches PhD's veccostJacobians linear cross).
+    //   (ω,ω): w_av·I_3 — already added above.
+    //   (ω,q): -w_av·∂ω_ff/∂q + α·∂err_dir/∂q.
+    //   (q,q):  w_av·(∂ω_ff/∂q)^T·(∂ω_ff/∂q)
+    //         - Σ_l (w_av·dw_l + α·err_dir_l) · ∂²ω_ff_l/∂q²
+    //         - α · ((∂err_dir/∂q)^T·(∂ω_ff/∂q) + (∂ω_ff/∂q)^T·(∂err_dir/∂q))
+    // =====================================================================
+    if (w_avang == 0.0 || is_eci_format) {
+        // Mode-aware err_dir(q) and its first/second q-derivatives.
+        // ω_ff = 0 — feed-forward tracking removed (was always zero in production).
+        // The cost is `½·w_av·|ω|² + α·err_dir(q)·ω`, so:
+        //   (ω,ω): w_av·I_3  (already added above)
+        //   (ω,q): α · ∂err_dir/∂q
+        //   (q,q): α · Σ_b ω_b · ∂²err_dir_b/∂q²  (nonzero only in vector mode)
+        Vec3 err_dir  = Vec3::Zero();
+        double alpha  = 0.0;
+        Eigen::Matrix<double, 3, 4> derr_dir_dq  = Eigen::Matrix<double, 3, 4>::Zero();
+        std::array<Eigen::Matrix4d, 3> dderr_dir_dqdq;
+        for (auto& M : dderr_dir_dqdq)  M.setZero();
+
+        if (is_eci_format) {
+            // Vector mode. err_dir = (R^T·r̂) × bs.
+            //   derr_dir_dq = -S · (drotmatTvecdq(q, r̂))^T,  S = skew(bs).
+            //   ∂²err_dir_b/∂q² = -Σ_c S[b,c] · ddrotmatTvecdqdq(q, r̂)[c].
+            const Vec3 bs_unit = boresight_body.normalized();
+            const Mat33 S = saltro::math::skewSymmetric(bs_unit);
+            const Mat33 R_T = saltro::math::rotationMatrix(q).transpose();
+            if (w_avang != 0.0) {
+                alpha = w_avang;
+            } else if (cost_cfg.ang_vel_err_dir_ratio > 0.0 && w_av > 0.0 && w_ang_eff > 0.0) {
+                const double lam_min = w_av * cost_cfg.ang_vel_roll_ratio;
+                alpha = cost_cfg.ang_vel_err_dir_ratio * std::sqrt(w_ang_eff * lam_min);
+            }
+            if (alpha > 0.0) {
+                const Vec3 r_eci_norm = attitude_target.tail(3).normalized();
+                err_dir = (R_T * r_eci_norm).cross(bs_unit);
+                const Mat43 J_rhat = saltro::math::drotmatTvecdq(q, r_eci_norm);
+                derr_dir_dq = -S * J_rhat.transpose();
+                const std::array<Eigen::Matrix4d, 3> H_rhat =
+                    saltro::math::ddrotmatTvecdqdq(q, r_eci_norm);
+                for (int b = 0; b < 3; ++b) {
+                    for (int c = 0; c < 3; ++c) {
+                        dderr_dir_dqdq[b] -= S(b, c) * H_rhat[c];
+                    }
+                }
+            }
+        } else {
+            // Quaternion mode (err_dir is linear in q ⇒ dderr_dir_dqdq = 0).
+            if (cost_cfg.ang_vel_err_dir_ratio > 0.0 && w_av > 0.0 && w_ang_eff > 0.0) {
+                alpha = cost_cfg.ang_vel_err_dir_ratio * std::sqrt(w_ang_eff * w_av);
+                const Mat43 W = saltro::math::findWMat(q);
+                err_dir = -safeSign(qdot_aligned) * (W.transpose() * q_goal_aligned).head<3>();
+                const double s = safeSign(qdot_aligned);
+                const double g0 = q_goal_aligned(0), g1 = q_goal_aligned(1);
+                const double g2 = q_goal_aligned(2), g3 = q_goal_aligned(3);
+                derr_dir_dq << -s*g1,  s*g0,  s*g3, -s*g2,
+                               -s*g2, -s*g3,  s*g0,  s*g1,
+                               -s*g3,  s*g2, -s*g1,  s*g0;
+            }
+        }
+
+        if (alpha > 0.0) {
+            // (ω, q) cross-Hessian.
+            const Eigen::Matrix<double, 3, 4> mix_omega_q = alpha * derr_dir_dq;
+            lxx.block<3, 4>(AV_INDEX, QUAT_INDEX) += mix_omega_q;
+            lxx.block<4, 3>(QUAT_INDEX, AV_INDEX) += mix_omega_q.transpose();
+
+            // (q, q) Hessian addend: α · Σ_b ω_b · ∂²err_dir_b/∂q²  (vec mode only).
+            Eigen::Matrix4d Hqq_om = Eigen::Matrix4d::Zero();
+            for (int b = 0; b < 3; ++b) {
+                Hqq_om += alpha * w(b) * dderr_dir_dqdq[b];
+            }
+            lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) += Hqq_om;
         }
     }
 
@@ -2014,7 +2435,11 @@ Satellite::constraintHessians(
     H_xx.slice(idx).block<3, 3>(AV_INDEX, AV_INDEX) = scale_av * Mat33::Identity();
     idx++;
 
-    // 2) Sun constraint Hessian: computed numerically to match normalization-aware Jacobian
+    // 2) Sun constraint Hessian: central finite differences of constraint Jacobian
+    // Constraint: c = [R(q)^T * sun_unit]_x - cos(limit)
+    // The chain rule through quaternion normalization makes the analytic form fragile,
+    // so we use central FD for robustness.  This is only called during the backward
+    // pass when use_constraint_hess is enabled.
     const double sun_norm = sun_eci.norm();
     const int sun_idx = idx;
     if (std::isfinite(sun_norm) && sun_norm > 1e-12) {
@@ -2023,12 +2448,8 @@ Satellite::constraintHessians(
             VecX xp = x; xp(j) += eps;
             VecX xm = x; xm(j) -= eps;
             if (j >= QUAT_INDEX && j < QUAT_INDEX + 4) {
-                Vec4 qxp = xp.segment<4>(QUAT_INDEX);
-                Vec4 qxm = xm.segment<4>(QUAT_INDEX);
-                qxp.normalize();
-                qxm.normalize();
-                xp.segment<4>(QUAT_INDEX) = qxp;
-                xm.segment<4>(QUAT_INDEX) = qxm;
+                xp.segment<4>(QUAT_INDEX).normalize();
+                xm.segment<4>(QUAT_INDEX).normalize();
             }
 
             auto [_, c_xp] = constraintJacobians(k, N, xp, u, sun_eci, cnst_cfg);
