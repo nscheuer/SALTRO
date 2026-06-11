@@ -666,9 +666,9 @@ class TestCostHessians:
         cost_cfg = saltro.CostConfig()
         cost_cfg.rw_AM_weight = 1e4
         cost_cfg.rw_stic_weight = 1.0
-        cost_cfg.RWh_max_mult = 0.8
+        cost_cfg.RWh_ok_mult = 0.8
         cost_cfg.RWh_stiction_mult = 0.01
-        cost_cfg.RWh_ok_mult = 0.5
+        cost_cfg.RWh_desat_mult = 0.5
         
         sat_direction = np.zeros(3)
         eci_target = np.array([1.0, 0.0, 0.0, 0.0])
@@ -895,8 +895,8 @@ class TestRWMomentumCost:
         """RW momentum penalty should increase with magnitude."""
         cost_cfg = saltro.CostConfig()
         cost_cfg.rw_AM_weight = 1e4
-        cost_cfg.RWh_max_mult = 0.8
-        cost_cfg.RWh_ok_mult = 0.5
+        cost_cfg.RWh_ok_mult = 0.8
+        cost_cfg.RWh_desat_mult = 0.5
         cost_cfg.angle = 0.0
         cost_cfg.ang_vel = 0.0
         cost_cfg.control_mult = 0.0
@@ -923,8 +923,8 @@ class TestRWMomentumCost:
         """RW momentum cost should be minimal at low momentum values."""
         cost_cfg = saltro.CostConfig()
         cost_cfg.rw_AM_weight = 1e4
-        cost_cfg.RWh_max_mult = 0.8
-        cost_cfg.RWh_ok_mult = 0.5
+        cost_cfg.RWh_ok_mult = 0.8
+        cost_cfg.RWh_desat_mult = 0.5
         cost_cfg.angle = 0.0
         cost_cfg.ang_vel = 0.0
         cost_cfg.control_mult = 0.0
