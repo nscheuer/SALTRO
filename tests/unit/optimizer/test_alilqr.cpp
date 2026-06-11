@@ -604,6 +604,11 @@ TEST_CASE("State slack: two-phase solve converges and meets the TRUE constraint 
 }
 
 TEST_CASE("State slack: stall fallback rescues an underpriced slack phase", "[optimizer][alilqr][slack]") {
+	// The auto-switch is OPT-IN: a wrong trigger does not cleanly revert to
+	// baseline (the polish inherits the slack-phase trajectory, ramped mu,
+	// and lambda clipped at slack_rho), so the default must stay disabled.
+	REQUIRE(AugLagConfig{}.slack_stall_iters == 0);
+
 	// slack_rho far below the binding constraint's multiplier: the slack
 	// phase "buys" the violation and can never reach slack_off_tol. With the
 	// stall fallback disabled the run must burn the outer budget and fail;

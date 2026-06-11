@@ -349,14 +349,46 @@ With ``auglag.use_state_slack = true`` the outer loop runs in two phases:
      "buys" the violation. Observed on underactuated MTQ-only 180-degree
      slews with tight ``wmax`` (needed multiplier is huge); raising
      ``slack_rho`` alone does NOT fix it there, because with
-     ``slack_sigma = 0`` the bought region also has zero curvature. The
-     stall fallback (``slack_stall_iters``, default 1) detects the
-     non-contracting TRUE violation and drops the slacks automatically,
-     recovering exact-AL behavior (where the slack phase genuinely helps it
-     contracts >5% per outer iter, so the hair-trigger default is
-     empirically bit-identical there); only with the fallback disabled must
-     you raise ``slack_rho``/``slack_sigma`` or loosen ``slack_off_tol`` by
-     hand.
+     ``slack_sigma = 0`` the bought region also has zero curvature.
+     Remedies: raise ``slack_rho``/``slack_sigma``, loosen
+     ``slack_off_tol``, or opt into the stall fallback below.
+
+.. warning::
+
+   **Stall fallback** (``slack_stall_iters``, OPT-IN, default 0 =
+   disabled). When set to N >= 1, the outer loop drops the slacks and
+   polishes as soon as the TRUE max violation fails to improve by at least
+   5% over the best seen for N consecutive slack-phase iterations. On the
+   benchmarked problems, ``slack_stall_iters = 1`` was bit-identical where
+   the slack phase genuinely helps (those contract >5% every outer iter)
+   and converted 3 of 4 catastrophic MTQ-only failures into convergences.
+
+   It is opt-in because the auto-switch carries real risks — evaluate them
+   against your problem before enabling:
+
+   1. *Premature trigger on slow-but-healthy phases.* The 5% threshold is a
+      fitted constant from short-horizon benchmarks, hardcoded in
+      ``alilqr.cpp``. Phases contracting steadily at <5%/iter (e.g. with
+      ``family_contraction_ratio`` deliberately slowing mu ramps) lose
+      their slacks for the rest of the solve.
+   2. *A wrong trigger is not a clean revert to baseline.* The polish
+      inherits the slack-phase trajectory (possibly dragged toward the
+      bought-violation region), already-ramped mu, and lambda clipped at
+      ``slack_rho`` — i.e. baseline AL from a potentially worse state than
+      the original warm start.
+   3. *Best-ever bookkeeping cuts V-shaped arcs.* Violation that rises for
+      a few outer iterations while the trajectory reshapes, then collapses,
+      is indistinguishable from the pathological equilibrium and gets cut
+      mid-V.
+   4. *Reproducibility knife-edge.* A 4.9% vs 5.1% improvement differs by
+      FP noise but bifurcates the entire remaining solve path; results near
+      the threshold are platform/BLAS sensitive.
+   5. *One-way switch.* Slacks never re-engage within a solve; if the
+      polish then stalls there is no re-relaxation.
+
+   Possible future hardening (not implemented): expose the 5% ratio as a
+   knob, a grace period before the detector arms, windowed/previous-iter
+   comparison instead of best-ever.
    - **Polish phase diverges after a clean slack phase**: the slack solution
      parked the trajectory somewhere the exact penalty cannot hold (e.g. the
      absorbed violation was structural, not transient). Inspect which family

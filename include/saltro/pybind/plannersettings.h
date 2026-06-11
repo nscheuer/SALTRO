@@ -381,17 +381,30 @@ struct AugLagConfig {
     /// outer loop drops the slacks and polishes. Clamped below at
     /// constraint_tol; keep it a few × constraint_tol.
     double slack_off_tol = 0.02;
-    /// Stall fallback: if the TRUE max violation fails to improve (by at
-    /// least 5% over the best seen) for this many consecutive slack-phase
-    /// outer iterations, drop the slacks and polish anyway. This rescues
-    /// problems whose binding-constraint multiplier exceeds the slack price
-    /// (e.g. underactuated MTQ-only slews, where the slack phase otherwise
-    /// "buys" a permanent violation and never reaches slack_off_tol).
-    /// Default 1 (hair-trigger): empirically bit-identical on problems where
-    /// the slack phase genuinely helps (it contracts >5% every outer iter
-    /// there), while bailing out before a misbehaving slack phase wrecks the
-    /// trajectory. Set <= 0 to disable.
-    int slack_stall_iters = 1;
+    /// Stall fallback (OPT-IN, default 0 = disabled): if the TRUE max
+    /// violation fails to improve (by at least 5% over the best seen) for
+    /// this many consecutive slack-phase outer iterations, drop the slacks
+    /// and polish anyway. This rescues problems whose binding-constraint
+    /// multiplier exceeds the slack price (e.g. underactuated MTQ-only
+    /// slews, where the slack phase otherwise "buys" a permanent violation
+    /// and never reaches slack_off_tol); 1 (hair-trigger) was bit-identical
+    /// on the benchmarked RW problems, which contract >5% every outer iter.
+    ///
+    /// It is opt-in because the auto-switch has real failure modes:
+    /// - premature trigger on slow-but-healthy phases (<5%/iter contraction,
+    ///   e.g. with family_contraction_ratio deliberately slowing ramps);
+    /// - a wrong trigger does NOT cleanly revert to baseline — polish
+    ///   inherits the slack-phase trajectory, ramped mu, and lambda clipped
+    ///   at slack_rho (can be worse than baseline from the original seed);
+    /// - the best-ever comparison cuts off V-shaped "buy now, repay later"
+    ///   arcs across outer iterations;
+    /// - a 4.9% vs 5.1% improvement is an FP-noise-sized difference that
+    ///   bifurcates the whole remaining solve path (cross-platform
+    ///   reproducibility hazard);
+    /// - the switch is one-way (no re-relaxation if the polish then stalls).
+    /// See the "State-Slack Relaxation" section of the convergence logic
+    /// tree for the full discussion.
+    int slack_stall_iters = 0;
 
     double constraint_tol = 0.002;
     double total_cost_tol = 1e-2;
