@@ -414,7 +414,8 @@ Evaluate inequality constraints c(x,u) <= 0.
 Constraint ordering:
 1) Angular velocity magnitude limit
 2) Sun avoidance limit using body +X boresight
-3) (k < N-1 only) MTQ and RW bounds, RW momentum bounds, RW stiction proxy
+3) (k < N-1 only) MTQ and RW bounds, RW momentum bounds, RW stiction torque
+   floor (theta - |u|/u_lim - |h|/h_c; always satisfied at default theta=0)
 
 Parameters
 ----------

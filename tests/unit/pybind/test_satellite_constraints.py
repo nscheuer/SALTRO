@@ -9,7 +9,7 @@ Covers:
  - MTQ dipole upper/lower bounds (scaling, config override)
  - RW torque upper/lower bounds
  - RW momentum upper/lower bounds
- - RW stiction proxy
+ - RW stiction torque floor (c = theta - |u|/u_lim - |h|/h_c)
  - Input validation (wrong dimensions, out-of-range k, negative N)
  - Finite-difference verification of Jacobians against constraints()
  - Finite-difference verification of Hessians against constraintJacobians()
@@ -501,15 +501,20 @@ def test_rw_negative_momentum_violates_lower_bound():
 
 
 # ============================================================================
-# SECTION 7 — RW stiction constraint
+# SECTION 7 — RW stiction torque floor
+#   c = theta - |u|/u_lim - |h|/h_c, with u_lim = control_limit_scale*rw_torque
+#   and h_c = rw_stic_band_mult*h_max. Default theta = 0 keeps the row always
+#   satisfied (back-compat with the old dead -(u*h)^2 row).
+#   NOTE: this base has no constraintFamily() API (that's PR #52 on the other
+#   train); the row keeps the 5th-per-RW slot so the layout is unchanged.
 # ============================================================================
 
 def test_rw_stiction_constraint_at_zero_state_is_zero():
     """Test stiction constraint at zero state is zero"""
     fixture = ConstraintFixture()
     fixture.setup_method()
-    
-    c = fixture.sat.constraints(0, 10, fixture.nominal_state(), fixture.nominal_control(), 
+
+    c = fixture.sat.constraints(0, 10, fixture.nominal_state(), fixture.nominal_control(),
                                 sun_z(), default_cnst_cfg())
     rw_start = 2 + 2 * fixture.n_mtq()
     for i in range(fixture.n_rw()):
@@ -518,20 +523,150 @@ def test_rw_stiction_constraint_at_zero_state_is_zero():
 
 
 def test_rw_stiction_constraint_is_non_positive():
-    """Test stiction constraint is non-positive (always satisfied or zero)"""
+    """Test stiction constraint is non-positive (always satisfied at theta=0)"""
     fixture = ConstraintFixture()
     fixture.setup_method()
-    
+
     h = np.array([0.005, -0.003])
     x = make_state(np.zeros(3), identity_quat(), h)
     u = fixture.nominal_control()
     u[fixture.n_mtq()] = 0.0005
     u[fixture.n_mtq() + 1] = -0.0003
-    
+
     c = fixture.sat.constraints(0, 10, x, u, sun_z(), default_cnst_cfg())
     rw_start = 2 + 2 * fixture.n_mtq()
     for i in range(fixture.n_rw()):
         assert c[rw_start + 5*i + 4] <= 0.0
+
+
+def test_rw_stiction_torque_floor_theta_zero_default_assorted():
+    """At default theta=0 the torque-floor row is <= 0 for assorted (u, h),
+    including exact zeros — behavior-identical to the old dead row."""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg = default_cnst_cfg()  # rw_stic_torque_theta defaults to 0.0
+    rw_start = 2 + 2 * fixture.n_mtq()
+
+    u_vals = [0.0, 1e-6, -1e-5, 0.0005, -fixture.rw_torque, fixture.rw_torque]
+    h_vals = [0.0, 1e-7, -1e-6, 0.004, -fixture.rw_hmax, fixture.rw_hmax]
+
+    for uv in u_vals:
+        for hv in h_vals:
+            h = np.full(fixture.n_rw(), hv)
+            x = make_state(np.zeros(3), identity_quat(), h)
+            u = fixture.nominal_control()
+            for i in range(fixture.n_rw()):
+                u[fixture.n_mtq() + i] = uv
+            c = fixture.sat.constraints(0, 10, x, u, sun_z(), cfg)
+            for i in range(fixture.n_rw()):
+                assert c[rw_start + 5*i + 4] <= 0.0
+
+
+def test_rw_stiction_torque_floor_theta_09_activation():
+    """With theta=0.9: violated at (u=0, h=0); satisfied at u=u_lim, h=0;
+    satisfied at u=0, |h| >= theta*h_c; violated at u=0, |h| < theta*h_c."""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg = default_cnst_cfg()
+    cfg.rw_stic_torque_theta = 0.9
+    theta = 0.9
+    h_c = 0.005 * fixture.rw_hmax           # rw_stic_band_mult default 0.005
+    u_lim = cfg.control_limit_scale * fixture.rw_torque
+    rw_start = 2 + 2 * fixture.n_mtq()
+
+    # (a) Violated at u = 0, h = 0: c = theta > 0.
+    c = fixture.sat.constraints(0, 10, fixture.nominal_state(),
+                                fixture.nominal_control(), sun_z(), cfg)
+    for i in range(fixture.n_rw()):
+        assert np.isclose(c[rw_start + 5*i + 4], theta, atol=1e-14)
+
+    # (b) Satisfied at u = u_lim (effective, incl. control_limit_scale), h = 0.
+    u = fixture.nominal_control()
+    for i in range(fixture.n_rw()):
+        u[fixture.n_mtq() + i] = u_lim
+    c = fixture.sat.constraints(0, 10, fixture.nominal_state(), u, sun_z(), cfg)
+    for i in range(fixture.n_rw()):
+        assert np.isclose(c[rw_start + 5*i + 4], theta - 1.0, atol=1e-12)
+
+    # (c) Satisfied at u = 0, |h| >= theta*h_c (either sign).
+    for sign in (1.0, -1.0):
+        h = np.full(fixture.n_rw(), sign * theta * h_c)  # boundary: c = 0
+        x = make_state(np.zeros(3), identity_quat(), h)
+        c = fixture.sat.constraints(0, 10, x, fixture.nominal_control(), sun_z(), cfg)
+        for i in range(fixture.n_rw()):
+            assert c[rw_start + 5*i + 4] <= 1e-12
+
+        h = np.full(fixture.n_rw(), sign * h_c)          # strictly inside
+        x = make_state(np.zeros(3), identity_quat(), h)
+        c = fixture.sat.constraints(0, 10, x, fixture.nominal_control(), sun_z(), cfg)
+        for i in range(fixture.n_rw()):
+            assert c[rw_start + 5*i + 4] < 0.0
+
+    # (d) Violated at u = 0, |h| < theta*h_c.
+    h = np.full(fixture.n_rw(), 0.5 * theta * h_c)
+    x = make_state(np.zeros(3), identity_quat(), h)
+    c = fixture.sat.constraints(0, 10, x, fixture.nominal_control(), sun_z(), cfg)
+    for i in range(fixture.n_rw()):
+        assert c[rw_start + 5*i + 4] > 0.0
+
+
+def test_rw_stiction_torque_floor_dimension_unchanged():
+    """Enabling the torque floor must not change the constraint dimension."""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg = default_cnst_cfg()
+    cfg.rw_stic_torque_theta = 0.9
+    cfg.rw_stic_band_mult = 0.005
+    c = fixture.sat.constraints(0, 10, fixture.nominal_state(),
+                                fixture.nominal_control(), sun_z(), cfg)
+    assert len(c) == fixture.expected_dim_intermediate()
+    ct = fixture.sat.constraints(9, 10, fixture.nominal_state(),
+                                 fixture.nominal_control(), sun_z(), cfg)
+    assert len(ct) == fixture.expected_dim_terminal()
+
+
+def test_rw_stiction_torque_floor_jacobian_fd_away_from_kinks():
+    """FD check of the torque-floor row's Jacobian (u and h directions),
+    away from the |u| / |h| kinks, for both sign quadrants."""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg = default_cnst_cfg()
+    cfg.rw_stic_torque_theta = 0.9
+    rw_start = 2 + 2 * fixture.n_mtq()
+    eps = 1e-9  # well below the |u|, |h| magnitudes used
+
+    for su in (1.0, -1.0):
+        for sh in (1.0, -1.0):
+            h = np.array([sh * 2e-5, sh * 3e-5])
+            x0 = make_state(np.zeros(3), identity_quat(), h)
+            u0 = fixture.nominal_control()
+            u0[fixture.n_mtq()] = su * 2e-4
+            u0[fixture.n_mtq() + 1] = su * 3e-4
+
+            c_u, c_x = fixture.sat.constraintJacobians(0, 10, x0, u0, sun_z(), cfg)
+
+            for i in range(fixture.n_rw()):
+                row = rw_start + 5 * i + 4
+                ctrl_idx = fixture.n_mtq() + i
+                state_idx = saltro_py.Satellite.RW_MOMENTUM_INDEX + i
+
+                up = u0.copy(); up[ctrl_idx] += eps
+                um = u0.copy(); um[ctrl_idx] -= eps
+                cp = fixture.sat.constraints(0, 10, x0, up, sun_z(), cfg)
+                cm = fixture.sat.constraints(0, 10, x0, um, sun_z(), cfg)
+                fd_u = (cp[row] - cm[row]) / (2.0 * eps)
+                assert np.isclose(c_u[row, ctrl_idx], fd_u, rtol=1e-6)
+
+                xp = x0.copy(); xp[state_idx] += eps
+                xm = x0.copy(); xm[state_idx] -= eps
+                cp = fixture.sat.constraints(0, 10, xp, u0, sun_z(), cfg)
+                cm = fixture.sat.constraints(0, 10, xm, u0, sun_z(), cfg)
+                fd_h = (cp[row] - cm[row]) / (2.0 * eps)
+                assert np.isclose(c_x[row, state_idx], fd_h, rtol=1e-6)
 
 
 # ============================================================================
@@ -695,11 +830,17 @@ def test_constraint_jacobians_finite_difference_c_u():
     """Test constraint Jacobian c_u matches finite difference"""
     fixture = ConstraintFixture()
     fixture.setup_method()
-    
-    x = fixture.nominal_state()
+
+    # Base point off the stiction torque-floor kinks at u = 0 / h = 0:
+    # the row c = theta - |u|/u_lim - |h|/h_c has a subgradient (defined 0)
+    # at the kinks, where one-sided FD would disagree by construction.
+    h = np.array([0.002, -0.003])
+    x = make_state(np.zeros(3), identity_quat(), h)
     u = fixture.nominal_control()
+    u[fixture.n_mtq()] = 0.0003
+    u[fixture.n_mtq() + 1] = -0.0002
     cfg = default_cnst_cfg()
-    
+
     c_u, _ = fixture.sat.constraintJacobians(0, 10, x, u, sun_z(), cfg)
     
     # Finite difference approximation
@@ -721,11 +862,15 @@ def test_constraint_jacobians_finite_difference_c_x():
     """Test constraint Jacobian c_x matches finite difference"""
     fixture = ConstraintFixture()
     fixture.setup_method()
-    
-    x = fixture.nominal_state()
+
+    # Base point off the stiction torque-floor kinks (see c_u FD test).
+    h = np.array([0.002, -0.003])
+    x = make_state(np.zeros(3), identity_quat(), h)
     u = fixture.nominal_control()
+    u[fixture.n_mtq()] = 0.0003
+    u[fixture.n_mtq() + 1] = -0.0002
     cfg = default_cnst_cfg()
-    
+
     _, c_x = fixture.sat.constraintJacobians(0, 10, x, u, sun_z(), cfg)
     
     # Finite difference approximation
@@ -773,11 +918,16 @@ def test_constraint_hessians_finite_difference_H_uu():
     """Test constraint Hessian H_uu matches finite difference of c_u"""
     fixture = ConstraintFixture()
     fixture.setup_method()
-    
-    x = fixture.nominal_state()
+
+    # Base point off the stiction torque-floor kinks at u = 0 / h = 0
+    # (the row is piecewise-linear; FD across a kink would blow up).
+    h = np.array([0.002, -0.003])
+    x = make_state(np.zeros(3), identity_quat(), h)
     u = fixture.nominal_control()
+    u[fixture.n_mtq()] = 0.0003
+    u[fixture.n_mtq() + 1] = -0.0002
     cfg = default_cnst_cfg()
-    
+
     H_uu, _, _ = fixture.sat.constraintHessians(0, 10, x, u, sun_z(), cfg)
     
     # Finite difference approximation
@@ -837,11 +987,15 @@ def test_constraint_hessians_finite_difference_H_xx():
     """Test constraint Hessian H_xx matches finite difference of c_x"""
     fixture = ConstraintFixture()
     fixture.setup_method()
-    
-    x = fixture.nominal_state()
+
+    # Base point off the stiction torque-floor kinks (see H_uu FD test).
+    h = np.array([0.002, -0.003])
+    x = make_state(np.zeros(3), identity_quat(), h)
     u = fixture.nominal_control()
+    u[fixture.n_mtq()] = 0.0003
+    u[fixture.n_mtq() + 1] = -0.0002
     cfg = default_cnst_cfg()
-    
+
     _, _, H_xx = fixture.sat.constraintHessians(0, 10, x, u, sun_z(), cfg)
     
     # Finite difference approximation
@@ -1328,38 +1482,33 @@ def test_constraint_hessians_rw_momentum_bounds_have_zero_hessians():
 
 
 # ============================================================================
-# SECTION 16 — Stiction Hessian structure
+# SECTION 16 — Stiction torque-floor Hessian structure
+# The row c = theta - |u|/u_lim - |h|/h_c is piecewise-linear: Hessian is
+# zero (the old -(u*h)^2 row had curvature here; the new form has none).
 # ============================================================================
 
-def test_constraint_hessians_stiction_hessian_is_non_zero_and_has_correct_pattern():
-    """Test stiction Hessian is non-zero and has correct pattern"""
+def test_constraint_hessians_stiction_row_is_zero_piecewise_linear():
+    """Stiction torque-floor row has zero Hessians (piecewise linear)"""
     fixture = ConstraintFixture()
     fixture.setup_method()
-    
+
     h = np.array([0.005, -0.003])
     x0 = make_state(np.zeros(3), identity_quat(), h)
     u0 = fixture.nominal_control()
     u0[fixture.n_mtq()] = 0.0003
     u0[fixture.n_mtq() + 1] = -0.0002
-    
-    H_uu, H_ux, H_xx = fixture.sat.constraintHessians(0, 10, x0, u0, sun_z(), default_cnst_cfg())
-    
+
+    cfg = default_cnst_cfg()
+    cfg.rw_stic_torque_theta = 0.9  # zero Hessian whether or not the floor is enabled
+
+    H_uu, H_ux, H_xx = fixture.sat.constraintHessians(0, 10, x0, u0, sun_z(), cfg)
+
     rw_start = 2 + 2 * fixture.n_mtq()
     for i in range(fixture.n_rw()):
         stiction_idx = rw_start + 5 * i + 4
-        ctrl_idx = fixture.n_mtq() + i
-        state_idx = 7 + i  # RW_MOMENTUM_INDEX + i
-        u_i = u0[ctrl_idx]
-        h_i = h[i]
-        
-        # H_uu: -2 * h²
-        assert np.isclose(H_uu[stiction_idx, ctrl_idx, ctrl_idx], -2.0 * h_i * h_i, atol=1e-12)
-        
-        # H_xx: -2 * u²
-        assert np.isclose(H_xx[stiction_idx, state_idx, state_idx], -2.0 * u_i * u_i, atol=1e-12)
-        
-        # H_ux: -4 * u * h
-        assert np.isclose(H_ux[stiction_idx, ctrl_idx, state_idx], -4.0 * u_i * h_i, atol=1e-12)
+        assert np.linalg.norm(H_uu[stiction_idx]) == 0.0
+        assert np.linalg.norm(H_ux[stiction_idx]) == 0.0
+        assert np.linalg.norm(H_xx[stiction_idx]) == 0.0
 
 
 # ============================================================================
@@ -1734,10 +1883,11 @@ def test_sun_jacobian_matches_fd_just_outside_active_region():
 # ============================================================================
 
 def test_stiction_hessian_fd_at_nonzero_momentum():
-    """The existing stiction Hessian test (Section 22) only covers x=0 (zero
-    momentum). The stiction term is roughly `h_rw^2 * w_rw_local` so its
-    second derivative w.r.t. h is non-zero everywhere — verify FD agreement
-    at several non-zero h values."""
+    """The stiction torque-floor row c = theta - |u|/u_lim - |h|/h_c is
+    piecewise-linear: its Jacobian is piecewise-constant in h, so the
+    analytic Hessian is zero and FD of the Jacobian must agree (also zero)
+    at non-zero h values away from the kink. Verify FD agreement at several
+    random non-zero h values (this used to assert the -(u*h)^2 curvature)."""
     fixture = ConstraintFixture()
     fixture.setup_method()
 

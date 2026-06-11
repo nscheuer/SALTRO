@@ -2782,7 +2782,18 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
         c(idx++) = (h - h_lim) / h_lim;
         c(idx++) = (-h - h_lim) / h_lim;
 
-        c(idx++) = -(u_cmd * h) * (u_cmd * h);
+        // RW stiction torque floor (direction-agnostic):
+        //   c = θ − |u|/u_lim − |h|/h_c ≤ 0
+        // with h_c = rw_stic_band_mult · h_max. At h = 0 the wheel must hold
+        // ≥ θ·u_lim of torque; the requirement fades to zero at |h| = θ·h_c
+        // (c ≤ 0 with u = 0 iff |h| ≥ θ·h_c). θ = 0 (default) keeps the row
+        // always satisfied — behavior-identical to the historical dead
+        // −(u·h)² row this replaces. See ConstraintConfig docs for the
+        // alignment rule with cost-side bias-momentum parking.
+        const double theta = std::clamp(cnst_cfg.rw_stic_torque_theta, 0.0, 1.0);
+        const double h_c = std::max(
+            1e-12, std::clamp(cnst_cfg.rw_stic_band_mult, 0.0, 1.0) * h_lim);
+        c(idx++) = theta - std::abs(u_cmd) / tau_lim - std::abs(h) / h_c;
     }
 
     // Magic-actuator torque bounds (no momentum or stiction terms — no internal state).
@@ -2919,13 +2930,29 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
         c_x(idx, state_idx) = -1.0 / h_lim;
         idx++;
         
-        // RW stiction: -(u*h)²
-        // ∂/∂u = -2*u*h²
-        // ∂/∂h = -2*h*u²
+        // RW stiction torque floor: c = θ − |u|/u_lim − |h|/h_c
+        //   ∂c/∂u = −sign(u)/u_lim
+        //   ∂c/∂h = −sign(h)/h_c
+        // Subgradient contract (matches the cost-side stiction tent): at
+        // exactly u == 0 / h == 0 the corresponding derivative is defined
+        // as 0 — deterministic, instead of pushing in an arbitrary
+        // direction. Known flat point: at exactly (u = 0, h = 0) the
+        // violated row has zero local gradient; the solver escapes via any
+        // perturbation — do not try to fix it here.
         const double u_i = u(ctrl_idx);
         const double h_i = x(state_idx);
-        c_u(idx, ctrl_idx) = -2.0 * u_i * h_i * h_i;
-        c_x(idx, state_idx) = -2.0 * h_i * u_i * u_i;
+        const double h_c = std::max(
+            1e-12, std::clamp(cnst_cfg.rw_stic_band_mult, 0.0, 1.0) * h_lim);
+        if (u_i > 0.0) {
+            c_u(idx, ctrl_idx) = -1.0 / tau_lim;
+        } else if (u_i < 0.0) {
+            c_u(idx, ctrl_idx) = 1.0 / tau_lim;
+        }
+        if (h_i > 0.0) {
+            c_x(idx, state_idx) = -1.0 / h_c;
+        } else if (h_i < 0.0) {
+            c_x(idx, state_idx) = 1.0 / h_c;
+        }
         idx++;
     }
 
@@ -3031,25 +3058,18 @@ Satellite::constraintHessians(
 
     // RW constraints
     for (int i = 0; i < num_rw_; ++i) {
-        const int ctrl_idx = num_mtq_ + i;
-        const int state_idx = RW_MOMENTUM_INDEX + i;
-        
         // RW torque bounds (linear, zero Hessian)
         idx += 2;
-        
+
         // RW momentum bounds (linear, zero Hessian)
         idx += 2;
-        
-        // RW stiction: -(u*h)²
-        // ∂²/∂u² = -2*h²
-        // ∂²/∂h² = -2*u²
-        // ∂²/∂u∂h = -4*u*h
-        const double u_i = u(ctrl_idx);
-        const double h_i = x(state_idx);
-        
-        H_uu.slice(idx)(ctrl_idx, ctrl_idx) = -2.0 * h_i * h_i;
-        H_xx.slice(idx)(state_idx, state_idx) = -2.0 * u_i * u_i;
-        H_ux.slice(idx)(ctrl_idx, state_idx) = -4.0 * u_i * h_i;
+
+        // RW stiction torque floor: c = θ − |u|/u_lim − |h|/h_c is
+        // piecewise-linear in (u, h) — zero Hessian everywhere away from
+        // the kinks at u = 0 / h = 0, and we define it as zero at the kinks
+        // too (consistent with the subgradient contract in
+        // constraintJacobians). The old −(u·h)² row had curvature here;
+        // the new form has none.
         idx++;
     }
 

@@ -98,6 +98,31 @@ struct DisturbanceConfig {
  * @param u_max Maximum control input vector
  * @param wmax Maximum allowable angular velocity magnitude (rad/s)
  * @param sun_limit_angle Minimum allowed angle to sun direction (rad)
+ *
+ * @param rw_stic_torque_theta Torque floor θ ∈ [0, 1] of the per-RW stiction
+ *        torque-floor constraint
+ *          c = θ − |u|/u_lim − |h|/h_c ≤ 0
+ *        with u_lim the (control_limit_scale-scaled) RW torque limit and
+ *        h_c = rw_stic_band_mult · h_max. Semantics: at h = 0 the wheel must
+ *        hold at least θ·u_lim of torque; the requirement fades linearly and
+ *        vanishes for |h| ≥ θ·h_c (c ≤ 0 with u = 0 iff |h| ≥ θ·h_c).
+ *        Default 0.0 disables the floor — the row is then always satisfied,
+ *        behavior-identical to the historical dead −(u·h)² row. Recommended
+ *        opt-in value: 0.9. High-torque zero crossings satisfy the row
+ *        throughout (|u|/u_lim ≥ θ alone suffices); chatter is handled by
+ *        the dwell cost, not this constraint.
+ *        ALIGNMENT RULE with bias-momentum parking (CostConfig::RWh_desat_mult
+ *        recipe, parked at h* = h_stic/2): a parked wheel must satisfy the
+ *        floor at zero torque, i.e. θ·h_c ≤ h*. Equivalently
+ *        rw_stic_torque_theta · rw_stic_band_mult ≤ h* / h_max. With defaults
+ *        (h_c = 0.005·h_max, θ = 0.9 when enabled, h_stic = 0.01·h_max,
+ *        h* = 0.005·h_max): θ·h_c = 0.0045·h_max < h* = 0.005·h_max (11%
+ *        margin).
+ * @param rw_stic_band_mult Momentum half-width of the torque-floor band as a
+ *        fraction of h_max: h_c = rw_stic_band_mult · h_max. Default 0.005 —
+ *        half of the default cost-side stiction band
+ *        (CostConfig::RWh_stiction_mult = 0.01). Deliberately independent of
+ *        CostConfig; see the alignment rule above.
  */
 
 struct ConstraintConfig {
@@ -110,6 +135,8 @@ struct ConstraintConfig {
     Eigen::Matrix<double, Eigen::Dynamic, 1, 0, saltro::limits::MAX_CTRL_DIM, 1> u_max;
     double wmax = 20.0 * M_PI / 180.0;
     double sun_limit_angle = 20.0 * M_PI / 180.0;
+    double rw_stic_torque_theta = 0.0;
+    double rw_stic_band_mult = 0.005;
 };
 
 /**

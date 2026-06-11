@@ -186,6 +186,97 @@ TEST_CASE("Invalid sun_limit_angle - NaN", "[plannersettings][validation][constr
     REQUIRE(error_msg == "sun_limit_angle invalid");
 }
 
+TEST_CASE("Valid rw_stic_torque_theta and rw_stic_band_mult - enabled floor", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_torque_theta = 0.9;
+    settings.constraints.rw_stic_band_mult = 0.005;
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Valid rw_stic_torque_theta - boundary values 0 and 1", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    settings.constraints.rw_stic_torque_theta = 0.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+
+    settings.constraints.rw_stic_torque_theta = 1.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Invalid rw_stic_torque_theta - negative", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_torque_theta = -0.1;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "rw_stic_torque_theta invalid");
+}
+
+TEST_CASE("Invalid rw_stic_torque_theta - exceeds one", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_torque_theta = 1.1;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "rw_stic_torque_theta invalid");
+}
+
+TEST_CASE("Invalid rw_stic_torque_theta - NaN", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_torque_theta = std::numeric_limits<double>::quiet_NaN();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "rw_stic_torque_theta invalid");
+}
+
+TEST_CASE("Valid rw_stic_band_mult - boundary value 1", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_band_mult = 1.0;
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Invalid rw_stic_band_mult - zero", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_band_mult = 0.0;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "rw_stic_band_mult invalid");
+}
+
+TEST_CASE("Invalid rw_stic_band_mult - negative", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_band_mult = -0.005;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "rw_stic_band_mult invalid");
+}
+
+TEST_CASE("Invalid rw_stic_band_mult - exceeds one", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_band_mult = 1.5;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "rw_stic_band_mult invalid");
+}
+
+TEST_CASE("Invalid rw_stic_band_mult - NaN", "[plannersettings][validation][constraints]") {
+    PlannerSettings settings = validSettings();
+    settings.constraints.rw_stic_band_mult = std::numeric_limits<double>::quiet_NaN();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "rw_stic_band_mult invalid");
+}
+
 TEST_CASE("Invalid u_max - empty vector", "[plannersettings][validation][constraints]") {
     PlannerSettings settings = validSettings();
     settings.constraints.u_max = Eigen::VectorXd();
