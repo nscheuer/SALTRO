@@ -132,6 +132,8 @@ def run_case(settings, sat, x0, tf, dt, goal_quat):
         "w_peak": w_max_traj,
         "h_peak": h_max_traj,
         "w_viol_tail": w_viol_tail,
+        "X": X_out,
+        "U": np.asarray(U_out),
     }
 
 
