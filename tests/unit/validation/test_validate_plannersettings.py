@@ -1182,3 +1182,55 @@ def test_valid_boundary_zero_cost_weights():
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
     
     assert ok
+
+
+def test_valid_auglag_state_slack_enabled():
+    """use_state_slack with sane knobs should pass"""
+    settings = valid_settings()
+    settings.passes[0].auglag.use_state_slack = True
+    settings.passes[0].auglag.slack_rho = 5.0
+    settings.passes[0].auglag.slack_sigma = 1.0
+    settings.passes[0].auglag.slack_off_tol = 0.05
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert ok
+
+
+def test_invalid_auglag_slack_rho_zero():
+    """slack_rho must be strictly positive"""
+    settings = valid_settings()
+    settings.passes[0].auglag.slack_rho = 0.0
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.slack_rho invalid"
+
+
+def test_invalid_auglag_slack_rho_nonfinite():
+    """slack_rho must be finite"""
+    settings = valid_settings()
+    settings.passes[0].auglag.slack_rho = math.inf
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.slack_rho invalid"
+
+
+def test_invalid_auglag_slack_sigma_negative():
+    """slack_sigma must be >= 0"""
+    settings = valid_settings()
+    settings.passes[0].auglag.slack_sigma = -1.0
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.slack_sigma invalid"
+
+
+def test_invalid_auglag_slack_off_tol_zero():
+    """slack_off_tol must be strictly positive"""
+    settings = valid_settings()
+    settings.passes[0].auglag.slack_off_tol = 0.0
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.slack_off_tol invalid"

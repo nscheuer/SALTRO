@@ -1085,3 +1085,57 @@ TEST_CASE("Valid boundary values - zero cost weights", "[plannersettings][valida
     
     REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
 }
+
+TEST_CASE("Valid auglag state-slack defaults", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Valid auglag state-slack enabled", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.use_state_slack = true;
+    settings.passes[0].auglag.slack_rho = 5.0;
+    settings.passes[0].auglag.slack_sigma = 1.0;
+    settings.passes[0].auglag.slack_off_tol = 0.05;
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Invalid auglag.slack_rho - zero", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.slack_rho = 0.0;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.slack_rho invalid");
+}
+
+TEST_CASE("Invalid auglag.slack_rho - non-finite", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.slack_rho = std::numeric_limits<double>::infinity();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.slack_rho invalid");
+}
+
+TEST_CASE("Invalid auglag.slack_sigma - negative", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.slack_sigma = -1.0;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.slack_sigma invalid");
+}
+
+TEST_CASE("Invalid auglag.slack_off_tol - zero", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.slack_off_tol = 0.0;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.slack_off_tol invalid");
+}

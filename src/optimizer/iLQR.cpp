@@ -1,4 +1,5 @@
 #include <saltro/optimizer/iLQR.h>
+#include <saltro/optimizer/al_slack.h>
 #include <saltro/optimizer/backwardpass.h>
 #include <saltro/optimizer/forwardpass.h>
 
@@ -29,6 +30,7 @@ Eigen::VectorXd control_at_k(
 double augmented_penalty_total(
 	const Satellite& satellite,
 	const ConstraintConfig& cnst_cfg,
+	const AugLagConfig& aug,
 	const Eigen::Ref<const Eigen::MatrixXd>& X,
 	const Eigen::Ref<const Eigen::MatrixXd>& U,
 	const Eigen::Ref<const Eigen::MatrixXd>& S,
@@ -59,16 +61,18 @@ double augmented_penalty_total(
 		const int lam_size = static_cast<int>(lambda_aug[k].size());
 		const int mu_size = static_cast<int>(mu_aug[k].size());
 		const int n_c = std::min(c_size, std::min(lam_size, mu_size));
+		const bool is_terminal = (k == N - 1);
 		for (int i = 0; i < n_c; ++i) {
-			const double ci = c_k(i);
-			const double li = lambda_aug[k](i);
 			// Lambda term always active with signed c; mu penalty when
 			// c > 0 OR lambda > 0. Must match the forward-pass merit exactly:
 			// this value seeds J_prev for the first line-search comparison.
-			total += li * ci;
-			if (ci > 0.0 || li > 0.0) {
-				total += 0.5 * mu_aug[k](i) * ci * ci;
-			}
+			// State-family slack (al_slack.h) follows the same contract.
+			const bool slack_on = aug.use_state_slack
+				&& isStateSlackFamily(satellite.constraintFamily(i, is_terminal));
+			total += alSlackMeritTerm(
+				c_k(i), lambda_aug[k](i), mu_aug[k](i),
+				slack_on, aug.slack_rho, aug.slack_sigma
+			);
 		}
 	}
 
@@ -142,7 +146,7 @@ bool iLQR(
 			}
 
 			double J_prev = satellite.totalCost(X, U.leftCols(N_u), B, boresight, attitude_target, cost_cfg);
-			J_prev += augmented_penalty_total(satellite, cnst_cfg, X, U, S, lambda_aug, mu_aug);
+			J_prev += augmented_penalty_total(satellite, cnst_cfg, settings.passes[pass_idx].auglag, X, U, S, lambda_aug, mu_aug);
 			
 			bool fp_success = forwardPass(
 				satellite,

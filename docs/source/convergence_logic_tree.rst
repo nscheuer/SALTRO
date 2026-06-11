@@ -316,3 +316,48 @@ Common Diagnosis Paths
        <p>The middle layer may be working, but AL penalty updates are not enforcing at least one active constraint quickly enough.</p>
      </article>
    </div>
+
+
+State-Slack Relaxation and the Polish Phase
+-------------------------------------------
+
+With ``auglag.use_state_slack = true`` the outer loop runs in two phases:
+
+1. **Slack phase.** Every STATE-family constraint (AngularVelocity,
+   SunAvoidance, RWMomentum) is relaxed as ``c(x) - s <= 0`` with slack cost
+   ``slack_rho * s + 0.5 * slack_sigma * s^2``. The slack is eliminated in
+   closed form (``include/saltro/optimizer/al_slack.h``) and never enters the
+   iLQR decision space; all four AL sites (BP stage block, BP terminal seed,
+   FP merit, lambda update) see the shifted constraint ``c - s*``. The
+   constraint force is therefore capped at ``slack_rho + slack_sigma * s*``
+   even as ``mu`` ramps, which keeps ``Q_uu`` conditioned on hard problems
+   with large unavoidable transient violations. Control-family constraints
+   (torque saturation) never get slacks.
+2. **Polish phase.** Once the TRUE (unslacked) max violation reaches
+   ``slack_off_tol``, slacks are dropped and AL iterations continue
+   warm-started from the same trajectory and multipliers.
+   ``ALILQRStatus::Converged`` is only ever declared in the polish phase, so
+   the usual ``constraint_tol`` guarantee is unchanged and every slack run
+   ends with at least one slack-free inner solve.
+
+.. tip::
+
+   Diagnosis additions for slack runs:
+
+   - **Slack phase stalls above** ``slack_off_tol`` **->**
+     ``MaxOuterIterations``: the slack price is below the constraint's true
+     multiplier, so the optimizer permanently "buys" the violation. Raise
+     ``slack_rho`` (it must exceed the multiplier scale of the binding
+     constraint) or loosen ``slack_off_tol``.
+   - **Polish phase diverges after a clean slack phase**: the slack solution
+     parked the trajectory somewhere the exact penalty cannot hold (e.g. the
+     absorbed violation was structural, not transient). Inspect which family
+     carried nonzero slack at switch time; that family's constraint is the
+     real blocker.
+   - **An infeasible fixed initial knot** (e.g. ``|w0| > wmax``) keeps
+     ``max_c`` pinned at the k=0 violation forever - with or without slacks -
+     because the initial state is not a decision variable. Slack cannot fix
+     this; relax the constraint or accept ``MaxOuterIterations`` semantics.
+   - ``use_state_slack = false`` (default) is bit-identical to the unslacked
+     solver, and so is an uneconomically high ``slack_rho`` (regression
+     anchors: the ``[alilqr][slack]`` unit tests).

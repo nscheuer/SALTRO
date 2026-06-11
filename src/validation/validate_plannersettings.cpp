@@ -247,6 +247,23 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
+            // State-slack relaxation knobs. Validated unconditionally so a
+            // bad value can't lie dormant until use_state_slack is flipped.
+            if (pass.auglag.slack_rho <= 0.0 || !std::isfinite(pass.auglag.slack_rho)) {
+                error_msg = "auglag.slack_rho invalid";
+                return false;
+            }
+
+            if (pass.auglag.slack_sigma < 0.0 || !std::isfinite(pass.auglag.slack_sigma)) {
+                error_msg = "auglag.slack_sigma invalid";
+                return false;
+            }
+
+            if (pass.auglag.slack_off_tol <= 0.0 || !std::isfinite(pass.auglag.slack_off_tol)) {
+                error_msg = "auglag.slack_off_tol invalid";
+                return false;
+            }
+
             if (pass.auglag.constraint_tol <= 0.0 || !std::isfinite(pass.auglag.constraint_tol)) {
                 error_msg = "auglag.constraint_tol invalid";
                 return false;

@@ -74,6 +74,10 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("penalty_max_per_family", &AugLagConfig::penalty_max_per_family)
         .def_readwrite("penalty_scale_per_family", &AugLagConfig::penalty_scale_per_family)
         .def_readwrite("family_contraction_ratio", &AugLagConfig::family_contraction_ratio)
+        .def_readwrite("use_state_slack", &AugLagConfig::use_state_slack)
+        .def_readwrite("slack_rho", &AugLagConfig::slack_rho)
+        .def_readwrite("slack_sigma", &AugLagConfig::slack_sigma)
+        .def_readwrite("slack_off_tol", &AugLagConfig::slack_off_tol)
         .def_readwrite("constraint_tol", &AugLagConfig::constraint_tol)
         .def_readwrite("total_cost_tol", &AugLagConfig::total_cost_tol);
 

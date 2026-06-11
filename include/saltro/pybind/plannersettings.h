@@ -343,6 +343,45 @@ struct AugLagConfig {
     /// Set ≤ 0 (default) to disable conditional ramping (always ramp every outer iter).
     double family_contraction_ratio = 0.0;
 
+    /// State-constraint slack relaxation with a slack-free polish phase.
+    ///
+    /// When enabled, the STATE constraint families (AngularVelocity,
+    /// SunAvoidance, RWMomentum) are relaxed with per-constraint slack
+    /// variables s ≥ 0: c(x) ≤ 0 becomes c(x) − s ≤ 0 with slack cost
+    /// slack_rho·s + ½·slack_sigma·s² added to the merit. The slack is
+    /// eliminated analytically (it never enters the iLQR decision space):
+    /// s* = max(0, (λ + μ·c − slack_rho)/(μ + slack_sigma)), and every AL
+    /// site (BP gradient/Hessian seed, FP merit, λ update) sees the shifted
+    /// constraint c̃ = c − s*. The net effect is an exact-penalty cap: the
+    /// constraint force on a violated state constraint saturates at
+    /// slack_rho + slack_sigma·s* instead of growing as μ·c, which keeps the
+    /// inner solve conditioned on hard problems where μ must ramp high while
+    /// large transient violations are unavoidable.
+    ///
+    /// Once the TRUE (unslacked) max violation drops to slack_off_tol, the
+    /// outer loop switches to a polish phase: slacks are disabled and AL
+    /// iterations continue warm-started from the current trajectory and
+    /// multipliers. Convergence is only ever declared in the polish phase,
+    /// so a slack-enabled solve always ends with at least one slack-free
+    /// inner solve and the usual constraint_tol guarantee.
+    ///
+    /// Control-family constraints (torque saturations, stiction) never get
+    /// slacks: they are cheap to satisfy and physically clipped anyway.
+    bool use_state_slack = false;
+    /// Linear slack price (per unit of NORMALIZED constraint violation —
+    /// constraints() returns dimensionless violations). Must exceed the true
+    /// constraint multiplier scale for the slack phase to drive violations
+    /// down to slack_off_tol; if the slack phase stalls, raise this.
+    double slack_rho = 10.0;
+    /// Optional quadratic slack price (≥ 0). Zero gives a pure exact-penalty
+    /// (constant force) cap; > 0 makes the capped force grow gently with the
+    /// absorbed violation and restores curvature to the BP quadratic model.
+    double slack_sigma = 0.0;
+    /// True-violation threshold ("reasonable satisfaction") at which the
+    /// outer loop drops the slacks and polishes. Clamped below at
+    /// constraint_tol; keep it a few × constraint_tol.
+    double slack_off_tol = 0.02;
+
     double constraint_tol = 0.002;
     double total_cost_tol = 1e-2;
 };

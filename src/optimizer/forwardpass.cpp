@@ -2,6 +2,7 @@
 
 #include <saltro/math/integrators/rk4.h>
 #include <saltro/math/mrp.h>
+#include <saltro/optimizer/al_slack.h>
 #include <algorithm>
 #include <cmath>
 #include <exception>
@@ -224,6 +225,7 @@ bool forwardPass(
 
         // Add augmented Lagrangian penalty terms when provided.
         if (!lambda_aug.empty() && !mu_aug.empty()) {
+            const AugLagConfig& aug = settings.passes[0].auglag;
             const int n_lam = static_cast<int>(lambda_aug.size());
             const int n_mu = static_cast<int>(mu_aug.size());
             const int n_steps = std::min(N, std::min(n_lam, n_mu));
@@ -239,17 +241,20 @@ bool forwardPass(
                     return false;
                 }
 
+                const bool is_terminal = (k == N - 1);
                 for (int i = 0; i < c_k.size(); ++i) {
-                    const double ci = c_k(i);
-                    const double li = lambda_aug[k](i);
-                    const double mi = mu_aug[k](i);
                     // Lambda term always active with signed c (rewards
                     // feasibility); mu penalty when c > 0 OR lambda > 0.
                     // Must match the BP gradient and the inner iLQR merit.
-                    J_new += li * ci;
-                    if (ci > 0.0 || li > 0.0) {
-                        J_new += 0.5 * mi * ci * ci;
-                    }
+                    // With use_state_slack, state-family constraints get the
+                    // analytically-eliminated slack (al_slack.h) — the merit,
+                    // the BP model, and the dual update all see c - s*.
+                    const bool slack_on = aug.use_state_slack
+                        && isStateSlackFamily(satellite.constraintFamily(i, is_terminal));
+                    J_new += alSlackMeritTerm(
+                        c_k(i), lambda_aug[k](i), mu_aug[k](i),
+                        slack_on, aug.slack_rho, aug.slack_sigma
+                    );
                 }
             }
         }

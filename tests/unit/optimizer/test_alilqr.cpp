@@ -345,7 +345,10 @@ struct ALRunResult {
 // is ACTIVE from the start (|w0| = 0.0374 rad/s > wmax). The initial state
 // violates the constraint, so penalty ramping is genuinely exercised and the
 // chosen per-family penalties influence the solution.
-ALRunResult runALILQRDirectRWCase(const std::function<void(PlannerSettings&)>& mutate_settings) {
+ALRunResult runALILQRDirectRWCase(
+	const std::function<void(PlannerSettings&)>& mutate_settings,
+	const Eigen::Vector3d& w0 = Eigen::Vector3d(-0.01, 0.02, 0.03)
+) {
 	const double dt_seconds = 10.0;
 	const double tf_seconds = 200.0;
 
@@ -366,7 +369,7 @@ ALRunResult runALILQRDirectRWCase(const std::function<void(PlannerSettings&)>& m
 
 	Satellite::VecX x0(satellite.stateDim());
 	x0.setZero();
-	x0.segment<3>(Satellite::AV_INDEX) = Eigen::Vector3d(-0.01, 0.02, 0.03);
+	x0.segment<3>(Satellite::AV_INDEX) = w0;
 	x0.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
 
 	const int N = static_cast<int>(tf_seconds / dt_seconds) + 1;
@@ -518,6 +521,86 @@ TEST_CASE("AL per-family penalties: contraction ratio 0 means always ramp (same 
 	REQUIRE(base.ok == ratio_zero.ok);
 	REQUIRE((base.X - ratio_zero.X).cwiseAbs().maxCoeff() == 0.0);
 	REQUIRE((base.U - ratio_zero.U).cwiseAbs().maxCoeff() == 0.0);
+}
+
+TEST_CASE("State slack: dormant knobs are bit-identical to baseline", "[optimizer][alilqr][slack]") {
+	const ALRunResult base = runALILQRDirectRWCase([](PlannerSettings&) {});
+
+	// With use_state_slack=false the slack knobs must be completely inert.
+	const ALRunResult dormant = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		aug.use_state_slack = false;
+		aug.slack_rho = 0.1;
+		aug.slack_sigma = 7.0;
+		aug.slack_off_tol = 0.5;
+	});
+
+	REQUIRE(base.ok == dormant.ok);
+	REQUIRE((base.X - dormant.X).cwiseAbs().maxCoeff() == 0.0);
+	REQUIRE((base.U - dormant.U).cwiseAbs().maxCoeff() == 0.0);
+}
+
+TEST_CASE("State slack: uneconomical slack price reproduces baseline bit-exactly", "[optimizer][alilqr][slack]") {
+	// With slack_rho far above any lambda + mu*c reached in this short run,
+	// s* = 0 at every site, so all four AL sites (BP stage, BP terminal seed,
+	// FP merit, lambda update) must produce baseline numbers exactly. Any
+	// site applying the slack inconsistently (wrong family gate, wrong
+	// formula) breaks this equality. The run is capped at 3 outer iters with
+	// an active AngularVelocity violation, so the phase switch never fires.
+	const ALRunResult base = runALILQRDirectRWCase([](PlannerSettings&) {});
+
+	const ALRunResult priced_out = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		aug.use_state_slack = true;
+		aug.slack_rho = 1e30;
+		aug.slack_off_tol = 1e-9;  // never "reasonably satisfied" mid-run
+	});
+
+	REQUIRE(base.ok == priced_out.ok);
+	REQUIRE((base.X - priced_out.X).cwiseAbs().maxCoeff() == 0.0);
+	REQUIRE((base.U - priced_out.U).cwiseAbs().maxCoeff() == 0.0);
+}
+
+TEST_CASE("State slack: cheap slack changes the solve", "[optimizer][alilqr][slack]") {
+	// A slack price low enough to be economical against the active
+	// AngularVelocity violation must actually alter the AL landscape (the
+	// relaxation is consumed, not just plumbed through).
+	const ALRunResult base = runALILQRDirectRWCase([](PlannerSettings&) {});
+
+	const ALRunResult slack = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		aug.use_state_slack = true;
+		aug.slack_rho = 1e-2;
+	});
+
+	REQUIRE((base.U - slack.U).cwiseAbs().maxCoeff() > 1e-12);
+}
+
+TEST_CASE("State slack: two-phase solve converges and meets the TRUE constraint tol", "[optimizer][alilqr][slack]") {
+	// Full slack -> polish cycle on a FEASIBLE but binding problem (the
+	// default harness x0 violates wmax at the fixed initial knot, which no
+	// optimizer can repair): start at rest inside the limit with a 90 deg
+	// slew whose time budget forces |w| close to wmax along the way.
+	// Convergence is declared only in the polish phase, so ok=true proves at
+	// least one slack-free inner solve ran, and max_c is the true
+	// (unslacked) violation.
+	const auto mutate = [](PlannerSettings& s) {
+		s.constraints.wmax = 0.012;
+		s.passes[0].auglag.max_outer_iters = 15;
+		s.passes[0].ilqr.max_iters = 30;
+	};
+
+	const ALRunResult slack = runALILQRDirectRWCase([&](PlannerSettings& s) {
+		mutate(s);
+		auto& aug = s.passes[0].auglag;
+		aug.use_state_slack = true;
+		aug.slack_rho = 50.0;
+		aug.slack_off_tol = 0.02;
+	}, Eigen::Vector3d::Zero());
+
+	CAPTURE(slack.max_c);
+	REQUIRE(slack.ok);
+	REQUIRE(slack.max_c <= 1e-3 + 1e-9);
 }
 
 TEST_CASE("AL per-family penalties: trajOpt converges with per-family config and conditional ramping", "[optimizer][alilqr][per_family]") {

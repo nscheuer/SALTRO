@@ -4,6 +4,7 @@
 #include <limits>
 #include <vector>
 
+#include <saltro/optimizer/al_slack.h>
 #include <saltro/optimizer/iLQR.h>
 
 namespace saltro::optimizer {
@@ -101,6 +102,18 @@ bool alilqr(
     const auto& aug = settings.passes[pass_idx].auglag;
     const int NUM_FAMILIES = static_cast<int>(ConstraintFamily::NumFamilies);
 
+    // State-slack two-phase control (al_slack.h). Phase 1 (slack): state
+    // constraints are relaxed by analytically-eliminated slacks so the inner
+    // solve stays conditioned while large violations are traded off at price
+    // slack_rho. Phase 2 (polish): once the TRUE max violation reaches
+    // slack_off_tol, slacks are dropped and AL continues warm-started from
+    // the same trajectory and multipliers. The inner stack reads the flag
+    // from the settings copy below; convergence is only declared in the
+    // polish phase, so every slack run ends with >= 1 slack-free solve.
+    bool slack_phase = aug.use_state_slack;
+    const double slack_switch_tol = std::max(aug.slack_off_tol, aug.constraint_tol);
+    PlannerSettings phase_settings = settings;
+
     // Per-family AL config: if the user provided vectors of the right size
     // (NumFamilies), use them; otherwise fall back to the scalar values.
     auto per_family_or_default = [&NUM_FAMILIES](
@@ -155,7 +168,7 @@ bool alilqr(
         ILQRStatus ilqr_status = ILQRStatus::MaxIterations;
         ILQRTelemetry ilqr_telemetry;
         const bool ilqr_ok = iLQR(
-            settings,
+            phase_settings,
             satellite,
             X,
             U,
@@ -183,15 +196,26 @@ bool alilqr(
             }
         }
 
+        // True (unslacked) violation: slack only changes what the optimizer
+        // is penalized for, never what counts as satisfied.
         const double max_c = max_constraint_violation(settings, satellite, X, U, S);
         max_constraint_violation_out = max_c;
-        if (max_c <= aug.constraint_tol) {
+        if (!slack_phase && max_c <= aug.constraint_tol) {
             if (hasInnerProgress(ilqr_status, ilqr_telemetry)) {
                 status = ALILQRStatus::Converged;
                 return true;
             }
             status = ALILQRStatus::InnerFailed;
             return false;
+        }
+
+        if (slack_phase && max_c <= slack_switch_tol) {
+            // "Reasonable satisfaction" reached: drop the slacks and polish
+            // the same trajectory with the exact constraints. lambda/mu carry
+            // over (warm start); the multiplier update below already runs
+            // slack-free for this iterate.
+            slack_phase = false;
+            phase_settings.passes[pass_idx].auglag.use_state_slack = false;
         }
 
         const auto c_list = collect_constraints(settings, satellite, X, U, S);
@@ -231,7 +255,23 @@ bool alilqr(
             // Dual update uses the RAW signed constraint value so lambda can
             // decrease for satisfied constraints (proper dual evolution); the
             // cwiseMax(0) keeps inequality multipliers non-negative.
-            lambda_aug[k] = (lambda_aug[k] + mu_aug[k].cwiseProduct(c_list[k]))
+            // In the slack phase, slack families update against the shifted
+            // constraint c - s* (matching the BP/FP model), which saturates
+            // lambda at the slack price instead of chasing the absorbed
+            // violation.
+            Eigen::VectorXd c_eff = c_list[k];
+            if (slack_phase) {
+                const auto& fams_k = family_id[k];
+                for (int i = 0; i < c_eff.size(); ++i) {
+                    if (isStateSlackFamily(fams_k[static_cast<size_t>(i)])) {
+                        c_eff(i) -= optimalSlack(
+                            c_eff(i), lambda_aug[k](i), mu_aug[k](i),
+                            aug.slack_rho, aug.slack_sigma
+                        );
+                    }
+                }
+            }
+            lambda_aug[k] = (lambda_aug[k] + mu_aug[k].cwiseProduct(c_eff))
                                 .cwiseMin(aug.lag_mult_max)
                                 .cwiseMax(0.0);
 

@@ -1,6 +1,7 @@
 #include <saltro/optimizer/backwardpass.h>
 #include <saltro/math/integrators/rk4.h>
 #include <saltro/math/mrp.h>
+#include <saltro/optimizer/al_slack.h>
 #include <iostream>
 #include <cmath>
 
@@ -92,6 +93,7 @@ bool backwardPass(
 	(void)rho;  // Suppress unused parameter warning
 	const CostConfig& cost_cfg = settings.passes[0].cost;
 	const ConstraintConfig& cnst_cfg = settings.constraints;
+	const AugLagConfig& aug_cfg = settings.passes[0].auglag;
 	const double dt = (settings.num_passes > 0 && std::isfinite(settings.passes[0].dt) && settings.passes[0].dt > 0.0)
 		? settings.passes[0].dt
 		: 1.0;
@@ -140,21 +142,20 @@ bool backwardPass(
 			const Eigen::MatrixXd c_x = cT_x_full * G_N.transpose();
 
 			Eigen::VectorXd w = Eigen::VectorXd::Zero(c_T.size());
+			Eigen::VectorXd mu_eff = Eigen::VectorXd::Zero(c_T.size());
 			for (int i = 0; i < c_T.size(); ++i) {
-				const double li = lambda_aug[kT](i);
-				const double ci = c_T(i);
-				w(i) = li;
-				if (ci > 0.0 || li > 0.0) {
-					w(i) += mu_aug[kT](i) * ci;
-				}
+				const bool slack_on = aug_cfg.use_state_slack
+					&& isStateSlackFamily(satellite.constraintFamily(i, /*is_terminal=*/true));
+				alSlackWeights(
+					c_T(i), lambda_aug[kT](i), mu_aug[kT](i),
+					slack_on, aug_cfg.slack_rho, aug_cfg.slack_sigma,
+					w(i), mu_eff(i)
+				);
 			}
 			p_k.noalias() += c_x.transpose() * w;
 
 			for (int i = 0; i < c_T.size(); ++i) {
-				if (c_T(i) <= 0.0 && lambda_aug[kT](i) <= 0.0) {
-					continue;
-				}
-				const double mu_i = mu_aug[kT](i);
+				const double mu_i = mu_eff(i);
 				if (!std::isfinite(mu_i) || mu_i <= 0.0) {
 					continue;
 				}
@@ -221,24 +222,27 @@ bool backwardPass(
 				// (signed c, so feasibility is rewarded and lambda can pull
 				// back); the mu penalty is active when c > 0 OR lambda > 0.
 				// Must match the FP/inner merit and the alilqr lambda update.
+				// State-family slack (al_slack.h): the same sites see the
+				// shifted constraint c - s*, so the gradient weight saturates
+				// at the slack price and the GN curvature drops to mu_eff
+				// while the slack is interior.
 				Eigen::VectorXd w = Eigen::VectorXd::Zero(c_k.size());
+				Eigen::VectorXd mu_eff = Eigen::VectorXd::Zero(c_k.size());
 				for (int i = 0; i < c_k.size(); ++i) {
-					const double li = lambda_aug[k](i);
-					const double ci = c_k(i);
-					w(i) = li;
-					if (ci > 0.0 || li > 0.0) {
-						w(i) += mu_aug[k](i) * ci;
-					}
+					const bool slack_on = aug_cfg.use_state_slack
+						&& isStateSlackFamily(satellite.constraintFamily(i, /*is_terminal=*/false));
+					alSlackWeights(
+						c_k(i), lambda_aug[k](i), mu_aug[k](i),
+						slack_on, aug_cfg.slack_rho, aug_cfg.slack_sigma,
+						w(i), mu_eff(i)
+					);
 				}
 
 				lx.noalias() += c_x.transpose() * w;
 				lu.noalias() += c_u.transpose() * w;
 
 				for (int i = 0; i < c_k.size(); ++i) {
-					if (c_k(i) <= 0.0 && lambda_aug[k](i) <= 0.0) {
-						continue;
-					}
-					const double mu_i = mu_aug[k](i);
+					const double mu_i = mu_eff(i);
 					if (!std::isfinite(mu_i) || mu_i <= 0.0) {
 						continue;
 					}
