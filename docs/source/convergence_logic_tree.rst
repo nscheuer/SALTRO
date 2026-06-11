@@ -344,11 +344,19 @@ With ``auglag.use_state_slack = true`` the outer loop runs in two phases:
 
    Diagnosis additions for slack runs:
 
-   - **Slack phase stalls above** ``slack_off_tol`` **->**
-     ``MaxOuterIterations``: the slack price is below the constraint's true
-     multiplier, so the optimizer permanently "buys" the violation. Raise
-     ``slack_rho`` (it must exceed the multiplier scale of the binding
-     constraint) or loosen ``slack_off_tol``.
+   - **Slack phase stalls above** ``slack_off_tol``: the slack price is
+     below the constraint's true multiplier, so the optimizer permanently
+     "buys" the violation. Observed on underactuated MTQ-only 180-degree
+     slews with tight ``wmax`` (needed multiplier is huge); raising
+     ``slack_rho`` alone does NOT fix it there, because with
+     ``slack_sigma = 0`` the bought region also has zero curvature. The
+     stall fallback (``slack_stall_iters``, default 1) detects the
+     non-contracting TRUE violation and drops the slacks automatically,
+     recovering exact-AL behavior (where the slack phase genuinely helps it
+     contracts >5% per outer iter, so the hair-trigger default is
+     empirically bit-identical there); only with the fallback disabled must
+     you raise ``slack_rho``/``slack_sigma`` or loosen ``slack_off_tol`` by
+     hand.
    - **Polish phase diverges after a clean slack phase**: the slack solution
      parked the trajectory somewhere the exact penalty cannot hold (e.g. the
      absorbed violation was structural, not transient). Inspect which family

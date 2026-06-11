@@ -78,6 +78,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("slack_rho", &AugLagConfig::slack_rho)
         .def_readwrite("slack_sigma", &AugLagConfig::slack_sigma)
         .def_readwrite("slack_off_tol", &AugLagConfig::slack_off_tol)
+        .def_readwrite("slack_stall_iters", &AugLagConfig::slack_stall_iters)
         .def_readwrite("constraint_tol", &AugLagConfig::constraint_tol)
         .def_readwrite("total_cost_tol", &AugLagConfig::total_cost_tol);
 

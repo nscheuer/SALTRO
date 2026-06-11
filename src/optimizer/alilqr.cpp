@@ -114,6 +114,13 @@ bool alilqr(
     const double slack_switch_tol = std::max(aug.slack_off_tol, aug.constraint_tol);
     PlannerSettings phase_settings = settings;
 
+    // Stall fallback bookkeeping: if the slack phase stops contracting the
+    // TRUE violation (the slack price is below the binding constraint's
+    // multiplier, so the optimizer permanently "buys" the violation), drop
+    // the slacks and continue exact rather than burning the outer budget.
+    double slack_best_c = std::numeric_limits<double>::infinity();
+    int slack_stall_count = 0;
+
     // Per-family AL config: if the user provided vectors of the right size
     // (NumFamilies), use them; otherwise fall back to the scalar values.
     auto per_family_or_default = [&NUM_FAMILIES](
@@ -209,13 +216,28 @@ bool alilqr(
             return false;
         }
 
-        if (slack_phase && max_c <= slack_switch_tol) {
-            // "Reasonable satisfaction" reached: drop the slacks and polish
-            // the same trajectory with the exact constraints. lambda/mu carry
-            // over (warm start); the multiplier update below already runs
-            // slack-free for this iterate.
-            slack_phase = false;
-            phase_settings.passes[pass_idx].auglag.use_state_slack = false;
+        if (slack_phase) {
+            bool drop_slacks = false;
+            if (max_c <= slack_switch_tol) {
+                // "Reasonable satisfaction" reached: drop the slacks and
+                // polish the same trajectory with the exact constraints.
+                drop_slacks = true;
+            } else if (aug.slack_stall_iters > 0) {
+                // Stall fallback: no meaningful contraction of the TRUE
+                // violation for slack_stall_iters consecutive outer iters.
+                if (max_c < 0.95 * slack_best_c) {
+                    slack_best_c = max_c;
+                    slack_stall_count = 0;
+                } else if (++slack_stall_count >= aug.slack_stall_iters) {
+                    drop_slacks = true;
+                }
+            }
+            if (drop_slacks) {
+                // lambda/mu carry over (warm start); the multiplier update
+                // below already runs slack-free for this iterate.
+                slack_phase = false;
+                phase_settings.passes[pass_idx].auglag.use_state_slack = false;
+            }
         }
 
         const auto c_list = collect_constraints(settings, satellite, X, U, S);

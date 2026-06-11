@@ -603,6 +603,38 @@ TEST_CASE("State slack: two-phase solve converges and meets the TRUE constraint 
 	REQUIRE(slack.max_c <= 1e-3 + 1e-9);
 }
 
+TEST_CASE("State slack: stall fallback rescues an underpriced slack phase", "[optimizer][alilqr][slack]") {
+	// slack_rho far below the binding constraint's multiplier: the slack
+	// phase "buys" the violation and can never reach slack_off_tol. With the
+	// stall fallback disabled the run must burn the outer budget and fail;
+	// with it enabled the solver drops the slacks after slack_stall_iters
+	// non-contracting iterations and converges exactly like baseline AL.
+	const auto base_mutate = [](PlannerSettings& s) {
+		s.constraints.wmax = 0.012;
+		s.passes[0].auglag.max_outer_iters = 15;
+		s.passes[0].ilqr.max_iters = 30;
+		auto& aug = s.passes[0].auglag;
+		aug.use_state_slack = true;
+		aug.slack_rho = 1e-3;     // absurdly cheap: violation is always "bought"
+		aug.slack_off_tol = 1e-9; // tol-based switch can never fire mid-run
+	};
+
+	const ALRunResult no_fallback = runALILQRDirectRWCase([&](PlannerSettings& s) {
+		base_mutate(s);
+		s.passes[0].auglag.slack_stall_iters = 0;  // disabled
+	}, Eigen::Vector3d::Zero());
+
+	const ALRunResult with_fallback = runALILQRDirectRWCase([&](PlannerSettings& s) {
+		base_mutate(s);
+		s.passes[0].auglag.slack_stall_iters = 3;
+	}, Eigen::Vector3d::Zero());
+
+	CAPTURE(no_fallback.max_c, with_fallback.max_c);
+	REQUIRE_FALSE(no_fallback.ok);
+	REQUIRE(with_fallback.ok);
+	REQUIRE(with_fallback.max_c <= 1e-3 + 1e-9);
+}
+
 TEST_CASE("AL per-family penalties: trajOpt converges with per-family config and conditional ramping", "[optimizer][alilqr][per_family]") {
 	// End-to-end sanity: the full planner still converges with per-family
 	// penalties and conditional ramping enabled (constraints here are easily

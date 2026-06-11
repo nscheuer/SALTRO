@@ -381,6 +381,17 @@ struct AugLagConfig {
     /// outer loop drops the slacks and polishes. Clamped below at
     /// constraint_tol; keep it a few × constraint_tol.
     double slack_off_tol = 0.02;
+    /// Stall fallback: if the TRUE max violation fails to improve (by at
+    /// least 5% over the best seen) for this many consecutive slack-phase
+    /// outer iterations, drop the slacks and polish anyway. This rescues
+    /// problems whose binding-constraint multiplier exceeds the slack price
+    /// (e.g. underactuated MTQ-only slews, where the slack phase otherwise
+    /// "buys" a permanent violation and never reaches slack_off_tol).
+    /// Default 1 (hair-trigger): empirically bit-identical on problems where
+    /// the slack phase genuinely helps (it contracts >5% every outer iter
+    /// there), while bailing out before a misbehaving slack phase wrecks the
+    /// trajectory. Set <= 0 to disable.
+    int slack_stall_iters = 1;
 
     double constraint_tol = 0.002;
     double total_cost_tol = 1e-2;

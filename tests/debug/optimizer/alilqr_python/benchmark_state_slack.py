@@ -68,14 +68,14 @@ def make_settings(dt, wmax, max_outer=20, ilqr_iters=50):
     return s
 
 
-def make_satellite(settings, n_mtq=0, rw_hmax=0.02):
+def make_satellite(settings, n_mtq=0, rw_hmax=0.02, n_rw=3):
     J = np.diag([0.067, 0.071, 0.069])
     sat = saltro_py.Satellite(J, settings)
     axes = [np.array([1.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0]), np.array([0.0, 0.0, 1.0])]
     for i in range(n_mtq):
         sat.addMTQ(axes[i], 0.2)
-    for ax in axes:
-        sat.addRW(ax, 0.001, 1e-5, 0.0, rw_hmax)
+    for i in range(n_rw):
+        sat.addRW(axes[i], 0.001, 1e-5, 0.0, rw_hmax)
     return sat
 
 
