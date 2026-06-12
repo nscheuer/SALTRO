@@ -54,6 +54,8 @@ struct ALOuterIterRecord {
     int inner_iterations = 0;
     int accepted_steps = 0;
     double max_c = -1.0;                 // max violation after this solve
+    double final_grad = -1.0;            // last gradient metric of the solve
+    double last_delta_J = -1.0;          // |dJ| of the solve's last accepted step
 };
 
 // Per-call AL outer-loop telemetry.

@@ -221,6 +221,8 @@ bool alilqr(
         record.inner_iterations = inner_telemetry.iterations;
         record.accepted_steps = inner_telemetry.accepted_steps;
         record.max_c = max_c;
+        record.final_grad = inner_telemetry.final_grad;
+        record.last_delta_J = inner_telemetry.last_delta_J;
         telemetry.outer.push_back(record);
 
         if (!ilqr_ok && !isRecoverableInnerFailure(ilqr_status)) {

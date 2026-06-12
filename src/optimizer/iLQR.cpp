@@ -257,6 +257,7 @@ bool iLQR(
 		bool checked_this_iteration = false;
 
 		// Regularization retry loop
+		const double reg_iter_start = reg;
 		while (reg <= reg_cfg.reg_max) {
 			deltaV.setZero();
 
@@ -283,20 +284,36 @@ bool iLQR(
 			// warm start has g ~ 0 after the first BP and must exit Converged
 			// with zero accepted steps — never die as RegularizationExceeded
 			// because no forward pass can improve on an optimum.
-			// Only the first successful BP of an iteration is checked: a BP
-			// re-run at escalated regularization shrinks d artificially, and
-			// certifying stationarity from a reg-shrunk gradient would be a
-			// false convergence.
+			// Only the first successful BP of an iteration is checked, and
+			// the gradient branches additionally require that BP to have
+			// succeeded WITHOUT regularization escalation: a BP re-run at
+			// escalated reg shrinks d ∝ 1/reg, and certifying stationarity
+			// from a reg-shrunk gradient is a false convergence (observed on
+			// stiff high-mu AL solves, where BP only succeeds at reg >> init
+			// and the tiny d would otherwise exit GradientIntermediate at
+			// zero accepted steps while badly infeasible).
 			if (!checked_this_iteration) {
 				checked_this_iteration = true;
+				const bool grad_usable = (reg <= reg_iter_start);
 				const double g = gradient_metric(
 					ilqr_cfg.grad_metric, d, U.leftCols(N_u), authority, N_u);
 				telemetry.final_grad = g;
 				telemetry.ls_failed = ls_failed;
 
-				const bool grad_enabled = (active_grad_tol > 0.0);
-				const bool grad_ok = grad_enabled && (g <= active_grad_tol);
 				const bool have_step = (telemetry.accepted_steps > 0);
+				// Zero-accepted-step gradient exits must meet the STRICT
+				// grad_tol in both tiers: an optimal warm start has g ~ 0 and
+				// sails through, but an infeasible AL-stationary-ish iterate
+				// with g in (grad_tol, grad_tol_intermediate] must not be
+				// allowed to exit without taking a single step — otherwise
+				// the outer loop livelocks (zero-step "converged" exits while
+				// the violation never moves). After >= 1 accepted step the
+				// intermediate tolerance applies ("good enough for this
+				// lambda/mu, move on").
+				const bool grad_enabled = (active_grad_tol > 0.0) && grad_usable;
+				const bool grad_ok = grad_enabled
+					&& (have_step ? (g <= active_grad_tol)
+					              : (strict_grad_tol > 0.0 && g <= strict_grad_tol));
 				const bool cost_ok = have_step && (delta_J <= active_cost_tol);
 				const bool rel_ok = have_step && (ilqr_cfg.rel_cost_tol > 0.0)
 					&& (rel_delta_J >= 0.0) && (rel_delta_J <= ilqr_cfg.rel_cost_tol);
@@ -319,12 +336,13 @@ bool iLQR(
 					if (!have_step) {
 						// Zero accepted steps: the gradient alone is the
 						// stationarity certificate (cost-change is vacuous).
-						if (strict_grad_tol > 0.0 && g <= strict_grad_tol) {
+						if (grad_usable && strict_grad_tol > 0.0 && g <= strict_grad_tol) {
 							fired = ILQRBreakReason::GradientStationary;
 						}
 					} else {
 						const bool g_ok_strict =
-							(strict_grad_tol <= 0.0) || (g <= strict_grad_tol);
+							(strict_grad_tol <= 0.0)
+							|| (grad_usable && g <= strict_grad_tol);
 						const bool cost_ok_strict =
 							(delta_J <= strict_cost_tol) || rel_ok;
 						if (g_ok_strict && cost_ok_strict && !ls_failed) {
