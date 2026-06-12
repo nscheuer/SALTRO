@@ -417,17 +417,70 @@ enum class ConstraintFamily : int {
     NumFamilies     = 7,
 };
 
+/// Dual (Lagrange multiplier) update gating for the AL outer loop.
+/// Classical safeguarded-AL theory (N&W Alg. 17.4) only updates λ from a
+/// subproblem solved to tolerance; updating λ off a garbage iterate poisons
+/// the dual sequence.
+/// (A stricter per-family variant gating λ on family-violation contraction
+/// is parked with the per-family penalty schedule, PR #52.)
+enum class DualUpdateMode : int {
+    /// Update λ only when the inner iLQR solve exited Converged (default).
+    /// Eliminates the one-accepted-step-then-RegExceeded dual-poisoning path.
+    OnConverged = 0,
+    /// Update λ whenever the inner solve made progress
+    /// (Converged OR ≥1 accepted step).
+    OnProgress = 1,
+};
+
 struct AugLagConfig {
     int max_outer_iters = 30;
+
+    /// Minimum number of completed outer iterations (counting the current
+    /// one) before the settled convergence declaration may fire. Prevents
+    /// premature exit on a half-settled dual sequence (OldPlanner `j > 2`).
+    int min_outer_iters = 3;
+
+    /// Global budget on TOTAL inner iLQR iterations summed across all outer
+    /// iterations (OldPlanner `maxIter` parity; Altro.jl `iterations`).
+    /// When exceeded the solve returns ALILQRStatus::MaxTotalIterations with
+    /// the best trajectory found (never throws). 0 disables the budget.
+    int max_total_iters = 1000;
 
     double lag_mult_init = 0.0;
     double lag_mult_max = 1e20;
 
+    /// AL penalty knobs.
+    /// penalty_max default dropped 1e16 → 1e8 (2026-06): without a
+    /// square-root backward pass, μ beyond ~1e8 wrecks the conditioning of
+    /// Q_uu with no way to survive it (ALTRO-class solvers also cap at 1e8).
     double penalty_init = 1e-1;
-    double penalty_max = 1e16;
+    double penalty_max = 1e8;
     double penalty_scale = 10.0;
 
+    /// Dual update gating (see DualUpdateMode). Default: OnConverged.
+    DualUpdateMode dual_update_mode = DualUpdateMode::OnConverged;
+
+    /// λ-stall detection for the PenaltyMaxReached exit: when every μ is
+    /// saturated at its cap and the problem is still infeasible, λ updates are
+    /// a slow method-of-multipliers that may still close the gap. We declare
+    /// PenaltyMaxReached once max_k,i |Δλ|/max(|λ|,1) < lambda_stall_tol for 2
+    /// consecutive saturated iterations, or after penalty_max_patience
+    /// saturated-and-infeasible outer iterations regardless.
+    double lambda_stall_tol = 1e-3;
+    int penalty_max_patience = 5;
+
     double constraint_tol = 0.002;
+
+    /// Fast-path constraint tolerance: if > 0 and max violation ≤ this,
+    /// declare AL Converged immediately — bypassing min_outer_iters and the
+    /// settled-strict-solve requirement, but NEVER the inner-progress floor
+    /// (a literal do-nothing trajectory can never be blessed). Suggested
+    /// enabled value: 0.1 × constraint_tol. Default 0.0 disables.
+    double constraint_tol_strict = 0.0;
+
+    /// RESERVED, NOT IMPLEMENTED. Never read by the optimizer; validation
+    /// rejects non-default values so the knob cannot silently no-op
+    /// (G20 policy: wire or reject).
     double total_cost_tol = 1e-2;
 };
 
@@ -450,10 +503,50 @@ struct AugLagConfig {
  * @param max_cost Abort if cost exceeds this value
  * @param state_bound Maximum allowed state magnitude
  */
+/// Gradient-surrogate metric used by the inner iLQR convergence test on the
+/// feedforward terms d_k from the backward pass.
+enum class GradMetric : int {
+    /// max_k max_i |d_k(i)| / u_max_i — "fraction of actuator authority the
+    /// next step wants". Dimensionless; robust to heterogeneous actuator
+    /// scales (MTQ A·m² vs RW N·m). Default.
+    Authority = 0,
+    /// Tassa iLQG.m g_norm: mean_k max_i |d_k(i)| / (|u_k(i)| + 1).
+    /// OldPlanner-parity metric (tuned PhD gradTol values calibrated to it).
+    GNormTassa = 1,
+    /// Raw max_k ‖d_k‖_∞ (PKMN_antispike metric).
+    LInf = 2,
+};
+
 struct ILQRConfig {
     int max_iters = 250;
-    double grad_tol = 0.0;
+
+    /// Strict-tier gradient tolerance (used by settling solves; also the
+    /// zero-accepted-steps stationarity certificate). ≤ 0 disables the
+    /// gradient test entirely (both tiers).
+    double grad_tol = 1e-3;
+    /// Loose-tier gradient tolerance for intermediate (non-settling) solves.
+    /// 0 (default) auto-derives 10 × grad_tol; explicit values are clamped
+    /// to ≥ grad_tol.
+    double grad_tol_intermediate = 0.0;
+    /// Metric used for the gradient test (see GradMetric).
+    GradMetric grad_metric = GradMetric::Authority;
+
+    /// Strict-tier absolute cost-change tolerance (settling solves).
     double cost_tol = 1e-1;
+    /// Loose-tier absolute cost-change tolerance for intermediate solves.
+    /// 0 (default) auto-derives 10 × cost_tol; explicit values are clamped
+    /// to ≥ cost_tol.
+    double cost_tol_intermediate = 0.0;
+    /// Relative cost-change tolerance |ΔJ|/max(|J_prev|,1) ≤ rel_cost_tol.
+    /// DEFAULTS OFF (0.0): absolute cost_tol stays the default exit; the
+    /// scale-invariant test is an opt-in stopgap until tolerance autotuning.
+    double rel_cost_tol = 0.0;
+
+    /// Stall counter (PhD dlaZcount semantics): increments on every accepted
+    /// step whose relative cost progress |ΔJ|/(|J|+1e-10) ≤ 1e-3, resets on
+    /// relative progress. Reaching z_count_lim exits with
+    /// ILQRStatus::Stalled and the best trajectory (not a failure).
+    /// 0 disables.
     int z_count_lim = 10;
 
     double max_cost = 1e40;
