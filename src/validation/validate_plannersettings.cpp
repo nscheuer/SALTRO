@@ -220,6 +220,16 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
+            if (pass.auglag.min_outer_iters < 0) {
+                error_msg = "auglag.min_outer_iters invalid";
+                return false;
+            }
+
+            if (pass.auglag.max_total_iters < 0) {
+                error_msg = "auglag.max_total_iters invalid";
+                return false;
+            }
+
             if (pass.auglag.lag_mult_init < 0.0 || !std::isfinite(pass.auglag.lag_mult_init)) {
                 error_msg = "auglag.lag_mult_init invalid";
                 return false;
@@ -260,8 +270,30 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
-            if (pass.auglag.total_cost_tol <= 0.0 || !std::isfinite(pass.auglag.total_cost_tol)) {
-                error_msg = "auglag.total_cost_tol invalid";
+            // constraint_tol_strict: 0 disables the fast path; when enabled
+            // it must be at least as tight as constraint_tol.
+            if (pass.auglag.constraint_tol_strict < 0.0
+                || !std::isfinite(pass.auglag.constraint_tol_strict)
+                || pass.auglag.constraint_tol_strict > pass.auglag.constraint_tol) {
+                error_msg = "auglag.constraint_tol_strict invalid";
+                return false;
+            }
+
+            if (pass.auglag.lambda_stall_tol <= 0.0 || !std::isfinite(pass.auglag.lambda_stall_tol)) {
+                error_msg = "auglag.lambda_stall_tol invalid";
+                return false;
+            }
+
+            if (pass.auglag.penalty_max_patience < 0) {
+                error_msg = "auglag.penalty_max_patience invalid";
+                return false;
+            }
+
+            // total_cost_tol is RESERVED (never read by the optimizer).
+            // Reject non-default values so the knob cannot silently no-op
+            // (G20 policy: wire or reject).
+            if (pass.auglag.total_cost_tol != AugLagConfig{}.total_cost_tol) {
+                error_msg = "auglag.total_cost_tol is reserved (not implemented); leave at default";
                 return false;
             }
 
@@ -271,13 +303,29 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
+            // grad_tol: 0 disables the gradient test; negative is invalid.
             if (pass.ilqr.grad_tol < 0.0 || !std::isfinite(pass.ilqr.grad_tol)) {
                 error_msg = "ilqr.grad_tol invalid";
                 return false;
             }
 
+            if (pass.ilqr.grad_tol_intermediate < 0.0 || !std::isfinite(pass.ilqr.grad_tol_intermediate)) {
+                error_msg = "ilqr.grad_tol_intermediate invalid";
+                return false;
+            }
+
             if (pass.ilqr.cost_tol < 0.0 || !std::isfinite(pass.ilqr.cost_tol)) {
                 error_msg = "ilqr.cost_tol invalid";
+                return false;
+            }
+
+            if (pass.ilqr.cost_tol_intermediate < 0.0 || !std::isfinite(pass.ilqr.cost_tol_intermediate)) {
+                error_msg = "ilqr.cost_tol_intermediate invalid";
+                return false;
+            }
+
+            if (pass.ilqr.rel_cost_tol < 0.0 || !std::isfinite(pass.ilqr.rel_cost_tol)) {
+                error_msg = "ilqr.rel_cost_tol invalid";
                 return false;
             }
 
