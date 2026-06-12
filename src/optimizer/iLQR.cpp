@@ -75,6 +75,102 @@ double augmented_penalty_total(
 	return total;
 }
 
+// Per-channel authority denominators for GradMetric::Authority.
+// Prefer the validated settings u_max; fall back to the satellite's actuator
+// limits (mirrors trajOpt's u_max auto-fill); channels with no/zero authority
+// use 1.0 so the metric stays finite.
+Eigen::VectorXd authority_denominators(
+	const PlannerSettings& settings,
+	const Satellite& satellite,
+	int nu
+)
+{
+	Eigen::VectorXd denom = Eigen::VectorXd::Ones(nu);
+	const auto& u_max = settings.constraints.u_max;
+	if (static_cast<int>(u_max.size()) == nu) {
+		for (int i = 0; i < nu; ++i) {
+			const double v = u_max(i);
+			if (std::isfinite(v) && v > 0.0) {
+				denom(i) = v;
+			}
+		}
+		return denom;
+	}
+
+	int idx = 0;
+	auto set_next = [&](double v) {
+		if (idx < nu) {
+			const double a = std::abs(v);
+			denom(idx++) = (std::isfinite(a) && a > 0.0) ? a : 1.0;
+		}
+	};
+	for (int i = 0; i < satellite.numMTQ(); ++i) {
+		set_next(satellite.getMTQ(i).u_max());
+	}
+	for (int i = 0; i < satellite.numRW(); ++i) {
+		set_next(satellite.getRW(i).u_max());
+	}
+	for (int i = 0; i < satellite.numMagic(); ++i) {
+		set_next(satellite.getMagic(i).u_max());
+	}
+	return denom;
+}
+
+// Gradient-surrogate metric over the feedforward terms d_k (see GradMetric).
+double gradient_metric(
+	const GradMetric metric,
+	const std::vector<Eigen::VectorXd>& d,
+	const Eigen::Ref<const Eigen::MatrixXd>& U,
+	const Eigen::VectorXd& authority,
+	int N_u
+)
+{
+	const int n = std::min(N_u, static_cast<int>(d.size()));
+	if (n <= 0) {
+		return 0.0;
+	}
+
+	switch (metric) {
+		case GradMetric::GNormTassa: {
+			// Tassa iLQG.m g_norm: mean_k max_i |d_k(i)| / (|u_k(i)| + 1).
+			double sum = 0.0;
+			for (int k = 0; k < n; ++k) {
+				double mx = 0.0;
+				for (int i = 0; i < d[k].size(); ++i) {
+					const double u_ki = (k < U.cols() && i < U.rows()) ? U(i, k) : 0.0;
+					mx = std::max(mx, std::abs(d[k](i)) / (std::abs(u_ki) + 1.0));
+				}
+				sum += mx;
+			}
+			return sum / static_cast<double>(n);
+		}
+		case GradMetric::LInf: {
+			double mx = 0.0;
+			for (int k = 0; k < n; ++k) {
+				mx = std::max(mx, d[k].lpNorm<Eigen::Infinity>());
+			}
+			return mx;
+		}
+		case GradMetric::Authority:
+		default: {
+			// max_k max_i |d_k(i)| / u_max_i: fraction of actuator authority
+			// the next full step requests.
+			double mx = 0.0;
+			for (int k = 0; k < n; ++k) {
+				for (int i = 0; i < d[k].size(); ++i) {
+					const double a = (i < authority.size()) ? authority(i) : 1.0;
+					mx = std::max(mx, std::abs(d[k](i)) / a);
+				}
+			}
+			return mx;
+		}
+	}
+}
+
+// Relative-progress threshold for the stall counter reset (OldPlanner
+// dlaZcount parity: reset when |dJ|/(|J|+1e-10) > 1e-3).
+constexpr double STALL_RESET_REL_PROGRESS = 1e-3;
+
 } // namespace
 
 bool iLQR(
@@ -93,11 +189,13 @@ bool iLQR(
 	int pass_idx,
 	const std::vector<Eigen::VectorXd>& lambda_aug,
 	const std::vector<Eigen::VectorXd>& mu_aug,
+	bool settle,
 	ILQRStatus& status,
 	double& J,
 	ILQRTelemetry& telemetry
 ) {
 	telemetry = ILQRTelemetry{};
+	telemetry.settle = settle;
 	const CostConfig& cost_cfg = settings.passes[pass_idx].cost;
 	const ILQRConfig& ilqr_cfg = settings.passes[pass_idx].ilqr;
 	const RegularizationConfig& reg_cfg = settings.passes[pass_idx].reg;
@@ -119,15 +217,44 @@ bool iLQR(
 	}
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
-	// Main iLQR iteration loop.
+	// ---- Tier tolerances ----------------------------------------------------
+	// Strict tier (settle=true): conjunctive, used by the AL outer loop for
+	// settling solves. Loose tier (settle=false): disjunctive intermediate
+	// tolerances (ALTRO `*_intermediate` pattern). Unset (0) intermediate
+	// values auto-derive 10x their strict counterpart; explicit values are
+	// clamped to be no tighter than strict.
+	const double strict_cost_tol = ilqr_cfg.cost_tol;
+	const double loose_cost_tol = (ilqr_cfg.cost_tol_intermediate > 0.0)
+		? std::max(ilqr_cfg.cost_tol_intermediate, strict_cost_tol)
+		: 10.0 * strict_cost_tol;
+	const double strict_grad_tol = ilqr_cfg.grad_tol;  // <= 0 disables
+	const double loose_grad_tol = (strict_grad_tol > 0.0)
+		? ((ilqr_cfg.grad_tol_intermediate > 0.0)
+			? std::max(ilqr_cfg.grad_tol_intermediate, strict_grad_tol)
+			: 10.0 * strict_grad_tol)
+		: 0.0;
+	const double active_cost_tol = settle ? strict_cost_tol : loose_cost_tol;
+	const double active_grad_tol = settle ? strict_grad_tol : loose_grad_tol;
+
+	const Eigen::VectorXd authority = authority_denominators(settings, satellite, nu);
+
+	// State carried across iterations for the pre-FP convergence check.
+	double delta_J = -1.0;        // |dJ| of the last accepted step
+	double rel_delta_J = -1.0;    // |dJ| / max(|J_prev_step|, 1)
+	double rel_progress = -1.0;   // |dJ| / (|J_prev_step| + 1e-10), stall reset
+	bool ls_failed = false;       // last forward-pass attempt failed
+	int stall_count = 0;          // dlaZcount
+
+	// Main iLQR iteration loop
 	double reg = reg_cfg.reg_init;
 	for (int iteration = 0; iteration < ilqr_cfg.max_iters; ++iteration) {
-		telemetry.iterations = iteration + 1;
+		++telemetry.iterations;
 		// Reset regularization each iteration unless persistent (ALTRO-style)
 		if (!ilqr_cfg.persistent_reg) {
 			reg = reg_cfg.reg_init;
 		}
 		const int N_u = std::max(0, N - 1);
+		bool checked_this_iteration = false;
 
 		// Regularization retry loop
 		while (reg <= reg_cfg.reg_max) {
@@ -150,7 +277,71 @@ bool iLQR(
 
 			double J_prev = satellite.totalCost(X, U.leftCols(N_u), B, boresight, attitude_target, cost_cfg);
 			J_prev += augmented_penalty_total(satellite, cnst_cfg, X, U, S, lambda_aug, mu_aug);
-			
+
+			// ---- Convergence check: after the backward pass, BEFORE the ----
+			// forward pass. Placement is load-bearing: a genuinely-optimal
+			// warm start has g ~ 0 after the first BP and must exit Converged
+			// with zero accepted steps — never die as RegularizationExceeded
+			// because no forward pass can improve on an optimum.
+			// Only the first successful BP of an iteration is checked: a BP
+			// re-run at escalated regularization shrinks d artificially, and
+			// certifying stationarity from a reg-shrunk gradient would be a
+			// false convergence.
+			if (!checked_this_iteration) {
+				checked_this_iteration = true;
+				const double g = gradient_metric(
+					ilqr_cfg.grad_metric, d, U.leftCols(N_u), authority, N_u);
+				telemetry.final_grad = g;
+				telemetry.ls_failed = ls_failed;
+
+				const bool grad_enabled = (active_grad_tol > 0.0);
+				const bool grad_ok = grad_enabled && (g <= active_grad_tol);
+				const bool have_step = (telemetry.accepted_steps > 0);
+				const bool cost_ok = have_step && (delta_J <= active_cost_tol);
+				const bool rel_ok = have_step && (ilqr_cfg.rel_cost_tol > 0.0)
+					&& (rel_delta_J >= 0.0) && (rel_delta_J <= ilqr_cfg.rel_cost_tol);
+
+				ILQRBreakReason fired = ILQRBreakReason::None;
+				if (!settle) {
+					// Loose tier: disjunctive (any criterion exits). The cost
+					// branches require >= 1 accepted step in THIS call (no dJ
+					// exists otherwise); the gradient branch may fire at zero
+					// accepted steps (optimal warm start).
+					if (grad_ok) {
+						fired = ILQRBreakReason::GradientIntermediate;
+					} else if (cost_ok) {
+						fired = ILQRBreakReason::CostIntermediate;
+					} else if (rel_ok) {
+						fired = ILQRBreakReason::RelCostIntermediate;
+					}
+				} else {
+					// Strict tier (settling solve): conjunctive.
+					if (!have_step) {
+						// Zero accepted steps: the gradient alone is the
+						// stationarity certificate (cost-change is vacuous).
+						if (strict_grad_tol > 0.0 && g <= strict_grad_tol) {
+							fired = ILQRBreakReason::GradientStationary;
+						}
+					} else {
+						const bool g_ok_strict =
+							(strict_grad_tol <= 0.0) || (g <= strict_grad_tol);
+						const bool cost_ok_strict =
+							(delta_J <= strict_cost_tol) || rel_ok;
+						if (g_ok_strict && cost_ok_strict && !ls_failed) {
+							fired = ILQRBreakReason::StrictConjunction;
+						}
+					}
+				}
+
+				if (fired != ILQRBreakReason::None) {
+					J = J_prev;  // cost of the (unchanged) current trajectory
+					telemetry.final_cost = J;
+					telemetry.break_reason = fired;
+					status = ILQRStatus::Converged;
+					return true;
+				}
+			}
+
 			bool fp_success = forwardPass(
 				satellite,
 				X,
@@ -172,8 +363,10 @@ bool iLQR(
 				J_prev,
 				J
 			);
-			
+
 			if (!fp_success) {
+				ls_failed = true;
+				telemetry.ls_failed = true;
 				if (ilqr_cfg.persistent_reg) {
 					// Triple increase (original ALTRO): increaseReg + bump + increaseReg
 					reg = reg * reg_cfg.reg_scale + reg_cfg.reg_bump;
@@ -193,37 +386,29 @@ bool iLQR(
 					reg = 0.0;
 				}
 			}
+
+			// Both passes succeeded: bookkeeping for the next iteration's
+			// pre-FP convergence check.
+			ls_failed = false;
+			telemetry.ls_failed = false;
 			++telemetry.accepted_steps;
+			delta_J = std::abs(J_prev - J);
+			rel_delta_J = delta_J / std::max(std::abs(J_prev), 1.0);
+			rel_progress = delta_J / (std::abs(J_prev) + 1e-10);
+			telemetry.last_delta_J = delta_J;
 			telemetry.final_cost = J;
 
-			// Both passes succeeded — check convergence (grad_tol/conjunctive
-			// flags supersede the legacy cost-only early return).
-			const double delta_J = std::abs(J_prev - J);
-			telemetry.last_delta_J = delta_J;
-			const bool cost_converged = (delta_J <= ilqr_cfg.cost_tol);
-
-			bool grad_converged = false;
-			if (ilqr_cfg.grad_tol > 0.0) {
-				double max_d_norm = 0.0;
-				for (int kk = 0; kk < N - 1; ++kk) {
-					const double dnorm = d[kk].norm();
-					if (dnorm > max_d_norm) max_d_norm = dnorm;
-				}
-				grad_converged = (max_d_norm <= ilqr_cfg.grad_tol);
-			}
-
-			if (ilqr_cfg.conjunctive_convergence) {
-				// Original ALTRO: require ALL conditions to hold.
-				// grad_tol=0 disables that requirement (treated as satisfied).
-				const bool grad_ok = (ilqr_cfg.grad_tol <= 0.0) || grad_converged;
-				if (cost_converged && grad_ok) {
-					status = ILQRStatus::Converged;
-					return true;
-				}
+			// Stall counter (dlaZcount semantics): counts consecutive accepted
+			// steps without relative progress; resets when relative progress
+			// is made. Tripping it returns the best trajectory as Stalled —
+			// a usable, non-failure exit that is NOT Converged.
+			if (rel_progress > STALL_RESET_REL_PROGRESS) {
+				stall_count = 0;
 			} else {
-				// Disjunctive: either cost or gradient convergence suffices.
-				if (cost_converged || (ilqr_cfg.grad_tol > 0.0 && grad_converged)) {
-					status = ILQRStatus::Converged;
+				++stall_count;
+				if (ilqr_cfg.z_count_lim > 0 && stall_count >= ilqr_cfg.z_count_lim) {
+					telemetry.break_reason = ILQRBreakReason::Stalled;
+					status = ILQRStatus::Stalled;
 					return true;
 				}
 			}
@@ -233,11 +418,13 @@ bool iLQR(
 
 		// Check if regularization exceeded maximum
 		if (reg > reg_cfg.reg_max) {
+			telemetry.break_reason = ILQRBreakReason::RegularizationExceeded;
 			status = ILQRStatus::RegularizationExceeded;
 			return false;
 		}
 	}
 
+	telemetry.break_reason = ILQRBreakReason::MaxIterations;
 	status = ILQRStatus::MaxIterations;
 	return false;
 }
@@ -278,6 +465,51 @@ bool iLQR(
 		pass_idx,
 		lambda_aug,
 		mu_aug,
+		false,
+		status,
+		J,
+		telemetry
+	);
+}
+
+// Back-compat overload: loose tier, telemetry reported.
+bool iLQR(
+	const PlannerSettings& settings,
+	const Satellite& satellite,
+	Eigen::Ref<Eigen::MatrixXd> X,
+	Eigen::Ref<Eigen::MatrixXd> U,
+	const Eigen::Ref<const Eigen::MatrixXd>& R,
+	const Eigen::Ref<const Eigen::MatrixXd>& V,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho,
+	const Eigen::Ref<const Eigen::VectorXd>& jtime,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+	int pass_idx,
+	const std::vector<Eigen::VectorXd>& lambda_aug,
+	const std::vector<Eigen::VectorXd>& mu_aug,
+	ILQRStatus& status,
+	double& J,
+	ILQRTelemetry& telemetry
+) {
+	return iLQR(
+		settings,
+		satellite,
+		X,
+		U,
+		R,
+		V,
+		B,
+		S,
+		rho,
+		jtime,
+		boresight,
+		attitude_target,
+		pass_idx,
+		lambda_aug,
+		mu_aug,
+		false,
 		status,
 		J,
 		telemetry
