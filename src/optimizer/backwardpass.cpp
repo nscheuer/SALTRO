@@ -94,6 +94,12 @@ bool backwardPass(
 	const std::vector<Eigen::VectorXd>& lambda_aug,
 	const std::vector<Eigen::VectorXd>& mu_aug
 ) {
+	if (settings.passes[0].reg.use_sqrt_bp) {
+		return backwardPassSqrt(
+			satellite, X, U, R, V, B, S, rho, boresight, attitude_target,
+			settings, reg, K, d, deltaV, lambda_aug, mu_aug
+		);
+	}
 	(void)rho;  // Suppress unused parameter warning
 	const CostConfig& cost_cfg = settings.passes[0].cost;
 	const ConstraintConfig& cnst_cfg = settings.constraints;
