@@ -165,6 +165,9 @@ bool alilqr(
     int lambda_stall_run = 0;   // consecutive saturated iters with stalled duals
     int saturated_iters = 0;    // consecutive saturated, infeasible, non-contracting iters
     double max_c_prev_outer = std::numeric_limits<double>::infinity();
+    // Largest relative dual update of the PREVIOUS outer iteration. Drives the
+    // dual-settlement side of the stalled-solve certificate below.
+    double prev_max_rel_dlambda = std::numeric_limits<double>::infinity();
 
     for (int outer_iter = 0; outer_iter < aug.max_outer_iters; ++outer_iter) {
         double J = 0.0;
@@ -244,14 +247,24 @@ bool alilqr(
         // "stalled" solve may still be improving meaningfully in absolute
         // terms, and blessing it prematurely truncates the refinement tail
         // (observed: 6 deg instead of ~1 deg on the RW-momentum winner
-        // config). So a stall certifies the settled declaration only when the
-        // solve also touched absolute flatness: some accepted step had
-        // |dJ| <= the strict cost_tol (exactly the step the legacy
-        // cost-only gate would have exited Converged on).
+        // config). So a stalled settle-tier solve certifies only when, in
+        // addition, either side of the LANCELOT-style two-sided test holds:
+        //   (a) absolute flatness: some accepted step had |dJ| <= the strict
+        //       cost_tol (exactly the step the legacy cost-only gate would
+        //       have exited Converged on); or
+        //   (b) dual settlement: the previous outer iteration's multiplier
+        //       update was negligible (max relative dLambda below
+        //       lambda_stall_tol) — the eta/omega forcing sequence has
+        //       converged, so the AL cannot meaningfully change anymore and
+        //       the primal plateau is the answer (e.g. a feasible-throughout
+        //       solve whose lambdas sit at 0).
         const bool inner_stalled_flat = inner_stalled
             && (inner_telemetry.min_delta_J >= 0.0)
             && (inner_telemetry.min_delta_J <= settings.passes[pass_idx].ilqr.cost_tol);
-        const bool inner_settled = inner_converged || inner_stalled_flat;
+        const bool inner_stalled_duals_settled = inner_stalled
+            && (prev_max_rel_dlambda < aug.lambda_stall_tol);
+        const bool inner_settled =
+            inner_converged || inner_stalled_flat || inner_stalled_duals_settled;
         const bool inner_progress =
             inner_converged || inner_stalled || (inner_telemetry.accepted_steps > 0);
 
@@ -326,6 +339,8 @@ bool alilqr(
             // parked with #52).
             mu_aug[k] = (mu_aug[k] * aug.penalty_scale).cwiseMin(aug.penalty_max);
         }
+
+        prev_max_rel_dlambda = max_rel_dlambda;
 
         // ---- PenaltyMaxReached: all penalties capped while infeasible ----
         // With mu pegged, lambda updates are still a slow method of
