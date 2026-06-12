@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <string>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -54,9 +55,7 @@ PlannerSettings createRWPlannerSettings(double dt_seconds) {
 	cost.magic_control_weight = 0.0;
 	cost.rw_AM_weight = 0.0;
 	cost.rw_stic_weight = 0.0;
-	cost.RWh_max_mult = 0.0;
 	cost.RWh_stiction_mult = 0.0;
-	cost.RWh_ok_mult = 0.0;
 	cost.angle_N = 0.0;
 	cost.ang_vel_N = 0.0;
 	cost.ang_cost_func_type = 3;
@@ -476,4 +475,238 @@ TEST_CASE("Break gates: PenaltyMaxReached is reachable and carries a trajectory"
 	        <= settings.passes[0].auglag.penalty_max_patience + 2);
 	requireFinite(p.X);
 	requireFinite(p.U);
+}
+
+// ----------------------------------------------------------------------------
+// 5. decide() truth table (BREAK_GATE_DESIGN.md §8)
+// ----------------------------------------------------------------------------
+//
+// The outer-loop verdict logic is a pure function over named predicates; this
+// table enumerates EVERY combination of the boolean GateInputs × representative
+// values of the analog inputs (max_c against the two tolerances,
+// outer_iters_done against min_outer_iters, total_inner_iters against the
+// global budget) × two config variants (all gates armed / fast path + budget
+// disabled). The table IS the documentation: expectedVerdict() restates the
+// design rule by rule, and each row's name is captured so a failure reads as
+// "which documented rule broke".
+
+namespace {
+
+using optimizer::ALConvergedVia;
+using optimizer::GateConfig;
+using optimizer::GateDecision;
+using optimizer::GateInputs;
+using optimizer::Verdict;
+
+GateInputs gateRow(bool inner_settled, bool inner_progress, bool ran_strict_tier,
+                   bool all_mu_saturated, bool lambda_stalled, bool patience_exhausted,
+                   double max_c, int outer_iters_done, long total_inner_iters) {
+	GateInputs in;
+	in.inner_settled = inner_settled;
+	in.inner_progress = inner_progress;
+	in.ran_strict_tier = ran_strict_tier;
+	in.all_mu_saturated = all_mu_saturated;
+	in.lambda_stalled = lambda_stalled;
+	in.patience_exhausted = patience_exhausted;
+	in.max_c = max_c;
+	in.outer_iters_done = outer_iters_done;
+	in.total_inner_iters = total_inner_iters;
+	return in;
+}
+
+std::string gateRowName(const GateInputs& in, const GateConfig& cfg) {
+	std::string s;
+	s += in.inner_settled ? "settled " : "unsettled ";
+	s += in.inner_progress ? "progress " : "no-progress ";
+	s += in.ran_strict_tier ? "strict-tier " : "loose-tier ";
+	s += in.all_mu_saturated ? "mu-saturated " : "mu-headroom ";
+	s += in.lambda_stalled ? "lambda-stalled " : "lambda-live ";
+	s += in.patience_exhausted ? "patience-out " : "patience-left ";
+	s += "max_c=" + std::to_string(in.max_c);
+	s += " outers=" + std::to_string(in.outer_iters_done);
+	s += " total=" + std::to_string(in.total_inner_iters);
+	s += " | cfg: tol=" + std::to_string(cfg.constraint_tol);
+	s += " strict=" + std::to_string(cfg.constraint_tol_strict);
+	s += " min_outer=" + std::to_string(cfg.min_outer_iters);
+	s += " budget=" + std::to_string(cfg.max_total_iters);
+	return s;
+}
+
+// Doc-as-code oracle: BREAK_GATE_DESIGN.md §6/§8 restated as a priority list
+// of named rules (deliberately phrased differently from decide() itself).
+GateDecision expectedVerdict(const GateInputs& in, const GateConfig& cfg) {
+	// Feasibility classes (the eta side of the two-sided test).
+	const bool feasible = (in.max_c <= cfg.constraint_tol);
+	const bool deeply_feasible =
+		(cfg.constraint_tol_strict > 0.0) && (in.max_c <= cfg.constraint_tol_strict);
+	const bool duals_matured = (in.outer_iters_done >= cfg.min_outer_iters);
+	const bool budget_spent =
+		(cfg.max_total_iters > 0) && (in.total_inner_iters >= cfg.max_total_iters);
+
+	// Rule 1 — fast path: deep feasibility may bypass dual maturation and the
+	// settle discipline, but NEVER the inner-progress floor (G15: a literal
+	// do-nothing trajectory is not a solution, however feasible).
+	if (deeply_feasible && in.inner_progress) {
+		return {Verdict::Converged, ALConvergedVia::FastPath};
+	}
+	// Rule 2 — settled declaration (two-sided, omega*/eta*-style): a feasible
+	// iterate (eta*) produced by a strict-tier solve that itself settled
+	// (omega*), after enough outer iterations for the duals to mature.
+	if (feasible && in.ran_strict_tier && in.inner_settled && duals_matured) {
+		return {Verdict::Converged, ALConvergedVia::Settled};
+	}
+	// Rule 3 — honest saturation exit: every mu pegged at its cap while still
+	// infeasible, and the leftover (slow) method of multipliers has stopped
+	// working — duals stalled for 2 consecutive non-contracting iterations,
+	// or the patience window is exhausted.
+	if (in.all_mu_saturated && !feasible
+	    && (in.lambda_stalled || in.patience_exhausted)) {
+		return {Verdict::PenaltyMaxReached, ALConvergedVia::None};
+	}
+	// Rule 4 — global inner-iteration budget: return honestly, never throw.
+	if (budget_spent) {
+		return {Verdict::MaxTotalIterations, ALConvergedVia::None};
+	}
+	// Otherwise — keep iterating: the lambda/mu update is committed and the
+	// outer loop continues (an exhausted OUTER budget becomes
+	// MaxOuterIterations in the caller, not a decide() verdict).
+	return {Verdict::Continue, ALConvergedVia::None};
+}
+
+} // namespace
+
+TEST_CASE("Break gates: decide() truth table is exhaustive over the gate predicates",
+          "[optimizer][break_gates][decide]") {
+	// Config A: every gate armed.
+	GateConfig armed;
+	armed.constraint_tol = 1e-3;
+	armed.constraint_tol_strict = 1e-4;
+	armed.min_outer_iters = 3;
+	armed.max_total_iters = 1000;
+	// Config B: opt-in gates off (fast path disabled, no global budget) —
+	// the shipping defaults for those two knobs.
+	GateConfig plain = armed;
+	plain.constraint_tol_strict = 0.0;
+	plain.max_total_iters = 0;
+
+	// Representative analog values: one per feasibility class / maturity
+	// side / budget side.
+	const double max_c_values[] = {
+		5e-5,  // deeply feasible (<= constraint_tol_strict when armed)
+		5e-4,  // feasible, but not deeply
+		5e-2,  // infeasible
+	};
+	const int outer_values[] = {1, 3};        // immature / matured duals
+	const long total_values[] = {500, 1000};  // budget remaining / spent
+
+	long rows = 0;
+	for (const GateConfig& cfg : {armed, plain}) {
+		for (int bits = 0; bits < (1 << 6); ++bits) {
+			for (const double max_c : max_c_values) {
+				for (const int outers : outer_values) {
+					for (const long total : total_values) {
+						const GateInputs in = gateRow(
+							(bits & 1) != 0,   // inner_settled
+							(bits & 2) != 0,   // inner_progress
+							(bits & 4) != 0,   // ran_strict_tier
+							(bits & 8) != 0,   // all_mu_saturated
+							(bits & 16) != 0,  // lambda_stalled
+							(bits & 32) != 0,  // patience_exhausted
+							max_c, outers, total);
+						++rows;
+						const std::string row_name = gateRowName(in, cfg);
+						CAPTURE(row_name);
+						const GateDecision got = optimizer::decide(in, cfg);
+						const GateDecision want = expectedVerdict(in, cfg);
+						REQUIRE(optimizer::verdictName(got.verdict)
+						        == optimizer::verdictName(want.verdict));
+						REQUIRE(static_cast<int>(got.via) == static_cast<int>(want.via));
+					}
+				}
+			}
+		}
+	}
+	// 2 configs x 64 boolean combinations x 3 max_c x 2 outer x 2 budget.
+	REQUIRE(rows == 2L * 64L * 3L * 2L * 2L);
+}
+
+TEST_CASE("Break gates: decide() landmark rows (the symptom classes, by name)",
+          "[optimizer][break_gates][decide]") {
+	GateConfig cfg;
+	cfg.constraint_tol = 1e-3;
+	cfg.constraint_tol_strict = 1e-4;
+	cfg.min_outer_iters = 3;
+	cfg.max_total_iters = 1000;
+	const double deep = 5e-5;        // <= constraint_tol_strict
+	const double feas = 5e-4;        // <= constraint_tol only
+	const double infeas = 5e-2;      // > constraint_tol
+
+	SECTION("G15 do-nothing: feasible warm start, zero progress — never blessed") {
+		const auto d = optimizer::decide(
+			gateRow(false, false, false, false, false, false, deep, 1, 10), cfg);
+		REQUIRE(d.verdict == Verdict::Continue);
+	}
+	SECTION("fast path: deep feasibility + the progress floor converges immediately") {
+		const auto d = optimizer::decide(
+			gateRow(false, true, false, false, false, false, deep, 1, 10), cfg);
+		REQUIRE(d.verdict == Verdict::Converged);
+		REQUIRE(d.via == ALConvergedVia::FastPath);
+	}
+	SECTION("settled declaration: feasible, strict-tier, settled, matured duals") {
+		const auto d = optimizer::decide(
+			gateRow(true, true, true, false, false, false, feas, 3, 10), cfg);
+		REQUIRE(d.verdict == Verdict::Converged);
+		REQUIRE(d.via == ALConvergedVia::Settled);
+	}
+	SECTION("settle discipline: a feasible LOOSE-tier solve must settle first") {
+		const auto d = optimizer::decide(
+			gateRow(true, true, false, false, false, false, feas, 3, 10), cfg);
+		REQUIRE(d.verdict == Verdict::Continue);
+	}
+	SECTION("dual maturation: feasible + settled but outer_iters_done < min_outer_iters") {
+		const auto d = optimizer::decide(
+			gateRow(true, true, true, false, false, false, feas, 1, 10), cfg);
+		REQUIRE(d.verdict == Verdict::Continue);
+	}
+	SECTION("unsettled strict-tier solve keeps iterating even when feasible") {
+		const auto d = optimizer::decide(
+			gateRow(false, true, true, false, false, false, feas, 3, 10), cfg);
+		REQUIRE(d.verdict == Verdict::Continue);
+	}
+	SECTION("mu-saturation grind ends honestly once the duals stall") {
+		const auto d = optimizer::decide(
+			gateRow(false, true, false, true, true, false, infeas, 4, 10), cfg);
+		REQUIRE(d.verdict == Verdict::PenaltyMaxReached);
+	}
+	SECTION("mu-saturation grind ends honestly when patience runs out") {
+		const auto d = optimizer::decide(
+			gateRow(false, true, false, true, false, true, infeas, 4, 10), cfg);
+		REQUIRE(d.verdict == Verdict::PenaltyMaxReached);
+	}
+	SECTION("saturated but duals alive and patience left: the multipliers may still close it") {
+		const auto d = optimizer::decide(
+			gateRow(false, true, false, true, false, false, infeas, 4, 10), cfg);
+		REQUIRE(d.verdict == Verdict::Continue);
+	}
+	SECTION("saturated while FEASIBLE is not a failure (settling may still succeed)") {
+		const auto d = optimizer::decide(
+			gateRow(false, true, false, true, true, true, feas, 4, 10), cfg);
+		REQUIRE(d.verdict == Verdict::Continue);
+	}
+	SECTION("global budget exhaustion returns MaxTotalIterations, never throws") {
+		const auto d = optimizer::decide(
+			gateRow(false, true, false, false, false, false, infeas, 4, 1000), cfg);
+		REQUIRE(d.verdict == Verdict::MaxTotalIterations);
+	}
+	SECTION("convergence outranks the budget on the same iteration") {
+		const auto d = optimizer::decide(
+			gateRow(true, true, true, false, false, false, feas, 3, 1000), cfg);
+		REQUIRE(d.verdict == Verdict::Converged);
+		REQUIRE(d.via == ALConvergedVia::Settled);
+	}
+	SECTION("the saturation exit outranks the budget on the same iteration") {
+		const auto d = optimizer::decide(
+			gateRow(false, true, false, true, true, false, infeas, 4, 1000), cfg);
+		REQUIRE(d.verdict == Verdict::PenaltyMaxReached);
+	}
 }

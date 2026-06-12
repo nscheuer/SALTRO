@@ -1,6 +1,7 @@
 #include <saltro/optimizer/alilqr.h>
 
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <vector>
 
@@ -92,6 +93,46 @@ std::vector<Eigen::VectorXd> collect_constraints(
 
 } // namespace
 
+// Pure outer-loop verdict (BREAK_GATE_DESIGN.md §8): the four terminal
+// decisions in strict priority order. No side effects; the caller commits the
+// λ/μ update and loop state only when the verdict is not Converged.
+GateDecision decide(const GateInputs& in, const GateConfig& cfg)
+{
+    // 1. Fast path: violation far below tolerance. Bypasses min_outer_iters
+    //    and the settled-strict-solve requirement, but never the
+    //    inner-progress floor (a do-nothing trajectory cannot be blessed).
+    if (cfg.constraint_tol_strict > 0.0
+        && in.max_c <= cfg.constraint_tol_strict
+        && in.inner_progress) {
+        return {Verdict::Converged, ALConvergedVia::FastPath};
+    }
+    // 2. Settled path (two-sided, omega*/eta*-style): this solve ran the strict
+    //    tier (previous iterate was feasible), settled on its own criteria
+    //    (ω* side), and the result is feasible (η* side), after enough dual
+    //    maturation.
+    if (in.max_c <= cfg.constraint_tol
+        && in.ran_strict_tier
+        && in.inner_settled
+        && in.outer_iters_done >= cfg.min_outer_iters) {
+        return {Verdict::Converged, ALConvergedVia::Settled};
+    }
+    // 3. All penalties capped while infeasible, and the residual (slow)
+    //    method of multipliers has demonstrably stopped working: the duals
+    //    stalled for 2 consecutive non-contracting iterations, or the
+    //    patience window of saturated, infeasible, non-contracting
+    //    iterations is exhausted.
+    if (in.all_mu_saturated
+        && in.max_c > cfg.constraint_tol
+        && (in.lambda_stalled || in.patience_exhausted)) {
+        return {Verdict::PenaltyMaxReached, ALConvergedVia::None};
+    }
+    // 4. Global inner-iteration budget exhausted (never throws).
+    if (cfg.max_total_iters > 0 && in.total_inner_iters >= cfg.max_total_iters) {
+        return {Verdict::MaxTotalIterations, ALConvergedVia::None};
+    }
+    return {Verdict::Continue, ALConvergedVia::None};
+}
+
 bool alilqr(
     const PlannerSettings& settings,
     int pass_idx,
@@ -162,6 +203,22 @@ bool alilqr(
         settle = (max_violation_of(c_warm) <= aug.constraint_tol);
     }
 
+    // Migration warning (one-time per process): cost_tol changed meaning in
+    // the break-gate redesign — it is now the strict-tier certificate
+    // tolerance, not the sole exit. Pre-redesign configs tuned to very tight
+    // absolute values may be uncertifiable (see BREAK_GATE_DESIGN.md).
+    {
+        const auto& ilqr_cfg = settings.passes[pass_idx].ilqr;
+        static bool warned_tight_cost_tol = false;
+        if (!warned_tight_cost_tol && ilqr_cfg.cost_tol < 1e-5 && ilqr_cfg.grad_tol > 0.0) {
+            warned_tight_cost_tol = true;
+            std::cerr << "[alilqr] WARNING: cost_tol = " << ilqr_cfg.cost_tol
+                      << " is now the strict-certificate tolerance (conjunctive with grad_tol),"
+                      << " not the sole exit; values this tight may be uncertifiable near C1"
+                      << " cost knees. Consider 1e-4 (see BREAK_GATE_DESIGN.md).\n";
+        }
+    }
+
     int lambda_stall_run = 0;   // consecutive saturated iters with stalled duals
     int saturated_iters = 0;    // consecutive saturated, infeasible, non-contracting iters
     double max_c_prev_outer = std::numeric_limits<double>::infinity();
@@ -202,8 +259,8 @@ bool alilqr(
         const double max_c = max_violation_of(c_list);
         max_constraint_violation_out = max_c;
 
-        // Per-family max violation at this outer iter. Used to gate ramping
-        // (only ramp families that aren't contracting) and for telemetry.
+        // Per-family max violation at this outer iter: violation-per-family
+        // telemetry (which constraint class is binding).
         std::vector<double> max_c_family(static_cast<size_t>(NUM_FAMILIES), 0.0);
         for (size_t k = 0; k < c_list.size(); ++k) {
             const auto& c_k = c_list[k];
@@ -248,7 +305,7 @@ bool alilqr(
         // terms, and blessing it prematurely truncates the refinement tail
         // (observed: 6 deg instead of ~1 deg on the RW-momentum winner
         // config). So a stalled settle-tier solve certifies only when, in
-        // addition, either side of the LANCELOT-style two-sided test holds:
+        // addition, either side of the two-sided (omega*/eta*) test holds:
         //   (a) absolute flatness: some accepted step had |dJ| <= the strict
         //       cost_tol (exactly the step the legacy cost-only gate would
         //       have exited Converged on); or
@@ -268,33 +325,14 @@ bool alilqr(
         const bool inner_progress =
             inner_converged || inner_stalled || (inner_telemetry.accepted_steps > 0);
 
-        // ---- Convergence declaration (two-sided, omega*/eta*-style) ----
-        // Fast path: violation far below tolerance. Bypasses min_outer_iters
-        // and the settled-strict-solve requirement, but never the
-        // inner-progress floor (a do-nothing trajectory cannot be blessed).
-        if (aug.constraint_tol_strict > 0.0
-            && max_c <= aug.constraint_tol_strict
-            && inner_progress) {
-            status = ALILQRStatus::Converged;
-            telemetry.converged_via = ALConvergedVia::FastPath;
-            finalize(c_list);
-            return true;
-        }
-        // Settled path: this solve ran the strict tier (previous iterate was
-        // feasible), converged on its own criteria (omega* side), and the
-        // result is feasible (eta* side), after enough dual maturation.
-        if (max_c <= aug.constraint_tol
-            && settle
-            && inner_settled
-            && (outer_iter + 1) >= aug.min_outer_iters) {
-            status = ALILQRStatus::Converged;
-            telemetry.converged_via = ALConvergedVia::Settled;
-            finalize(c_list);
-            return true;
-        }
-
-        // Tier handoff for the next inner call.
-        settle = (max_c <= aug.constraint_tol);
+        // ================= Second pure block: dual/penalty update ==========
+        // (BREAK_GATE_DESIGN.md §8.) Candidate λ/μ and the stall/patience
+        // counters are COMPUTED here without touching loop state, because the
+        // verdict needs their outputs (saturation, dual stall) while a
+        // Converged exit must report telemetry at the pre-update λ/μ. The
+        // candidates are committed after decide(), iff the verdict is not
+        // Converged — bitwise identical to updating in place on every
+        // non-Converged path.
 
         // ---- Dual update gating (dual_update_mode) ----
         // Classical safeguarded-AL rule, softened: lambda may only be updated
@@ -316,6 +354,10 @@ bool alilqr(
                 break;
         }
 
+        // Candidate λ/μ: same arithmetic as the in-place update (each (k,i)
+        // entry is read once from the current values, written once).
+        std::vector<Eigen::VectorXd> lambda_next = lambda_aug;
+        std::vector<Eigen::VectorXd> mu_next = mu_aug;
         double max_rel_dlambda = 0.0;
         for (size_t k = 0; k < c_list.size(); ++k) {
             if (lambda_bar_met) {
@@ -331,65 +373,92 @@ bool alilqr(
                     max_rel_dlambda = std::max(
                         max_rel_dlambda,
                         std::abs(new_l - old_l) / std::max(std::abs(old_l), 1.0));
-                    lambda_aug[k](i) = new_l;
+                    lambda_next[k](i) = new_l;
                 }
             }
 
             // Penalty ramp (global schedule; the per-family schedule is
             // parked with #52).
-            mu_aug[k] = (mu_aug[k] * aug.penalty_scale).cwiseMin(aug.penalty_max);
+            mu_next[k] = (mu_aug[k] * aug.penalty_scale).cwiseMin(aug.penalty_max);
         }
 
-        prev_max_rel_dlambda = max_rel_dlambda;
-
-        // ---- PenaltyMaxReached: all penalties capped while infeasible ----
-        // With mu pegged, lambda updates are still a slow method of
-        // multipliers; wait for them to stall (2 consecutive stalled iters)
-        // or for the patience window before giving up honestly.
+        // Penalty saturation: every (post-ramp) mu entry at the cap.
         bool any_constraint = false;
         bool all_saturated = true;
-        for (size_t k = 0; k < mu_aug.size() && all_saturated; ++k) {
-            for (int i = 0; i < mu_aug[k].size(); ++i) {
+        for (size_t k = 0; k < mu_next.size() && all_saturated; ++k) {
+            for (int i = 0; i < mu_next[k].size(); ++i) {
                 any_constraint = true;
-                if (mu_aug[k](i) < aug.penalty_max) {
+                if (mu_next[k](i) < aug.penalty_max) {
                     all_saturated = false;
                     break;
                 }
             }
         }
-        if (any_constraint && all_saturated && max_c > aug.constraint_tol) {
-            // With mu pegged, the (slow) method of multipliers — or even the
-            // inner solves alone — may still be closing the violation. While
-            // max_c demonstrably contracts, let it work; only iterations
-            // WITHOUT meaningful contraction count toward the patience window
-            // and the dual-stall detector.
-            const bool contracting = (max_c < 0.99 * max_c_prev_outer);
-            if (contracting) {
-                saturated_iters = 0;
-                lambda_stall_run = 0;
-            } else {
-                ++saturated_iters;
-                if (max_rel_dlambda < aug.lambda_stall_tol) {
-                    ++lambda_stall_run;
-                } else {
-                    lambda_stall_run = 0;
-                }
-            }
-            if (lambda_stall_run >= 2
-                || (aug.penalty_max_patience > 0 && saturated_iters >= aug.penalty_max_patience)) {
-                status = ALILQRStatus::PenaltyMaxReached;
-                finalize(c_list);
-                return false;
-            }
-        } else {
-            saturated_iters = 0;
-            lambda_stall_run = 0;
-        }
-        max_c_prev_outer = max_c;
+        const bool all_mu_saturated = any_constraint && all_saturated;
 
-        // ---- Global inner-iteration budget (never throws) ----
-        if (aug.max_total_iters > 0
-            && telemetry.total_inner_iterations >= aug.max_total_iters) {
+        // Stall/patience counters. With mu pegged, the (slow) method of
+        // multipliers — or even the inner solves alone — may still be closing
+        // the violation. While max_c demonstrably contracts, let it work;
+        // only saturated, infeasible iterations WITHOUT meaningful
+        // contraction count toward the patience window and the dual-stall
+        // detector.
+        int saturated_iters_next = 0;
+        int lambda_stall_run_next = 0;
+        if (all_mu_saturated && max_c > aug.constraint_tol) {
+            const bool contracting = (max_c < 0.99 * max_c_prev_outer);
+            if (!contracting) {
+                saturated_iters_next = saturated_iters + 1;
+                lambda_stall_run_next =
+                    (max_rel_dlambda < aug.lambda_stall_tol) ? (lambda_stall_run + 1) : 0;
+            }
+        }
+
+        // ================= The verdict (pure, once per outer iter) =========
+        GateInputs gate_in;
+        gate_in.inner_settled = inner_settled;
+        gate_in.inner_progress = inner_progress;
+        gate_in.ran_strict_tier = settle;
+        gate_in.all_mu_saturated = all_mu_saturated;
+        gate_in.lambda_stalled = (lambda_stall_run_next >= 2);
+        gate_in.patience_exhausted = (aug.penalty_max_patience > 0
+            && saturated_iters_next >= aug.penalty_max_patience);
+        gate_in.max_c = max_c;
+        gate_in.outer_iters_done = outer_iter + 1;
+        gate_in.total_inner_iters = telemetry.total_inner_iterations;
+
+        GateConfig gate_cfg;
+        gate_cfg.constraint_tol = aug.constraint_tol;
+        gate_cfg.constraint_tol_strict = aug.constraint_tol_strict;
+        gate_cfg.min_outer_iters = aug.min_outer_iters;
+        gate_cfg.max_total_iters = aug.max_total_iters;
+
+        const GateDecision gate = decide(gate_in, gate_cfg);
+
+        if (gate.verdict == Verdict::Converged) {
+            // Telemetry reports the lambda/mu the converged solve actually
+            // ran with: the candidate update is discarded, not committed.
+            status = ALILQRStatus::Converged;
+            telemetry.converged_via = gate.via;
+            finalize(c_list);
+            return true;
+        }
+
+        // ================= Commit: apply the update, roll loop state =======
+        lambda_aug = std::move(lambda_next);
+        mu_aug = std::move(mu_next);
+        saturated_iters = saturated_iters_next;
+        lambda_stall_run = lambda_stall_run_next;
+        prev_max_rel_dlambda = max_rel_dlambda;
+        max_c_prev_outer = max_c;
+        // Tier handoff for the next inner call.
+        settle = (max_c <= aug.constraint_tol);
+
+        if (gate.verdict == Verdict::PenaltyMaxReached) {
+            status = ALILQRStatus::PenaltyMaxReached;
+            finalize(c_list);
+            return false;
+        }
+        if (gate.verdict == Verdict::MaxTotalIterations) {
             status = ALILQRStatus::MaxTotalIterations;
             finalize(c_list);
             return false;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <limits>
 #include <vector>
 
 #include <saltro/optimizer/iLQR.h>
@@ -70,6 +71,84 @@ struct ALILQRTelemetry {
     int total_inner_iterations = 0;
     ALConvergedVia converged_via = ALConvergedVia::None;
 };
+
+// ---- Pure outer-loop verdict logic (BREAK_GATE_DESIGN.md §8) --------------
+//
+// Every termination decision of the AL outer loop is folded into a single
+// side-effect-free function over named predicates, evaluated exactly once per
+// outer iteration. The λ/μ update is a separate pure-compute block in
+// alilqr.cpp whose outputs (penalty saturation, dual stall, patience) feed
+// this function as inputs; the update is committed only when the verdict is
+// not Converged (a Converged exit reports telemetry at the pre-update λ/μ).
+// The exhaustive truth table in tests/unit/optimizer/test_break_gates.cpp is
+// the executable documentation of this function.
+
+// Named predicates for one outer iteration, all computed by the caller.
+struct GateInputs {
+    /// ω*-side settlement certificate: the inner solve exited Converged, or
+    /// Stalled with either certificate — absolute flatness (some accepted
+    /// step had |ΔJ| ≤ the strict cost_tol) or dual settlement (the previous
+    /// outer iteration's max relative Δλ was below lambda_stall_tol).
+    bool inner_settled = false;
+    /// Progress floor: Converged, Stalled, or ≥ 1 accepted step. Guards the
+    /// fast path so a literal do-nothing trajectory can never be blessed.
+    bool inner_progress = false;
+    /// This inner solve ran the strict/conjunctive (settling) tier, i.e. the
+    /// previous iterate was already feasible (settle handoff).
+    bool ran_strict_tier = false;
+    /// ≥ 1 constraint exists and every μ entry sits at its family cap
+    /// (post-ramp values of this iteration).
+    bool all_mu_saturated = false;
+    /// ≥ 2 consecutive saturated, infeasible, non-contracting outer
+    /// iterations whose dual updates were negligible (< lambda_stall_tol).
+    bool lambda_stalled = false;
+    /// penalty_max_patience > 0 and the count of consecutive saturated,
+    /// infeasible, non-contracting outer iterations has reached it.
+    bool patience_exhausted = false;
+    /// Max constraint violation after this inner solve (η side).
+    double max_c = std::numeric_limits<double>::infinity();
+    /// Completed outer iterations counting the current one (outer_iter + 1).
+    int outer_iters_done = 0;
+    /// Total inner iLQR iterations accumulated across all outer iterations.
+    long total_inner_iters = 0;
+};
+
+// The gate-relevant slice of AugLagConfig.
+struct GateConfig {
+    double constraint_tol = 0.0;
+    double constraint_tol_strict = 0.0;  // <= 0 disables the fast path
+    int min_outer_iters = 0;
+    long max_total_iters = 0;            // <= 0 disables the global budget
+};
+
+// MaxOuterIterations is not a decide() verdict: it is the structural
+// fallthrough when the outer for-loop ends without a verdict, and InnerFailed
+// (non-recoverable inner status) aborts before the gate is reached.
+enum class Verdict {
+    Converged,
+    PenaltyMaxReached,
+    MaxTotalIterations,
+    Continue,
+};
+
+inline const char* verdictName(Verdict v)
+{
+    switch (v) {
+        case Verdict::Converged: return "Converged";
+        case Verdict::PenaltyMaxReached: return "PenaltyMaxReached";
+        case Verdict::MaxTotalIterations: return "MaxTotalIterations";
+        case Verdict::Continue: return "Continue";
+    }
+    return "Unknown";
+}
+
+struct GateDecision {
+    Verdict verdict = Verdict::Continue;
+    ALConvergedVia via = ALConvergedVia::None;  // set iff verdict == Converged
+};
+
+// Pure verdict function: no side effects, total over all inputs.
+GateDecision decide(const GateInputs& in, const GateConfig& cfg);
 
 bool alilqr(
     const PlannerSettings& settings,

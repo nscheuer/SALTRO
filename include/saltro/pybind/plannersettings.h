@@ -497,7 +497,12 @@ struct AugLagConfig {
  *
  * @param max_iters Maximum number of iLQR iterations
  * @param grad_tol Gradient norm convergence tolerance
- * @param cost_tol Cost improvement tolerance
+ * @param cost_tol Cost improvement tolerance. SEMANTIC CHANGE (break-gate
+ *        redesign): this is now the STRICT-tier certificate tolerance used by
+ *        the settling solve (conjunctive with grad_tol), not the sole exit.
+ *        Very tight values (e.g. 1e-6) may be uncertifiable near C1 cost
+ *        knees; 1e-4 is the validated starting point. A one-time runtime
+ *        warning fires for cost_tol < 1e-5 with the gradient gate active.
  * @param z_count_lim Maximum number of zero-improvement steps
  *
  * @param max_cost Abort if cost exceeds this value
