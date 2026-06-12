@@ -173,8 +173,66 @@ bool backwardPassSqrt(
 	Eigen::VectorXd p_k = G_N * p_N_full;
 	Eigen::MatrixXd S_k = psdSqrtFactor(G_N * P_N_full * G_N.transpose());
 
-	// Minimal disturbance config for linearization
-	DisturbanceConfig dist_config;
+	// Fold the terminal-knot (k = N-1) AL constraint terms into the cost-to-go
+	// seed, mirroring the dense backward pass: the FP merit and the alilqr
+	// multiplier update both price constraints at the terminal knot, so the
+	// quadratic model must see them too. In square-root form this is exactly
+	// ALTRO eq. (19): the Gauss-Newton penalty enters as rows
+	// sqrt(mu_i) * c_x_i stacked under the terminal cost factor. Only state
+	// terms exist (the merit evaluates the terminal knot with u = 0).
+	// Semantics match the in-loop AL block below and the FP merit: lambda
+	// gradient always on (signed c); mu terms when c > 0 OR lambda > 0.
+	if (!lambda_aug.empty() && !mu_aug.empty()
+			&& (N - 1) < static_cast<int>(lambda_aug.size())
+			&& (N - 1) < static_cast<int>(mu_aug.size())) {
+		const int kT = N - 1;
+		const Eigen::VectorXd u_zero = Eigen::VectorXd::Zero(satellite.controlDim());
+		const Eigen::Vector3d S_final = S.col(kT);
+		const Eigen::VectorXd c_T = satellite.constraints(kT, N, x_final, u_zero, S_final, cnst_cfg);
+		if (lambda_aug[kT].size() == c_T.size() && mu_aug[kT].size() == c_T.size()) {
+			auto [cT_u, cT_x_full] = satellite.constraintJacobians(kT, N, x_final, u_zero, S_final, cnst_cfg);
+			(void)cT_u;  // No control exists at the terminal knot.
+			const Eigen::MatrixXd c_x = cT_x_full * G_N.transpose();
+			const int nxr_T = static_cast<int>(c_x.cols());
+
+			Eigen::VectorXd w = Eigen::VectorXd::Zero(c_T.size());
+			int n_active_T = 0;
+			for (int i = 0; i < c_T.size(); ++i) {
+				const double li = lambda_aug[kT](i);
+				const double ci = c_T(i);
+				w(i) = li;
+				if (ci > 0.0 || li > 0.0) {
+					w(i) += mu_aug[kT](i) * ci;
+					if (std::isfinite(mu_aug[kT](i)) && mu_aug[kT](i) > 0.0) {
+						++n_active_T;
+					}
+				}
+			}
+			p_k.noalias() += c_x.transpose() * w;
+
+			if (n_active_T > 0) {
+				Eigen::MatrixXd stacked(S_k.rows() + n_active_T, nxr_T);
+				stacked.topRows(S_k.rows()) = S_k;
+				int row = static_cast<int>(S_k.rows());
+				for (int i = 0; i < c_T.size(); ++i) {
+					if (c_T(i) <= 0.0 && lambda_aug[kT](i) <= 0.0) {
+						continue;
+					}
+					const double mu_i = mu_aug[kT](i);
+					if (!std::isfinite(mu_i) || mu_i <= 0.0) {
+						continue;
+					}
+					stacked.row(row) = std::sqrt(mu_i) * c_x.row(i);
+					++row;
+				}
+				S_k = qrFactor(stacked);
+			}
+		}
+	}
+
+	// Linearize with the same disturbance config the forward pass rolls out
+	// (forwardpass.cpp uses settings.disturbances), mirroring the dense pass.
+	const DisturbanceConfig& dist_config = settings.disturbances;
 
 	// Backward loop: k from N-2 down to 0
 	for (int k = N - 2; k >= 0; --k) {
@@ -220,6 +278,10 @@ bool backwardPassSqrt(
 		// square-root form as rows sqrt(mu_i) * [c_x_i c_u_i] (ALTRO eqs.
 		// 19-21) instead of forming mu * c^T c outer products, so large
 		// penalties only enter the recursion through their square root.
+		// ALTRO active-set semantics (matching the dense pass, FP merit, and
+		// alilqr lambda update): the lambda gradient is always on (signed c,
+		// so feasibility is rewarded and lambda can pull back); the mu
+		// penalty is active when c > 0 OR lambda > 0.
 		Eigen::MatrixXd Cx_rows(0, nxr);
 		Eigen::MatrixXd Cu_rows(0, nu);
 		if (!lambda_aug.empty() && !mu_aug.empty() && k < static_cast<int>(lambda_aug.size()) && k < static_cast<int>(mu_aug.size())) {
@@ -231,8 +293,11 @@ bool backwardPassSqrt(
 				Eigen::VectorXd w = Eigen::VectorXd::Zero(c_k.size());
 				int n_active = 0;
 				for (int i = 0; i < c_k.size(); ++i) {
-					if (c_k(i) > 0.0) {
-						w(i) = lambda_aug[k](i) + mu_aug[k](i) * c_k(i);
+					const double li = lambda_aug[k](i);
+					const double ci = c_k(i);
+					w(i) = li;
+					if (ci > 0.0 || li > 0.0) {
+						w(i) += mu_aug[k](i) * ci;
 						const double mu_i = mu_aug[k](i);
 						if (std::isfinite(mu_i) && mu_i > 0.0) {
 							++n_active;
@@ -247,7 +312,7 @@ bool backwardPassSqrt(
 				Cu_rows.resize(n_active, nu);
 				int row = 0;
 				for (int i = 0; i < c_k.size(); ++i) {
-					if (c_k(i) <= 0.0) {
+					if (c_k(i) <= 0.0 && lambda_aug[k](i) <= 0.0) {
 						continue;
 					}
 					const double mu_i = mu_aug[k](i);

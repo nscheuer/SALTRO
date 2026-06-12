@@ -22,10 +22,11 @@ number is halved (in the exponent).
 All quantities are in the reduced (MRP-projected) state space, matching the
 dense backward pass.
 
-Terminal step (paper eq. 19, without terminal constraint rows — SALTRO's dense
-pass does not apply AL terms at the terminal knot):
+Terminal step (paper eq. 19): the terminal cost Hessian is factored, then the
+terminal-knot AL penalty enters as stacked rows (state terms only — no control
+exists at the terminal knot), matching the dense pass's terminal seed:
 
-    S_N = psdSqrtFactor(G_N P_N G_Nᵀ)
+    S_N = qr([ psdSqrtFactor(G_N P_N G_Nᵀ) ; √μ_i c_x_i (active i) ])
 
 At each step k, a square-root factor `[F_x F_u]` of the **joint** action-value
 Hessian is assembled by row-stacking (cf. paper eqs. 20–21):
