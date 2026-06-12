@@ -139,6 +139,10 @@ def test_settle_discipline_loose_then_strict_conjunctive_before_converged():
     ps.constraints.wmax = 0.012               # active mid-slew, feasible overall
     ps.passes[0].auglag.max_outer_iters = 60
     ps.passes[0].auglag.max_total_iters = 2000
+    # Disable the stall exit so Converged must come from the strict
+    # conjunctive certificate itself (Stalled settle-tier solves are also
+    # accepted by the outer gate in general; this test pins the conjunction).
+    ps.passes[0].ilqr.z_count_lim = 0
     sat = create_satellite_rw(ps)
     p = prepare_problem(ps, sat, 200.0, 10.0, w0_scale=0.1)
 

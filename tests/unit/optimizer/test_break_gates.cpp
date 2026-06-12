@@ -325,6 +325,11 @@ TEST_CASE("Break gates: loose-tier exits while infeasible, strict conjunctive ex
 	settings.constraints.wmax = 0.012;
 	settings.passes[0].auglag.max_outer_iters = 60;
 	settings.passes[0].auglag.max_total_iters = 2000;
+	// Disable the stall exit so the Converged declaration must come from the
+	// strict conjunctive certificate itself (a Stalled settle-tier solve is
+	// also accepted by the outer gate in general — OldPlanner parity — but
+	// this test pins the conjunction path).
+	settings.passes[0].ilqr.z_count_lim = 0;
 	Satellite satellite(rwInertia(), settings);
 	addRWTriad(satellite);
 	ProblemData p = prepareRWProblem(settings, satellite, 200.0, 10.0, 0.1);

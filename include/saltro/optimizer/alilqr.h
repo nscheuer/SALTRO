@@ -10,9 +10,11 @@
 namespace saltro::optimizer {
 
 enum class ALILQRStatus {
-    // Two-sided convergence: a strict-tier (settling) inner solve converged
-    // AND max constraint violation <= constraint_tol — or the opt-in
-    // constraint_tol_strict fast path fired (with inner progress).
+    // Two-sided convergence: a strict-tier (settling) inner solve settled
+    // (Converged, or Stalled at a cost plateau — OldPlanner dlaZcount /
+    // antispike stagnation parity) AND max constraint violation <=
+    // constraint_tol — or the opt-in constraint_tol_strict fast path fired
+    // (with inner progress).
     Converged,
     // Outer-iteration budget exhausted before constraint convergence.
     MaxOuterIterations,

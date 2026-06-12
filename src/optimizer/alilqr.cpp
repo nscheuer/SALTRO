@@ -232,7 +232,16 @@ bool alilqr(
         }
 
         const bool inner_converged = (ilqr_status == ILQRStatus::Converged);
-        const bool inner_progress = inner_converged || (inner_telemetry.accepted_steps > 0);
+        // A Stalled exit is a *plateaued* solve: >= z_count_lim accepted steps
+        // with no further relative cost progress at this lambda/mu. Both
+        // reference implementations treat it as a settled subproblem
+        // (OldPlanner's outer gate accepts the dlaZcount branch of ilqrBreak;
+        // PKMN_antispike returns Converged from its stagnation counter), so it
+        // qualifies as "solved" for the settled declaration and the
+        // on_converged dual bar. It can never be a do-nothing solve.
+        const bool inner_settled =
+            inner_converged || (ilqr_status == ILQRStatus::Stalled);
+        const bool inner_progress = inner_settled || (inner_telemetry.accepted_steps > 0);
 
         // ---- Convergence declaration (two-sided, omega*/eta*-style) ----
         // Fast path: violation far below tolerance. Bypasses min_outer_iters
@@ -251,7 +260,7 @@ bool alilqr(
         // result is feasible (eta* side), after enough dual maturation.
         if (max_c <= aug.constraint_tol
             && settle
-            && inner_converged
+            && inner_settled
             && (outer_iter + 1) >= aug.min_outer_iters) {
             status = ALILQRStatus::Converged;
             telemetry.converged_via = ALConvergedVia::Settled;
@@ -273,7 +282,10 @@ bool alilqr(
                 break;
             case DualUpdateMode::OnConverged:
             default:
-                lambda_bar_met = inner_converged;
+                // Settled solves only (Converged or Stalled-at-plateau):
+                // eliminates the one-step-then-RegExceeded dual-poisoning
+                // path while keeping duals alive on plateau exits.
+                lambda_bar_met = inner_settled;
                 break;
         }
 
