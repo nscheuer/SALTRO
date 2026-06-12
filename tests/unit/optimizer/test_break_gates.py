@@ -237,5 +237,5 @@ def test_telemetry_per_family_max_c_and_cost_share():
     for rec in tel["outer"]:
         for key in ("settle", "inner_status", "break_reason",
                     "inner_iterations", "accepted_steps", "max_c",
-                    "final_grad", "last_delta_J"):
+                    "final_grad", "last_delta_J", "min_delta_J"):
             assert key in rec

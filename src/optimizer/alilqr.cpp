@@ -163,7 +163,8 @@ bool alilqr(
     }
 
     int lambda_stall_run = 0;   // consecutive saturated iters with stalled duals
-    int saturated_iters = 0;    // consecutive saturated-and-infeasible iters
+    int saturated_iters = 0;    // consecutive saturated, infeasible, non-contracting iters
+    double max_c_prev_outer = std::numeric_limits<double>::infinity();
 
     for (int outer_iter = 0; outer_iter < aug.max_outer_iters; ++outer_iter) {
         double J = 0.0;
@@ -223,6 +224,7 @@ bool alilqr(
         record.max_c = max_c;
         record.final_grad = inner_telemetry.final_grad;
         record.last_delta_J = inner_telemetry.last_delta_J;
+        record.min_delta_J = inner_telemetry.min_delta_J;
         telemetry.outer.push_back(record);
 
         if (!ilqr_ok && !isRecoverableInnerFailure(ilqr_status)) {
@@ -232,16 +234,26 @@ bool alilqr(
         }
 
         const bool inner_converged = (ilqr_status == ILQRStatus::Converged);
+        const bool inner_stalled = (ilqr_status == ILQRStatus::Stalled);
         // A Stalled exit is a *plateaued* solve: >= z_count_lim accepted steps
-        // with no further relative cost progress at this lambda/mu. Both
-        // reference implementations treat it as a settled subproblem
+        // with no further relative cost progress at this lambda/mu. The
+        // reference implementations treat such exits as settled subproblems
         // (OldPlanner's outer gate accepts the dlaZcount branch of ilqrBreak;
-        // PKMN_antispike returns Converged from its stagnation counter), so it
-        // qualifies as "solved" for the settled declaration and the
-        // on_converged dual bar. It can never be a do-nothing solve.
-        const bool inner_settled =
-            inner_converged || (ilqr_status == ILQRStatus::Stalled);
-        const bool inner_progress = inner_settled || (inner_telemetry.accepted_steps > 0);
+        // PKMN_antispike returns Converged from its stagnation counter), BUT
+        // dlaZcount counts *relative* stagnation — on large-J problems a
+        // "stalled" solve may still be improving meaningfully in absolute
+        // terms, and blessing it prematurely truncates the refinement tail
+        // (observed: 6 deg instead of ~1 deg on the RW-momentum winner
+        // config). So a stall certifies the settled declaration only when the
+        // solve also touched absolute flatness: some accepted step had
+        // |dJ| <= the strict cost_tol (exactly the step the legacy
+        // cost-only gate would have exited Converged on).
+        const bool inner_stalled_flat = inner_stalled
+            && (inner_telemetry.min_delta_J >= 0.0)
+            && (inner_telemetry.min_delta_J <= settings.passes[pass_idx].ilqr.cost_tol);
+        const bool inner_settled = inner_converged || inner_stalled_flat;
+        const bool inner_progress =
+            inner_converged || inner_stalled || (inner_telemetry.accepted_steps > 0);
 
         // ---- Convergence declaration (two-sided, omega*/eta*-style) ----
         // Fast path: violation far below tolerance. Bypasses min_outer_iters
@@ -282,10 +294,12 @@ bool alilqr(
                 break;
             case DualUpdateMode::OnConverged:
             default:
-                // Settled solves only (Converged or Stalled-at-plateau):
-                // eliminates the one-step-then-RegExceeded dual-poisoning
-                // path while keeping duals alive on plateau exits.
-                lambda_bar_met = inner_settled;
+                // Converged or any Stalled plateau (flat or not): eliminates
+                // the one-step-then-RegExceeded dual-poisoning path while
+                // keeping the dual sequence alive on plateau exits (a stall
+                // is never a garbage iterate — it took >= z_count_lim
+                // accepted steps).
+                lambda_bar_met = inner_converged || inner_stalled;
                 break;
         }
 
@@ -329,11 +343,22 @@ bool alilqr(
             }
         }
         if (any_constraint && all_saturated && max_c > aug.constraint_tol) {
-            ++saturated_iters;
-            if (max_rel_dlambda < aug.lambda_stall_tol) {
-                ++lambda_stall_run;
-            } else {
+            // With mu pegged, the (slow) method of multipliers — or even the
+            // inner solves alone — may still be closing the violation. While
+            // max_c demonstrably contracts, let it work; only iterations
+            // WITHOUT meaningful contraction count toward the patience window
+            // and the dual-stall detector.
+            const bool contracting = (max_c < 0.99 * max_c_prev_outer);
+            if (contracting) {
+                saturated_iters = 0;
                 lambda_stall_run = 0;
+            } else {
+                ++saturated_iters;
+                if (max_rel_dlambda < aug.lambda_stall_tol) {
+                    ++lambda_stall_run;
+                } else {
+                    lambda_stall_run = 0;
+                }
             }
             if (lambda_stall_run >= 2
                 || (aug.penalty_max_patience > 0 && saturated_iters >= aug.penalty_max_patience)) {
@@ -345,6 +370,7 @@ bool alilqr(
             saturated_iters = 0;
             lambda_stall_run = 0;
         }
+        max_c_prev_outer = max_c;
 
         // ---- Global inner-iteration budget (never throws) ----
         if (aug.max_total_iters > 0

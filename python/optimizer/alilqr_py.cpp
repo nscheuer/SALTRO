@@ -111,6 +111,7 @@ py::dict telemetry_to_dict(const saltro::optimizer::ALILQRTelemetry& telemetry)
         r["max_c"] = rec.max_c;
         r["final_grad"] = rec.final_grad;
         r["last_delta_J"] = rec.last_delta_J;
+        r["min_delta_J"] = rec.min_delta_J;
         outer.append(r);
     }
     d["outer"] = outer;

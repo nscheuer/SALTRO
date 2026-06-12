@@ -414,6 +414,9 @@ bool iLQR(
 			rel_delta_J = delta_J / std::max(std::abs(J_prev), 1.0);
 			rel_progress = delta_J / (std::abs(J_prev) + 1e-10);
 			telemetry.last_delta_J = delta_J;
+			if (telemetry.min_delta_J < 0.0 || delta_J < telemetry.min_delta_J) {
+				telemetry.min_delta_J = delta_J;
+			}
 			telemetry.final_cost = J;
 
 			// Stall counter (dlaZcount semantics): counts consecutive accepted

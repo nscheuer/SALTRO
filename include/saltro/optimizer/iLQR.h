@@ -43,6 +43,7 @@ struct ILQRTelemetry {
 	int iterations = 0;       // iLQR iterations entered (incl. terminal partial one)
 	int accepted_steps = 0;   // forward passes accepted
 	double last_delta_J = -1.0;   // |dJ| of the last accepted step (-1: none)
+	double min_delta_J = -1.0;    // smallest |dJ| over accepted steps (-1: none)
 	double final_grad = -1.0;     // last computed gradient metric (-1: none)
 	double final_cost = -1.0;     // AL-merit cost of the returned trajectory
 	bool ls_failed = false;       // last forward-pass attempt failed
