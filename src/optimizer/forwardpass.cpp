@@ -34,7 +34,20 @@ static bool linesearch(
     (void)U_bar;
 
     const double delta_V_alpha = alpha * (deltaV(0) + alpha * deltaV(1));
-    if (!std::isfinite(delta_V_alpha) || std::abs(delta_V_alpha) < 1e-16) {
+    if (!std::isfinite(delta_V_alpha)) {
+        return false;
+    }
+
+    // G2: ΔV(α) = α·ΔV₀ + α²·ΔV₁ is the backward pass's PREDICTED cost change;
+    // a useful trial requires predicted descent (ΔV(α) < 0). When ΔV(α) ≥ 0
+    // (BP predicts ascent or no change), the z-ratio below flips sign: a trial
+    // with J_new > J_minus would give z = (neg)/(neg) > 0 and could be
+    // ACCEPTED, letting the line search take cost-increasing steps. Reject the
+    // trial instead (continue backtracking) — OldPlanner's exp > 0 guard.
+    // The -1e-16 threshold also subsumes the old |ΔV(α)| < 1e-16 degenerate
+    // check: near-zero predictions are rejected regardless of sign, and
+    // genuine descent (ΔV(α) < -1e-16) behaves exactly as before.
+    if (delta_V_alpha >= -1e-16) {
         return false;
     }
 
