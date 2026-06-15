@@ -342,6 +342,22 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
+            // Square-root backward pass compatibility guards.
+            //
+            // backwardPassSqrt mirrors the Gauss-Newton dense pass exactly, but
+            // it does NOT implement DDP second-order (true Hessian) curvature:
+            // the sqrt factorization assumes a PSD Gauss-Newton stage Hessian,
+            // and adding indefinite second-order dynamics/constraint curvature
+            // would either be silently dropped (diverging from the dense DDP
+            // pass) or break the real square root. Reject the combination
+            // explicitly rather than diverge silently. (When the DDP pass is
+            // mirrored in the sqrt path, drop this guard.)
+            if (pass.reg.use_sqrt_bp && (pass.reg.use_dynamics_hess || pass.reg.use_constraint_hess)) {
+                error_msg = "DDP second-order terms (use_dynamics_hess/use_constraint_hess) "
+                            "are not supported with the square-root backward pass (use_sqrt_bp)";
+                return false;
+            }
+
             // Validate line search configuration
             if (pass.linesearch.max_iters < 0) {
                 error_msg = "linesearch.max_iters invalid";

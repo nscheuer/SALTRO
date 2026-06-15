@@ -1105,6 +1105,51 @@ TEST_CASE("Valid boundary values - zero cost weights", "[plannersettings][valida
 }
 
 // ============================================================================
+// Square-root backward pass compatibility guards
+// ============================================================================
+
+TEST_CASE("Valid use_sqrt_bp alone passes validation", "[plannersettings][validation][sqrt_bp]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].reg.use_sqrt_bp = true;
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg.empty());
+}
+
+TEST_CASE("use_sqrt_bp with use_dynamics_hess is rejected", "[plannersettings][validation][sqrt_bp]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].reg.use_sqrt_bp = true;
+    settings.passes[0].reg.use_dynamics_hess = true;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg.find("square-root backward pass") != std::string::npos);
+}
+
+TEST_CASE("use_sqrt_bp with use_constraint_hess is rejected", "[plannersettings][validation][sqrt_bp]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].reg.use_sqrt_bp = true;
+    settings.passes[0].reg.use_constraint_hess = true;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg.find("square-root backward pass") != std::string::npos);
+}
+
+TEST_CASE("DDP second-order terms without use_sqrt_bp still pass validation", "[plannersettings][validation][sqrt_bp]") {
+    // The guard must only fire on the unsupported combination; pure-DDP
+    // settings (the #62 path with the dense pass) stay valid.
+    PlannerSettings settings = validSettings();
+    settings.passes[0].reg.use_sqrt_bp = false;
+    settings.passes[0].reg.use_dynamics_hess = true;
+    settings.passes[0].reg.use_constraint_hess = true;
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+// ============================================================================
 // DDP second-order term knobs (G12/G13)
 // ============================================================================
 
