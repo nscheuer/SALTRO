@@ -295,14 +295,29 @@ bool backwardPass(
 		Eigen::VectorXd Q_u = lu + B_k_dyn.transpose() * p_k;
 		
 		Eigen::MatrixXd Q_uu_reg = Q_uu + reg * Eigen::MatrixXd::Identity(nu, nu);
+
+		// Eigen's LLT does not reliably flag NaN input (NaN comparisons are
+		// all false), so a poisoned Q_uu can factor "successfully" and emit
+		// NaN gains that only die later in the rollout, misattributed to the
+		// line search. Check explicitly before and after the solve.
+		if (!Q_uu_reg.allFinite()) {
+			SALTRO_OPT_DLOG("[BP] FAIL k=" << k << " Q_uu_reg not finite");
+			return false;
+		}
+
 		Eigen::LLT<Eigen::MatrixXd> llt(Q_uu_reg);
-		
+
 		if (llt.info() != Eigen::Success) {
 			SALTRO_OPT_DLOG("[BP] FAIL k=" << k << " reg=" << reg);
 			return false;
 		}
-		
+
 		solveRiccattiStep(Q_uu_reg, Q_uu, Q_u, Q_ux, Q_xx, Q_x, k, K, d, deltaV, p_k, P_k);
+
+		if (!K[k].allFinite() || !d[k].allFinite() || !P_k.allFinite()) {
+			SALTRO_OPT_DLOG("[BP] FAIL k=" << k << " non-finite gains or value function");
+			return false;
+		}
 		SALTRO_OPT_DLOG("[BP] k=" << k << " reg=" << reg << " ||d||=" << d[k].norm());
 	}
 	SALTRO_OPT_DLOG("[BP] success dV1=" << deltaV(0) << " dV2=" << deltaV(1));
