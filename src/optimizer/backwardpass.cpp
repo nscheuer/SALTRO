@@ -160,17 +160,24 @@ bool backwardPass(
 		Eigen::MatrixXd lxx = G_k * lxx_full * G_k.transpose();
 		Eigen::MatrixXd lux_hess = lux_hess_full * G_k.transpose();
 
-		// Augmented Lagrangian terms: l += lambda^T c+ + 0.5 * c+^T diag(mu) c+
+		// Augmented Lagrangian terms: l += lambda^T c + active-set 0.5 * c^T diag(mu) c
 		if (!lambda_aug.empty() && !mu_aug.empty() && k < static_cast<int>(lambda_aug.size()) && k < static_cast<int>(mu_aug.size())) {
 			const Eigen::VectorXd c_k = satellite.constraints(k, N, x_k, u_k, S_k, cnst_cfg);
 			auto [c_u, c_x_full] = satellite.constraintJacobians(k, N, x_k, u_k, S_k, cnst_cfg);
 			if (lambda_aug[k].size() == c_k.size() && mu_aug[k].size() == c_k.size()) {
 				const Eigen::MatrixXd c_x = c_x_full * G_k.transpose();
 
+				// ALTRO active-set semantics: the lambda gradient is always on
+				// (signed c, so feasibility is rewarded and lambda can pull
+				// back); the mu penalty is active when c > 0 OR lambda > 0.
+				// Must match the FP/inner merit and the alilqr lambda update.
 				Eigen::VectorXd w = Eigen::VectorXd::Zero(c_k.size());
 				for (int i = 0; i < c_k.size(); ++i) {
-					if (c_k(i) > 0.0) {
-						w(i) = lambda_aug[k](i) + mu_aug[k](i) * c_k(i);
+					const double li = lambda_aug[k](i);
+					const double ci = c_k(i);
+					w(i) = li;
+					if (ci > 0.0 || li > 0.0) {
+						w(i) += mu_aug[k](i) * ci;
 					}
 				}
 
@@ -178,7 +185,7 @@ bool backwardPass(
 				lu.noalias() += c_u.transpose() * w;
 
 				for (int i = 0; i < c_k.size(); ++i) {
-					if (c_k(i) <= 0.0) {
+					if (c_k(i) <= 0.0 && lambda_aug[k](i) <= 0.0) {
 						continue;
 					}
 					const double mu_i = mu_aug[k](i);
