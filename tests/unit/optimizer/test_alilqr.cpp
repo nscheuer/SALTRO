@@ -640,6 +640,57 @@ TEST_CASE("State slack: stall fallback rescues an underpriced slack phase", "[op
 	REQUIRE(with_fallback.max_c <= 1e-3 + 1e-9);
 }
 
+TEST_CASE("State slack: rho continuation default is off (bit-identical to fixed-rho)", "[optimizer][alilqr][slack]") {
+	// slack_rho_scale = 1.0 must disable the ramp entirely. A run with an
+	// explicit scale of 1.0 and a generous rho ceiling must reproduce the
+	// plain fixed-rho slack solve to the last bit.
+	const ALRunResult fixed = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		aug.use_state_slack = true;
+		aug.slack_rho = 1e-2;  // economical: actually changes the solve
+	});
+	REQUIRE(AugLagConfig{}.slack_rho_scale == 1.0);
+
+	const ALRunResult scale_one = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		aug.use_state_slack = true;
+		aug.slack_rho = 1e-2;
+		aug.slack_rho_scale = 1.0;  // explicit no-ramp
+		aug.slack_rho_max = 1e12;
+	});
+
+	REQUIRE(fixed.ok == scale_one.ok);
+	REQUIRE((fixed.X - scale_one.X).cwiseAbs().maxCoeff() == 0.0);
+	REQUIRE((fixed.U - scale_one.U).cwiseAbs().maxCoeff() == 0.0);
+}
+
+TEST_CASE("State slack: rho continuation rescues an underpriced slack phase", "[optimizer][alilqr][slack]") {
+	// Same underpriced setup as the stall-fallback test: slack_rho far below
+	// the binding constraint's multiplier so a fixed-rho slack phase "buys"
+	// the violation forever and never reaches slack_off_tol. Continuation
+	// (slack_rho_scale > 1) anneals the cap upward until it exceeds the
+	// shadow price, then hands off CONTINUOUSLY to exact AL and converges —
+	// with the stall fallback left disabled, so this exercises the ramp, not
+	// the abrupt drop. slack_sigma > 0 keeps the bought region conditioned.
+	const ALRunResult cont = runALILQRDirectRWCase([](PlannerSettings& s) {
+		s.constraints.wmax = 0.012;
+		s.passes[0].auglag.max_outer_iters = 15;
+		s.passes[0].ilqr.max_iters = 30;
+		auto& aug = s.passes[0].auglag;
+		aug.use_state_slack = true;
+		aug.slack_rho = 1e-2;        // absurdly cheap to start
+		aug.slack_sigma = 1.0;       // Huber curvature floor
+		aug.slack_off_tol = 0.02;
+		aug.slack_rho_scale = 10.0;  // continuation
+		aug.slack_rho_max = 1e6;
+		aug.slack_stall_iters = 0;   // fallback OFF: only continuation in play
+	}, Eigen::Vector3d::Zero());
+
+	CAPTURE(cont.max_c);
+	REQUIRE(cont.ok);
+	REQUIRE(cont.max_c <= 1e-3 + 1e-9);
+}
+
 TEST_CASE("AL per-family penalties: trajOpt converges with per-family config and conditional ramping", "[optimizer][alilqr][per_family]") {
 	// End-to-end sanity: the full planner still converges with per-family
 	// penalties and conditional ramping enabled (constraints here are easily

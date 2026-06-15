@@ -264,6 +264,21 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
+            if (pass.auglag.slack_rho_scale < 1.0 || !std::isfinite(pass.auglag.slack_rho_scale)) {
+                error_msg = "auglag.slack_rho_scale invalid";
+                return false;
+            }
+
+            if (pass.auglag.slack_rho_max <= 0.0 || !std::isfinite(pass.auglag.slack_rho_max)) {
+                error_msg = "auglag.slack_rho_max invalid";
+                return false;
+            }
+
+            if (pass.auglag.slack_rho_max < pass.auglag.slack_rho) {
+                error_msg = "auglag.slack_rho_max must be >= slack_rho";
+                return false;
+            }
+
             if (pass.auglag.constraint_tol <= 0.0 || !std::isfinite(pass.auglag.constraint_tol)) {
                 error_msg = "auglag.constraint_tol invalid";
                 return false;

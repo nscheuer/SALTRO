@@ -114,12 +114,23 @@ bool alilqr(
     const double slack_switch_tol = std::max(aug.slack_off_tol, aug.constraint_tol);
     PlannerSettings phase_settings = settings;
 
+    // Continuation on the slack price (Huber annealing): slack_rho_cur is
+    // the live cap used by every AL site this outer iter. With
+    // slack_rho_scale > 1 it ramps up across slack-phase iterations so the
+    // relaxation anneals toward the exact penalty (al_slack.h / plannersettings.h).
+    double slack_rho_cur = aug.slack_rho;
+
     // Stall fallback bookkeeping: if the slack phase stops contracting the
     // TRUE violation (the slack price is below the binding constraint's
     // multiplier, so the optimizer permanently "buys" the violation), drop
     // the slacks and continue exact rather than burning the outer budget.
     double slack_best_c = std::numeric_limits<double>::infinity();
     int slack_stall_count = 0;
+    // Continuation latch: set once the soft cap stalls above slack_off_tol;
+    // from then on rho anneals every iteration until the goal or the ceiling.
+    // Latching (vs re-deciding each iter) avoids a dribble where each small
+    // post-ramp contraction would otherwise veto the next ramp.
+    bool slack_continuation_active = false;
 
     // Per-family AL config: if the user provided vectors of the right size
     // (NumFamilies), use them; otherwise fall back to the scalar values.
@@ -171,6 +182,11 @@ bool alilqr(
                                           std::numeric_limits<double>::infinity());
 
     for (int outer_iter = 0; outer_iter < aug.max_outer_iters; ++outer_iter) {
+        // Publish the live slack price to the inner stack (BP/FP/iLQR read
+        // it from phase_settings) so the merit, the BP model and the dual
+        // update below all price the slack at the same rho this iteration.
+        phase_settings.passes[pass_idx].auglag.slack_rho = slack_rho_cur;
+
         double J = 0.0;
         ILQRStatus ilqr_status = ILQRStatus::MaxIterations;
         ILQRTelemetry ilqr_telemetry;
@@ -216,21 +232,56 @@ bool alilqr(
             return false;
         }
 
+        bool ramp_rho_next = false;
         if (slack_phase) {
             bool drop_slacks = false;
+
+            // Shared stall signal: did the TRUE violation contract >5% vs the
+            // best seen this slack phase? Both continuation (raise the cap)
+            // and the stall fallback (drop the slacks) react to a stall; a
+            // contraction resets the counter. (First iter: best = +inf, so it
+            // always counts as contracting — never ramp/drop on iter 0.)
+            const bool contracting = (max_c < 0.95 * slack_best_c);
+            if (contracting) {
+                slack_best_c = max_c;
+                slack_stall_count = 0;
+            } else {
+                ++slack_stall_count;
+            }
+            const bool can_continue = (aug.slack_rho_scale > 1.0);
+
+            // CONTINUATION latch: the slack phase stalled at an equilibrium
+            // above slack_off_tol because the cap is below the constraint's
+            // true shadow price. Commit to annealing rho upward. Gated on the
+            // stall + still-far-from-goal, so it NEVER engages while the soft
+            // cap is productively driving the violation down to slack_off_tol
+            // (e.g. RW binding cases) — those wins are preserved for any
+            // slack_rho_scale.
+            if (can_continue && !slack_continuation_active
+                    && !contracting && max_c > slack_switch_tol) {
+                slack_continuation_active = true;
+            }
+
             if (max_c <= slack_switch_tol) {
                 // "Reasonable satisfaction" reached: drop the slacks and
                 // polish the same trajectory with the exact constraints.
                 drop_slacks = true;
-            } else if (aug.slack_stall_iters > 0) {
-                // Stall fallback: no meaningful contraction of the TRUE
-                // violation for slack_stall_iters consecutive outer iters.
-                if (max_c < 0.95 * slack_best_c) {
-                    slack_best_c = max_c;
-                    slack_stall_count = 0;
-                } else if (++slack_stall_count >= aug.slack_stall_iters) {
-                    drop_slacks = true;
-                }
+            } else if (slack_continuation_active && slack_rho_cur >= aug.slack_rho_max) {
+                // Continuation exhausted: the cap annealed to its ceiling
+                // without reaching slack_off_tol, so hand off to exact AL.
+                drop_slacks = true;
+            } else if (slack_continuation_active) {
+                // Anneal the cap every iteration once latched — a graceful,
+                // conditioning-preserving handoff toward exact AL (contrast
+                // the abrupt stall-fallback drop). Applied after the dual
+                // update so this iter's lambda used the same rho the solve did.
+                ramp_rho_next = true;
+            } else if (aug.slack_stall_iters > 0
+                       && slack_stall_count >= aug.slack_stall_iters) {
+                // Stall fallback (opt-in, abrupt): drop the slacks after
+                // slack_stall_iters non-contracting iters. Only reached when
+                // continuation is off (slack_rho_scale == 1).
+                drop_slacks = true;
             }
             if (drop_slacks) {
                 // lambda/mu carry over (warm start); the multiplier update
@@ -288,7 +339,7 @@ bool alilqr(
                     if (isStateSlackFamily(fams_k[static_cast<size_t>(i)])) {
                         c_eff(i) -= optimalSlack(
                             c_eff(i), lambda_aug[k](i), mu_aug[k](i),
-                            aug.slack_rho, aug.slack_sigma
+                            slack_rho_cur, aug.slack_sigma
                         );
                     }
                 }
@@ -312,6 +363,14 @@ bool alilqr(
                     mu_aug[k](i) = std::min(mu_aug[k](i) * pscale_f, pmax_f);
                 }
             }
+        }
+
+        // Continuation: anneal the slack cap upward for the next slack-phase
+        // iteration when the phase stalled (ramp_rho_next set above). Ramped
+        // AFTER the dual update so this iter's lambda used the same rho the
+        // inner solve did.
+        if (ramp_rho_next) {
+            slack_rho_cur = std::min(slack_rho_cur * aug.slack_rho_scale, aug.slack_rho_max);
         }
     }
 

@@ -169,6 +169,10 @@ def main():
     parser.add_argument("--slack-off-tol", type=float, default=0.02)
     parser.add_argument("--slack-stall-iters", type=int, default=0,
                         help="opt-in stall fallback (0 = disabled, the C++ default)")
+    parser.add_argument("--slack-rho-scale", type=float, default=1.0,
+                        help="opt-in rho continuation (1.0 = off); pair with --slack-sigma")
+    parser.add_argument("--slack-rho-max", type=float, default=1e8)
+    parser.add_argument("--slack-sigma", type=float, default=0.0)
     parser.add_argument("--max-outer", type=int, default=20)
     args = parser.parse_args()
 
@@ -191,6 +195,9 @@ def main():
                 aug.slack_rho = args.slack_rho
                 aug.slack_off_tol = args.slack_off_tol
                 aug.slack_stall_iters = args.slack_stall_iters
+                aug.slack_rho_scale = args.slack_rho_scale
+                aug.slack_rho_max = args.slack_rho_max
+                aug.slack_sigma = args.slack_sigma
             sat = make_satellite(settings, n_mtq=n_mtq, rw_hmax=rw_hmax)
 
             x0 = np.zeros(sat.stateDim)

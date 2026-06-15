@@ -1139,3 +1139,42 @@ TEST_CASE("Invalid auglag.slack_off_tol - zero", "[plannersettings][validation][
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
     REQUIRE(error_msg == "auglag.slack_off_tol invalid");
 }
+
+TEST_CASE("Valid auglag rho continuation", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.use_state_slack = true;
+    settings.passes[0].auglag.slack_rho = 10.0;
+    settings.passes[0].auglag.slack_rho_scale = 10.0;
+    settings.passes[0].auglag.slack_rho_max = 1e6;
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Invalid auglag.slack_rho_scale - below one", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.slack_rho_scale = 0.5;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.slack_rho_scale invalid");
+}
+
+TEST_CASE("Invalid auglag.slack_rho_max - non-finite", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.slack_rho_max = std::numeric_limits<double>::infinity();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.slack_rho_max invalid");
+}
+
+TEST_CASE("Invalid auglag.slack_rho_max - below slack_rho", "[plannersettings][validation][auglag][slack]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.slack_rho = 100.0;
+    settings.passes[0].auglag.slack_rho_max = 10.0;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.slack_rho_max must be >= slack_rho");
+}

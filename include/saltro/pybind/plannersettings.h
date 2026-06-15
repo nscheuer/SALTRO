@@ -406,6 +406,31 @@ struct AugLagConfig {
     /// tree for the full discussion.
     int slack_stall_iters = 0;
 
+    /// Continuation on the slack price (Huber annealing). The slack penalty
+    /// is a Huber / Moreau-Yosida smoothing of the exact AL penalty with
+    /// slack_rho as the smoothing radius; a FIXED rho caps the constraint
+    /// force at rho, so a constraint whose true shadow price exceeds rho is
+    /// "bought" forever (observed on underactuated MTQ-only razor slews,
+    /// where the rate constraint's multiplier is enormous). Ramping rho up
+    /// across slack-phase outer iterations anneals the cap away: once rho
+    /// passes the true shadow price the slack deactivates per knot (s*->0)
+    /// and the solve hands off CONTINUOUSLY to exact AL — no discrete
+    /// switch, so it degrades from a good state rather than from a possibly
+    /// damaged one (contrast slack_stall_iters, which drops the slacks
+    /// abruptly). This is the principled fix for the MTQ-only failure mode.
+    ///
+    /// slack_rho_scale = 1.0 (default) disables the ramp -> fixed-rho slack,
+    /// bit-identical to the original behavior. > 1.0 ramps rho by this
+    /// factor each slack-phase outer iteration (same cadence as the mu
+    /// ramp). Pair with slack_sigma > 0 so the bought region keeps a Huber
+    /// curvature floor (sigma) instead of the sigma=0 zero-curvature cliff
+    /// the line search thrashes on at large rho.
+    double slack_rho_scale = 1.0;
+    /// Ceiling for the rho ramp. When rho reaches it the continuation is
+    /// exhausted and the slack phase ends (hand off to exact-AL polish),
+    /// even if slack_off_tol was never reached. Must be >= slack_rho.
+    double slack_rho_max = 1e8;
+
     double constraint_tol = 0.002;
     double total_cost_tol = 1e-2;
 };

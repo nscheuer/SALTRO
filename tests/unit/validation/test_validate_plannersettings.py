@@ -1234,3 +1234,36 @@ def test_invalid_auglag_slack_off_tol_zero():
 
     assert not ok
     assert error_msg == "auglag.slack_off_tol invalid"
+
+
+def test_valid_auglag_rho_continuation():
+    """rho continuation knobs with sane values should pass"""
+    settings = valid_settings()
+    settings.passes[0].auglag.use_state_slack = True
+    settings.passes[0].auglag.slack_rho = 10.0
+    settings.passes[0].auglag.slack_rho_scale = 10.0
+    settings.passes[0].auglag.slack_rho_max = 1e6
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert ok
+
+
+def test_invalid_auglag_slack_rho_scale_below_one():
+    """slack_rho_scale must be >= 1.0"""
+    settings = valid_settings()
+    settings.passes[0].auglag.slack_rho_scale = 0.5
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.slack_rho_scale invalid"
+
+
+def test_invalid_auglag_slack_rho_max_below_rho():
+    """slack_rho_max must be >= slack_rho"""
+    settings = valid_settings()
+    settings.passes[0].auglag.slack_rho = 100.0
+    settings.passes[0].auglag.slack_rho_max = 10.0
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.slack_rho_max must be >= slack_rho"

@@ -350,8 +350,45 @@ With ``auglag.use_state_slack = true`` the outer loop runs in two phases:
      slews with tight ``wmax`` (needed multiplier is huge); raising
      ``slack_rho`` alone does NOT fix it there, because with
      ``slack_sigma = 0`` the bought region also has zero curvature.
-     Remedies: raise ``slack_rho``/``slack_sigma``, loosen
-     ``slack_off_tol``, or opt into the stall fallback below.
+     Remedies, best first: opt into rho continuation (below); failing that
+     raise ``slack_rho``/``slack_sigma`` or loosen ``slack_off_tol`` by
+     hand, or use the cruder stall fallback.
+
+.. note::
+
+   **Rho continuation** (``slack_rho_scale`` > 1, OPT-IN, default 1.0 =
+   off) is the principled fix for the stall-above-``slack_off_tol`` mode.
+   The slack penalty is a Huber / Moreau-Yosida smoothing of the exact AL
+   penalty with ``slack_rho`` the smoothing radius; a fixed radius caps the
+   constraint force, so a constraint whose true shadow price exceeds the cap
+   is bought forever. Continuation anneals the cap upward (by
+   ``slack_rho_scale`` per iteration, to ``slack_rho_max``) so it crosses
+   the shadow price, the slack deactivates per knot, and the solve hands off
+   *continuously* to exact AL — reaching baseline-quality feasibility, not
+   merely the ``slack_off_tol`` neighborhood.
+
+   It is **latched and gated**: the ramp engages only once the soft cap
+   stalls (no >5% contraction) *while still above* ``slack_off_tol``, then
+   anneals every iteration. So it is a strict no-op whenever the soft cap is
+   productively driving the violation down (RW binding cases reach
+   ``slack_off_tol`` and polish before any stall), preserving those wins for
+   any ``slack_rho_scale``. Pair with ``slack_sigma`` > 0 so the bought
+   region keeps a Huber curvature floor instead of the sigma=0 cliff.
+
+   Benchmarks: latched continuation (``slack_rho_scale`` = 10,
+   ``slack_sigma`` = 1) preserved every RW win and converged 4 of 6
+   feasible MTQ-only hard cases to baseline quality (vs 2/6 fixed-rho),
+   beating the stall fallback's solution quality on the cases both solve.
+   Residual misses: an infeasible fixed initial knot (unfixable by anyone)
+   and a razor MTQ slew with an aggressive ``penalty_scale`` = 30 mu ramp,
+   where mu outruns any practical rho ramp and exact-AL baseline still wins
+   — set ``slack_rho_scale`` >= ``penalty_scale`` to narrow the gap, but
+   that corner is baseline's.
+
+   Same-class caveats as the stall fallback apply (hardcoded 5% gate;
+   FP-noise knife-edge at the stall threshold; one-way once latched), which
+   is why it is opt-in. The graceful, conditioning-preserving handoff makes
+   it the recommended choice over the stall fallback.
 
 .. warning::
 
