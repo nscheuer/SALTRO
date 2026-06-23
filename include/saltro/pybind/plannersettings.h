@@ -91,6 +91,10 @@ struct DisturbanceConfig {
 
 struct ConstraintConfig {
     double control_limit_scale = 0.75;
+    /// Margin on the hard RW-momentum constraint: |h| <= rw_momentum_limit_scale * h_max.
+    /// <1 leaves slack below saturation (the momentum analog of control_limit_scale for
+    /// torque). Default 1.0 = bind exactly at h_max (no margin).
+    double rw_momentum_limit_scale = 1.0;
     /// Stack-allocated bounded control limit vector (no heap allocation).
     Eigen::Matrix<double, Eigen::Dynamic, 1, 0, saltro::limits::MAX_CTRL_DIM, 1> u_max;
     double wmax = 20.0 * M_PI / 180.0;
@@ -271,6 +275,14 @@ struct RegularizationConfig {
 
     bool use_dynamics_hess = false;
     bool use_constraint_hess = false;
+
+    // DDP companion knob: when adding true second-order dynamics/constraint
+    // curvature (use_dynamics_hess / use_constraint_hess), Q_uu can become
+    // indefinite, which makes the LLT fail or produce an ascent direction.
+    // When set, the DDP curvature contributions Q*_ddp are projected to PSD
+    // (negative eigenvalues clamped to 0) before being folded into Q_uu and
+    // the existing reg+LLT. Default OFF — pure Gauss-Newton is unchanged.
+    bool psd_clip_quu_ddp = false;
 };
 
 /**

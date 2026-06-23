@@ -205,6 +205,164 @@ TEST_CASE_METHOD(SatelliteDisturbancesFixture, "SRP is zero when disabled",
     REQUIRE(tau_off.isZero());
 }
 
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Prop disturbance applies body-fixed constant torque",
+                 "[disturbances][prop]") {
+    const Eigen::Vector3d tau_body(4.0e-5, -1.0e-5, 2.0e-5);
+
+    DisturbanceConfig dist;
+    dist.plan_for_gg = false;
+    dist.plan_for_aero = false;
+    dist.plan_for_srp = false;
+    dist.plan_for_prop = true;
+    dist.prop_torque = tau_body;
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+
+    Eigen::Vector3d tau_total = getDisturbanceTorque(x, dist, 0);
+
+    REQUIRE(tau_total.allFinite());
+    REQUIRE_THAT(tau_total(0), Catch::Matchers::WithinAbs(tau_body(0), 1e-15));
+    REQUIRE_THAT(tau_total(1), Catch::Matchers::WithinAbs(tau_body(1), 1e-15));
+    REQUIRE_THAT(tau_total(2), Catch::Matchers::WithinAbs(tau_body(2), 1e-15));
+}
+
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Prop disturbance is zero when disabled",
+                 "[disturbances][prop]") {
+    DisturbanceConfig dist;
+    dist.plan_for_gg = false;
+    dist.plan_for_aero = false;
+    dist.plan_for_srp = false;
+    dist.plan_for_prop = false;
+    dist.prop_torque = Eigen::Vector3d(4.0e-5, -1.0e-5, 2.0e-5);
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+
+    Eigen::Vector3d tau_total = getDisturbanceTorque(x, dist, 0);
+
+    REQUIRE(tau_total.isZero());
+}
+
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Prop disturbance stays body-fixed under attitude changes",
+                 "[disturbances][prop][attitude]") {
+    const Eigen::Vector3d tau_body(3.0e-5, 0.0, 0.0);
+
+    DisturbanceConfig dist;
+    dist.plan_for_gg = false;
+    dist.plan_for_aero = false;
+    dist.plan_for_srp = false;
+    dist.plan_for_prop = true;
+    dist.prop_torque = tau_body;
+
+    Satellite::VecX x_id = Satellite::VecX::Zero(sat.stateDim());
+    x_id.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+    Eigen::Vector3d tau_id = getDisturbanceTorque(x_id, dist, 0);
+
+    Satellite::VecX x_rot = Satellite::VecX::Zero(sat.stateDim());
+    x_rot.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(0, 0, 0, 1);
+    Eigen::Vector3d tau_rot = getDisturbanceTorque(x_rot, dist, 0);
+
+    REQUIRE_THAT(tau_id(0), Catch::Matchers::WithinAbs(tau_body(0), 1e-15));
+    REQUIRE_THAT(tau_id(1), Catch::Matchers::WithinAbs(tau_body(1), 1e-15));
+    REQUIRE_THAT(tau_id(2), Catch::Matchers::WithinAbs(tau_body(2), 1e-15));
+
+    REQUIRE_THAT(tau_rot(0), Catch::Matchers::WithinAbs(tau_body(0), 1e-15));
+    REQUIRE_THAT(tau_rot(1), Catch::Matchers::WithinAbs(tau_body(1), 1e-15));
+    REQUIRE_THAT(tau_rot(2), Catch::Matchers::WithinAbs(tau_body(2), 1e-15));
+}
+
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Generic disturbance applies body-fixed constant torque",
+                 "[disturbances][gendist]") {
+    const Eigen::Vector3d tau_body(-2.0e-5, 3.0e-5, 1.0e-5);
+    DisturbanceConfig dist;
+    dist.plan_for_gendist = true;
+    dist.gendist_torque = tau_body;
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+
+    const Eigen::Vector3d tau_total = getDisturbanceTorque(x, dist, 0);
+    REQUIRE(tau_total.allFinite());
+    REQUIRE(tau_total.isApprox(tau_body));
+}
+
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Generic disturbance is zero when disabled",
+                 "[disturbances][gendist]") {
+    DisturbanceConfig dist;
+    dist.plan_for_gendist = false;
+    dist.gendist_torque = Eigen::Vector3d(-2.0e-5, 3.0e-5, 1.0e-5);
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+
+    REQUIRE(getDisturbanceTorque(x, dist, 0).isZero());
+}
+
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Generic disturbance is body-fixed under attitude",
+                 "[disturbances][gendist]") {
+    const Eigen::Vector3d tau_body(0.0, 5.0e-5, 0.0);
+    DisturbanceConfig dist;
+    dist.plan_for_gendist = true;
+    dist.gendist_torque = tau_body;
+
+    Satellite::VecX x_identity = Satellite::VecX::Zero(sat.stateDim());
+    x_identity.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX x_rotated = Satellite::VecX::Zero(sat.stateDim());
+    x_rotated.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(0, 0, 0, 1);
+
+    REQUIRE(getDisturbanceTorque(x_identity, dist, 0).isApprox(tau_body));
+    REQUIRE(getDisturbanceTorque(x_rotated, dist, 0).isApprox(tau_body));
+}
+
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Residual dipole matches m cross body magnetic field",
+                 "[disturbances][resdipole]") {
+    const int step = 20;
+    const Eigen::Vector3d m(0.05, -0.02, 0.03);
+    REQUIRE(B.col(step).norm() > 0.0);
+
+    DisturbanceConfig dist;
+    dist.plan_for_resdipole = true;
+    dist.res_dipole = m;
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+
+    const Eigen::Vector3d tau_total = getDisturbanceTorque(x, dist, step);
+    const Eigen::Vector3d expected = m.cross(B.col(step));
+    REQUIRE(tau_total.allFinite());
+    REQUIRE(tau_total.isApprox(expected));
+    REQUIRE(tau_total.norm() > 0.0);
+}
+
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Residual dipole is zero when disabled",
+                 "[disturbances][resdipole]") {
+    DisturbanceConfig dist;
+    dist.plan_for_resdipole = false;
+    dist.res_dipole = Eigen::Vector3d(0.05, -0.02, 0.03);
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+
+    REQUIRE(getDisturbanceTorque(x, dist, 20).isZero());
+}
+
+TEST_CASE_METHOD(SatelliteDisturbancesFixture, "Residual dipole depends on attitude",
+                 "[disturbances][resdipole]") {
+    const int step = 20;
+    const Eigen::Vector3d m(0.05, -0.02, 0.03);
+    DisturbanceConfig dist;
+    dist.plan_for_resdipole = true;
+    dist.res_dipole = m;
+
+    Satellite::VecX x_rotated = Satellite::VecX::Zero(sat.stateDim());
+    x_rotated.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(0, 0, 0, 1);
+
+    const Eigen::Vector3d B_eci = B.col(step);
+    const Eigen::Vector3d B_body_expected(-B_eci.x(), -B_eci.y(), B_eci.z());
+    REQUIRE(getDisturbanceTorque(x_rotated, dist, step).isApprox(m.cross(B_body_expected)));
+}
+
 // ============================================================================
 // TEST SECTION 2: Multiple Disturbances Together
 // ============================================================================

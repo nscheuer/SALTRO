@@ -176,8 +176,8 @@ def alilqr(
     for iteration in range(passsettings.auglag.max_outer_iters):
         # Solve AL subproblem with iLQR first (ALTRO style).
         X, U, stop_reason, snaps, trans = ilqr(
-            plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho, 
-            jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug
+            plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho,
+            jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug,
         )
 
         if debug:
@@ -216,7 +216,7 @@ def alilqr(
             stop_reason = f"AL-iLQR converged: max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}"
             break
 
-        # Update lambda_k and mu_k elementwise (inequality constraints).
+        # Update lambda_k and mu_k elementwise using c_pos to match C++ AL-iLQR.
         clist = _collect_constraints(plannersettings, satellite, X, U, S)
         for k, ck in enumerate(clist):
             ck_pos = np.maximum(0.0, ck)
@@ -230,6 +230,3 @@ def alilqr(
             mu_aug[k] = np.minimum(passsettings.auglag.penalty_max, phi_aug * mu_aug[k])
 
     return X, U, stop_reason, snapshots, transitions
-
-
-        

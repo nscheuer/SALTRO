@@ -240,13 +240,16 @@ bool forwardPass(
                 }
 
                 for (int i = 0; i < c_k.size(); ++i) {
-                    if (c_k(i) <= 0.0) {
-                        continue;
-                    }
                     const double ci = c_k(i);
                     const double li = lambda_aug[k](i);
                     const double mi = mu_aug[k](i);
-                    J_new += li * ci + 0.5 * mi * ci * ci;
+                    // Lambda term always active with signed c (rewards
+                    // feasibility); mu penalty when c > 0 OR lambda > 0.
+                    // Must match the BP gradient and the inner iLQR merit.
+                    J_new += li * ci;
+                    if (ci > 0.0 || li > 0.0) {
+                        J_new += 0.5 * mi * ci * ci;
+                    }
                 }
             }
         }

@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <Eigen/Dense>
+#include <array>
 
 #include <saltro/pybind/satellite.h>
 #include <saltro/orbit_generation/generate_orbit.h>
@@ -839,6 +840,117 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Jacobian w.r.t. state with disturban
                 std::abs(analytical - numerical) / std::abs(numerical) : 0.0;
             double abs_err = std::abs(analytical - numerical);
             
+            REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Residual dipole state Jacobian matches finite differences",
+                 "[jacobians][finite-diff][resdipole]") {
+    const int step = 50;
+    const Eigen::Vector3d R_eci = R.col(step);
+    const Eigen::Vector3d B_eci = B.col(step);
+    const Eigen::Vector3d S_eci = S.col(step);
+    const Eigen::Vector3d V_eci = V.col(step);
+    REQUIRE(B_eci.norm() > 0.0);
+
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    DisturbanceConfig dist;
+    dist.plan_for_resdipole = true;
+    dist.res_dipole = Eigen::Vector3d(0.05, -0.02, 0.03);
+
+    const std::array<Eigen::Vector4d, 2> attitudes = {
+        Eigen::Vector4d(1.0, 0.0, 0.0, 0.0),
+        Eigen::Vector4d(0.9, 0.2, -0.3, 0.1).normalized()
+    };
+
+    for (const Eigen::Vector4d& q : attitudes) {
+        Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+        x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+        x.segment<4>(Satellite::QUAT_INDEX) = q;
+
+        auto [jac_x_analytical, jac_u, jac_dist] = sat.dynamicsJacobians(
+            x, u, dist, R_eci, B_eci, S_eci, V_eci
+        );
+        REQUIRE(jac_x_analytical.block(Satellite::AV_INDEX, Satellite::QUAT_INDEX, 3, 4).norm() > 0.0);
+
+        const double eps = 1e-6;
+        Satellite::MatX jac_x_numerical = Satellite::MatX::Zero(sat.stateDim(), sat.stateDim());
+        for (int j = 0; j < sat.stateDim(); ++j) {
+            Satellite::VecX x_plus = x;
+            Satellite::VecX x_minus = x;
+            x_plus(j) += eps;
+            x_minus(j) -= eps;
+            const Satellite::VecX f_plus = sat.dynamics(x_plus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
+            const Satellite::VecX f_minus = sat.dynamics(x_minus, u, dist, R_eci, B_eci, S_eci, V_eci, 0);
+            jac_x_numerical.col(j) = (f_plus - f_minus) / (2.0 * eps);
+        }
+
+        const double rel_tol = 1e-5;
+        const double abs_tol = 1e-9;
+        for (int i = 0; i < sat.stateDim(); ++i) {
+            for (int j = 0; j < sat.stateDim(); ++j) {
+                const double analytical = jac_x_analytical(i, j);
+                const double numerical = jac_x_numerical(i, j);
+                const double abs_err = std::abs(analytical - numerical);
+                const double rel_err = std::abs(numerical) > abs_tol
+                    ? abs_err / std::abs(numerical) : 0.0;
+                CAPTURE(q.transpose(), i, j, analytical, numerical, abs_err, rel_err);
+                REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
+            }
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteDynamicsFixture, "Generic disturbance state Jacobian matches finite differences",
+                 "[jacobians][finite-diff][gendist]") {
+    const int step = 50;
+    const Eigen::Vector3d R_eci = R.col(step);
+    const Eigen::Vector3d B_eci = B.col(step);
+    const Eigen::Vector3d S_eci = S.col(step);
+    const Eigen::Vector3d V_eci = V.col(step);
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+
+    DisturbanceConfig dist_on;
+    dist_on.plan_for_gendist = true;
+    dist_on.gendist_torque = Eigen::Vector3d(-2.0e-5, 3.0e-5, 1.0e-5);
+    DisturbanceConfig dist_off;
+
+    auto [jac_x_on, jac_u_on, jac_dist_on] = sat.dynamicsJacobians(
+        x, u, dist_on, R_eci, B_eci, S_eci, V_eci
+    );
+    auto [jac_x_off, jac_u_off, jac_dist_off] = sat.dynamicsJacobians(
+        x, u, dist_off, R_eci, B_eci, S_eci, V_eci
+    );
+    REQUIRE((jac_x_on.array() == jac_x_off.array()).all());
+    REQUIRE((jac_u_on.array() == jac_u_off.array()).all());
+
+    const double eps = 1e-6;
+    Satellite::MatX jac_x_numerical = Satellite::MatX::Zero(sat.stateDim(), sat.stateDim());
+    for (int j = 0; j < sat.stateDim(); ++j) {
+        Satellite::VecX x_plus = x;
+        Satellite::VecX x_minus = x;
+        x_plus(j) += eps;
+        x_minus(j) -= eps;
+        const Satellite::VecX f_plus = sat.dynamics(x_plus, u, dist_on, R_eci, B_eci, S_eci, V_eci, 0);
+        const Satellite::VecX f_minus = sat.dynamics(x_minus, u, dist_on, R_eci, B_eci, S_eci, V_eci, 0);
+        jac_x_numerical.col(j) = (f_plus - f_minus) / (2.0 * eps);
+    }
+
+    const double rel_tol = 1e-5;
+    const double abs_tol = 1e-9;
+    for (int i = 0; i < sat.stateDim(); ++i) {
+        for (int j = 0; j < sat.stateDim(); ++j) {
+            const double analytical = jac_x_on(i, j);
+            const double numerical = jac_x_numerical(i, j);
+            const double abs_err = std::abs(analytical - numerical);
+            const double rel_err = std::abs(numerical) > abs_tol
+                ? abs_err / std::abs(numerical) : 0.0;
+            CAPTURE(i, j, analytical, numerical, abs_err, rel_err);
             REQUIRE((rel_err <= rel_tol || abs_err <= abs_tol));
         }
     }
