@@ -301,7 +301,16 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
         saltro::disturbances::SRPDisturbance srp(geometry_config_);
         torque += srp.torque(x_base, dist, S_body);
     }
-    
+
+    // Constant body-fixed propulsion torque (e.g. off-axis thruster). The
+    // DisturbanceConfig struct already exposes plan_for_prop and prop_torque,
+    // but the dispatch in disturbanceTorque() previously had no branch that
+    // applied them — they were dead settings. ∂τ/∂x = 0 and ∂τ/∂u = 0 so no
+    // dynamicsJacobians/dynamicsHessians changes are required.
+    if (dist.plan_for_prop) {
+        torque += dist.prop_torque;
+    }
+
     return torque;
 }
 

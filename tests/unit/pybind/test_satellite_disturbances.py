@@ -180,8 +180,82 @@ def test_srp_is_zero_when_disabled():
     x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
     
     tau_off = fixture.get_disturbance_torque(x, dist_off, 0)
-    
+
     assert np.allclose(tau_off, np.zeros(3))
+
+
+def test_prop_disturbance_applies_body_fixed_constant_torque():
+    """plan_for_prop=True should add prop_torque (body-fixed) to the disturbance."""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    tau_body = np.array([4.0e-5, -1.0e-5, 2.0e-5])
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_prop = True
+    dist.prop_torque = tau_body
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+
+    tau_total = fixture.get_disturbance_torque(x, dist, 0)
+
+    assert np.all(np.isfinite(tau_total))
+    # With only prop enabled (no other contributors), the total equals prop_torque.
+    assert np.allclose(tau_total, tau_body)
+
+
+def test_prop_disturbance_is_zero_when_disabled():
+    """plan_for_prop=False should ignore prop_torque even if non-zero."""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_prop = False
+    dist.prop_torque = np.array([4.0e-5, -1.0e-5, 2.0e-5])
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+
+    tau_total = fixture.get_disturbance_torque(x, dist, 0)
+    assert np.allclose(tau_total, np.zeros(3))
+
+
+def test_prop_disturbance_is_body_fixed_under_attitude():
+    """prop_torque is in the body frame -- it should NOT rotate when the
+    attitude changes (this distinguishes body-fixed propulsion from a
+    fixed-inertial torque).
+    """
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    tau_body = np.array([3.0e-5, 0.0, 0.0])
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_prop = True
+    dist.prop_torque = tau_body
+
+    # At identity quaternion: body = inertial, output is +x_body == +x_inertial.
+    x_id = np.zeros(fixture.sat.stateDim)
+    x_id[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    tau_id = fixture.get_disturbance_torque(x_id, dist, 0)
+
+    # 180-degree rotation about z keeps body +x equal to body +x in body frame.
+    x_rot = np.zeros(fixture.sat.stateDim)
+    x_rot[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([0, 0, 0, 1])
+    tau_rot = fixture.get_disturbance_torque(x_rot, dist, 0)
+
+    assert np.allclose(tau_id, tau_body)
+    assert np.allclose(tau_rot, tau_body)
 
 
 # ============================================================================
