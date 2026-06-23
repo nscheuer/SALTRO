@@ -922,6 +922,97 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass K and d have consistent nor
 }
 
 TEST_CASE_METHOD(BackwardPassFixture,
+	"backward_pass linearizes with settings.disturbances (regression: BP ignored the config)",
+	"[backward_pass][disturbances]") {
+	// The forward pass rolls out with settings.disturbances; the backward pass
+	// must linearize with the same config, or A_k/B_k disagree with the actual
+	// rollout and the expected-decrease prediction is biased. This test runs
+	// the identical trajectory through the BP with all disturbances off and
+	// with gravity-gradient planning on: the gains must differ. (With the old
+	// default-constructed DisturbanceConfig inside backwardPass, both runs
+	// produced bit-identical K/d.)
+	constexpr int N_test = 5;
+
+	PlannerSettings settings_off = settings;  // fixture: all plan_for_* false
+	PlannerSettings settings_gg = settings;
+	settings_gg.disturbances.plan_for_gg = true;
+
+	Satellite satellite_test(
+		Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal(), settings_off
+	);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitX(), 0.2);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitY(), 0.2);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitZ(), 0.2);
+	satellite_test.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+	satellite_test.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+	satellite_test.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+	Eigen::MatrixXd X(satellite_test.stateDim(), N_test);
+	Eigen::MatrixXd U(satellite_test.controlDim(), N_test - 1);
+	Eigen::MatrixXd R_test(3, N_test);
+	Eigen::MatrixXd V_test(3, N_test);
+	Eigen::MatrixXd B_test(3, N_test);
+	Eigen::MatrixXd S_test(3, N_test);
+	Eigen::MatrixXd rho_test(1, N_test);
+	Eigen::MatrixXd boresight_test(3, N_test);
+
+	// Attitude rotated 30 deg about z so the gravity-gradient torque and its
+	// quaternion Jacobian are nonzero (at identity with r along body x the GG
+	// torque vanishes for a diagonal inertia).
+	Satellite::VecX x_rot = x0;
+	x_rot.segment<4>(Satellite::QUAT_INDEX) =
+		Eigen::Vector4d(std::cos(M_PI / 12.0), 0.0, 0.0, std::sin(M_PI / 12.0));
+
+	for (int k = 0; k < N_test; ++k) {
+		X.col(k) = x_rot;
+		if (k < N_test - 1) U.col(k) = 0.001 * Eigen::VectorXd::Random(satellite_test.controlDim());
+
+		R_test.col(k) = Eigen::Vector3d(7000e3, 0.0, 0.0);
+		V_test.col(k) = Eigen::Vector3d(0.0, 7500.0, 0.0);
+		B_test.col(k) = Eigen::Vector3d(2.5e-5, -1.5e-5, 3.0e-5);
+		S_test.col(k) = Eigen::Vector3d(1.0, 0.1, -0.05).normalized();
+		rho_test(0, k) = 0.0;
+		boresight_test.col(k) = Eigen::Vector3d::UnitX();
+	}
+
+	Eigen::Vector4d attitude_target_test;
+	attitude_target_test << std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0, 0.0;
+	Eigen::MatrixXd attitude_target_test_traj = makeAttitudeTraj(attitude_target_test, N_test);
+
+	const int nu = satellite_test.controlDim();
+	const int nxr = satellite_test.reducedStateDim();
+
+	auto run_bp = [&](const PlannerSettings& s,
+	                  std::vector<Eigen::MatrixXd>& K,
+	                  std::vector<Eigen::VectorXd>& d,
+	                  Eigen::Vector2d& deltaV) {
+		K.assign(N_test - 1, Eigen::MatrixXd::Zero(nu, nxr));
+		d.assign(N_test - 1, Eigen::VectorXd::Zero(nu));
+		deltaV.setZero();
+		return optimizer::backwardPass(
+			satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
+			boresight_test, attitude_target_test_traj, s,
+			s.passes[0].reg.reg_init, K, d, deltaV
+		);
+	};
+
+	std::vector<Eigen::MatrixXd> K_off, K_gg;
+	std::vector<Eigen::VectorXd> d_off, d_gg;
+	Eigen::Vector2d deltaV_off, deltaV_gg;
+
+	REQUIRE(run_bp(settings_off, K_off, d_off, deltaV_off));
+	REQUIRE(run_bp(settings_gg, K_gg, d_gg, deltaV_gg));
+
+	double diff = 0.0;
+	for (int k = 0; k < N_test - 1; ++k) {
+		REQUIRE(K_gg[k].allFinite());
+		REQUIRE(d_gg[k].allFinite());
+		diff += (K_gg[k] - K_off[k]).norm() + (d_gg[k] - d_off[k]).norm();
+	}
+	REQUIRE(diff > 0.0);
+}
+
+TEST_CASE_METHOD(BackwardPassFixture,
 	"backward_pass rejects non-finite trajectory states instead of emitting NaN gains",
 	"[backward_pass][nan_guard]") {
 	// Eigen's LLT does not flag NaN input, so before the guards a NaN state

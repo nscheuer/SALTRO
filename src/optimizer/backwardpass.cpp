@@ -172,8 +172,11 @@ bool backwardPass(
 		}
 	}
 
-	// Minimal disturbance config for linearization
-	DisturbanceConfig dist_config;
+	// Linearize with the same disturbance config the forward pass rolls out
+	// (forwardpass.cpp uses settings.disturbances). A default-constructed
+	// config here makes A_k/B_k disagree with the actual rollout whenever any
+	// plan_for_* flag is on, biasing the expected-decrease prediction.
+	const DisturbanceConfig& dist_config = settings.disturbances;
 	
 	// Backward loop: k from N-2 down to 0
 	for (int k = N - 2; k >= 0; --k) {
