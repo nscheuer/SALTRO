@@ -133,6 +133,209 @@ def _max_gain_diff(K_a, d_a, K_b, d_b):
     )
 
 
+def _state_norm_jacobian(x, quat_idx=3):
+    nx = x.shape[0]
+    J = np.eye(nx)
+    q = x[quat_idx:quat_idx + 4]
+    qn = np.linalg.norm(q)
+    if qn < 1e-10:
+        return J
+    qn3 = qn * qn * qn
+    J[quat_idx:quat_idx + 4, quat_idx:quat_idx + 4] = (
+        np.eye(4) / qn - np.outer(q, q) / qn3
+    )
+    return J
+
+
+def _tensor_slices(tensor, rows, cols, depth):
+    array = np.asarray(tensor, dtype=float)
+    return [array[i, :rows, :cols] for i in range(depth)]
+
+
+def _mat_times_cube(M, cube):
+    return [M @ s for s in cube]
+
+
+def _cube_times_mat(cube, M):
+    return [s @ M for s in cube]
+
+
+def _mat_times_cube_t(M, cube):
+    return [M @ s.T for s in cube]
+
+
+def _mat_over_cube(A, cube):
+    n_out, n_in = A.shape
+    r, c = cube[0].shape
+    out = [np.zeros((r, c)) for _ in range(n_out)]
+    for i in range(n_out):
+        for l in range(n_in):
+            a = A[i, l]
+            if a != 0.0:
+                out[i] += a * cube[l]
+    return out
+
+
+def _cube_add(a, b):
+    return [x + y for x, y in zip(a, b)]
+
+
+def _cube_scale(s, cube):
+    return [s * m for m in cube]
+
+
+def _rk4_jacobians_python(dynamics_jac, x, u, t, dt, quat_idx=3):
+    nx = x.shape[0]
+    I = np.eye(nx)
+
+    N0 = _state_norm_jacobian(x, quat_idx)
+
+    A1, B1, k1 = dynamics_jac(t, x, u)
+    dk1_dx = A1 @ N0
+    dk1_du = B1
+
+    x2_raw = x + 0.5 * dt * k1
+    x2 = x2_raw.copy()
+    x2[quat_idx:quat_idx + 4] /= np.linalg.norm(x2[quat_idx:quat_idx + 4])
+    N2 = _state_norm_jacobian(x2_raw, quat_idx)
+    A2, B2, k2 = dynamics_jac(t + 0.5 * dt, x2, u)
+    dk2_dx = A2 @ N2 @ (I + 0.5 * dt * dk1_dx)
+    dk2_du = A2 @ N2 @ (0.5 * dt * dk1_du) + B2
+
+    x3_raw = x + 0.5 * dt * k2
+    x3 = x3_raw.copy()
+    x3[quat_idx:quat_idx + 4] /= np.linalg.norm(x3[quat_idx:quat_idx + 4])
+    N3 = _state_norm_jacobian(x3_raw, quat_idx)
+    A3, B3, k3 = dynamics_jac(t + 0.5 * dt, x3, u)
+    dk3_dx = A3 @ N3 @ (I + 0.5 * dt * dk2_dx)
+    dk3_du = A3 @ N3 @ (0.5 * dt * dk2_du) + B3
+
+    x4_raw = x + dt * k3
+    x4 = x4_raw.copy()
+    x4[quat_idx:quat_idx + 4] /= np.linalg.norm(x4[quat_idx:quat_idx + 4])
+    N4 = _state_norm_jacobian(x4_raw, quat_idx)
+    A4, B4, k4 = dynamics_jac(t + dt, x4, u)
+    dk4_dx = A4 @ N4 @ (I + dt * dk3_dx)
+    dk4_du = A4 @ N4 @ (dt * dk3_du) + B4
+
+    x_next_raw = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    N_next = _state_norm_jacobian(x_next_raw, quat_idx)
+    A_raw = N0 + (dt / 6.0) * (dk1_dx + 2.0 * dk2_dx + 2.0 * dk3_dx + dk4_dx)
+    B_raw = (dt / 6.0) * (dk1_du + 2.0 * dk2_du + 2.0 * dk3_du + dk4_du)
+    return N_next @ A_raw, N_next @ B_raw
+
+
+def _rk4_hessians_python(dynamics_hess, x, u, t, dt, quat_idx=3):
+    nx = x.shape[0]
+    nu = u.shape[0]
+    I = np.eye(nx)
+
+    def make_xx():
+        return [np.zeros((nx, nx)) for _ in range(nx)]
+
+    def make_ux():
+        return [np.zeros((nu, nx)) for _ in range(nx)]
+
+    def make_uu():
+        return [np.zeros((nu, nu)) for _ in range(nx)]
+
+    def compose_f(A, fxx, fux, fuu, Mx, Mu, H_xx, H_ux, H_uu):
+        Kxx = _cube_add(
+            _mat_times_cube(Mx.T, _cube_times_mat(fxx, Mx)),
+            _mat_over_cube(A, H_xx),
+        )
+        Kux = _cube_add(
+            _cube_add(
+                _mat_times_cube(Mu.T, _cube_times_mat(fxx, Mx)),
+                _cube_times_mat(fux, Mx),
+            ),
+            _mat_over_cube(A, H_ux),
+        )
+        Kuu = _cube_add(
+            _cube_add(
+                _mat_times_cube(Mu.T, _cube_times_mat(fxx, Mu)),
+                _cube_add(
+                    _cube_times_mat(fux, Mu),
+                    _mat_times_cube_t(Mu.T, fux),
+                ),
+            ),
+            _cube_add(fuu, _mat_over_cube(A, H_uu)),
+        )
+        return Kxx, Kux, Kuu
+
+    N0 = _state_norm_jacobian(x, quat_idx)
+    Mx_in = N0
+    Mu_in = np.zeros((nx, nu))
+    Hxx_in = make_xx()
+    Hux_in = make_ux()
+    Huu_in = make_uu()
+
+    A1, B1, k1, fxx1, fux1, fuu1 = dynamics_hess(t, x, u)
+    Kxx1, Kux1, Kuu1 = compose_f(A1, fxx1, fux1, fuu1, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in)
+    dk1_dx = A1 @ Mx_in
+    dk1_du = A1 @ Mu_in + B1
+
+    x1_raw = x + 0.5 * dt * k1
+    N1 = _state_norm_jacobian(x1_raw, quat_idx)
+    Mx_in = N1 @ (I + 0.5 * dt * dk1_dx)
+    Mu_in = N1 @ (0.5 * dt * dk1_du)
+    Hxx_in = _mat_over_cube(N1, _cube_scale(0.5 * dt, Kxx1))
+    Hux_in = _mat_over_cube(N1, _cube_scale(0.5 * dt, Kux1))
+    Huu_in = _mat_over_cube(N1, _cube_scale(0.5 * dt, Kuu1))
+    x1 = x1_raw.copy()
+    x1[quat_idx:quat_idx + 4] /= np.linalg.norm(x1[quat_idx:quat_idx + 4])
+
+    A2, B2, k2, fxx2, fux2, fuu2 = dynamics_hess(t + 0.5 * dt, x1, u)
+    Kxx2, Kux2, Kuu2 = compose_f(A2, fxx2, fux2, fuu2, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in)
+    dk2_dx = A2 @ Mx_in
+    dk2_du = A2 @ Mu_in + B2
+
+    x2_raw = x + 0.5 * dt * k2
+    N2 = _state_norm_jacobian(x2_raw, quat_idx)
+    Mx_in = N2 @ (I + 0.5 * dt * dk2_dx)
+    Mu_in = N2 @ (0.5 * dt * dk2_du)
+    Hxx_in = _mat_over_cube(N2, _cube_scale(0.5 * dt, Kxx2))
+    Hux_in = _mat_over_cube(N2, _cube_scale(0.5 * dt, Kux2))
+    Huu_in = _mat_over_cube(N2, _cube_scale(0.5 * dt, Kuu2))
+    x2n = x2_raw.copy()
+    x2n[quat_idx:quat_idx + 4] /= np.linalg.norm(x2n[quat_idx:quat_idx + 4])
+
+    A3, B3, k3, fxx3, fux3, fuu3 = dynamics_hess(t + 0.5 * dt, x2n, u)
+    Kxx3, Kux3, Kuu3 = compose_f(A3, fxx3, fux3, fuu3, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in)
+    dk3_dx = A3 @ Mx_in
+    dk3_du = A3 @ Mu_in + B3
+
+    x3_raw = x + dt * k3
+    N3 = _state_norm_jacobian(x3_raw, quat_idx)
+    Mx_in = N3 @ (I + dt * dk3_dx)
+    Mu_in = N3 @ (dt * dk3_du)
+    Hxx_in = _mat_over_cube(N3, _cube_scale(dt, Kxx3))
+    Hux_in = _mat_over_cube(N3, _cube_scale(dt, Kux3))
+    Huu_in = _mat_over_cube(N3, _cube_scale(dt, Kuu3))
+    x3n = x3_raw.copy()
+    x3n[quat_idx:quat_idx + 4] /= np.linalg.norm(x3n[quat_idx:quat_idx + 4])
+
+    A4, B4, k4, fxx4, fux4, fuu4 = dynamics_hess(t + dt, x3n, u)
+    Kxx4, Kux4, Kuu4 = compose_f(A4, fxx4, fux4, fuu4, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in)
+
+    w = dt / 6.0
+
+    def sum4(A, B, C, D):
+        return [w * (a + 2.0 * b + 2.0 * c + d) for a, b, c, d in zip(A, B, C, D)]
+
+    Fxx_raw = sum4(Kxx1, Kxx2, Kxx3, Kxx4)
+    Fux_raw = sum4(Kux1, Kux2, Kux3, Kux4)
+    Fuu_raw = sum4(Kuu1, Kuu2, Kuu3, Kuu4)
+
+    x_next_raw = x + w * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    N_next = _state_norm_jacobian(x_next_raw, quat_idx)
+    return (
+        _mat_over_cube(N_next, Fxx_raw),
+        _mat_over_cube(N_next, Fux_raw),
+        _mat_over_cube(N_next, Fuu_raw),
+    )
+
+
 class BackwardPassFixture:
     """Fixture for backward pass tests with satellite setup."""
 
@@ -872,6 +1075,87 @@ class TestBackwardPass:
         assert np.all(np.isfinite(K))
         assert np.all(np.isfinite(d))
         assert np.all(np.isfinite(deltaV))
+
+    def test_rk4_hessians_match_finite_difference_of_rk4_jacobians(self):
+        """Mirror the C++ FD sanity check for normalized RK4 Hessian composition."""
+        settings = saltro_py.PlannerSettings()
+        settings.num_passes = 1
+        settings.passes[0].dt = 0.05
+        sat = saltro_py.Satellite(np.diag([0.067, 0.071, 0.069]), settings)
+        sat.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+        sat.addRW(np.array([1.0, 0.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
+
+        nx = sat.stateDim
+        nu = sat.controlDim
+        dt = settings.passes[0].dt
+
+        axis = np.array([0.2, 0.5, -0.84], dtype=float)
+        axis /= np.linalg.norm(axis)
+        half = 0.5 * (40.0 * PI / 180.0)
+        q = np.concatenate(([np.cos(half)], np.sin(half) * axis))
+        x = np.zeros(nx)
+        x[0:3] = np.array([0.08, -0.05, 0.06])
+        x[3:7] = q
+        if sat.numRW > 0:
+            x[7] = 0.004
+        u = np.full(nu, 0.02)
+
+        dist = saltro_py.DisturbanceConfig()
+        R0 = np.array([7000e3, 0.0, 0.0])
+        V0 = np.array([0.0, 7500.0, 0.0])
+        B0 = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+        S0 = np.array([1.0, 0.1, -0.05], dtype=float)
+        S0 /= np.linalg.norm(S0)
+
+        def jac_wrapper(t_local, xl, ul):
+            A, B, _ = sat.dynamicsJacobians(xl, ul, dist, R0, B0, S0, V0)
+            k = np.asarray(sat.dynamics(xl, ul, dist, R0, B0, S0, V0, 0), dtype=float)
+            return np.asarray(A, dtype=float), np.asarray(B, dtype=float), k
+
+        def hess_wrapper(t_local, xl, ul):
+            A, B, _ = sat.dynamicsJacobians(xl, ul, dist, R0, B0, S0, V0)
+            k = np.asarray(sat.dynamics(xl, ul, dist, R0, B0, S0, V0, 0), dtype=float)
+            hxx, hux, huu = sat.dynamicsHessians(xl, ul, dist, R0, B0, S0, V0)
+            return (
+                np.asarray(A, dtype=float),
+                np.asarray(B, dtype=float),
+                k,
+                _tensor_slices(hxx, nx, nx, nx),
+                _tensor_slices(hux, nu, nx, nx),
+                _tensor_slices(huu, nu, nu, nx),
+            )
+
+        Fxx, _, _ = _rk4_hessians_python(hess_wrapper, x, u, 0.0, dt)
+
+        def is_quat(idx):
+            return 3 <= idx < 7
+
+        eps = 1e-6
+        max_err = 0.0
+        max_indices = None
+        checked = 0
+        for j in range(nx):
+            if is_quat(j):
+                continue
+            xp = x.copy()
+            xm = x.copy()
+            xp[j] += eps
+            xm[j] -= eps
+            Ap, _ = _rk4_jacobians_python(jac_wrapper, xp, u, 0.0, dt)
+            Am, _ = _rk4_jacobians_python(jac_wrapper, xm, u, 0.0, dt)
+            dA = (Ap - Am) / (2.0 * eps)
+            for l in range(nx):
+                for m in range(nx):
+                    if is_quat(m):
+                        continue
+                    err = abs(dA[l, m] - Fxx[l][m, j])
+                    if err > max_err:
+                        max_err = err
+                        max_indices = (l, m, j, dA[l, m], Fxx[l][m, j])
+                    checked += 1
+
+        assert checked > 0
+        assert max_err < 1e-3, max_indices
 
 
 if __name__ == "__main__":

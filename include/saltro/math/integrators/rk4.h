@@ -291,13 +291,13 @@ inline std::vector<Eigen::MatrixXd> cubeScale(
  *   F_ux[l] = ∂²x_{k+1}_l / ∂u_k∂x_k      (nx slices, each nu×nx)
  *   F_uu[l] = ∂²x_{k+1}_l / ∂u_k∂u_k      (nx slices, each nu×nu)
  *
- * IMPORTANT — consistency with rk4_jacobians: this routine uses the SAME pure
- * RK4 chain rule as the non-normalizing `rk4_jacobians` above (no per-substage
- * quaternion renormalization). The reduced-state projection in the backward
- * pass (via the G matrices) handles the manifold structure, exactly as it does
- * for A_k/B_k. If `rk4_jacobians` is ever changed to normalize substeps (the
- * G6 / PR #41 work), this routine must be updated in lockstep so the first- and
- * second-order discrete models stay consistent.
+ * IMPORTANT — consistency with rk4_jacobians: this routine mirrors the same
+ * quaternion renormalization convention used by rk4_jacobians at the initial
+ * state, each RK4 substep, and the final output. As on the Jacobian path, the
+ * normalization is threaded through the chain rule using the normalization
+ * Jacobian. Second derivatives of the normalization map itself are not modeled
+ * here; the goal is to keep the discrete first- and second-order models aligned
+ * with the convention used on the main branch Jacobian path.
  *
  * The callback signature matches `rk4_jacobians` extended with three Hessian
  * output cubes (std::vector<Eigen::MatrixXd>, nx slices each).
@@ -321,7 +321,8 @@ void rk4_hessians(
     double dt,
     std::vector<Eigen::MatrixXd>& F_xx,
     std::vector<Eigen::MatrixXd>& F_ux,
-    std::vector<Eigen::MatrixXd>& F_uu
+    std::vector<Eigen::MatrixXd>& F_uu,
+    int quat_idx = 3
 ) {
     using MatXd = Eigen::MatrixXd;
     using VecXd = Eigen::VectorXd;
@@ -386,32 +387,38 @@ void rk4_hessians(
         return std::make_tuple(std::move(Kxx), std::move(Kux), std::move(Kuu));
     };
 
-    // Stage input 0 (= x): dx_0/dx = I, dx_0/du = 0, second derivatives zero.
-    MatXd Mx_in = I;
+    // Stage input 0 (= norm(x)): propagate through the same normalization
+    // convention used by rk4_jacobians. As on that path, we include the
+    // normalization Jacobian but not second derivatives of normalization.
+    const MatXd N0 = stateNormJacobian(x, nx, quat_idx);
+    MatXd Mx_in = N0;
     MatXd Mu_in = MatXd::Zero(nx, nu);
     auto Hxx_in = makeXX();
     auto Hux_in = makeUX();
     auto Huu_in = makeUU();
 
-    // Stage 1: k1 = f(x, u)
+    // Stage 1: k1 = f(norm(x), u)
     MatXd A1(nx, nx), B1(nx, nu);
     VecXd k1(nx);
     auto fxx1 = makeXX(); auto fux1 = makeUX(); auto fuu1 = makeUU();
     dynamics_hess(t, x, u, A1, B1, k1, fxx1, fux1, fuu1);
     auto K1 = composeF(A1, fxx1, fux1, fuu1, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in);
     auto& Kxx1 = std::get<0>(K1); auto& Kux1 = std::get<1>(K1); auto& Kuu1 = std::get<2>(K1);
-    const MatXd dk1_dx = A1 * Mx_in;   // = A1
-    const MatXd dk1_du = A1 * Mu_in + B1;  // = B1
+    const MatXd dk1_dx = A1 * Mx_in;
+    const MatXd dk1_du = A1 * Mu_in + B1;
 
-    // Stage 2 input: x_1 = x + 0.5·dt·k1
+    // Stage 2 input: x_1 = norm(x + 0.5·dt·k1)
     {
-        Mx_in = I + 0.5 * dt * dk1_dx;
-        Mu_in = 0.5 * dt * dk1_du;
-        Hxx_in = cubeScale(0.5 * dt, Kxx1);
-        Hux_in = cubeScale(0.5 * dt, Kux1);
-        Huu_in = cubeScale(0.5 * dt, Kuu1);
+        const VecXd x_1_raw = x + 0.5 * dt * k1;
+        const MatXd N1 = stateNormJacobian(x_1_raw, nx, quat_idx);
+        Mx_in = N1 * (I + 0.5 * dt * dk1_dx);
+        Mu_in = N1 * (0.5 * dt * dk1_du);
+        Hxx_in = matOverCube(N1, cubeScale(0.5 * dt, Kxx1));
+        Hux_in = matOverCube(N1, cubeScale(0.5 * dt, Kux1));
+        Huu_in = matOverCube(N1, cubeScale(0.5 * dt, Kuu1));
     }
-    const VecXd x_1 = x + 0.5 * dt * k1;
+    VecXd x_1 = x + 0.5 * dt * k1;
+    x_1.segment<4>(quat_idx).normalize();
 
     // Stage 2: k2 = f(x_1, u)
     MatXd A2(nx, nx), B2(nx, nu);
@@ -423,15 +430,18 @@ void rk4_hessians(
     const MatXd dk2_dx = A2 * Mx_in;
     const MatXd dk2_du = A2 * Mu_in + B2;
 
-    // Stage 3 input: x_2 = x + 0.5·dt·k2
+    // Stage 3 input: x_2 = norm(x + 0.5·dt·k2)
     {
-        Mx_in = I + 0.5 * dt * dk2_dx;
-        Mu_in = 0.5 * dt * dk2_du;
-        Hxx_in = cubeScale(0.5 * dt, Kxx2);
-        Hux_in = cubeScale(0.5 * dt, Kux2);
-        Huu_in = cubeScale(0.5 * dt, Kuu2);
+        const VecXd x_2_raw = x + 0.5 * dt * k2;
+        const MatXd N2 = stateNormJacobian(x_2_raw, nx, quat_idx);
+        Mx_in = N2 * (I + 0.5 * dt * dk2_dx);
+        Mu_in = N2 * (0.5 * dt * dk2_du);
+        Hxx_in = matOverCube(N2, cubeScale(0.5 * dt, Kxx2));
+        Hux_in = matOverCube(N2, cubeScale(0.5 * dt, Kux2));
+        Huu_in = matOverCube(N2, cubeScale(0.5 * dt, Kuu2));
     }
-    const VecXd x_2 = x + 0.5 * dt * k2;
+    VecXd x_2 = x + 0.5 * dt * k2;
+    x_2.segment<4>(quat_idx).normalize();
 
     // Stage 3: k3 = f(x_2, u)
     MatXd A3(nx, nx), B3(nx, nu);
@@ -443,15 +453,18 @@ void rk4_hessians(
     const MatXd dk3_dx = A3 * Mx_in;
     const MatXd dk3_du = A3 * Mu_in + B3;
 
-    // Stage 4 input: x_3 = x + dt·k3
+    // Stage 4 input: x_3 = norm(x + dt·k3)
     {
-        Mx_in = I + dt * dk3_dx;
-        Mu_in = dt * dk3_du;
-        Hxx_in = cubeScale(dt, Kxx3);
-        Hux_in = cubeScale(dt, Kux3);
-        Huu_in = cubeScale(dt, Kuu3);
+        const VecXd x_3_raw = x + dt * k3;
+        const MatXd N3 = stateNormJacobian(x_3_raw, nx, quat_idx);
+        Mx_in = N3 * (I + dt * dk3_dx);
+        Mu_in = N3 * (dt * dk3_du);
+        Hxx_in = matOverCube(N3, cubeScale(dt, Kxx3));
+        Hux_in = matOverCube(N3, cubeScale(dt, Kux3));
+        Huu_in = matOverCube(N3, cubeScale(dt, Kuu3));
     }
-    const VecXd x_3 = x + dt * k3;
+    VecXd x_3 = x + dt * k3;
+    x_3.segment<4>(quat_idx).normalize();
 
     // Stage 4: k4 = f(x_3, u)
     MatXd A4(nx, nx), B4(nx, nu);
@@ -476,7 +489,13 @@ void rk4_hessians(
         }
         return out;
     };
-    F_xx = sum4(Kxx1, Kxx2, Kxx3, Kxx4);
-    F_ux = sum4(Kux1, Kux2, Kux3, Kux4);
-    F_uu = sum4(Kuu1, Kuu2, Kuu3, Kuu4);
+    auto F_xx_raw = sum4(Kxx1, Kxx2, Kxx3, Kxx4);
+    auto F_ux_raw = sum4(Kux1, Kux2, Kux3, Kux4);
+    auto F_uu_raw = sum4(Kuu1, Kuu2, Kuu3, Kuu4);
+
+    const VecXd x_next_raw = x + w * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+    const MatXd N_next = stateNormJacobian(x_next_raw, nx, quat_idx);
+    F_xx = matOverCube(N_next, F_xx_raw);
+    F_ux = matOverCube(N_next, F_ux_raw);
+    F_uu = matOverCube(N_next, F_uu_raw);
 }

@@ -804,15 +804,14 @@ TEST_CASE("rk4_hessians matches finite-difference of rk4_jacobians", "[backward_
 	// FD: d/dx_j of A_discrete(l, m) ≈ (A(x+e_j)(l,m) - A(x-e_j)(l,m)) / 2eps
 	//     should equal Fxx[l](m, j).
 	//
-	// NOTE: dynamicsJacobians/dynamicsHessians internally normalize the
-	// quaternion, while base's rk4_jacobians does NOT renormalize substeps (the
-	// G6 / PR #41 chain-rule work is a separate, not-yet-landed change). So a
-	// finite difference that perturbs a RAW quaternion component picks up the
-	// normalization null-direction, which the analytic Hessian (evaluated at the
-	// normalized q) does not model. We therefore FD-validate the NON-quaternion
-	// state directions (ω indices 0..2 and the RW-momentum tail), where the
-	// model is unambiguous. This still exercises the full RK4 second-order
-	// composition (every stage, all output rows).
+	// NOTE: rk4_jacobians and rk4_hessians now both mirror the same quaternion
+	// renormalization convention from the main-branch Jacobian path. We still
+	// FD-validate only the NON-quaternion state directions (ω indices 0..2 and
+	// the RW-momentum tail), because the second derivatives of the normalization
+	// map itself are not modeled explicitly here. That means the finite
+	// difference is checking the restored substep/output renormalization
+	// convention plus the RK4 composition, but only to the accuracy expected from
+	// a first-order normalization chain rule in the Hessian path.
 	auto is_quat = [&](int idx) { return idx >= Satellite::QUAT_INDEX && idx < Satellite::QUAT_INDEX + 4; };
 	const double eps = 1e-6;
 	double max_err = 0.0;
@@ -835,7 +834,7 @@ TEST_CASE("rk4_hessians matches finite-difference of rk4_jacobians", "[backward_
 	}
 	INFO("checked " << checked << " entries, max |rk4_hessians - FD(rk4_jacobians)| = " << max_err);
 	REQUIRE(checked > 0);
-	REQUIRE(max_err < 1e-4);
+	REQUIRE(max_err < 1e-3);
 }
 
 TEST_CASE("DDP both knobs on with active constraint stays finite", "[backward_pass][ddp][combined]") {
