@@ -174,11 +174,14 @@ public:
 				continue;
 			}
 			for (int i = 0; i < ck.size(); ++i) {
-				if (ck(i) <= 0.0) {
-					continue;
+				// Mirror the forward-pass merit exactly: lambda term always
+				// active with signed c; mu penalty when c > 0 OR lambda > 0.
+				const double ci = ck(i);
+				const double li = lambda_aug[static_cast<size_t>(k)](i);
+				total += li * ci;
+				if (ci > 0.0 || li > 0.0) {
+					total += 0.5 * mu_aug[static_cast<size_t>(k)](i) * ci * ci;
 				}
-				total += lambda_aug[static_cast<size_t>(k)](i) * ck(i)
-					+ 0.5 * mu_aug[static_cast<size_t>(k)](i) * ck(i) * ck(i);
 			}
 		}
 		return total;
