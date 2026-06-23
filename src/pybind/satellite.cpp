@@ -1838,7 +1838,7 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
         c(idx++) = (-u_cmd - tau_lim) / tau_lim;
 
         const double h = x(RW_MOMENTUM_INDEX + i);
-        const double h_lim = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+        const double h_lim = cnst_cfg.rw_momentum_limit_scale * std::max(1e-9, std::abs(getRW(i).momentumMax()));
         c(idx++) = (h - h_lim) / h_lim;
         c(idx++) = (-h - h_lim) / h_lim;
 
@@ -1969,7 +1969,7 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
         c_u(idx, ctrl_idx) = -1.0 / tau_lim;
         idx++;
         
-        const double h_lim = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+        const double h_lim = cnst_cfg.rw_momentum_limit_scale * std::max(1e-9, std::abs(getRW(i).momentumMax()));
         
         // RW momentum upper bound
         c_x(idx, state_idx) = 1.0 / h_lim;

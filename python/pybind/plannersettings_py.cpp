@@ -30,6 +30,7 @@ void bind_plannersettings(py::module_& m) {
     py::class_<ConstraintConfig>(m, "ConstraintConfig")
         .def(py::init<>())
         .def_readwrite("control_limit_scale", &ConstraintConfig::control_limit_scale)
+        .def_readwrite("rw_momentum_limit_scale", &ConstraintConfig::rw_momentum_limit_scale)
         .def_readwrite("u_max", &ConstraintConfig::u_max)
         .def_readwrite("wmax", &ConstraintConfig::wmax)
         .def_readwrite("sun_limit_angle", &ConstraintConfig::sun_limit_angle);

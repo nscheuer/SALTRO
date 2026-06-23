@@ -1488,6 +1488,45 @@ def test_smaller_scale_tightens_limits():
     assert c2[2] < 0.0
 
 
+def test_rw_momentum_limit_scale_equals_1_uses_full_rw_momentum_capacity():
+    """Test rw_momentum_limit_scale = 1 uses full RW momentum capacity"""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg = default_cnst_cfg()
+    cfg.rw_momentum_limit_scale = 1.0
+
+    h = np.zeros(fixture.n_rw())
+    h[0] = fixture.rw_hmax  # exactly at full momentum capacity
+    x = make_state(np.zeros(3), identity_quat(), h)
+    c = fixture.sat.constraints(0, 10, x, fixture.nominal_control(), sun_z(), cfg)
+
+    rw_start = 2 + 2 * fixture.n_mtq()
+    assert np.isclose(c[rw_start + 2], 0.0, atol=1e-12)
+
+
+def test_smaller_rw_momentum_limit_scale_tightens_rw_momentum_limits():
+    """Test smaller rw_momentum_limit_scale tightens RW momentum limits"""
+    fixture = ConstraintFixture()
+    fixture.setup_method()
+
+    cfg1 = default_cnst_cfg()
+    cfg1.rw_momentum_limit_scale = 0.5
+    cfg2 = default_cnst_cfg()
+    cfg2.rw_momentum_limit_scale = 1.0
+
+    h = np.zeros(fixture.n_rw())
+    h[0] = 0.0075  # between 0.5*0.01 = 0.005 and 1.0*0.01 = 0.01
+    x = make_state(np.zeros(3), identity_quat(), h)
+
+    c1 = fixture.sat.constraints(0, 10, x, fixture.nominal_control(), sun_z(), cfg1)
+    c2 = fixture.sat.constraints(0, 10, x, fixture.nominal_control(), sun_z(), cfg2)
+
+    rw_start = 2 + 2 * fixture.n_mtq()
+    assert c1[rw_start + 2] > 0.0
+    assert c2[rw_start + 2] < 0.0
+
+
 # ============================================================================
 # SECTION 21 — Sun limit angle edge cases
 # ============================================================================
