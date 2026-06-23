@@ -1100,6 +1100,41 @@ TEST_CASE_METHOD(ConstraintFixture,
     REQUIRE(c2(2) < 0.0);
 }
 
+TEST_CASE_METHOD(ConstraintFixture,
+    "constraints: rw_momentum_limit_scale = 1 uses full RW momentum capacity",
+    "[satellite][constraints][scale]") {
+    auto cfg = defaultCnstCfg();
+    cfg.rw_momentum_limit_scale = 1.0;
+
+    Eigen::VectorXd h(n_rw());
+    h << rw_hmax, 0.0;
+    auto x = makeState(Vec3::Zero(), identityQuat(), h);
+    auto c = sat.constraints(0, 10, x, nominalControl(), sunZ(), cfg);
+
+    const int rw_start = 2 + 2 * n_mtq();
+    REQUIRE(c(rw_start + 2) == Catch::Approx(0.0).margin(1e-12));
+}
+
+TEST_CASE_METHOD(ConstraintFixture,
+    "constraints: smaller rw_momentum_limit_scale tightens RW momentum limits",
+    "[satellite][constraints][scale]") {
+    auto cfg1 = defaultCnstCfg();
+    cfg1.rw_momentum_limit_scale = 0.5;
+    auto cfg2 = defaultCnstCfg();
+    cfg2.rw_momentum_limit_scale = 1.0;
+
+    Eigen::VectorXd h(n_rw());
+    h << 0.0075, 0.0;  // between 0.5*0.01 = 0.005 and 1.0*0.01 = 0.01
+    auto x = makeState(Vec3::Zero(), identityQuat(), h);
+
+    auto c1 = sat.constraints(0, 10, x, nominalControl(), sunZ(), cfg1);
+    auto c2 = sat.constraints(0, 10, x, nominalControl(), sunZ(), cfg2);
+
+    const int rw_start = 2 + 2 * n_mtq();
+    REQUIRE(c1(rw_start + 2) > 0.0);
+    REQUIRE(c2(rw_start + 2) < 0.0);
+}
+
 // ============================================================================
 // SECTION 21 — Sun limit angle edge cases
 // ============================================================================
