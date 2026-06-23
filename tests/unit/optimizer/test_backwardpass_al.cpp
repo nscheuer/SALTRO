@@ -294,6 +294,59 @@ TEST_CASE("backward_pass AL: active penalties modify gains/feedforward", "[backw
 	REQUIRE(dv_diff > 1e-12);
 }
 
+TEST_CASE("backward_pass AL: terminal-knot constraint terms seed the cost-to-go", "[backward_pass][al][terminal_knot]") {
+	BackwardPassALFixture fixture(6);
+	TrajectoryData td = fixture.makeTrajectory(false);
+
+	// Violate the angular-velocity constraint at the terminal knot ONLY:
+	// pre-terminal |w| ~ 0.0137 rad/s stays below wmax, terminal |w| ~ 0.137
+	// rad/s is well above it.
+	fixture.settings.constraints.wmax = 0.05;
+	td.X.col(fixture.N - 1).segment<3>(Satellite::AV_INDEX) = Eigen::Vector3d(0.1, -0.05, 0.08);
+
+	const std::vector<Eigen::VectorXd> c_list = fixture.collectConstraints(td);
+
+	// Sanity: the AV constraint (entry 0) is violated at the terminal knot
+	// and satisfied at every earlier knot.
+	REQUIRE(c_list.back()(0) > 0.0);
+	for (int k = 0; k < fixture.N - 1; ++k) {
+		REQUIRE(c_list[static_cast<size_t>(k)](0) <= 0.0);
+	}
+
+	std::vector<Eigen::VectorXd> lambda_zero;
+	std::vector<Eigen::VectorXd> mu_zero;
+	BackwardPassALFixture::makeZeroAug(c_list, lambda_zero, mu_zero);
+
+	// Nonzero multipliers ONLY on the terminal-knot AV constraint. Without
+	// the terminal cost-to-go seed, the backward pass never reads these and
+	// the result is identical to the zero-multiplier case.
+	std::vector<Eigen::VectorXd> lambda_term = lambda_zero;
+	std::vector<Eigen::VectorXd> mu_term = mu_zero;
+	lambda_term.back()(0) = 5.0;
+	mu_term.back()(0) = 25.0;
+
+	std::vector<Eigen::MatrixXd> K0;
+	std::vector<Eigen::VectorXd> d0;
+	Eigen::Vector2d deltaV0 = Eigen::Vector2d::Zero();
+	const bool ok0 = fixture.runBackward(td, lambda_zero, mu_zero, K0, d0, deltaV0);
+
+	std::vector<Eigen::MatrixXd> K1;
+	std::vector<Eigen::VectorXd> d1;
+	Eigen::Vector2d deltaV1 = Eigen::Vector2d::Zero();
+	const bool ok1 = fixture.runBackward(td, lambda_term, mu_term, K1, d1, deltaV1);
+
+	REQUIRE(ok0);
+	REQUIRE(ok1);
+
+	// The backward pass must now "see" the terminal violation: gains,
+	// feedforward, and expected cost reduction all change.
+	const double k_diff = gainDeltaNorm(K1, K0);
+	const double d_diff = feedforwardDeltaNorm(d1, d0);
+	const double dv_diff = (deltaV1 - deltaV0).norm();
+	REQUIRE((k_diff > 1e-12 || d_diff > 1e-12));
+	REQUIRE(dv_diff > 1e-12);
+}
+
 TEST_CASE("backward_pass AL: size mismatch lists are ignored", "[backward_pass][al][size_mismatch]") {
 	BackwardPassALFixture fixture(6);
 	TrajectoryData td = fixture.makeTrajectory(true);
