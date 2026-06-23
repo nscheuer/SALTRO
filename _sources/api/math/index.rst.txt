@@ -7,6 +7,7 @@ math
    integrators/index
    angles
    frames
+   matrix
    mrp
    quaternion
    tensor

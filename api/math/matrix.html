@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>mrp &#8212; SALTRO 0.0.0 documentation</title>
+    <title>matrix &#8212; SALTRO 0.0.0 documentation</title>
   
   
   
@@ -42,13 +42,12 @@
     <script src="../../_static/documentation_options.js?v=7026087e"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
-    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'api/math/mrp';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/math/matrix';</script>
     <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="quaternion" href="quaternion.html" />
-    <link rel="prev" title="matrix" href="matrix.html" />
+    <link rel="next" title="mrp" href="mrp.html" />
+    <link rel="prev" title="frames" href="frames.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -418,8 +417,8 @@
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="angles.html">angles</a></li>
 <li class="toctree-l1"><a class="reference internal" href="frames.html">frames</a></li>
-<li class="toctree-l1"><a class="reference internal" href="matrix.html">matrix</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">mrp</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">matrix</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mrp.html">mrp</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quaternion.html">quaternion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tensor.html">tensor</a></li>
 </ul>
@@ -465,7 +464,7 @@
     
     <li class="breadcrumb-item"><a href="index.html" class="nav-link">math</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">mrp</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">matrix</span></li>
   </ul>
 </nav>
 </div>
@@ -482,8 +481,8 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="mrp">
-<h1>mrp<a class="headerlink" href="#mrp" title="Link to this heading">#</a></h1>
+  <section id="matrix">
+<h1>matrix<a class="headerlink" href="#matrix" title="Link to this heading">#</a></h1>
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv46saltro">
 <span id="_CPPv36saltro"></span><span id="_CPPv26saltro"></span><span id="saltro"></span><span class="target" id="namespacesaltro"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">saltro</span></span></span><br /></dt>
@@ -493,71 +492,9 @@
 <dd><div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N6saltro4math9quatErrorERKN5Eigen8Vector4dERKN5Eigen8Vector4dE">
-<span id="_CPPv3N6saltro4math9quatErrorERKN5Eigen8Vector4dERKN5Eigen8Vector4dE"></span><span id="_CPPv2N6saltro4math9quatErrorERKN5Eigen8Vector4dERKN5Eigen8Vector4dE"></span><span id="saltro::math::quatError__Eigen::Vector4dCR.Eigen::Vector4dCR"></span><span class="target" id="namespacesaltro_1_1math_1aec853f7e53bb47dd2cafa427cdebb715"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">quatError</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">q_goal</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">q</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro4math9quatErrorERKN5Eigen8Vector4dERKN5Eigen8Vector4dE" title="Link to this definition">#</a><br /></dt>
-<dd><p>Compute the quaternion error: q_err = q_goal^{-1} ⊗ q. </p>
-<p>Returns the relative rotation from q to q_goal. If q == q_goal, the result is [1, 0, 0, 0] (identity quaternion).</p>
-<p>Convention: scalar-first [q0, q1, q2, q3].</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>q_goal</strong> – Goal quaternion (unit). </p></li>
-<li><p><strong>q</strong> – Current quaternion (unit). </p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Quaternion error (unit), sign-chosen so q0 &gt;= 0. </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N6saltro4math9quatToMRPERKN5Eigen8Vector4dE">
-<span id="_CPPv3N6saltro4math9quatToMRPERKN5Eigen8Vector4dE"></span><span id="_CPPv2N6saltro4math9quatToMRPERKN5Eigen8Vector4dE"></span><span id="saltro::math::quatToMRP__Eigen::Vector4dCR"></span><span class="target" id="namespacesaltro_1_1math_1a5a8d3f1b31f575accfd06f338fb697f6"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">quatToMRP</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">q_err</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro4math9quatToMRPERKN5Eigen8Vector4dE" title="Link to this definition">#</a><br /></dt>
-<dd><p>Convert a small quaternion error to Modified Rodrigues Parameters. </p>
-<p>Given q_err = [q0, q1, q2, q3], the MRP is:  <div class="math notranslate nohighlight">
-\[
-  \boldsymbol{\sigma} = \frac{2 \, \mathbf{q}_{1:3}}{1 + q_0}
-\]</div>
-</p>
-<p>For small rotations, MRP ≈ rotation vector (angle × axis).</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>q_err</strong> – Quaternion error (unit, q0 &gt;= 0). </p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>3D MRP vector. </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N6saltro4math8findGMatERKN5Eigen8Vector4dEi">
-<span id="_CPPv3N6saltro4math8findGMatERKN5Eigen8Vector4dEi"></span><span id="_CPPv2N6saltro4math8findGMatERKN5Eigen8Vector4dEi"></span><span id="saltro::math::findGMat__Eigen::Vector4dCR.i"></span><span class="target" id="namespacesaltro_1_1math_1a66660f2c2d6cf03104f2e975b224c30d"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">findGMat</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">q</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">nRW</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro4math8findGMatERKN5Eigen8Vector4dEi" title="Link to this definition">#</a><br /></dt>
-<dd><p>Build the G projection matrix from full state to reduced state. </p>
-<p>The full state is [ω(3), q(4), h_rw(nRW)] with dimension 7+nRW. The reduced state is [ω(3), δθ(3), h_rw(nRW)] with dimension 6+nRW.</p>
-<p>The G matrix maps full-state perturbations to reduced-state perturbations:  <div class="math notranslate nohighlight">
-\[\begin{split}
-  G = \begin{bmatrix}
-    I_3 &amp; 0 &amp; 0 \\
-    0 &amp; W^T(q) &amp; 0 \\
-    0 &amp; 0 &amp; I_{nRW}
-  \end{bmatrix}
-\end{split}\]</div>
- where W(q) is the 4×3 quaternion kinematics matrix, so W^T is 3×4.</p>
-<p>G has shape (6+nRW) × (7+nRW).</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>q</strong> – Unit quaternion at the linearization point. </p></li>
-<li><p><strong>nRW</strong> – Number of reaction wheels. </p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>G matrix of size (6+nRW) × (7+nRW). </p>
-</dd>
-</dl>
-</dd></dl>
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro4math8psd_clipERN5Eigen8MatrixXdE">
+<span id="_CPPv3N6saltro4math8psd_clipERN5Eigen8MatrixXdE"></span><span id="_CPPv2N6saltro4math8psd_clipERN5Eigen8MatrixXdE"></span><span id="saltro::math::psd_clip__Eigen::MatrixXdR"></span><span class="target" id="namespacesaltro_1_1math_1a51e48cc6434414f4e16e19082454d44e"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">psd_clip</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">M</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro4math8psd_clipERN5Eigen8MatrixXdE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
 
 </div>
 </dd></dl>
@@ -577,20 +514,20 @@
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="matrix.html"
+       href="frames.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">matrix</p>
+        <p class="prev-next-title">frames</p>
       </div>
     </a>
     <a class="right-next"
-       href="quaternion.html"
+       href="mrp.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">quaternion</p>
+        <p class="prev-next-title">mrp</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -615,9 +552,7 @@
     <ul class="pst-show_toc_level nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv46saltro"><code class="docutils literal notranslate"><span class="pre">saltro</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro4mathE"><code class="docutils literal notranslate"><span class="pre">saltro::math</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro4math9quatErrorERKN5Eigen8Vector4dERKN5Eigen8Vector4dE"><code class="docutils literal notranslate"><span class="pre">quatError()</span></code></a></li>
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro4math9quatToMRPERKN5Eigen8Vector4dE"><code class="docutils literal notranslate"><span class="pre">quatToMRP()</span></code></a></li>
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro4math8findGMatERKN5Eigen8Vector4dEi"><code class="docutils literal notranslate"><span class="pre">findGMat()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro4math8psd_clipERN5Eigen8MatrixXdE"><code class="docutils literal notranslate"><span class="pre">psd_clip()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -628,7 +563,7 @@
   <div class="sidebar-secondary-item">
 
   <div class="tocsection sourcelink">
-    <a href="../../_sources/api/math/mrp.rst.txt">
+    <a href="../../_sources/api/math/matrix.rst.txt">
       <i class="fa-solid fa-file-lines"></i> Show Source
     </a>
   </div>

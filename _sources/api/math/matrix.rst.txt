@@ -1,0 +1,6 @@
+matrix
+======
+
+.. doxygenfile:: math/matrix.h
+   :project: saltro
+   :path: ../include/saltro
