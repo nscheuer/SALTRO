@@ -600,3 +600,62 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass K and d have consistent nor
 		REQUIRE(dk_norm < 1e6);
 	}
 }
+
+TEST_CASE_METHOD(BackwardPassFixture,
+	"backward_pass rejects non-finite trajectory states instead of emitting NaN gains",
+	"[backward_pass][nan_guard]") {
+	// Eigen's LLT does not flag NaN input, so before the guards a NaN state
+	// produced NaN K/d "successfully" and the failure surfaced only when the
+	// forward-pass rollout died -- a full FP later, misattributed to the line
+	// search. The BP must fail fast instead.
+	constexpr int N_test = 5;
+
+	PlannerSettings settings_test = settings;
+	Satellite satellite_test(
+		Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal(), settings_test
+	);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitX(), 0.2);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitY(), 0.2);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitZ(), 0.2);
+	satellite_test.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+	satellite_test.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+	satellite_test.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+	Eigen::MatrixXd X(satellite_test.stateDim(), N_test);
+	Eigen::MatrixXd U(satellite_test.controlDim(), N_test - 1);
+	Eigen::MatrixXd R_t(3, N_test), V_t(3, N_test), B_t(3, N_test), S_t(3, N_test);
+	Eigen::MatrixXd rho_t(1, N_test), bs_t(3, N_test);
+	for (int k = 0; k < N_test; ++k) {
+		X.col(k) = x0;
+		if (k < N_test - 1) U.col(k) = 1e-4 * Eigen::VectorXd::Ones(satellite_test.controlDim());
+		R_t.col(k) = Eigen::Vector3d(7000e3, 0.0, 0.0);
+		V_t.col(k) = Eigen::Vector3d(0.0, 7500.0, 0.0);
+		B_t.col(k) = Eigen::Vector3d(2.5e-5, -1.5e-5, 3.0e-5);
+		S_t.col(k) = Eigen::Vector3d(1.0, 0.1, -0.05).normalized();
+		rho_t(0, k) = 0.0;
+		bs_t.col(k) = Eigen::Vector3d::UnitX();
+	}
+	Eigen::Vector4d tgt;
+	tgt << std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0, 0.0;
+	Eigen::MatrixXd tgt_traj = makeAttitudeTraj(tgt, N_test);
+
+	// Poison one mid-trajectory angular velocity entry.
+	X(0, 2) = std::numeric_limits<double>::quiet_NaN();
+
+	const int nu = satellite_test.controlDim();
+	const int nxr = satellite_test.reducedStateDim();
+	std::vector<Eigen::MatrixXd> K(N_test - 1, Eigen::MatrixXd::Zero(nu, nxr));
+	std::vector<Eigen::VectorXd> d(N_test - 1, Eigen::VectorXd::Zero(nu));
+	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
+
+	const bool ok = optimizer::backwardPass(
+		satellite_test, X, U, R_t, V_t, B_t, S_t, rho_t, bs_t, tgt_traj,
+		settings_test, settings_test.passes[0].reg.reg_init, K, d, deltaV
+	);
+
+	REQUIRE_FALSE(ok);
+	// And no NaN gains may have been handed back for the knots it did process.
+	for (const auto& Kk : K) {
+		REQUIRE((Kk.allFinite() || Kk.isZero()));
+	}
+}

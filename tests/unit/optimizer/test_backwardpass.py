@@ -482,6 +482,71 @@ class TestBackwardPass:
             assert Kk_norm < 1e6
             assert dk_norm < 1e6
 
+    def test_rejects_non_finite_trajectory_states_instead_of_emitting_nan_gains(self):
+        """A poisoned state should make backward_pass fail fast without
+        returning NaN gain matrices.
+        """
+        N_test = 5
+
+        settings_test = saltro_py.PlannerSettings()
+        J = np.diag([0.067, 0.071, 0.069])
+        satellite_test = saltro_py.Satellite(J, settings_test)
+
+        satellite_test.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+        satellite_test.addMTQ(np.array([0.0, 1.0, 0.0]), 0.2)
+        satellite_test.addMTQ(np.array([0.0, 0.0, 1.0]), 0.2)
+        satellite_test.addRW(np.array([1.0, 0.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
+        satellite_test.addRW(np.array([0.0, 1.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
+        satellite_test.addRW(np.array([0.0, 0.0, 1.0]), 0.001, 1e-5, 0.0, 0.02)
+
+        nx = satellite_test.stateDim
+        nu = satellite_test.controlDim
+
+        x0 = np.zeros(nx)
+        x0[0:3] = np.array([0.01, -0.005, 0.008])
+        x0[3:7] = np.array([1.0, 0.0, 0.0, 0.0])
+
+        X = np.zeros((nx, N_test))
+        U = np.zeros((nu, N_test - 1))
+        R_test = np.zeros((3, N_test))
+        V_test = np.zeros((3, N_test))
+        B_test = np.zeros((3, N_test))
+        S_test = np.zeros((3, N_test))
+        rho_test = np.zeros((1, N_test))
+        boresight_test = np.zeros((3, N_test))
+
+        for k in range(N_test):
+            X[:, k] = x0
+            if k < N_test - 1:
+                U[:, k] = 1e-4 * np.ones(nu)
+
+            R_test[:, k] = np.array([7000e3, 0.0, 0.0])
+            V_test[:, k] = np.array([0.0, 7500.0, 0.0])
+            B_test[:, k] = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+            S_test[:, k] = np.array([1.0, 0.1, -0.05]) / np.linalg.norm([1.0, 0.1, -0.05])
+            boresight_test[:, k] = np.array([1.0, 0.0, 0.0])
+
+        attitude_target_test = np.array([np.nan, 0.0, 0.0, 0.0])
+        attitude_target_test_traj = make_attitude_traj(attitude_target_test, N_test)
+
+        settings_test.num_passes = 1
+        settings_test.passes[0].dt = 0.5
+        settings_test.passes[0].reg.reg_init = 1e-8
+        settings_test.passes[0].reg.reg_scale = 10.0
+        settings_test.passes[0].reg.reg_max = 1e4
+
+        X[0, 2] = np.nan
+
+        ok, K, d, deltaV = saltro_py.backward_pass(
+            satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
+            boresight_test, attitude_target_test_traj, settings_test,
+            LAMBDA_AUG_ZERO, MU_AUG_ZERO, settings_test.passes[0].reg.reg_init
+        )
+
+        assert not ok
+        for k in range(K.shape[0]):
+            assert np.all(np.isfinite(K[k]) | (K[k] == 0.0))
+
 
 if __name__ == "__main__":
     # Run tests with pytest
