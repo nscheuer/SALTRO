@@ -28,6 +28,111 @@ def make_attitude_traj(att, N_cols):
     return traj
 
 
+def _make_test_satellite(settings):
+    J = np.diag([0.067, 0.071, 0.069])
+    sat = saltro_py.Satellite(J, settings)
+    sat.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+    sat.addMTQ(np.array([0.0, 1.0, 0.0]), 0.2)
+    sat.addMTQ(np.array([0.0, 0.0, 1.0]), 0.2)
+    sat.addRW(np.array([1.0, 0.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
+    sat.addRW(np.array([0.0, 1.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
+    sat.addRW(np.array([0.0, 0.0, 1.0]), 0.001, 1e-5, 0.0, 0.02)
+    return sat
+
+
+def _run_ddp_scenario(configure, with_constraint_lambda):
+    N_test = 3
+    settings = saltro_py.PlannerSettings()
+    settings.disturbances.plan_for_aero = False
+    settings.disturbances.plan_for_gg = False
+    settings.disturbances.plan_for_srp = False
+    settings.disturbances.plan_for_prop = False
+    settings.disturbances.plan_for_gendist = False
+    settings.disturbances.plan_for_resdipole = False
+    settings.num_passes = 1
+    settings.passes[0].dt = 0.5
+    settings.passes[0].reg.reg_init = 1e-6
+    settings.passes[0].reg.reg_scale = 10.0
+    settings.passes[0].reg.reg_max = 1e6
+    settings.passes[0].cost.angle = 50.0
+    settings.passes[0].cost.ang_vel = 10.0
+    configure(settings)
+
+    sat = _make_test_satellite(settings)
+
+    nx = sat.stateDim
+    nu = sat.controlDim
+
+    axis = np.array([0.3, -0.6, 0.74], dtype=float)
+    axis /= np.linalg.norm(axis)
+    half = 0.5 * (60.0 * PI / 180.0)
+    q = np.concatenate(([np.cos(half)], np.sin(half) * axis))
+
+    xs = np.zeros(nx)
+    xs[0:3] = np.array([0.05, -0.03, 0.04])
+    xs[3:7] = q
+    if sat.numRW > 0:
+        xs[7:7 + sat.numRW] = 0.005
+
+    X = np.zeros((nx, N_test))
+    U = np.zeros((nu, N_test - 1))
+    R = np.zeros((3, N_test))
+    V = np.zeros((3, N_test))
+    B = np.zeros((3, N_test))
+    S = np.zeros((3, N_test))
+    rho = np.zeros((1, N_test))
+    boresight = np.zeros((3, N_test))
+    for k in range(N_test):
+        X[:, k] = xs
+        if k < N_test - 1:
+            U[:, k] = 0.01
+        R[:, k] = np.array([7000e3, 0.0, 0.0])
+        V[:, k] = np.array([0.0, 7500.0, 0.0])
+        B[:, k] = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+        S[:, k] = np.array([1.0, 0.1, -0.05])
+        S[:, k] /= np.linalg.norm(S[:, k])
+        boresight[:, k] = np.array([1.0, 0.0, 0.0])
+
+    attitude_target = np.array([np.nan, 0.0, 0.0, 0.0])
+    attitude_target_traj = make_attitude_traj(attitude_target, N_test)
+
+    lambda_aug = LAMBDA_AUG_ZERO
+    mu_aug = MU_AUG_ZERO
+    if with_constraint_lambda:
+        settings.constraints.wmax = 0.01
+        c0 = np.asarray(
+            sat.constraints(0, N_test, X[:, 0], U[:, 0], S[:, 0], settings.constraints),
+            dtype=float,
+        )
+        lambda_aug = [np.full_like(c0, 1.0) for _ in range(N_test)]
+        mu_aug = [np.full_like(c0, 100.0) for _ in range(N_test)]
+
+    ok, K, d, deltaV = saltro_py.backward_pass(
+        sat,
+        X,
+        U,
+        R,
+        V,
+        B,
+        S,
+        rho,
+        boresight,
+        attitude_target_traj,
+        settings,
+        lambda_aug,
+        mu_aug,
+        settings.passes[0].reg.reg_init,
+    )
+    return ok, K, d, deltaV
+
+
+def _max_gain_diff(K_a, d_a, K_b, d_b):
+    return max(
+        np.max(np.abs(K_a - K_b)),
+        np.max(np.abs(d_a - d_b)),
+    )
+
+
 class BackwardPassFixture:
     """Fixture for backward pass tests with satellite setup."""
 
@@ -546,6 +651,88 @@ class TestBackwardPass:
         assert not ok
         for k in range(K.shape[0]):
             assert np.all(np.isfinite(K[k]) | (K[k] == 0.0))
+
+    def test_ddp_knobs_off_reproduce_gauss_newton(self):
+        """Default backward pass should match explicitly disabled DDP knobs."""
+        ok0, K0, d0, deltaV0 = _run_ddp_scenario(lambda settings: None, False)
+        ok1, K1, d1, deltaV1 = _run_ddp_scenario(
+            lambda settings: (
+                setattr(settings.passes[0].reg, "use_dynamics_hess", False),
+                setattr(settings.passes[0].reg, "use_constraint_hess", False),
+                setattr(settings.passes[0].reg, "psd_clip_quu_ddp", False),
+            ),
+            False,
+        )
+
+        assert ok0 and ok1
+        assert np.array_equal(K0, K1)
+        assert np.array_equal(d0, d1)
+        assert np.array_equal(deltaV0, deltaV1)
+
+    def test_ddp_knobs_off_with_active_constraint_reproduce_gauss_newton(self):
+        """Default backward pass should stay identical with active AL inputs too."""
+        ok0, K0, d0, _ = _run_ddp_scenario(lambda settings: None, True)
+        ok1, K1, d1, _ = _run_ddp_scenario(
+            lambda settings: (
+                setattr(settings.passes[0].reg, "use_dynamics_hess", False),
+                setattr(settings.passes[0].reg, "use_constraint_hess", False),
+            ),
+            True,
+        )
+
+        assert ok0 and ok1
+        assert np.array_equal(K0, K1)
+        assert np.array_equal(d0, d1)
+
+    def test_ddp_dynamics_hessian_changes_gains_vs_gauss_newton(self):
+        """Enabling dynamics Hessians should measurably perturb the solution."""
+        ok_gn, K_gn, d_gn, _ = _run_ddp_scenario(lambda settings: None, False)
+        ok_ddp, K_ddp, d_ddp, deltaV_ddp = _run_ddp_scenario(
+            lambda settings: (
+                setattr(settings.passes[0].reg, "use_dynamics_hess", True),
+                setattr(settings.passes[0].reg, "psd_clip_quu_ddp", True),
+            ),
+            False,
+        )
+
+        assert ok_gn and ok_ddp
+        assert np.all(np.isfinite(K_ddp))
+        assert np.all(np.isfinite(d_ddp))
+        assert np.all(np.isfinite(deltaV_ddp))
+        assert _max_gain_diff(K_gn, d_gn, K_ddp, d_ddp) > 1e-9
+
+    def test_ddp_constraint_hessian_changes_gains_vs_gauss_newton(self):
+        """Enabling constraint Hessians should measurably perturb the solution."""
+        ok_gn, K_gn, d_gn, _ = _run_ddp_scenario(lambda settings: None, True)
+        ok_ddp, K_ddp, d_ddp, deltaV_ddp = _run_ddp_scenario(
+            lambda settings: (
+                setattr(settings.passes[0].reg, "use_constraint_hess", True),
+                setattr(settings.passes[0].reg, "psd_clip_quu_ddp", True),
+            ),
+            True,
+        )
+
+        assert ok_gn and ok_ddp
+        assert np.all(np.isfinite(K_ddp))
+        assert np.all(np.isfinite(d_ddp))
+        assert np.all(np.isfinite(deltaV_ddp))
+        assert _max_gain_diff(K_gn, d_gn, K_ddp, d_ddp) > 1e-9
+
+    def test_ddp_both_knobs_on_with_active_constraint_stays_finite(self):
+        """Combined second-order terms should still yield a finite backward pass."""
+        ok, K, d, deltaV = _run_ddp_scenario(
+            lambda settings: (
+                setattr(settings.passes[0].reg, "use_dynamics_hess", True),
+                setattr(settings.passes[0].reg, "use_constraint_hess", True),
+                setattr(settings.passes[0].reg, "psd_clip_quu_ddp", True),
+            ),
+            True,
+        )
+
+        assert ok
+        assert np.all(np.isfinite(K))
+        assert np.all(np.isfinite(d))
+        assert np.all(np.isfinite(deltaV))
 
 
 if __name__ == "__main__":
