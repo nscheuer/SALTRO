@@ -1,5 +1,6 @@
 #include <saltro/optimizer/backwardpass.h>
 #include <saltro/math/integrators/rk4.h>
+#include <saltro/math/matrix.h>
 #include <saltro/math/mrp.h>
 #include <iostream>
 #include <cmath>
@@ -11,18 +12,6 @@
 #endif
 
 namespace saltro::optimizer {
-
-// Project a symmetric matrix to its nearest PSD matrix by symmetrizing then
-// clamping negative eigenvalues to zero. Used (opt-in via psd_clip_quu_ddp) to
-// strip indefinite "anti-curvature" eigenmodes from the DDP second-order
-// contributions before they are folded into the Riccati Q matrices, so true
-// second-order terms cannot turn Q_uu into an ascent direction / break LLT.
-static void psd_clip(Eigen::MatrixXd& M) {
-	const Eigen::MatrixXd Msym = 0.5 * (M + Eigen::MatrixXd(M.transpose()));
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(Msym);
-	const Eigen::VectorXd lam = es.eigenvalues().cwiseMax(0.0);
-	M = es.eigenvectors() * lam.asDiagonal() * es.eigenvectors().transpose();
-}
 
 /**
  * @brief Solve a single Riccati step in reduced state space.
@@ -241,8 +230,8 @@ bool backwardPass(
 					Eigen::MatrixXd Cxx = G_k * Cxx_full * G_k.transpose();   // (nxr × nxr)
 					Eigen::MatrixXd Cux = Cux_full * G_k.transpose();         // (nu × nxr)
 					if (reg_cfg.psd_clip_quu_ddp) {
-						psd_clip(Cxx);
-						psd_clip(Cuu);
+						saltro::math::psd_clip(Cxx);
+						saltro::math::psd_clip(Cuu);
 					}
 					(void)nxr;
 					lxx.noalias()       += Cxx;
@@ -367,8 +356,8 @@ bool backwardPass(
 			// PSD-clip the DDP curvature (opt-in): drop indefinite eigenmodes so
 			// true second-order terms cannot make Q_uu an ascent direction.
 			if (reg_cfg.psd_clip_quu_ddp) {
-				psd_clip(Quu_ddp);
-				psd_clip(Qxx_ddp);
+				saltro::math::psd_clip(Quu_ddp);
+				saltro::math::psd_clip(Qxx_ddp);
 				// Qux_ddp is the cross block (no standalone PSD concept); left intact.
 			}
 		}
