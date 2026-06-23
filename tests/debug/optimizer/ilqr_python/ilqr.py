@@ -82,7 +82,15 @@ def ilqr(
         U_trim = U[:, :X.shape[1] - 1]
         J = satellite.totalCost(X, U_trim, B, boresight, q_goal, passsettings.cost)
         components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
-        snapshots.append({"X": X.copy(), "U": U.copy(), "J": J, "q_goal": q_goal.copy(), "components": components})
+        snapshots.append(
+            {
+                "X": X.copy(),
+                "U": U.copy(),
+                "J": J,
+                "q_goal": q_goal.copy(),
+                "components": components,
+            }
+        )
 
     for iteration in range(passsettings.ilqr.max_iters):
         reg = passsettings.reg.reg_init
@@ -115,7 +123,26 @@ def ilqr(
             U_trim = U[:, :X.shape[1] - 1]
             J_prev = satellite.totalCost(X, U_trim, B, boresight, q_goal, passsettings.cost)
 
-            ok_fp, X_new, U_new, J_new = saltro_py.forward_pass(satellite, X, U, K_list, d_list, deltaV, B, R, V, S, rho, boresight, q_goal, plannersettings, jtime, J_prev)
+            ok_fp, X_new, U_new, J_new = saltro_py.forward_pass(
+                satellite,
+                X,
+                U,
+                K_list,
+                d_list,
+                deltaV,
+                B,
+                R,
+                V,
+                S,
+                rho,
+                boresight,
+                q_goal,
+                plannersettings,
+                LAMBDA_AUG_ZERO,
+                MU_AUG_ZERO,
+                jtime,
+                J_prev,
+            )
             if not ok_fp:
                 reg *= passsettings.reg.reg_scale
                 continue
@@ -127,7 +154,15 @@ def ilqr(
             
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
-                snapshots.append({"X": X.copy(), "U": U.copy(), "J": J_new, "q_goal": q_goal.copy(), "components": components})
+                snapshots.append(
+                    {
+                        "X": X.copy(),
+                        "U": U.copy(),
+                        "J": J_new,
+                        "q_goal": q_goal.copy(),
+                        "components": components,
+                    }
+                )
                 transitions.append({
                     "bp_ok": True,
                     "fp_ok": True,

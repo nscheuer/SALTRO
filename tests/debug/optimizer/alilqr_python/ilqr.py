@@ -104,7 +104,7 @@ def ilqr(
     boresight: np.ndarray,
     lambda_aug: list[np.ndarray],
     mu_aug: list[np.ndarray],
-    debug: bool = False
+    debug: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, str, list, list]:
     passsettings = plannersettings.passes[pass_idx]
     
@@ -123,7 +123,6 @@ def ilqr(
                 "U": U.copy(),
                 "J": J,
                 "q_goal": q_goal.copy(),
-                "boresight": boresight.copy(),
                 "components": components,
                 "R": R.copy(),
                 "B": B.copy(),
@@ -190,7 +189,7 @@ def ilqr(
             U = U_new
 
             delta_J = abs(J_prev - J_new)
-            
+
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
                 snapshots.append(
@@ -199,7 +198,6 @@ def ilqr(
                         "U": U.copy(),
                         "J": J_new,
                         "q_goal": q_goal.copy(),
-                        "boresight": boresight.copy(),
                         "components": components,
                         "R": R.copy(),
                         "B": B.copy(),
@@ -209,15 +207,15 @@ def ilqr(
                     "bp_ok": True,
                     "fp_ok": True,
                     "act_delta": delta_J,
-                    "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol
+                    "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol,
                 })
-            
+
             if delta_J <= passsettings.ilqr.cost_tol:
                 return X, U, "converged", snapshots, transitions
-            
+
             break
 
         if reg > passsettings.reg.reg_max:
             return X, U, "reg_exceeded", snapshots, transitions
-        
+
     return X, U, "max_iters", snapshots, transitions
