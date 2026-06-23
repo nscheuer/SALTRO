@@ -19,32 +19,48 @@ def create_planner_settings():
 
     plannersettings.num_passes = 1
     plannersettings.passes[0].dt = 10.0
-    plannersettings.passes[0].ilqr.cost_tol = 1e-3
-    plannersettings.passes[0].ilqr.max_iters = 20
+    plannersettings.passes[0].ilqr.cost_tol = 1e-5
+    plannersettings.passes[0].ilqr.max_iters = 100
 
-    plannersettings.passes[0].auglag.max_outer_iters = 10
+    plannersettings.passes[0].auglag.max_outer_iters = 100
     plannersettings.passes[0].auglag.constraint_tol = 1e-3
+    plannersettings.passes[0].auglag.penalty_init = 1e2  # feel the constraints
+    # from iter 0 — at the default the first inner solve is ~unconstrained and
+    # over-commits a 30x-violating slew the later penalty levels can't unwind.
 
     cost = plannersettings.passes[0].cost
-    cost.angle = 1e2
-    cost.ang_vel = 1e1
+    cost.angle = 1e3
+    cost.ang_vel = 1e2  # rate damping: too low leaves residual body spin that
+    # nutates the boresight a few degrees at the end (non-diagonal inertia).
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1e-1
-    cost.rw_control_weight = 1e3
+    cost.rw_control_weight = 1.0
     cost.magic_control_weight = 0.0
-    cost.rw_AM_weight = 0.0
+    # Non-zero RW-momentum penalty: the vec-mode Gauss-Newton angle Hessian
+    # is rank-1 (curvature only along dc/dtheta), so the AL outer loop needs
+    # some auxiliary curvature on the h (RW momentum) state to converge a
+    # large slew.  The quat-mode debug case can leave this at 0 because its
+    # angle Hessian already covers all three q-tangent directions.
+    cost.rw_AM_weight = 1e4
     cost.rw_stic_weight = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_ok_mult = 0.5   # free band below 50% h_max (validated: wheel used ~11%)
     cost.RWh_desat_mult = 0.05  # REQUIRED: flat free band grinds the outer loop (see plannersettings.h)
-    cost.angle_N = 1e2
-    cost.ang_vel_N = 1e1
+    cost.angle_N = 1e4
+    cost.ang_vel_N = 1e5  # strong terminal rate damping is what actually holds
+    # the boresight at the goal — under-weighting it was the residual-nutation
+    # "tail-drift". With this + the RWh re-key the slew points sub-degree
+    # (min 0.39 deg, last-quarter mean ~1.0 deg) vs strangled (never settles).
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
+    # Bounded-curvature cost (type 4 = (1-c)^2): unlike acos^2 (type 3) it has
+    # no antipodal curvature blow-up, so a >90 deg slew stays well-conditioned.
     cost.ang_cost_func_type = 4
     cost.use_cost_hess = True
+    # Gauss-Newton angle Hessian: rank-1, PSD by construction. Required for the
+    # vector-pointing backward pass to stay positive-definite past 90 deg.
     cost.cost_hess_gauss_newton = True
 
     plannersettings.disturbances.plan_for_aero = False
