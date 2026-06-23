@@ -652,6 +652,145 @@ class TestBackwardPass:
         for k in range(K.shape[0]):
             assert np.all(np.isfinite(K[k]) | (K[k] == 0.0))
 
+    def test_linearizes_with_configured_disturbances(self):
+        """The C++ backward pass must use the same disturbance config as rollout."""
+        N_test = 5
+        settings_off = saltro_py.PlannerSettings()
+        settings_gg = saltro_py.PlannerSettings()
+        settings_off.num_passes = 1
+        settings_gg.num_passes = 1
+        settings_off.passes[0].dt = 0.5
+        settings_gg.passes[0].dt = 0.5
+        settings_gg.disturbances.plan_for_gg = True
+
+        satellite = _make_test_satellite(settings_off)
+        nx = satellite.stateDim
+        nu = satellite.controlDim
+
+        X = np.zeros((nx, N_test))
+        U = np.zeros((nu, N_test - 1))
+        R = np.zeros((3, N_test))
+        V = np.zeros((3, N_test))
+        B = np.zeros((3, N_test))
+        S = np.zeros((3, N_test))
+        rho = np.zeros((1, N_test))
+        boresight = np.zeros((3, N_test))
+
+        half_angle = np.pi / 12.0
+        x_rotated = np.zeros(nx)
+        x_rotated[3:7] = np.array([
+            np.cos(half_angle), 0.0, 0.0, np.sin(half_angle)
+        ])
+        rng = np.random.default_rng(0)
+        for k in range(N_test):
+            X[:, k] = x_rotated
+            if k < N_test - 1:
+                U[:, k] = 0.001 * rng.standard_normal(nu)
+            R[:, k] = np.array([7000e3, 0.0, 0.0])
+            V[:, k] = np.array([0.0, 7500.0, 0.0])
+            B[:, k] = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+            S[:, k] = np.array([1.0, 0.1, -0.05])
+            S[:, k] /= np.linalg.norm(S[:, k])
+            boresight[:, k] = np.array([1.0, 0.0, 0.0])
+
+        attitude_target = make_attitude_traj(
+            np.array([np.nan, 0.0, 0.0, 0.0]), N_test
+        )
+
+        def run(settings):
+            return saltro_py.backward_pass(
+                satellite, X, U, R, V, B, S, rho, boresight, attitude_target,
+                settings, LAMBDA_AUG_ZERO, MU_AUG_ZERO,
+                settings.passes[0].reg.reg_init,
+            )
+
+        ok_off, K_off, d_off, _ = run(settings_off)
+        ok_gg, K_gg, d_gg, _ = run(settings_gg)
+
+        assert ok_off and ok_gg
+        assert np.all(np.isfinite(K_gg))
+        assert np.all(np.isfinite(d_gg))
+        assert np.linalg.norm(K_gg - K_off) + np.linalg.norm(d_gg - d_off) > 0.0
+
+    def test_psd_clip_clips_negative_eigenvalues(self):
+        """Exercise the C++ psd_clip helper through its Python binding."""
+        matrix = np.array([
+            [2.0, 0.0, 0.0],
+            [0.0, -5.0, 1.0],
+            [0.0, 1.0, 3.0],
+        ])
+        matrix = 0.5 * (matrix + matrix.T)
+        assert np.linalg.eigvalsh(matrix)[0] < 0.0
+
+        clipped = saltro_py.psd_clip(matrix)
+
+        assert np.linalg.eigvalsh(clipped)[0] >= -1e-12
+        np.linalg.cholesky(clipped + 1e-6 * np.eye(3))
+
+    def test_rk4_hessians_match_finite_difference_of_rk4_jacobians(self):
+        """Validate the C++ RK4 Hessian composition against its C++ Jacobian."""
+        settings = saltro_py.PlannerSettings()
+        settings.num_passes = 1
+        settings.passes[0].dt = 0.05
+        satellite = saltro_py.Satellite(np.diag([0.067, 0.071, 0.069]), settings)
+        satellite.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+        satellite.addRW(np.array([1.0, 0.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
+
+        nx = satellite.stateDim
+        nu = satellite.controlDim
+        axis = np.array([0.2, 0.5, -0.84])
+        axis /= np.linalg.norm(axis)
+        half_angle = 0.5 * np.deg2rad(40.0)
+        x = np.zeros(nx)
+        x[0:3] = np.array([0.08, -0.05, 0.06])
+        x[3:7] = np.concatenate(([np.cos(half_angle)], np.sin(half_angle) * axis))
+        x[7] = 0.004
+        u = np.full(nu, 0.02)
+
+        R = np.array([7000e3, 0.0, 0.0])
+        V = np.array([0.0, 7500.0, 0.0])
+        B = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+        S = np.array([1.0, 0.1, -0.05])
+        S /= np.linalg.norm(S)
+        disturbances = settings.disturbances
+        dt = settings.passes[0].dt
+
+        F_xx, _, _ = saltro_py.rk4_dynamics_hessians(
+            satellite, x, u, dt, disturbances, R, B, S, V
+        )
+        F_xx = np.asarray(F_xx)
+
+        epsilon = 1e-6
+        max_error = 0.0
+        checked = 0
+        quaternion_indices = range(3, 7)
+        for j in range(nx):
+            if j in quaternion_indices:
+                continue
+            x_plus = x.copy()
+            x_minus = x.copy()
+            x_plus[j] += epsilon
+            x_minus[j] -= epsilon
+            A_plus, _ = saltro_py.rk4_dynamics_jacobians(
+                satellite, x_plus, u, dt, disturbances, R, B, S, V
+            )
+            A_minus, _ = saltro_py.rk4_dynamics_jacobians(
+                satellite, x_minus, u, dt, disturbances, R, B, S, V
+            )
+            dA_dxj = (A_plus - A_minus) / (2.0 * epsilon)
+            for output in range(nx):
+                for state in range(nx):
+                    if state in quaternion_indices:
+                        continue
+                    max_error = max(
+                        max_error,
+                        abs(dA_dxj[output, state] - F_xx[output, state, j]),
+                    )
+                    checked += 1
+
+        assert checked > 0
+        assert max_error < 1e-4
+
     def test_ddp_knobs_off_reproduce_gauss_newton(self):
         """Default backward pass should match explicitly disabled DDP knobs."""
         ok0, K0, d0, deltaV0 = _run_ddp_scenario(lambda settings: None, False)
