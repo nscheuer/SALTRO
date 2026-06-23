@@ -147,6 +147,25 @@ def _state_norm_jacobian(x, quat_idx=3):
     return J
 
 
+def _find_g_mat(q, num_rw):
+    """Python equivalent of saltro::math::findGMat for an independent oracle."""
+    nx = 7 + num_rw
+    nx_reduced = 6 + num_rw
+    G = np.zeros((nx_reduced, nx))
+    G[:3, :3] = np.eye(3)
+
+    q0, q1, q2, q3 = q
+    W = np.array([
+        [-q1, -q2, -q3],
+        [q0, -q3, q2],
+        [q3, q0, -q1],
+        [-q2, q1, q0],
+    ])
+    G[3:6, 3:7] = W.T
+    G[6:, 7:] = np.eye(num_rw)
+    return G
+
+
 def _tensor_slices(tensor, rows, cols, depth):
     array = np.asarray(tensor, dtype=float)
     return [array[i, :rows, :cols] for i in range(depth)]
@@ -545,8 +564,72 @@ class TestBackwardPass:
         # K[0] and d[:,0] should be finite
         assert np.all(np.isfinite(K[0]))
         assert np.all(np.isfinite(d[:, 0]))
-        
-        # Verify deltaV is finite
+
+        # Independently reproduce the N=2 backward-pass equations, matching
+        # the hand verification in test_backwardpass.cpp.
+        x_0 = X[:, 0]
+        u_0 = U[:, 0]
+        B_0 = B_test[:, 0]
+        boresight_0 = boresight_test[:, 0]
+
+        p_1, _, _ = satellite_test.terminalCostJacobians(
+            x_0, boresight_0, attitude_target_test, B_0,
+            settings_test.passes[0].cost,
+        )
+        P_1, _, _ = satellite_test.terminalCostHessians(
+            x_0, boresight_0, attitude_target_test, B_0,
+            settings_test.passes[0].cost,
+        )
+        l_x, l_u_matrix, _ = satellite_test.stageCostJacobians(
+            0, N_test, x_0, u_0, boresight_0, attitude_target_test, B_0,
+            settings_test.passes[0].cost,
+        )
+        l_xx, l_uu, l_ux = satellite_test.stageCostHessians(
+            0, N_test, x_0, u_0, boresight_0, attitude_target_test, B_0,
+            settings_test.passes[0].cost,
+        )
+
+        dist = saltro_py.DisturbanceConfig()
+        R_0 = R_test[:, 0]
+        V_0 = V_test[:, 0]
+        S_0 = S_test[:, 0]
+
+        def dynamics_jacobian(t_local, x_local, u_local):
+            A_c, B_c, _ = satellite_test.dynamicsJacobians(
+                x_local, u_local, dist, R_0, B_0, S_0, V_0,
+            )
+            k = satellite_test.dynamics(
+                x_local, u_local, dist, R_0, B_0, S_0, V_0, 0,
+            )
+            return np.asarray(A_c), np.asarray(B_c), np.asarray(k)
+
+        A_0, B_0_dyn = _rk4_jacobians_python(
+            dynamics_jacobian, x_0, u_0, 0.0, settings_test.passes[0].dt,
+        )
+
+        G_0 = _find_g_mat(X[3:7, 0], satellite_test.numRW)
+        G_1 = _find_g_mat(X[3:7, 1], satellite_test.numRW)
+        p_1_reduced = G_1 @ np.asarray(p_1)
+        P_1_reduced = G_1 @ np.asarray(P_1) @ G_1.T
+        l_x_reduced = G_0 @ np.asarray(l_x)
+        l_xx_reduced = G_0 @ np.asarray(l_xx) @ G_0.T
+        l_ux_reduced = np.asarray(l_ux) @ G_0.T
+        A_0_reduced = G_1 @ A_0 @ G_0.T
+        B_0_reduced = G_1 @ B_0_dyn
+
+        # l_x_reduced/l_xx_reduced are part of the full value update even
+        # though only Q_u/Q_ux/Q_uu determine K and d at this single knot.
+        assert np.all(np.isfinite(l_x_reduced))
+        assert np.all(np.isfinite(l_xx_reduced))
+        Q_uu = np.asarray(l_uu) + B_0_reduced.T @ P_1_reduced @ B_0_reduced
+        Q_ux = l_ux_reduced + B_0_reduced.T @ P_1_reduced @ A_0_reduced
+        Q_u = np.asarray(l_u_matrix)[0] + B_0_reduced.T @ p_1_reduced
+        Q_uu_reg = Q_uu + settings_test.passes[0].reg.reg_init * np.eye(nu)
+        K_expected = -np.linalg.solve(Q_uu_reg, Q_ux)
+        d_expected = -np.linalg.solve(Q_uu_reg, Q_u)
+
+        assert np.linalg.norm(K[0] - K_expected) < 1e-10
+        assert np.linalg.norm(d[:, 0] - d_expected) < 1e-10
         assert np.all(np.isfinite(deltaV))
     
     def test_dimensions(self, fixture):
@@ -631,10 +714,10 @@ class TestBackwardPass:
         
         X = np.zeros((nx, N))
         X[:, 0] = fixture.x0
-        X[:, 1] = fixture.x0 + 0.001 * np.random.randn(nx)
+        X[:, 1] = fixture.x0 + 0.001 * np.linspace(-0.5, 0.5, nx)
         
         U = np.zeros((nu, N - 1))
-        U[:, 0] = 0.001 * np.random.randn(nu)
+        U[:, 0] = 0.001 * np.linspace(-0.5, 0.5, nu)
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
@@ -684,7 +767,7 @@ class TestBackwardPass:
         for k in range(N_test):
             X[:, k] = x0
             if k < N_test - 1:
-                U[:, k] = 0.001 * np.random.randn(nu)
+                U[:, k] = 0.001 * (k + 1) * np.linspace(-0.5, 0.5, nu)
             
             R_test[:, k] = np.array([7000e3, 0.0, 0.0])
             V_test[:, k] = np.array([0.0, 7500.0, 0.0])
@@ -1059,6 +1142,23 @@ class TestBackwardPass:
         assert np.all(np.isfinite(d_ddp))
         assert np.all(np.isfinite(deltaV_ddp))
         assert _max_gain_diff(K_gn, d_gn, K_ddp, d_ddp) > 1e-9
+
+    def test_ddp_psd_clip_yields_psd_matrix(self):
+        """Mirror the descent-safety property checked by the C++ PSD test."""
+        M = np.array([
+            [2.0, 0.0, 0.0],
+            [0.0, -5.0, 1.0],
+            [0.0, 1.0, 3.0],
+        ])
+        M = 0.5 * (M + M.T)
+        assert np.linalg.eigvalsh(M).min() < 0.0
+
+        eigenvalues, eigenvectors = np.linalg.eigh(M)
+        M_clipped = eigenvectors @ np.diag(np.maximum(eigenvalues, 0.0)) @ eigenvectors.T
+        assert np.linalg.eigvalsh(M_clipped).min() >= -1e-12
+
+        # Cholesky succeeding mirrors Eigen::LLT reporting Eigen::Success.
+        np.linalg.cholesky(M_clipped + 1e-6 * np.eye(3))
 
     def test_ddp_both_knobs_on_with_active_constraint_stays_finite(self):
         """Combined second-order terms should still yield a finite backward pass."""

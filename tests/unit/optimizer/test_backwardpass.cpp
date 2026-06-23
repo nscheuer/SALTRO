@@ -440,10 +440,10 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass regularization loop converg
 
 	// Perturb state slightly to create richer dynamics
 	X.col(0) = x0;
-	X.col(1) = x0 + 0.001 * Eigen::VectorXd::Random(satellite.stateDim());
+	X.col(1) = x0 + 0.001 * Eigen::VectorXd::LinSpaced(satellite.stateDim(), -0.5, 0.5);
 
 	// Non-zero control
-	U.col(0) = 0.001 * Eigen::VectorXd::Random(satellite.controlDim());
+	U.col(0) = 0.001 * Eigen::VectorXd::LinSpaced(satellite.controlDim(), -0.5, 0.5);
 
 	std::vector<Eigen::MatrixXd> K(N - 1);
 	std::vector<Eigen::VectorXd> d(N - 1);
@@ -494,7 +494,11 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass handles longer trajectory N
 
 	for (int k = 0; k < N_test; ++k) {
 		X.col(k) = x0;
-		if (k < N_test - 1) U.col(k) = 0.001 * Eigen::VectorXd::Random(satellite_test.controlDim());
+		if (k < N_test - 1) {
+			U.col(k) = 0.001 * (k + 1) * Eigen::VectorXd::LinSpaced(
+				satellite_test.controlDim(), -0.5, 0.5
+			);
+		}
 
 		R_test.col(k) = Eigen::Vector3d(7000e3, 0.0, 0.0);
 		V_test.col(k) = Eigen::Vector3d(0.0, 7500.0, 0.0);
