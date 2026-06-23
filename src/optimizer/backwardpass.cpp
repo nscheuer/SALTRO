@@ -60,10 +60,14 @@ void solveRiccattiStep(
 	// across many backward steps (critical for long horizons).
 	P_k = 0.5 * (P_k + Eigen::MatrixXd(P_k.transpose()));
 	
-	p_k = Q_x 
-	  + K_k.transpose() * Q_uu * d_k 
-	  + K_k.transpose() * Q_u 
-	  + Q_ux.transpose() * d_k;
+	// p_k update: the textbook form has 4 terms,
+	//   p_k = Q_x + K^T·Q_uu·d_k + K^T·Q_u + Q_ux^T·d_k,
+	// but d_k = -Q_uu^{-1}·Q_u, so K^T·Q_uu·d_k = -K^T·Q_u and the middle
+	// two cancel exactly in real arithmetic.  In fp64 they cancel only
+	// up to ~eps·||K||·||Q_uu||·||d_k|| of catastrophic-cancellation
+	// noise, which accumulates across the Riccati recursion.  We use
+	// the algebraically equivalent 2-term form to avoid that noise.
+	p_k = Q_x + Q_ux.transpose() * d_k;
 	
 	// Accumulate expected cost reduction
 	deltaV(0) += d_k.dot(Q_u);
@@ -139,12 +143,19 @@ bool backwardPass(
 		// Reshape lu from 1×nu matrix to nu vector
 		Eigen::VectorXd lu = lu_mat.row(0);
 		
-		// Scale stage cost derivatives by dt
-		lx_full = dt * lx_full;
-		lu = dt * lu;
-		lxx_full = dt * lxx_full;
-		luu = dt * luu;
-		lux_hess_full = dt * lux_hess_full;
+		// NOTE: previously scaled stage-cost derivatives by dt, but
+		// Satellite::totalCost SUMS stageCost without any dt factor (see
+		// satellite.cpp `J_total += stage_cost`). Multiplying gradients by
+		// dt was therefore inconsistent with the cost being optimized — BP's
+		// predicted ΔV came out a factor of dt too large in pure-cost regions
+		// and mixed in AL regions (since the AL gradient is added below WITHOUT
+		// dt scaling, so AL part was un-scaled while stage part was over-scaled).
+		// Confirmed via closed-loop FD gradient check: bisect by cost component
+		// (angle only, +ω, +control, +AL) all gave ratio = 1/dt = 0.10 pre-fix
+		// and ratio = 1.000 ± 0.025 after the dt factors were removed.
+		// Smoke test on the chronic 12_omega_5x ict=1e-3 + spike scenario:
+		//   pre-fix : 137 iters, 6.26°PE, ls_attempts_exceeded
+		//   post-fix: 325 iters, 2.14°PE, converged (better than synced 3.0°)
 		
 		// Step 2: Build G matrices for projection
 		Eigen::Vector4d q_k = x_k.segment<4>(3);

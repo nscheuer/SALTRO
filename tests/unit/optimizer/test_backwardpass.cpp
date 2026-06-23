@@ -265,12 +265,11 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass N=2 hand-verified computati
 
 	Eigen::VectorXd l_u_0 = l_u_0_mat.row(0);
 	const double dt = settings_test.passes[0].dt;
-	// Match backward pass implementation: scale stage derivatives by dt.
-	l_x_0 *= dt;
-	l_u_0 *= dt;
-	l_xx_0 *= dt;
-	l_uu_0 *= dt;
-	l_ux_hess_0 *= dt;
+	(void)dt;
+	// BP no longer scales stage cost derivatives by dt: Satellite::totalCost
+	// SUMS stageCost without a dt factor, so gradients/Hessians are already
+	// in the right scale.  This manual computation must mirror that — do not
+	// reintroduce the dt multiplication.
 
 	// Compute discrete-time dynamics Jacobians at k=0 (matches backward pass).
 	DisturbanceConfig dist_config;
@@ -325,7 +324,7 @@ TEST_CASE_METHOD(BackwardPassFixture, "backward_pass N=2 hand-verified computati
 	Eigen::MatrixXd K_0_expected = -llt.solve(Q_ux_0);
 	Eigen::VectorXd d_0_expected = -llt.solve(Q_u_0);
 
-	// Verify K[0] and d[0] match expected values (within numerical tolerance)
+	// Verify K[0] and d[0] match expected values (within numerical tolerance).
 	REQUIRE((K[0] - K_0_expected).norm() < 1e-10);
 	REQUIRE((d[0] - d_0_expected).norm() < 1e-10);
 
