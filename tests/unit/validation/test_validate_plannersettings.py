@@ -1010,32 +1010,5 @@ def test_valid_boundary_zero_cost_weights():
     settings.passes[0].cost.angle = 0.0
     settings.passes[0].cost.ang_vel = 0.0
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-
+    
     assert ok
-
-
-# ============================================================================
-# DDP second-order term knobs (G12/G13)
-# ============================================================================
-
-def test_reg_ddp_knobs_default_false():
-    """DDP/curvature knobs default OFF (Gauss-Newton is the default path)."""
-    reg = saltro_py.RegularizationConfig()
-    assert reg.use_dynamics_hess is False
-    assert reg.use_constraint_hess is False
-    assert reg.psd_clip_quu_ddp is False
-
-
-def test_psd_clip_quu_ddp_roundtrip_and_valid():
-    """psd_clip_quu_ddp is a bool: round-trips and both values pass validation."""
-    for val in (True, False):
-        settings = valid_settings()
-        settings.passes[0].reg.psd_clip_quu_ddp = val
-        settings.passes[0].reg.use_dynamics_hess = val
-        settings.passes[0].reg.use_constraint_hess = val
-        assert settings.passes[0].reg.psd_clip_quu_ddp is val
-        assert settings.passes[0].reg.use_dynamics_hess is val
-        assert settings.passes[0].reg.use_constraint_hess is val
-        ok, error_msg = saltro_py.validatePlannerSettings(settings)
-        assert ok
-        assert error_msg == ""

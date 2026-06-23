@@ -275,14 +275,6 @@ struct RegularizationConfig {
 
     bool use_dynamics_hess = false;
     bool use_constraint_hess = false;
-
-    // DDP companion knob: when adding true second-order dynamics/constraint
-    // curvature (use_dynamics_hess / use_constraint_hess), Q_uu can become
-    // indefinite, which makes the LLT fail or produce an ascent direction.
-    // When set, the DDP curvature contributions Q*_ddp are projected to PSD
-    // (negative eigenvalues clamped to 0) before being folded into Q_uu and
-    // the existing reg+LLT. Default OFF — pure Gauss-Newton is unchanged.
-    bool psd_clip_quu_ddp = false;
 };
 
 /**

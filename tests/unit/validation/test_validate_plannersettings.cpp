@@ -927,30 +927,6 @@ TEST_CASE("Valid boundary values - zero cost weights", "[plannersettings][valida
     settings.passes[0].cost.angle = 0.0;
     settings.passes[0].cost.ang_vel = 0.0;
     std::string error_msg;
-
+    
     REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
-}
-
-// ============================================================================
-// DDP second-order term knobs (G12/G13)
-// ============================================================================
-
-TEST_CASE("Regularization DDP knobs default OFF", "[plannersettings][validation][ddp]") {
-    RegularizationConfig reg;
-    REQUIRE_FALSE(reg.use_dynamics_hess);
-    REQUIRE_FALSE(reg.use_constraint_hess);
-    REQUIRE_FALSE(reg.psd_clip_quu_ddp);
-}
-
-TEST_CASE("psd_clip_quu_ddp bool accepted by validation", "[plannersettings][validation][ddp]") {
-    for (bool val : {true, false}) {
-        PlannerSettings settings = validSettings();
-        settings.passes[0].reg.psd_clip_quu_ddp = val;
-        settings.passes[0].reg.use_dynamics_hess = val;
-        settings.passes[0].reg.use_constraint_hess = val;
-        std::string error_msg;
-        REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
-        REQUIRE(error_msg.empty());
-        REQUIRE(settings.passes[0].reg.psd_clip_quu_ddp == val);
-    }
 }

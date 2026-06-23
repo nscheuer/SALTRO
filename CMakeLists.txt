@@ -35,7 +35,7 @@ if(SALTRO_BUILD_PYTHON)
     FetchContent_MakeAvailable(pybind11)
 endif()
 
-file(GLOB_RECURSE SALTRO_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE SALTRO_SOURCES
     ${CMAKE_SOURCE_DIR}/src/*.cpp
 )
 
