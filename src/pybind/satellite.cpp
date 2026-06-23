@@ -1371,29 +1371,21 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     // For W matrix structure:
     Vec4 d_qgoal_W_w_dq = Vec4::Zero();
     {
-        // The W matrix is 4x3. We compute how (q_goal^T * W * w) changes with each q component.
-        // W(q) is linear in q, so we can compute its derivatives directly.
-        // W = 0.5 * [[-q(1), -q(2), -q(3)],
-        //            [q(0), -q(3), q(2)],
-        //            [q(3), q(0), -q(1)],
-        //            [-q(2), q(1), q(0)]]  (in quaternion [q0, q1, q2, q3] form)
-        // Each row i of W depends on q as: W_i = 0.5 * (linear combination of q components)
-        // ∂(W^T * q_goal)/∂q_j gives a 3D vector
-        // We need to compute how (q_goal^T * W * w) changes
-        
-        // Use numerical differentiation for simplicity and robustness
-        const double eps = 1e-8;
-        Vec4 q_pert = q;
-        double f0 = (q_goal_aligned.transpose() * W * w)(0);
-        
-        for (int j = 0; j < 4; ++j) {
-            q_pert = q;
-            q_pert(j) += eps;
-            q_pert.normalize();
-            const Mat43 W_pert = saltro::math::findWMat(q_pert);
-            const double f_pert = (q_goal_aligned.transpose() * W_pert * w)(0);
-            d_qgoal_W_w_dq(j) = (f_pert - f0) / eps;
-        }
+        // Analytic derivative of f(q) = q_g^T * W(q) * w w.r.t. q.
+        // W(q) is linear in q (4×3 matrix), so ∂f/∂q_j = q_g^T * (∂W/∂q_j) * w.
+        // From the W matrix structure:
+        //   W = [[-q1, -q2, -q3],
+        //        [ q0, -q3,  q2],
+        //        [ q3,  q0, -q1],
+        //        [-q2,  q1,  q0]]
+        // Collecting terms by q component:
+        const double g0 = q_goal_aligned(0), g1 = q_goal_aligned(1);
+        const double g2 = q_goal_aligned(2), g3 = q_goal_aligned(3);
+        const double ww0 = w(0), ww1 = w(1), ww2 = w(2);
+        d_qgoal_W_w_dq(0) =  g1*ww0 + g2*ww1 + g3*ww2;
+        d_qgoal_W_w_dq(1) = -g0*ww0 - g2*ww2 + g3*ww1;
+        d_qgoal_W_w_dq(2) = -g0*ww1 + g1*ww2 - g3*ww0;
+        d_qgoal_W_w_dq(3) = -g0*ww2 - g1*ww1 + g2*ww0;
     }
     lx.segment<4>(QUAT_INDEX) += -safeSign(qdot_aligned) * w_avang * d_qgoal_W_w_dq;
 
@@ -1416,7 +1408,6 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     }
 
     // NOTE: Quaternion projection is applied at the END (see below), not here.
-    // Applying it twice would corrupt the Hessian finite difference computation.
 
     // =====================================================================
     // Gradient w.r.t. RW momentum h: ∂L/∂h
@@ -1543,7 +1534,14 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         w_ang_eff = 0.0;
     }
 
-    (void)w_ang_eff;  // Used in numerical differentiation
+    // Quaternion alignment: ensure q_goal is on the same hemisphere as q
+    const double qdot = q_goal.dot(q);
+    Vec4 q_goal_aligned = q_goal;
+    if (qdot < 0.0) {
+        q_goal_aligned = -q_goal;
+    }
+    const double qdot_aligned = std::abs(qdot);  // always >= 0
+
     (void)w_avmag;
     (void)w_avang;
     (void)w;
@@ -1582,28 +1580,90 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     lxx.block<3, 3>(AV_INDEX, AV_INDEX) += w_av * Mat33::Identity();
 
     // =====================================================================
-    // Hessian w.r.t. quaternion: ∂²L/∂q² (attitude terms)
+    // Hessian w.r.t. quaternion: ∂²L/∂q² (attitude terms) — ANALYTIC
     // =====================================================================
-    // This is complex and depends on ang_cost_func_type. 
-    // For robustness, use numerical differentiation of the gradient.
+    // Following Jackson, Tracy & Manchester "Planning with Attitude" (2020):
+    //   For scalar cost h(q) on S³, the R⁴ Hessian ∂²h/∂q² is computed
+    //   analytically per cost function type.  The manifold projection
+    //   (eq 15 in the paper) is applied at the end of this function.
+    //
+    // Let d = q_goal_aligned · q  (scalar, non-negative after alignment).
+    // All attitude costs are functions of d alone, so:
+    //   ∂h/∂q  = h'(d) * q_goal_aligned
+    //   ∂²h/∂q² = h''(d) * q_goal_aligned * q_goal_aligned^T
     {
-        const double eps = 1e-8;
-        VecX x_pert = x;
-        auto lx_base = stageCostJacobians(k, N, x, u, boresight_body, attitude_target, B_eci, cost_cfg);
-        VecX grad_base = std::get<0>(lx_base);
+        const double d = qdot_aligned;  // |q_goal · q|, already >= 0
+        const double d2 = d * d;
+        const double one_minus_d2 = std::max(1.0 - d2, 1e-12);  // clamp for numerical safety
+        const double sqrt_omd2 = std::sqrt(one_minus_d2);
 
-        for (int j = 0; j < 4; ++j) {
-            x_pert = x;
-            x_pert(QUAT_INDEX + j) += eps;
-            // CRITICAL: Normalize the perturbed quaternion before computing gradient
-            x_pert.segment<4>(QUAT_INDEX).normalize();
-            auto lx_pert = stageCostJacobians(k, N, x_pert, u, boresight_body, attitude_target, B_eci, cost_cfg);
-            VecX grad_pert = std::get<0>(lx_pert);
+        double d2h_dd2 = 0.0;  // second derivative of ang_cost w.r.t. d
 
-            VecX d_grad = (grad_pert - grad_base) / eps;
-            lxx.col(QUAT_INDEX + j) += d_grad;
+        switch (cost_cfg.ang_cost_func_type) {
+            case 0:  // h = 1 - d  →  h'' = 0
+                d2h_dd2 = 0.0;
+                break;
+            case 1: {  // h = 0.5*(1-d)²  →  h' = -(1-d), h'' = 1
+                d2h_dd2 = 1.0;
+                break;
+            }
+            case 2: {  // h = arccos(d)  →  h' = -1/sqrt(1-d²), h'' = -d/(1-d²)^(3/2)
+                d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
+                break;
+            }
+            case 3: {  // h = 0.5*arccos(d)²  →  h' = -phi/sqrt(1-d²)
+                       //  h'' = 1/(1-d²) - phi*d/(1-d²)^(3/2)
+                       //  where phi = arccos(d)
+                const double phi = std::acos(std::clamp(d, 0.0, 1.0));
+                d2h_dd2 = 1.0 / one_minus_d2 - phi * d / (one_minus_d2 * sqrt_omd2);
+                break;
+            }
+            case 4:  // h = 1 - d²  →  h' = -2d, h'' = -2
+                d2h_dd2 = -2.0;
+                break;
+            default: {  // same as case 2
+                d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
+                break;
+            }
         }
+
+        // ∂²(ang_cost)/∂q² = h''(d) * q_g * q_g^T
+        // Full cost Hessian contribution = w_ang * d2h_dd2 * q_g * q_g^T
+        lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) += w_ang_eff * d2h_dd2
+            * (q_goal_aligned * q_goal_aligned.transpose());
+
+        // Per "Planning with Attitude" eq (15), the manifold Hessian includes
+        // a correction term:  -I_3 * (∂h/∂q · q)  which in R⁴ before projection
+        // becomes  -(∂h/∂q · q) * I_4.
+        // ∂h/∂q = h'(d) * q_goal_aligned,  so ∂h/∂q · q = h'(d) * d
+        double dh_dd = 0.0;
+        switch (cost_cfg.ang_cost_func_type) {
+            case 0: dh_dd = -1.0; break;
+            case 1: dh_dd = -(1.0 - d); break;
+            case 2: dh_dd = -1.0 / sqrt_omd2; break;
+            case 3: {
+                const double phi2 = std::acos(std::clamp(d, 0.0, 1.0));
+                dh_dd = -phi2 / sqrt_omd2;
+                break;
+            }
+            case 4: dh_dd = -2.0 * d; break;
+            default: dh_dd = -1.0 / sqrt_omd2; break;
+        }
+        // Correction: -(grad · q) * I_4 on the quaternion block
+        const double grad_dot_q = dh_dd * d;  // h'(d) * (q_g · q) = h'(d) * d
+        lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) -= w_ang_eff * grad_dot_q
+            * Eigen::Matrix<double, 4, 4>::Identity();
     }
+
+    // =====================================================================
+    // Cross-term Hessian: ∂²L/∂q² from angular-velocity-direction cost
+    // =====================================================================
+    // The cross_cost = -sign(d) * w_avang * (q_g^T W(q) w) is LINEAR in q
+    // (W(q) is linear in q, sign(d) is piecewise constant).
+    // Therefore ∂²(cross_cost)/∂q² = 0 — no Hessian contribution.
+    //
+    // Cross-term ∂²L/∂w∂q is also needed (mixed Hessian), but lux is not
+    // currently used for the quaternion-omega cross terms, so we skip it.
 
     // =====================================================================
     // Hessian w.r.t. RW momentum: ∂²L/∂h²
@@ -1845,7 +1905,7 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
         c(idx++) = (-u_cmd - tau_lim) / tau_lim;
 
         const double h = x(RW_MOMENTUM_INDEX + i);
-        const double h_lim = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+        const double h_lim = cnst_cfg.rw_momentum_limit_scale * std::max(1e-9, std::abs(getRW(i).momentumMax()));
         c(idx++) = (h - h_lim) / h_lim;
         c(idx++) = (-h - h_lim) / h_lim;
 
@@ -1976,7 +2036,7 @@ std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(
         c_u(idx, ctrl_idx) = -1.0 / tau_lim;
         idx++;
         
-        const double h_lim = std::max(1e-9, std::abs(getRW(i).momentumMax()));
+        const double h_lim = cnst_cfg.rw_momentum_limit_scale * std::max(1e-9, std::abs(getRW(i).momentumMax()));
         
         // RW momentum upper bound
         c_x(idx, state_idx) = 1.0 / h_lim;
@@ -2048,7 +2108,11 @@ Satellite::constraintHessians(
     H_xx.slice(idx).block<3, 3>(AV_INDEX, AV_INDEX) = scale_av * Mat33::Identity();
     idx++;
 
-    // 2) Sun constraint Hessian: computed numerically to match normalization-aware Jacobian
+    // 2) Sun constraint Hessian: central finite differences of constraint Jacobian
+    // Constraint: c = [R(q)^T * sun_unit]_x - cos(limit)
+    // The chain rule through quaternion normalization makes the analytic form fragile,
+    // so we use central FD for robustness.  This is only called during the backward
+    // pass when use_constraint_hess is enabled.
     const double sun_norm = sun_eci.norm();
     const int sun_idx = idx;
     if (std::isfinite(sun_norm) && sun_norm > 1e-12) {
@@ -2057,12 +2121,8 @@ Satellite::constraintHessians(
             VecX xp = x; xp(j) += eps;
             VecX xm = x; xm(j) -= eps;
             if (j >= QUAT_INDEX && j < QUAT_INDEX + 4) {
-                Vec4 qxp = xp.segment<4>(QUAT_INDEX);
-                Vec4 qxm = xm.segment<4>(QUAT_INDEX);
-                qxp.normalize();
-                qxm.normalize();
-                xp.segment<4>(QUAT_INDEX) = qxp;
-                xm.segment<4>(QUAT_INDEX) = qxm;
+                xp.segment<4>(QUAT_INDEX).normalize();
+                xm.segment<4>(QUAT_INDEX).normalize();
             }
 
             auto [_, c_xp] = constraintJacobians(k, N, xp, u, sun_eci, cnst_cfg);

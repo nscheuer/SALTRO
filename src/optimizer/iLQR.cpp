@@ -60,11 +60,15 @@ double augmented_penalty_total(
 		const int mu_size = static_cast<int>(mu_aug[k].size());
 		const int n_c = std::min(c_size, std::min(lam_size, mu_size));
 		for (int i = 0; i < n_c; ++i) {
-			const double c_pos = std::max(0.0, c_k(i));
-			if (c_pos <= 0.0) {
-				continue;
+			const double ci = c_k(i);
+			const double li = lambda_aug[k](i);
+			// Lambda term always active with signed c; mu penalty when
+			// c > 0 OR lambda > 0. Must match the forward-pass merit exactly:
+			// this value seeds J_prev for the first line-search comparison.
+			total += li * ci;
+			if (ci > 0.0 || li > 0.0) {
+				total += 0.5 * mu_aug[k](i) * ci * ci;
 			}
-			total += lambda_aug[k](i) * c_pos + 0.5 * mu_aug[k](i) * c_pos * c_pos;
 		}
 	}
 

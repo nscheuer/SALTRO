@@ -30,6 +30,7 @@ void bind_plannersettings(py::module_& m) {
     py::class_<ConstraintConfig>(m, "ConstraintConfig")
         .def(py::init<>())
         .def_readwrite("control_limit_scale", &ConstraintConfig::control_limit_scale)
+        .def_readwrite("rw_momentum_limit_scale", &ConstraintConfig::rw_momentum_limit_scale)
         .def_readwrite("u_max", &ConstraintConfig::u_max)
         .def_readwrite("wmax", &ConstraintConfig::wmax)
         .def_readwrite("sun_limit_angle", &ConstraintConfig::sun_limit_angle);
@@ -86,7 +87,8 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("reg_min_cond", &RegularizationConfig::reg_min_cond)
         .def_readwrite("rand_add_ratio", &RegularizationConfig::rand_add_ratio)
         .def_readwrite("use_dynamics_hess", &RegularizationConfig::use_dynamics_hess)
-        .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess);
+        .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess)
+        .def_readwrite("psd_clip_quu_ddp", &RegularizationConfig::psd_clip_quu_ddp);
 
     py::class_<LineSearchConfig>(m, "LineSearchConfig")
         .def(py::init<>())
