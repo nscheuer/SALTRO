@@ -258,6 +258,159 @@ def test_prop_disturbance_is_body_fixed_under_attitude():
     assert np.allclose(tau_rot, tau_body)
 
 
+def test_gendist_disturbance_applies_body_fixed_constant_torque():
+    """plan_for_gendist=True should add gendist_torque (body-fixed) to the disturbance."""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    tau_body = np.array([-2.0e-5, 3.0e-5, 1.0e-5])
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_prop = False
+    dist.plan_for_gendist = True
+    dist.gendist_torque = tau_body
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+
+    tau_total = fixture.get_disturbance_torque(x, dist, 0)
+
+    assert np.all(np.isfinite(tau_total))
+    # With only gendist enabled, the total equals gendist_torque.
+    assert np.allclose(tau_total, tau_body)
+
+
+def test_gendist_disturbance_is_zero_when_disabled():
+    """plan_for_gendist=False should ignore gendist_torque even if non-zero."""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_prop = False
+    dist.plan_for_gendist = False
+    dist.gendist_torque = np.array([-2.0e-5, 3.0e-5, 1.0e-5])
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+
+    tau_total = fixture.get_disturbance_torque(x, dist, 0)
+    assert np.allclose(tau_total, np.zeros(3))
+
+
+def test_gendist_disturbance_is_body_fixed_under_attitude():
+    """gendist_torque is body-fixed: it must not change with attitude."""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    tau_body = np.array([0.0, 5.0e-5, 0.0])
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_gendist = True
+    dist.gendist_torque = tau_body
+
+    x_id = np.zeros(fixture.sat.stateDim)
+    x_id[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+    tau_id = fixture.get_disturbance_torque(x_id, dist, 0)
+
+    x_rot = np.zeros(fixture.sat.stateDim)
+    x_rot[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([0, 0, 0, 1])
+    tau_rot = fixture.get_disturbance_torque(x_rot, dist, 0)
+
+    assert np.allclose(tau_id, tau_body)
+    assert np.allclose(tau_rot, tau_body)
+
+
+def test_resdipole_disturbance_matches_m_cross_body_B():
+    """plan_for_resdipole=True: tau = res_dipole x (R^T * B_eci).
+
+    At identity attitude B_body == B_eci, so the expected torque is
+    res_dipole x B_eci with no rotation-convention ambiguity.
+    """
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    m = np.array([0.05, -0.02, 0.03])  # A*m^2
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_resdipole = True
+    dist.res_dipole = m
+
+    step = 20
+    B_eci = fixture.B[:, step]
+    assert np.linalg.norm(B_eci) > 0
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+
+    tau_total = fixture.get_disturbance_torque(x, dist, step)
+
+    assert np.all(np.isfinite(tau_total))
+    assert np.allclose(tau_total, np.cross(m, B_eci))
+    assert np.linalg.norm(tau_total) > 0
+
+
+def test_resdipole_disturbance_is_zero_when_disabled():
+    """plan_for_resdipole=False should ignore res_dipole even if non-zero."""
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_resdipole = False
+    dist.res_dipole = np.array([0.05, -0.02, 0.03])
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+
+    tau_total = fixture.get_disturbance_torque(x, dist, 20)
+    assert np.allclose(tau_total, np.zeros(3))
+
+
+def test_resdipole_disturbance_depends_on_attitude():
+    """Residual dipole torque uses the BODY-frame field: rotating the
+    spacecraft 180 deg about z flips B_body x/y components, so the torque
+    must change accordingly (unlike the body-fixed prop/gendist torques).
+
+    For q = [0, 0, 0, 1] the rotation is pi about z, so R = R^T =
+    diag(-1, -1, 1) under either body-to-ECI convention.
+    """
+    fixture = TestSatelliteDisturbancesFixture()
+    fixture.setup_method()
+
+    m = np.array([0.05, -0.02, 0.03])
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = False
+    dist.plan_for_aero = False
+    dist.plan_for_srp = False
+    dist.plan_for_resdipole = True
+    dist.res_dipole = m
+
+    step = 20
+    B_eci = fixture.B[:, step]
+
+    x_rot = np.zeros(fixture.sat.stateDim)
+    x_rot[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([0, 0, 0, 1])
+    tau_rot = fixture.get_disturbance_torque(x_rot, dist, step)
+
+    B_body_expected = np.array([-B_eci[0], -B_eci[1], B_eci[2]])
+    assert np.allclose(tau_rot, np.cross(m, B_body_expected))
+
+
 # ============================================================================
 # TEST SECTION 2: Multiple Disturbances Together
 # ============================================================================

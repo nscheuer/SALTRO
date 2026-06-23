@@ -872,6 +872,118 @@ def test_jacobian_wrt_state_with_disturbances_enabled():
             assert (rel_err <= rel_tol or abs_err <= abs_tol)
 
 
+def _fd_state_jacobian(fixture, x, u, dist, R_eci, B_eci, S_eci, V_eci, eps=1e-6):
+    """Central-difference Jacobian of dynamics() w.r.t. the state."""
+    nx = fixture.sat.stateDim
+    jac = np.zeros((nx, nx))
+    for j in range(nx):
+        x_plus = x.copy()
+        x_minus = x.copy()
+        x_plus[j] += eps
+        x_minus[j] -= eps
+        f_plus = fixture.sat.dynamics(x_plus, u, dist, R_eci, B_eci, S_eci, V_eci, 0)
+        f_minus = fixture.sat.dynamics(x_minus, u, dist, R_eci, B_eci, S_eci, V_eci, 0)
+        jac[:, j] = (f_plus - f_minus) / (2.0 * eps)
+    return jac
+
+
+def _assert_jacobians_match(jac_analytical, jac_numerical, rel_tol=1e-5, abs_tol=1e-9):
+    rows, cols = jac_numerical.shape
+    for i in range(rows):
+        for j in range(cols):
+            analytical = jac_analytical[i, j]
+            numerical = jac_numerical[i, j]
+            rel_err = abs(analytical - numerical) / abs(numerical) if abs(numerical) > abs_tol else 0.0
+            abs_err = abs(analytical - numerical)
+            assert (rel_err <= rel_tol or abs_err <= abs_tol), \
+                f"Mismatch at ({i},{j}): analytical={analytical}, numerical={numerical}"
+
+
+@pytest.mark.parametrize("q0", [
+    np.array([1.0, 0.0, 0.0, 0.0]),
+    np.array([0.9, 0.2, -0.3, 0.1]) / np.linalg.norm([0.9, 0.2, -0.3, 0.1]),
+])
+def test_jacobian_wrt_state_with_resdipole_matches_finite_differences(q0):
+    """Residual dipole torque tau = m x (R^T B_eci) depends on attitude, so it
+    contributes skew(m) * d(R^T B)/dq to the quaternion Jacobian. Validate the
+    analytic Jacobian against finite differences with resdipole enabled."""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+
+    step = 50
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = q0
+
+    u = np.zeros(fixture.sat.controlDim)
+
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_resdipole = True
+    dist.res_dipole = np.array([0.05, -0.02, 0.03])
+
+    R_eci = fixture.R[:, step]
+    B_eci = fixture.B[:, step]
+    S_eci = fixture.S[:, step]
+    V_eci = fixture.V[:, step]
+    assert np.linalg.norm(B_eci) > 0
+
+    jac_x_analytical, _, _ = fixture.sat.dynamicsJacobians(
+        x, u, dist, R_eci, B_eci, S_eci, V_eci
+    )
+
+    # The resdipole quaternion block must actually be exercised (non-zero):
+    # with u = 0 and all other disturbances off, the only dwdot/dq term is
+    # skew(m) * d(R^T B)/dq.
+    av0 = saltro_py.Satellite.AV_INDEX
+    q0_idx = saltro_py.Satellite.QUAT_INDEX
+    assert np.linalg.norm(jac_x_analytical[av0:av0 + 3, q0_idx:q0_idx + 4]) > 0
+
+    jac_x_numerical = _fd_state_jacobian(fixture, x, u, dist, R_eci, B_eci, S_eci, V_eci)
+    _assert_jacobians_match(jac_x_analytical, jac_x_numerical)
+
+
+def test_jacobian_wrt_state_with_gendist_matches_finite_differences():
+    """gendist_torque is a body-fixed constant: dtau/dx = 0. The analytic
+    Jacobian must match FD with gendist enabled AND be identical to the
+    Jacobian with gendist disabled (no spurious contribution)."""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+
+    step = 50
+
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
+
+    u = np.zeros(fixture.sat.controlDim)
+
+    dist_on = saltro_py.DisturbanceConfig()
+    dist_on.plan_for_gendist = True
+    dist_on.gendist_torque = np.array([-2.0e-5, 3.0e-5, 1.0e-5])
+
+    dist_off = saltro_py.DisturbanceConfig()
+
+    R_eci = fixture.R[:, step]
+    B_eci = fixture.B[:, step]
+    S_eci = fixture.S[:, step]
+    V_eci = fixture.V[:, step]
+
+    jac_x_on, jac_u_on, _ = fixture.sat.dynamicsJacobians(
+        x, u, dist_on, R_eci, B_eci, S_eci, V_eci
+    )
+    jac_x_off, jac_u_off, _ = fixture.sat.dynamicsJacobians(
+        x, u, dist_off, R_eci, B_eci, S_eci, V_eci
+    )
+
+    # Constant body-fixed torque: exactly zero Jacobian contribution.
+    assert np.array_equal(jac_x_on, jac_x_off)
+    assert np.array_equal(jac_u_on, jac_u_off)
+
+    jac_x_numerical = _fd_state_jacobian(fixture, x, u, dist_on, R_eci, B_eci, S_eci, V_eci)
+    _assert_jacobians_match(jac_x_on, jac_x_numerical)
+
+
 # ============================================================================
 # TEST SECTION 11: Dynamics Hessians - Dimensions and Basic Checks
 # ============================================================================

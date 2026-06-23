@@ -282,7 +282,6 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
     Vec3 S_body = R_T * S_eci;
     Mat34 dV_dq = saltro::math::drotmatTvecdq(q, V_eci).transpose();
     auto d2V_dq2 = saltro::math::ddrotmatTvecdqdq(q, V_eci);
-    (void)B_eci;
     (void)rho;
     (void)dV_dq;
     (void)d2V_dq2;
@@ -309,6 +308,21 @@ Satellite::Vec3 Satellite::disturbanceTorque(const VecX& x, const DisturbanceCon
     // dynamicsJacobians/dynamicsHessians changes are required.
     if (dist.plan_for_prop) {
         torque += dist.prop_torque;
+    }
+
+    // Generic constant body-fixed disturbance torque. Same pattern as prop:
+    // ∂τ/∂x = 0 and ∂τ/∂u = 0, so no dynamicsJacobians/dynamicsHessians
+    // changes are required.
+    if (dist.plan_for_gendist) {
+        torque += dist.gendist_torque;
+    }
+
+    // Residual magnetic dipole: τ = m × B_body with B_body = Rᵀ·B_eci.
+    // Unlike prop/gendist this DOES depend on attitude — the matching
+    // quaternion derivative skew(m)·∂(RᵀB)/∂q lives in dynamicsJacobians
+    // (and its second derivative in dynamicsHessians).
+    if (dist.plan_for_resdipole) {
+        torque += dist.res_dipole.cross(R_T * B_eci);
     }
 
     return torque;
@@ -472,7 +486,21 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamic
             //Silently ignore disturbance derivative errors (flight-safe)
         }
     }
-    
+
+    // Residual dipole contribution: τ = m × (Rᵀ·B_eci), so
+    //   ∂τ/∂q = skew(m) · ∂(RᵀB)/∂q
+    // (mirrors the MTQ skew(magvec)·dB/dq term above and OldPlanner's
+    // skewSymmetric(magvec)*dRTBdq(q, Bk) with magvec = res_dipole).
+    // prop/gendist are body-fixed constants → no Jacobian contribution.
+    if (dist.plan_for_resdipole && B_eci.norm() > 1e-12) {
+        Mat43 dB_dq = saltro::math::drotmatTvecdq(q, B_eci);
+        Mat34 resdip_jac =
+            saltro::math::skewSymmetric(dist.res_dipole) * dB_dq.transpose();
+        if (resdip_jac.allFinite()) {
+            dwdot_dq += resdip_jac;
+        }
+    }
+
     // Apply accumulated quaternion derivatives to Jacobian
     jac_x.block<3, 4>(AV_INDEX, QUAT_INDEX) = invJcom_noRW_ * dwdot_dq;
     
@@ -849,7 +877,37 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
             // Silently ignore SRP Hessian errors (flight-safe)
         }
     }
-    
+
+    // Residual dipole Hessian: τ = m × (Rᵀ·B_eci) gives
+    //   ∂²τ_l/∂q_j∂q_k = Σ_m skew(m)_{lm} · ∂²(RᵀB)_m/∂q_j∂q_k
+    // (prop/gendist are body-fixed constants → no Hessian contribution).
+    if (dist.plan_for_resdipole && B_eci.norm() > 1e-12) {
+        try {
+            auto d2B_dq2 = saltro::math::ddrotmatTvecdqdq(q, B_eci);
+            Mat33 skew_m = saltro::math::skewSymmetric(dist.res_dipole);
+
+            for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 4; ++j) {
+                    for (int k = 0; k < 4; ++k) {
+                        double contrib = 0.0;
+                        for (int l = 0; l < 3; ++l) {
+                            double tau_hess_l = 0.0;
+                            for (int m = 0; m < 3; ++m) {
+                                tau_hess_l += skew_m(l, m) * d2B_dq2[m](j, k);
+                            }
+                            contrib += invJcom_noRW_(i, l) * tau_hess_l;
+                        }
+                        if (std::isfinite(contrib)) {
+                            hess_xx.slice(AV_INDEX + i)(QUAT_INDEX + j, QUAT_INDEX + k) += contrib;
+                        }
+                    }
+                }
+            }
+        } catch (...) {
+            // Silently ignore residual-dipole Hessian errors (flight-safe)
+        }
+    }
+
     // =========================================================================
     // Quaternion Hessian: ∂²qdot_i/∂x_j∂x_k (indexed by output i = 0,1,2,3)
     // =========================================================================
