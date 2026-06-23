@@ -939,17 +939,6 @@ TEST_CASE_METHOD(BackwardPassFixture,
 
 	Satellite satellite_test(
 		Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal(), settings_off
-	"backward_pass rejects non-finite trajectory states instead of emitting NaN gains",
-	"[backward_pass][nan_guard]") {
-	// Eigen's LLT does not flag NaN input, so before the guards a NaN state
-	// produced NaN K/d "successfully" and the failure surfaced only when the
-	// forward-pass rollout died -- a full FP later, misattributed to the line
-	// search. The BP must fail fast instead.
-	constexpr int N_test = 5;
-
-	PlannerSettings settings_test = settings;
-	Satellite satellite_test(
-		Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal(), settings_test
 	);
 	satellite_test.addMTQ(Eigen::Vector3d::UnitX(), 0.2);
 	satellite_test.addMTQ(Eigen::Vector3d::UnitY(), 0.2);
@@ -1021,6 +1010,30 @@ TEST_CASE_METHOD(BackwardPassFixture,
 		diff += (K_gg[k] - K_off[k]).norm() + (d_gg[k] - d_off[k]).norm();
 	}
 	REQUIRE(diff > 0.0);
+}
+
+TEST_CASE_METHOD(BackwardPassFixture,
+	"backward_pass rejects non-finite trajectory states instead of emitting NaN gains",
+	"[backward_pass][nan_guard]") {
+	// Eigen's LLT does not flag NaN input, so before the guards a NaN state
+	// produced NaN K/d "successfully" and the failure surfaced only when the
+	// forward-pass rollout died -- a full FP later, misattributed to the line
+	// search. The BP must fail fast instead.
+	constexpr int N_test = 5;
+
+	PlannerSettings settings_test = settings;
+	Satellite satellite_test(
+		Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal(), settings_test
+	);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitX(), 0.2);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitY(), 0.2);
+	satellite_test.addMTQ(Eigen::Vector3d::UnitZ(), 0.2);
+	satellite_test.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+	satellite_test.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+	satellite_test.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+	Eigen::MatrixXd X(satellite_test.stateDim(), N_test);
+	Eigen::MatrixXd U(satellite_test.controlDim(), N_test - 1);
 	Eigen::MatrixXd R_t(3, N_test), V_t(3, N_test), B_t(3, N_test), S_t(3, N_test);
 	Eigen::MatrixXd rho_t(1, N_test), bs_t(3, N_test);
 	for (int k = 0; k < N_test; ++k) {

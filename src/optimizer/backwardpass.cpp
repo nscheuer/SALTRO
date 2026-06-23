@@ -121,14 +121,6 @@ bool backwardPass(
 	
 	Eigen::VectorXd p_k = G_N * p_N_full;
 	Eigen::MatrixXd P_k = G_N * P_N_full * G_N.transpose();
-<<<<<<< fix/bp-disturbance-config
-	
-	// Linearize with the same disturbance config the forward pass rolls out
-	// (forwardpass.cpp uses settings.disturbances). A default-constructed
-	// config here makes A_k/B_k disagree with the actual rollout whenever any
-	// plan_for_* flag is on, biasing the expected-decrease prediction.
-	const DisturbanceConfig& dist_config = settings.disturbances;
-=======
 
 	// Fold the terminal-knot (k = N-1) AL constraint terms into the cost-to-go
 	// seed. The forward-pass merit and the alilqr multiplier update both price
@@ -180,9 +172,11 @@ bool backwardPass(
 		}
 	}
 
-	// Minimal disturbance config for linearization
-	DisturbanceConfig dist_config;
->>>>>>> main
+	// Linearize with the same disturbance config the forward pass rolls out
+	// (forwardpass.cpp uses settings.disturbances). A default-constructed
+	// config here makes A_k/B_k disagree with the actual rollout whenever any
+	// plan_for_* flag is on, biasing the expected-decrease prediction.
+	const DisturbanceConfig& dist_config = settings.disturbances;
 	
 	// Backward loop: k from N-2 down to 0
 	for (int k = N - 2; k >= 0; --k) {
