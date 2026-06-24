@@ -105,12 +105,17 @@ bool solveRiccattiStepSqrt(
 	K[k] = K_k;
 	d[k] = d_k;
 
-	// Unregularized Q_uu products through the factor: Q_uu d = F_u^T (F_u d).
+	// Q_uu·d through the factor, used only for the expected-reduction term
+	// below: Q_uu d = F_u^T (F_u d).
 	const Eigen::VectorXd Fu_d = F_u * d_k;
-	p_k = Q_x
-	  + K_k.transpose() * (F_u.transpose() * Fu_d)
-	  + K_k.transpose() * Q_u
-	  + Q_ux.transpose() * d_k;
+
+	// Cost-to-go gradient. K_k and d_k are solved against the REGULARIZED
+	// Z_uu, so the K^T·Q_uu·d_k + K^T·Q_u cross terms cancel exactly and p_k
+	// collapses to the short Jacobson form -- matching the dense pass
+	// (backwardpass.cpp). Carrying the long form with the unregularized Q_uu
+	// (= F_u^T F_u) instead leaves a residual reg·K^T d_k and breaks
+	// dense/sqrt parity.
+	p_k = Q_x + Q_ux.transpose() * d_k;
 
 	// Accumulate expected cost reduction (ALTRO eq. 25).
 	deltaV(0) += d_k.dot(Q_u);
@@ -253,12 +258,9 @@ bool backwardPassSqrt(
 		// Reshape lu from 1×nu matrix to nu vector
 		Eigen::VectorXd lu = lu_mat.row(0);
 
-		// Scale stage cost derivatives by dt
-		lx_full = dt * lx_full;
-		lu = dt * lu;
-		lxx_full = dt * lxx_full;
-		luu = dt * luu;
-		lux_hess_full = dt * lux_hess_full;
+		// NB: stage cost derivatives are NOT dt-scaled here -- the dense pass
+		// (backwardpass.cpp) dropped that scaling, so the sqrt pass must match
+		// to keep dense/sqrt parity.
 
 		// Step 2: Build G matrices for projection
 		Eigen::Vector4d q_k = x_k.segment<4>(3);
