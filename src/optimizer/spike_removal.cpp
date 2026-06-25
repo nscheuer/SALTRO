@@ -32,28 +32,77 @@ double pointingError(
 }
 
 /// Find set of knot indices where goal changes.
-/// True if two attitude-target columns represent the SAME goal. Components are
-/// compared element-wise, treating the NaN sentinel as equal to NaN: in
-/// vector-pointing mode the target is [NaN, x, y, z], and NaN != NaN would make
-/// a plain (a - b).isZero() check ALWAYS false, flagging every knot as a goal
-/// transition and buffering the whole horizon out of spike detection. A goal
-/// change is a change in the NaN pattern or in any finite component.
-bool sameGoalTarget(const Eigen::Ref<const Eigen::VectorXd>& a,
-                    const Eigen::Ref<const Eigen::VectorXd>& b) {
-	for (int i = 0; i < a.size(); ++i) {
-		const bool a_nan = std::isnan(a(i));
-		const bool b_nan = std::isnan(b(i));
-		if (a_nan != b_nan) return false;
-		if (!a_nan && std::abs(a(i) - b(i)) > 1e-9) return false;
+/// Per-knot angular change of the pointing target between two columns.
+/// Returns +inf when the target MODE changes (quaternion <-> vector-pointing,
+/// i.e. the NaN-sentinel pattern flips) — always a discrete goal transition.
+/// Otherwise: the angle between the two ECI target DIRECTIONS in vector mode
+/// (rows 1..3, the [NaN, x, y, z] sentinel), or the geodesic angle between the
+/// two unit quaternions in quaternion mode. This is the natural "how far did the
+/// goal move this step" metric — small for a smoothly slewing target (e.g.
+/// nadir tracking), large for a discrete re-tasking (e.g. nadir -> sun).
+double targetStepAngle(const Eigen::Ref<const Eigen::VectorXd>& a,
+                       const Eigen::Ref<const Eigen::VectorXd>& b) {
+	const bool a_vec = std::isnan(a(0));
+	const bool b_vec = std::isnan(b(0));
+	if (a_vec != b_vec) {
+		return std::numeric_limits<double>::infinity();
 	}
-	return true;
+	if (a_vec) {
+		const Eigen::Vector3d da = a.segment<3>(1);
+		const Eigen::Vector3d db = b.segment<3>(1);
+		const double na = da.norm(), nb = db.norm();
+		if (na < 1e-12 || nb < 1e-12) return 0.0;
+		const double c = std::clamp(da.dot(db) / (na * nb), -1.0, 1.0);
+		return std::acos(c);
+	}
+	const Eigen::Vector4d qa = a.head<4>();
+	const Eigen::Vector4d qb = b.head<4>();
+	const double na = qa.norm(), nb = qb.norm();
+	if (na < 1e-12 || nb < 1e-12) return 0.0;
+	const double d = std::clamp(std::abs(qa.dot(qb)) / (na * nb), 0.0, 1.0);
+	return 2.0 * std::acos(d);
 }
 
+/// Knots where the pointing GOAL discretely changes (a re-tasking such as
+/// nadir -> sun), which warrant buffering the surrounding excursion out of spike
+/// detection. The previous test treated ANY target change as a transition, which
+/// (a) was always-true under the NaN sentinel and (b) wrongly flagged every knot
+/// of a continuously-slewing target (nadir tracking). Instead, compare each
+/// per-knot target step against the trajectory's TYPICAL step (the median, which
+/// is robust to the handful of large jumps we are looking for): a transition is
+/// a step far above that baseline, or a target-mode flip. A smoothly varying
+/// goal has a small, roughly-constant step and produces no transitions.
 std::set<int> findGoalTransitions(const Eigen::Ref<const Eigen::MatrixXd>& attitude_target) {
 	const int N = static_cast<int>(attitude_target.cols());
 	std::set<int> transitions;
+	if (N < 2) return transitions;
+
+	std::vector<double> step(static_cast<std::size_t>(N), 0.0);
+	std::vector<double> finite_steps;
+	finite_steps.reserve(static_cast<std::size_t>(N));
 	for (int k = 1; k < N; ++k) {
-		if (!sameGoalTarget(attitude_target.col(k), attitude_target.col(k - 1))) {
+		const double s = targetStepAngle(attitude_target.col(k), attitude_target.col(k - 1));
+		step[static_cast<std::size_t>(k)] = s;
+		if (std::isfinite(s)) finite_steps.push_back(s);
+	}
+
+	double baseline = 0.0;
+	if (!finite_steps.empty()) {
+		const std::size_t mid = finite_steps.size() / 2;
+		std::nth_element(finite_steps.begin(), finite_steps.begin() + mid, finite_steps.end());
+		baseline = finite_steps[mid];
+	}
+
+	// A transition is >= GOAL_STEP_RATIO x the typical step, but at least
+	// GOAL_STEP_FLOOR (so numerical jitter on a held target never registers, and
+	// a sub-5-deg "switch" — which causes no spike-scale excursion anyway — is
+	// not buffered). A target-mode flip is +inf and always crosses.
+	constexpr double GOAL_STEP_RATIO = 6.0;
+	constexpr double GOAL_STEP_FLOOR = 0.0873;  // ~5 degrees
+	const double threshold = std::max(GOAL_STEP_FLOOR, GOAL_STEP_RATIO * baseline);
+
+	for (int k = 1; k < N; ++k) {
+		if (step[static_cast<std::size_t>(k)] > threshold) {
 			transitions.insert(k);
 		}
 	}
