@@ -41,8 +41,12 @@ struct Traj {
     Eigen::MatrixXd X, U, attitude_target, boresight, B;
 };
 
+// phi[k] is the target's own rotation about +Z at knot k (lets a test move the
+// goal — smoothly for tracking, or with a discrete jump for a re-tasking). The
+// boresight is placed at angle phi[k]+theta[k], so the pointing error stays
+// exactly theta[k] regardless of how the target moves. phi empty => held target.
 Traj buildTrajectory(const Satellite& sat, const std::vector<double>& theta,
-                     bool vector_mode = false) {
+                     bool vector_mode = false, const std::vector<double>& phi = {}) {
     const int N = static_cast<int>(theta.size());
     Traj t;
     t.X = Eigen::MatrixXd::Zero(sat.stateDim(), N);
@@ -51,15 +55,19 @@ Traj buildTrajectory(const Satellite& sat, const std::vector<double>& theta,
     t.boresight = Eigen::MatrixXd::Zero(3, N);
     t.B = Eigen::MatrixXd::Zero(3, N);
     for (int k = 0; k < N; ++k) {
-        const double th = theta[static_cast<std::size_t>(k)];
-        t.X(3, k) = std::cos(th / 2.0);  // q0
-        t.X(6, k) = std::sin(th / 2.0);  // q3 (rotation about +Z)
+        const double ph = phi.empty() ? 0.0 : phi[static_cast<std::size_t>(k)];
+        const double ang = ph + theta[static_cast<std::size_t>(k)];
+        t.X(3, k) = std::cos(ang / 2.0);  // q0  (boresight at phi+theta about +Z)
+        t.X(6, k) = std::sin(ang / 2.0);  // q3
         if (vector_mode) {
-            // Vector-pointing target [NaN, x, y, z]: body +X boresight to inertial +X.
+            // Vector-pointing target [NaN, x, y, z]: ECI direction at angle phi.
             t.attitude_target(0, k) = std::nan("");
-            t.attitude_target(1, k) = 1.0;
+            t.attitude_target(1, k) = std::cos(ph);
+            t.attitude_target(2, k) = std::sin(ph);
         } else {
-            t.attitude_target(0, k) = 1.0;  // identity quaternion target (constant)
+            // Quaternion target: rotation about +Z by phi.
+            t.attitude_target(0, k) = std::cos(ph / 2.0);
+            t.attitude_target(3, k) = std::sin(ph / 2.0);
         }
         t.boresight(0, k) = 1.0;
         t.B(0, k) = 2.5e-5;
@@ -126,6 +134,62 @@ TEST_CASE("detectSpikes works in vector-pointing mode (NaN-sentinel target)",
     REQUIRE(spikes.size() == 1);
     REQUIRE(spikes.front().first >= 13);
     REQUIRE(spikes.front().first <= 15);
+}
+
+TEST_CASE("detectSpikes still fires when the goal is slowly slewing (not a transition)",
+          "[spike_removal][detect][goal_transition]") {
+    // The key case: a continuously slewing target (e.g. nadir tracking) must NOT
+    // be mistaken for a goal transition. Here the vector target rotates a steady
+    // 0.5 deg/knot — well below the 5 deg floor — so findGoalTransitions flags
+    // nothing and the spike is still detected. (Under the old "any change is a
+    // transition" rule this slow drift buffered the whole horizon and the spike
+    // was missed.)
+    Eigen::Matrix3d J = Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal();
+    PlannerSettings settings;
+    Satellite sat(J, settings);
+    setupSpikeSat(sat);
+    SpikeRemovalConfig cfg;
+    ConstraintConfig cnst;
+
+    const std::vector<double> theta = spikeProfile();
+    std::vector<double> phi(theta.size(), 0.0);
+    const double slew_per_knot = 0.5 * M_PI / 180.0;  // 0.5 deg/knot
+    for (std::size_t k = 0; k < phi.size(); ++k) phi[k] = static_cast<double>(k) * slew_per_knot;
+
+    Traj t = buildTrajectory(sat, theta, /*vector_mode=*/true, phi);
+    std::vector<SpikeCandidate> spikes =
+        detectSpikes(sat, t.X, t.U, t.attitude_target, t.boresight, t.B, cnst, cfg);
+
+    REQUIRE(spikes.size() == 1);
+    REQUIRE(spikes.front().first >= 13);
+    REQUIRE(spikes.front().first <= 15);
+}
+
+TEST_CASE("detectSpikes buffers a discrete goal re-tasking (nadir -> sun style jump)",
+          "[spike_removal][detect][goal_transition]") {
+    // The complementary case: a genuine discrete goal switch (here a 60 deg jump
+    // in the target direction at knot 20, mid-spike) MUST be treated as a
+    // transition so the slew-induced excursion isn't removed as a spike. The
+    // goal-switch buffer (+/-15 knots) then covers the whole window -> no
+    // candidate. The identical excursion with a held goal is detected (the case
+    // above), so this isolates the transition handling.
+    Eigen::Matrix3d J = Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal();
+    PlannerSettings settings;
+    Satellite sat(J, settings);
+    setupSpikeSat(sat);
+    SpikeRemovalConfig cfg;
+    ConstraintConfig cnst;
+
+    const std::vector<double> theta = spikeProfile();
+    std::vector<double> phi(theta.size(), 0.0);
+    const double jump = 60.0 * M_PI / 180.0;
+    for (std::size_t k = 20; k < phi.size(); ++k) phi[k] = jump;  // discrete step at knot 20
+
+    Traj t = buildTrajectory(sat, theta, /*vector_mode=*/true, phi);
+    std::vector<SpikeCandidate> spikes =
+        detectSpikes(sat, t.X, t.U, t.attitude_target, t.boresight, t.B, cnst, cfg);
+
+    REQUIRE(spikes.empty());
 }
 
 TEST_CASE("detectSpikes returns nothing for a monotonically converging trajectory",
