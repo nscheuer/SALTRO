@@ -1041,11 +1041,6 @@ def test_hessian_elements_are_finite():
         assert np.all(np.isfinite(hess_uu[i]))
 
 
-@pytest.mark.skip(
-    reason="Requires the analytic dynamics-Hessian fix in PR #21. "
-    "main currently computes a w-dependent d^2w_dot/dw^2 block when "
-    "the correct value is constant. Re-enable once PR #21 lands."
-)
 def test_hessians_are_symmetric_where_expected():
     """Test that Hessian matrices are symmetric where expected"""
     fixture = TestSatelliteDynamicsFixture()
@@ -1088,12 +1083,6 @@ def test_hessians_are_symmetric_where_expected():
 # does not. To test quaternion outputs properly we'd need tangent-space
 # perturbations (or a non-normalizing dynamics variant); leaving those out
 # here. The covered set still catches Bug 4 (which lives in ω outputs).
-@pytest.mark.skip(
-    reason="Requires the analytic dynamics-Hessian fix in PR #21. "
-    "main's d^2w_dot/dw^2 is w-dependent (it should be constant), "
-    "so analytic vs FD differs by ~10x on omega-output indices. "
-    "Re-enable once PR #21 lands."
-)
 @pytest.mark.parametrize("out_idx", [0, 1, 2, 7, 8, 9])
 def test_hessian_wrt_state_matches_finite_differences(out_idx):
     """Test that Hessian w.r.t. state matches finite differences for each

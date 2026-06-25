@@ -909,6 +909,102 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
     }
 
     // =========================================================================
+    // Quaternion normalization second-order chain rule (manifold curvature)
+    // =========================================================================
+    // dynamics() normalizes q → q/‖q‖ internally, so the q-derivatives of ω̇
+    // above (built from the raw rotmat-formula helpers drotmatTvecdq /
+    // ddrotmatTvecdqdq) are derivatives w.r.t. an UNCONSTRAINED q. They are not
+    // yet the derivatives the optimizer needs (w.r.t. the raw state quaternion,
+    // which dynamics renormalizes). With N(q)=q/‖q‖, f(q)=g(N(q)), and P = I₄ −
+    // qqᵀ at ‖q‖=1, the exact transform is:
+    //   ∂²f/∂q_a∂q_c = (P·H_raw·P)_{ac}
+    //                  − g_a q_c − q_a g_c − δ_ac(g·q) + 3 q_a q_c (g·q)
+    // where H_raw is the assembled raw q-q Hessian block and g = ∂(raw ω̇)/∂q is
+    // the UNPROJECTED q-gradient (the dynamicsJacobians q-block before its
+    // (I−qqᵀ) projection). dynamicsJacobians already applies the first-order P
+    // to its q-columns; the Hessian needs both P·H·P and the retraction-curvature
+    // term carried by g. The mixed ∂²ω̇/∂u∂q block likewise needs a single
+    // right-projection by P (u is not on the manifold, so no g-term there).
+    // Without this, the analytic Hessian is asymmetric and disagrees with finite
+    // differences of the (renormalizing) dynamics. ω̇ is corrected in place here
+    // BEFORE the ḣ / actuator-momentum blocks below read it, so those inherit it.
+    {
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+        const Mat44 Pn = Mat44::Identity() - q * q.transpose();
+
+        // Raw (unprojected) q-gradient of ω̇: invJ · ∂τ/∂q_raw, replicating the
+        // disturbance/MTQ assembly in dynamicsJacobians WITHOUT the projection.
+        Mat34 dtau_dq_raw = Mat34::Zero();
+        if (num_mtq_ > 0 && B_eci.norm() > 1e-12) {
+            Mat43 dB_dq = saltro::math::drotmatTvecdq(q, B_eci);
+            for (int a = 0; a < num_mtq_; ++a) {
+                const MTQ& mtq = getMTQ(a);
+                Mat73 dtau_dx = mtq.dtorq_dbasestate(u(a), x_base, B_body, dB_dq);
+                dtau_dq_raw += dtau_dx.block<4, 3>(3, 0).transpose();
+            }
+        }
+        if (dist.plan_for_gg && R_eci.norm() > 1e-6) {
+            try {
+                saltro::disturbances::GGDisturbance gg(Jcom_);
+                Mat43 dR_dq = saltro::math::drotmatTvecdq(q, R_eci);
+                Mat34 j = gg.dtorque_dq(x_base, dist, R_body, Jcom_, dR_dq.transpose());
+                if (j.allFinite()) dtau_dq_raw += j;
+            } catch (...) {}
+        }
+        if (dist.plan_for_aero && V_eci.norm() > 1e-6) {
+            try {
+                saltro::disturbances::DragDisturbance drag(geometry_config_);
+                Mat43 dV_dq = saltro::math::drotmatTvecdq(q, V_eci);
+                Mat34 j = drag.dtorque_dq(x_base, dist, V_body, dV_dq.transpose());
+                if (j.allFinite()) dtau_dq_raw += j;
+            } catch (...) {}
+        }
+        if (dist.plan_for_srp && S_eci.norm() > 1e-6) {
+            try {
+                saltro::disturbances::SRPDisturbance srp(geometry_config_);
+                Mat43 dS_dq = saltro::math::drotmatTvecdq(q, S_eci);
+                Mat34 j = srp.dtorque_dq(x_base, dist, S_body, dS_dq.transpose());
+                if (j.allFinite()) dtau_dq_raw += j;
+            } catch (...) {}
+        }
+        if (dist.plan_for_resdipole && B_eci.norm() > 1e-12) {
+            Mat43 dB_dq = saltro::math::drotmatTvecdq(q, B_eci);
+            Mat34 j = saltro::math::skewSymmetric(dist.res_dipole) * dB_dq.transpose();
+            if (j.allFinite()) dtau_dq_raw += j;
+        }
+        const Mat34 g_raw = invJcom_noRW_ * dtau_dq_raw;  // rows = ω̇ output, cols = q
+
+        for (int i = 0; i < 3; ++i) {
+            // --- q-q block: H_f = P·H_raw·P + retraction-curvature(g) ---
+            Mat44 H_raw;
+            for (int jj = 0; jj < 4; ++jj)
+                for (int kk = 0; kk < 4; ++kk)
+                    H_raw(jj, kk) = hess_xx.slice(AV_INDEX + i)(QUAT_INDEX + jj, QUAT_INDEX + kk);
+
+            const Vec4 g = g_raw.row(i).transpose();
+            const double s = g.dot(q);
+            const Mat44 C = -(g * q.transpose() + q * g.transpose())
+                            - s * Mat44::Identity()
+                            + 3.0 * s * (q * q.transpose());
+            const Mat44 H_f = Pn * H_raw * Pn + C;
+
+            for (int jj = 0; jj < 4; ++jj)
+                for (int kk = 0; kk < 4; ++kk)
+                    hess_xx.slice(AV_INDEX + i)(QUAT_INDEX + jj, QUAT_INDEX + kk) = H_f(jj, kk);
+
+            // --- mixed ∂²ω̇/∂u∂q block: right-project the q-index by P ---
+            for (int jc = 0; jc < controlDim(); ++jc) {
+                Vec4 row;
+                for (int kk = 0; kk < 4; ++kk)
+                    row(kk) = hess_ux.slice(AV_INDEX + i)(jc, QUAT_INDEX + kk);
+                const Vec4 proj = Pn * row;
+                for (int kk = 0; kk < 4; ++kk)
+                    hess_ux.slice(AV_INDEX + i)(jc, QUAT_INDEX + kk) = proj(kk);
+            }
+        }
+    }
+
+    // =========================================================================
     // Quaternion Hessian: ∂²qdot_i/∂x_j∂x_k (indexed by output i = 0,1,2,3)
     // =========================================================================
     // qdot = 0.5 * W(q) * w where W depends on q
