@@ -32,11 +32,28 @@ double pointingError(
 }
 
 /// Find set of knot indices where goal changes.
+/// True if two attitude-target columns represent the SAME goal. Components are
+/// compared element-wise, treating the NaN sentinel as equal to NaN: in
+/// vector-pointing mode the target is [NaN, x, y, z], and NaN != NaN would make
+/// a plain (a - b).isZero() check ALWAYS false, flagging every knot as a goal
+/// transition and buffering the whole horizon out of spike detection. A goal
+/// change is a change in the NaN pattern or in any finite component.
+bool sameGoalTarget(const Eigen::Ref<const Eigen::VectorXd>& a,
+                    const Eigen::Ref<const Eigen::VectorXd>& b) {
+	for (int i = 0; i < a.size(); ++i) {
+		const bool a_nan = std::isnan(a(i));
+		const bool b_nan = std::isnan(b(i));
+		if (a_nan != b_nan) return false;
+		if (!a_nan && std::abs(a(i) - b(i)) > 1e-9) return false;
+	}
+	return true;
+}
+
 std::set<int> findGoalTransitions(const Eigen::Ref<const Eigen::MatrixXd>& attitude_target) {
 	const int N = static_cast<int>(attitude_target.cols());
 	std::set<int> transitions;
 	for (int k = 1; k < N; ++k) {
-		if (!(attitude_target.col(k) - attitude_target.col(k - 1)).isZero(1e-9)) {
+		if (!sameGoalTarget(attitude_target.col(k), attitude_target.col(k - 1))) {
 			transitions.insert(k);
 		}
 	}

@@ -41,7 +41,8 @@ struct Traj {
     Eigen::MatrixXd X, U, attitude_target, boresight, B;
 };
 
-Traj buildTrajectory(const Satellite& sat, const std::vector<double>& theta) {
+Traj buildTrajectory(const Satellite& sat, const std::vector<double>& theta,
+                     bool vector_mode = false) {
     const int N = static_cast<int>(theta.size());
     Traj t;
     t.X = Eigen::MatrixXd::Zero(sat.stateDim(), N);
@@ -53,13 +54,29 @@ Traj buildTrajectory(const Satellite& sat, const std::vector<double>& theta) {
         const double th = theta[static_cast<std::size_t>(k)];
         t.X(3, k) = std::cos(th / 2.0);  // q0
         t.X(6, k) = std::sin(th / 2.0);  // q3 (rotation about +Z)
-        t.attitude_target(0, k) = 1.0;   // identity quaternion target (constant)
+        if (vector_mode) {
+            // Vector-pointing target [NaN, x, y, z]: body +X boresight to inertial +X.
+            t.attitude_target(0, k) = std::nan("");
+            t.attitude_target(1, k) = 1.0;
+        } else {
+            t.attitude_target(0, k) = 1.0;  // identity quaternion target (constant)
+        }
         t.boresight(0, k) = 1.0;
         t.B(0, k) = 2.5e-5;
         t.B(1, k) = -1.5e-5;
         t.B(2, k) = 3.0e-5;
     }
     return t;
+}
+
+// The converge -> spike -> return pointing-error profile used by the detection
+// tests (entry 0.05, peak 0.30 = 6x, return below entry*exit_fudge).
+std::vector<double> spikeProfile() {
+    std::vector<double> theta;
+    for (int k = 0; k <= 14; ++k) theta.push_back(0.50 - k * (0.45 / 14.0));
+    for (int k = 1; k <= 8; ++k) theta.push_back(0.05 + k * (0.25 / 8.0));
+    for (int k = 1; k <= 9; ++k) theta.push_back(0.30 - k * (0.26 / 9.0));
+    return theta;
 }
 
 }  // namespace
@@ -73,14 +90,7 @@ TEST_CASE("detectSpikes flags a converge -> spike -> return window", "[spike_rem
                               //           min_spike_ratio=3, exit_fudge=2
     ConstraintConfig cnst;
 
-    std::vector<double> theta;
-    // 0..14: converge 0.50 -> 0.05 (15 strictly-decreasing knots, prior-decrease filter)
-    for (int k = 0; k <= 14; ++k) theta.push_back(0.50 - k * (0.45 / 14.0));
-    // 15..22: spike rise 0.05 -> 0.30 (8 strictly-increasing knots; entry 0.05, peak 0.30 -> 6x)
-    for (int k = 1; k <= 8; ++k) theta.push_back(0.05 + k * (0.25 / 8.0));
-    // 23..31: return 0.30 -> 0.04, crossing entry*exit_fudge (0.10)
-    for (int k = 1; k <= 9; ++k) theta.push_back(0.30 - k * (0.26 / 9.0));
-
+    const std::vector<double> theta = spikeProfile();
     Traj t = buildTrajectory(sat, theta);
     std::vector<SpikeCandidate> spikes =
         detectSpikes(sat, t.X, t.U, t.attitude_target, t.boresight, t.B, cnst, cfg);
@@ -92,6 +102,30 @@ TEST_CASE("detectSpikes flags a converge -> spike -> return window", "[spike_rem
     REQUIRE(s.first <= 15);
     REQUIRE(s.second > 22);
     REQUIRE(s.second < static_cast<int>(theta.size()));
+}
+
+TEST_CASE("detectSpikes works in vector-pointing mode (NaN-sentinel target)",
+          "[spike_removal][detect][vector_pointing]") {
+    // Regression guard for findGoalTransitions: a held vector-pointing target is
+    // [NaN, x, y, z]. A naive (col(k)-col(k-1)).isZero() check is ALWAYS false
+    // because NaN != NaN, so every knot was flagged as a goal transition and the
+    // whole horizon was buffered out of detection — making the detector blind to
+    // every spike in vector-pointing mode. The same spike must now be found.
+    Eigen::Matrix3d J = Eigen::Vector3d(0.067, 0.071, 0.069).asDiagonal();
+    PlannerSettings settings;
+    Satellite sat(J, settings);
+    setupSpikeSat(sat);
+    SpikeRemovalConfig cfg;
+    ConstraintConfig cnst;
+
+    const std::vector<double> theta = spikeProfile();
+    Traj t = buildTrajectory(sat, theta, /*vector_mode=*/true);
+    std::vector<SpikeCandidate> spikes =
+        detectSpikes(sat, t.X, t.U, t.attitude_target, t.boresight, t.B, cnst, cfg);
+
+    REQUIRE(spikes.size() == 1);
+    REQUIRE(spikes.front().first >= 13);
+    REQUIRE(spikes.front().first <= 15);
 }
 
 TEST_CASE("detectSpikes returns nothing for a monotonically converging trajectory",
