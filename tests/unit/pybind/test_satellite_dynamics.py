@@ -1166,6 +1166,69 @@ def test_hessian_wrt_state_matches_finite_differences(out_idx):
             )
 
 
+@pytest.mark.parametrize("out_idx", [0, 1, 2, 7, 8, 9])
+def test_hessian_wrt_state_matches_fd_at_non_identity_attitude(out_idx):
+    """Hessian vs finite differences at a NON-IDENTITY quaternion.
+
+    The identity-quaternion tests above are blind to the quaternion-coupled
+    (q0) terms of the attitude second derivative: at q=[1,0,0,0] the
+    normalization projector is diag(0,1,1,1) and the retraction-curvature
+    off-diagonals vanish. The disturbance Hessian assembly + the normalization
+    chain rule are exercised in full only off identity. The q-q disturbance
+    entries are O(1e-6), so a loose abs tolerance hides errors; we use a
+    converged step (eps=3e-4) and a magnitude-relative tolerance.
+    """
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    step = 50
+
+    q = np.array([0.6, -0.3, 0.5, 0.2])
+    q = q / np.linalg.norm(q)
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = q
+
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    R_eci, B_eci, S_eci, V_eci = (fixture.R[:, step], fixture.B[:, step],
+                                  fixture.S[:, step], fixture.V[:, step])
+
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R_eci, B_eci, S_eci, V_eci)
+    H = np.array(hess_xx[out_idx])
+
+    eps = 3e-4
+    nx = fixture.sat.stateDim
+    QI = saltro_py.Satellite.QUAT_INDEX
+
+    def f(xx):
+        return fixture.sat.dynamics(xx, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
+
+    # Only the quaternion block carries the manifold subtlety; check it tightly.
+    fd = np.zeros((4, 4))
+    for a in range(4):
+        for b in range(a, 4):
+            xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+            xpp[QI + a] += eps; xpp[QI + b] += eps
+            xpm[QI + a] += eps; xpm[QI + b] -= eps
+            xmp[QI + a] -= eps; xmp[QI + b] += eps
+            xmm[QI + a] -= eps; xmm[QI + b] -= eps
+            v = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4.0 * eps * eps)
+            fd[a, b] = v
+            fd[b, a] = v
+
+    Hqq = H[QI:QI + 4, QI:QI + 4]
+    scale = np.abs(fd).max() + 1e-12
+    err = np.abs(Hqq - fd).max()
+    # Converged FD is good to ~1e-11 here; the pre-fix bug was ~5.6e-7 on an
+    # O(1e-7) entry, so a 1e-3 relative tolerance both passes the fix and would
+    # have caught the bug.
+    assert err <= 1e-3 * scale + 1e-9, (
+        f"out_idx={out_idx}: max|analytic-FD| over q-q block = {err:.3e} "
+        f"(scale {scale:.3e})\nanalytic=\n{Hqq}\nfd=\n{fd}"
+    )
+
+
 # ============================================================================
 # TEST SECTION 13: Euler's equation - cross-product gyroscopic terms
 # ============================================================================
