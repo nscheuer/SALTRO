@@ -1229,6 +1229,81 @@ def test_hessian_wrt_state_matches_fd_at_non_identity_attitude(out_idx):
     )
 
 
+def _rot_matrix(q):
+    """Body->ECI rotation (Euler-Rodrigues) for a unit quaternion [w,x,y,z]."""
+    w, x, y, z = q
+    return np.array([
+        [w*w + x*x - y*y - z*z, 2*(x*y - w*z),         2*(x*z + w*y)],
+        [2*(x*y + w*z),         w*w - x*x + y*y - z*z,  2*(y*z - w*x)],
+        [2*(x*z - w*y),         2*(y*z + w*x),          w*w - x*x - y*y + z*z],
+    ])
+
+
+@pytest.mark.parametrize("which", ["aero", "srp"])
+def test_disturbance_hessian_matches_fd_at_non_identity_with_geometry(which):
+    """Drag/SRP attitude Hessians vs FD at a non-identity quaternion, with real
+    surface geometry. The fixtures elsewhere have no faces, so these torques
+    (and their Hessians) are otherwise never exercised. A single asymmetric face
+    with strong, stable incidence keeps the active-set gate from flipping under
+    the FD perturbation. Both rely on the same normalization-chain-rule machinery
+    the gg fix corrected; this pins them off identity."""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+
+    cfg = saltro_py.GeometryConfig()
+    # area, centroid (offset lever), normal +x, eta_s, eta_d, eta_a, CD
+    cfg.addFace(saltro_py.GeometryFace(
+        1.0, np.array([0.3, 0.4, 0.1]), np.array([1.0, 0.0, 0.0]),
+        0.3, 0.2, 0.1, 2.2))
+    fixture.sat.setGeometryConfig(cfg)
+
+    q = np.array([0.6, -0.3, 0.5, 0.2])
+    q = q / np.linalg.norm(q)
+    QI = saltro_py.Satellite.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+
+    dist = saltro_py.DisturbanceConfig()
+    R_eci = np.zeros(3)
+    B_eci = fixture.B[:, 50]
+    Rm = _rot_matrix(q)
+    if which == "aero":
+        dist.plan_for_aero = True
+        # body velocity strongly along +x so the face stays active under perturbation
+        V_eci = Rm @ np.array([5000.0, 300.0, 150.0])
+        S_eci = np.zeros(3)
+    else:
+        dist.plan_for_srp = True
+        S_eci = Rm @ (np.array([0.9, 0.3, 0.2]) / np.linalg.norm([0.9, 0.3, 0.2]))
+        V_eci = np.zeros(3)
+
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R_eci, B_eci, S_eci, V_eci)
+
+    eps = 1e-3  # eps^2 convergence verified; rel error ~2e-6 here
+
+    def f(xx, o):
+        return fixture.sat.dynamics(xx, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[o]
+
+    for o in [0, 1, 2]:
+        H = np.array(hess_xx[o])
+        block = H[QI:QI + 4, QI:QI + 4]
+        scale = np.abs(block).max() + 1e-30
+        for a in range(4):
+            for b in range(a, 4):
+                xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+                xpp[QI + a] += eps; xpp[QI + b] += eps
+                xpm[QI + a] += eps; xpm[QI + b] -= eps
+                xmp[QI + a] -= eps; xmp[QI + b] += eps
+                xmm[QI + a] -= eps; xmm[QI + b] -= eps
+                fd = (f(xpp, o) - f(xpm, o) - f(xmp, o) + f(xmm, o)) / (4.0 * eps * eps)
+                rel = abs(block[a, b] - fd) / scale
+                assert rel < 1e-4, (
+                    f"{which} out={o} ({a},{b}): analytic={block[a,b]:.6e} "
+                    f"fd={fd:.6e} rel={rel:.2e}")
+
+
 # ============================================================================
 # TEST SECTION 13: Euler's equation - cross-product gyroscopic terms
 # ============================================================================
