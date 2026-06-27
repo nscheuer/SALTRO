@@ -15,10 +15,14 @@ Covers:
  - Finite-difference verification of Hessians against constraintJacobians()
 """
 
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
-import sys
-sys.path.insert(0, '/home/nic2703/SALTRO/build')
+
+ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(ROOT / "build"))
 import saltro_py
 
 
