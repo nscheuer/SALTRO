@@ -908,6 +908,34 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
         }
     }
 
+    // MTQ torque Hessian: τ_mtq = magvec × B_body = skew(magvec)·(R^T B_eci),
+    // magvec = Σ_i axis_i u_i. Linear in B_body, so only the d²(R^T B)/dq² term:
+    //   ∂²τ_l/∂q_j∂q_k = Σ_m skew(magvec)_{lm} · ∂²(R^T B)_m/∂q_j∂q_k
+    // (mirrors the residual-dipole block). Nonzero only when MTQs are commanding
+    // (u≠0); the previous code computed only the ∂²τ_mtq/∂u∂q mixed block, so the
+    // pure q-q term was missing for nonzero MTQ control.
+    if (num_mtq_ > 0 && B_eci.norm() > 1e-12) {
+        Vec3 magvec = Vec3::Zero();
+        for (int i = 0; i < num_mtq_; ++i) magvec += getMTQ(i).axis() * u(i);
+        if (magvec.norm() > 1e-15) {
+            const auto d2B_dq2 = saltro::math::ddrotmatTvecdqdq(q, B_eci);
+            const Mat33 skew_m = saltro::math::skewSymmetric(magvec);
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 4; ++j)
+                    for (int k = 0; k < 4; ++k) {
+                        double contrib = 0.0;
+                        for (int l = 0; l < 3; ++l) {
+                            double tau_hess_l = 0.0;
+                            for (int m = 0; m < 3; ++m)
+                                tau_hess_l += skew_m(l, m) * d2B_dq2[static_cast<size_t>(m)](j, k);
+                            contrib += invJcom_noRW_(i, l) * tau_hess_l;
+                        }
+                        if (std::isfinite(contrib))
+                            hess_xx.slice(AV_INDEX + i)(QUAT_INDEX + j, QUAT_INDEX + k) += contrib;
+                    }
+        }
+    }
+
 
     // =========================================================================
     // Quaternion Hessian: ∂²qdot_i/∂x_j∂x_k (indexed by output i = 0,1,2,3)

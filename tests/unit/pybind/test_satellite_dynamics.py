@@ -1277,6 +1277,53 @@ def test_qdot_hessian_matches_fd_at_non_identity_attitude(out_idx):
     assert err <= 1e-4 * (scale + 1.0), f"out_idx={out_idx}: max|analytic-FD| = {err:.3e} (scale {scale:.3e})"
 
 
+def test_mtq_hessian_wrt_q_matches_fd_at_nonzero_control():
+    """MTQ torque q-q Hessian at nonzero MTQ control, non-identity attitude.
+
+    tau_mtq = magvec x B_body (magvec = sum axis_i u_i), linear in B_body, so the
+    q-q Hessian is skew(magvec)*d2(R^T B)/dq2. It is zero only at u=0, so the
+    previous code (which computed only the d2/du dq mixed block) left it untested.
+    """
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    AV = saltro_py.Satellite.AV_INDEX
+    QI = saltro_py.Satellite.QUAT_INDEX
+    q = np.array([0.6, -0.3, 0.5, 0.2])
+    q = q / np.linalg.norm(q)
+    x = np.zeros(fixture.sat.stateDim)
+    x[AV:AV + 3] = np.array([0.05, 0.02, 0.01])
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+    u[0], u[1], u[2] = 0.15, -0.1, 0.08  # MTQ dipoles
+    dist = saltro_py.DisturbanceConfig()
+    R_eci = np.zeros(3)
+    B_eci = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+    S_eci = np.zeros(3)
+    V_eci = np.zeros(3)
+
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R_eci, B_eci, S_eci, V_eci)
+    eps = 1e-4
+
+    for o in [0, 1, 2]:
+        H = np.array(hess_xx[o])
+
+        def f(xx, o=o):
+            return fixture.sat.dynamics(xx, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[o]
+
+        block = H[QI:QI + 4, QI:QI + 4]
+        scale = np.abs(block).max() + 1e-30
+        for a in range(4):
+            for b in range(a, 4):
+                xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+                xpp[QI + a] += eps; xpp[QI + b] += eps
+                xpm[QI + a] += eps; xpm[QI + b] -= eps
+                xmp[QI + a] -= eps; xmp[QI + b] += eps
+                xmm[QI + a] -= eps; xmm[QI + b] -= eps
+                fd = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4.0 * eps * eps)
+                assert abs(block[a, b] - fd) < 1e-4 * scale + 1e-9, (
+                    f"out={o} ({a},{b}): analytic={block[a,b]:.6e} fd={fd:.6e}")
+
+
 def _rot_matrix(q):
     """Body->ECI rotation (Euler-Rodrigues) for a unit quaternion [w,x,y,z]."""
     w, x, y, z = q
