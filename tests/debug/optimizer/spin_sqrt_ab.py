@@ -8,13 +8,19 @@ afc=4 was removed by PR #53 (it equals afc=1 with the constant 2 absorbed
 into the angle weight), so this runs afc=1 with doubled angle weights —
 the documented migration, numerically identical cost.
 """
-import sys, os, time, json
+import sys, os, time, json, tempfile
 import importlib.util
+from pathlib import Path
 
-BUILD = "/Users/patrickmckeen/ADCS_wt/saltro-sqrt/build"
-GENADCS = "/Users/patrickmckeen/Documents/Generalized_ADCS"
-sys.path.insert(0, BUILD)            # saltro_py from the sqrt branch
-sys.path.insert(0, GENADCS)          # ADCS package
+# saltro_py: prefer an already-importable build (PYTHONPATH / installed), else
+# this repo's ./build. Override with the SALTRO_BUILD env var.
+BUILD = os.environ.get("SALTRO_BUILD", str(Path(__file__).resolve().parents[3] / "build"))
+sys.path.insert(0, BUILD)
+
+# The GenADCS scenario builders (generate_fig_spin.py) live OUTSIDE this repo,
+# in the Generalized_ADCS checkout. Point GENADCS at that checkout to run the
+# benchmark; otherwise skip gracefully (this is an optional debug driver).
+GENADCS = os.environ.get("GENADCS")
 
 import numpy as np
 import matplotlib
@@ -22,11 +28,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 import saltro_py
-assert saltro_py.__file__.startswith(BUILD), saltro_py.__file__
+
+_scenario = os.path.join(GENADCS, "papers/Planner/generate_fig_spin.py") if GENADCS else None
+if not _scenario or not os.path.exists(_scenario):
+    print("SKIP: set GENADCS to a Generalized_ADCS checkout to run this A/B "
+          "benchmark (needs papers/Planner/generate_fig_spin.py).")
+    sys.exit(0)
 
 # Import the real scenario file by path (its main() only runs under __main__).
-spec = importlib.util.spec_from_file_location(
-    "genfigspin", os.path.join(GENADCS, "papers/Planner/generate_fig_spin.py"))
+spec = importlib.util.spec_from_file_location("genfigspin", _scenario)
 gfs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gfs)
 
@@ -183,7 +193,7 @@ def run_case(tf, dt, prop, label, out, penalty_max=None, penalty_scale=None,
 
 
 if __name__ == "__main__":
-    out = "/tmp/sqrt_spin_ab"
+    out = os.environ.get("SQRT_AB_OUT", os.path.join(tempfile.gettempdir(), "sqrt_spin_ab"))
     cases = sys.argv[1:] or ["default", "hard", "highmu"]
     all_res = {}
     if "default" in cases:
