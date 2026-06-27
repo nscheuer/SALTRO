@@ -1229,6 +1229,54 @@ def test_hessian_wrt_state_matches_fd_at_non_identity_attitude(out_idx):
     )
 
 
+@pytest.mark.parametrize("out_idx", [3, 4, 5, 6])
+def test_qdot_hessian_matches_fd_at_non_identity_attitude(out_idx):
+    """q-dot (quaternion-output) Hessians at a non-identity quaternion.
+
+    q-dot = 0.5 W(q) w with q normalized internally. W is linear in q, so the
+    raw q-q Hessian is zero, but the normalization retraction term is not -- it
+    was previously left at zero (and these outputs were excluded from the FD
+    tests). Checks both the q-q and the q-w mixed blocks vs finite differences of
+    the renormalizing dynamics. Pure kinematics, so no disturbances are needed.
+    """
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    q = np.array([0.6, -0.3, 0.5, 0.2])
+    q = q / np.linalg.norm(q)
+    AV = saltro_py.Satellite.AV_INDEX
+    QI = saltro_py.Satellite.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[AV:AV + 3] = np.array([0.05, 0.02, 0.01])
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    R_eci, B_eci, S_eci, V_eci = (fixture.R[:, 50], fixture.B[:, 50],
+                                  fixture.S[:, 50], fixture.V[:, 50])
+
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R_eci, B_eci, S_eci, V_eci)
+    H = np.array(hess_xx[out_idx])
+
+    eps = 1e-4
+    idxs = list(range(AV, AV + 3)) + list(range(QI, QI + 4))
+
+    def f(xx):
+        return fixture.sat.dynamics(xx, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
+
+    scale = 0.0
+    err = 0.0
+    for a in idxs:
+        for b in idxs:
+            xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+            xpp[a] += eps; xpp[b] += eps
+            xpm[a] += eps; xpm[b] -= eps
+            xmp[a] -= eps; xmp[b] += eps
+            xmm[a] -= eps; xmm[b] -= eps
+            fd = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4.0 * eps * eps)
+            scale = max(scale, abs(fd))
+            err = max(err, abs(H[a, b] - fd))
+    assert err <= 1e-4 * (scale + 1.0), f"out_idx={out_idx}: max|analytic-FD| = {err:.3e} (scale {scale:.3e})"
+
+
 def _rot_matrix(q):
     """Body->ECI rotation (Euler-Rodrigues) for a unit quaternion [w,x,y,z]."""
     w, x, y, z = q

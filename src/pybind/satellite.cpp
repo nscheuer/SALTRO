@@ -1189,6 +1189,26 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
                 }
             }
         }
+
+        // q-dot outputs: q-dot_r = 0.5 (W(q) w)_r. W is linear in q so the raw
+        // q-q Hessian is zero, but the normalization retraction term is not. The
+        // unprojected q-gradient is g_r[a] = 0.5 * sum_k W_sign[r][k] w_k for
+        // a = W_qidx[r][k]. (The q-w mixed block is set above and projected by
+        // the block before this; only the q-q retraction term is missing.)
+        {
+            static const int    W_qidx[4][3] = {{1,2,3},{0,3,2},{3,0,1},{2,1,0}};
+            static const double W_sign[4][3] = {{-1,-1,-1},{+1,-1,+1},{+1,+1,-1},{-1,+1,+1}};
+            const Vec3 w = x.segment<3>(AV_INDEX);
+            for (int r = 0; r < 4; ++r) {
+                Vec4 gr = Vec4::Zero();
+                for (int kk = 0; kk < 3; ++kk)
+                    gr(W_qidx[r][kk]) += 0.5 * W_sign[r][kk] * w(kk);
+                const Mat44 Cr = curvature(gr);
+                for (int a = 0; a < 4; ++a)
+                    for (int c = 0; c < 4; ++c)
+                        hess_xx.slice(QUAT_INDEX + r)(QUAT_INDEX + a, QUAT_INDEX + c) += Cr(a, c);
+            }
+        }
     }
 
     return std::make_tuple(hess_xx, hess_ux, hess_uu);
