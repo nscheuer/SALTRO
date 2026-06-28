@@ -1400,6 +1400,74 @@ def test_disturbance_hessian_matches_fd_at_non_identity_with_geometry(which):
 
 
 # ============================================================================
+def test_qdot_output_hessian_matches_fd_at_non_identity():
+    """q-dot outputs (3-6): q-dot = 0.5 W(q) w. W is linear in q so the raw q-q
+    Hessian is zero, but the normalization retraction term is not. Verify the
+    q-q block vs finite differences at a non-identity attitude (these outputs
+    are excluded from the omega/h-dot FD test above)."""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    q = np.array([0.6, -0.3, 0.5, 0.2]); q = q / np.linalg.norm(q)
+    QI = saltro_py.Satellite.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = [0.05, 0.02, 0.01]
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    R, B, S, V = (fixture.R[:, 50], fixture.B[:, 50], fixture.S[:, 50], fixture.V[:, 50])
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R, B, S, V)
+
+    def f(xx, o):
+        return fixture.sat.dynamics(xx, u, dist, R, B, S, V, 0)[o]
+
+    eps = 1e-4
+    for o in range(QI, QI + 4):           # q-dot outputs
+        H = np.array(hess_xx[o])
+        for a in range(4):
+            for b in range(a, 4):
+                xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+                xpp[QI + a] += eps; xpp[QI + b] += eps
+                xpm[QI + a] += eps; xpm[QI + b] -= eps
+                xmp[QI + a] -= eps; xmp[QI + b] += eps
+                xmm[QI + a] -= eps; xmm[QI + b] -= eps
+                fd = (f(xpp, o) - f(xpm, o) - f(xmp, o) + f(xmm, o)) / (4.0 * eps * eps)
+                assert abs(H[QI + a, QI + b] - fd) < 1e-7, f"qdot o={o} ({a},{b})"
+
+
+def test_mtq_dynamics_hessian_matches_fd_at_non_identity_nonzero_control():
+    """MTQ torque depends on q (B_body) and is linear in u, so its omega-dot q-q
+    Hessian is nonzero only for u != 0 -- not exercised by the u=0 tests. Verify
+    at a non-identity attitude with nonzero MTQ control."""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    q = np.array([0.6, -0.3, 0.5, 0.2]); q = q / np.linalg.norm(q)
+    AV = saltro_py.Satellite.AV_INDEX; QI = saltro_py.Satellite.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[AV:AV + 3] = [0.05, 0.02, 0.01]
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+    u[:fixture.sat.numMTQ] = np.array([0.15, -0.1, 0.08])[:fixture.sat.numMTQ]
+    dist = saltro_py.DisturbanceConfig()   # isolate MTQ torque q-dependence
+    R, B, S, V = (fixture.R[:, 50], fixture.B[:, 50], fixture.S[:, 50], fixture.V[:, 50])
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R, B, S, V)
+
+    def f(xx, o):
+        return fixture.sat.dynamics(xx, u, dist, R, B, S, V, 0)[o]
+
+    eps = 1e-4
+    for o in range(3):                    # omega-dot outputs
+        H = np.array(hess_xx[o])
+        for a in range(4):
+            for b in range(a, 4):
+                xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+                xpp[QI + a] += eps; xpp[QI + b] += eps
+                xpm[QI + a] += eps; xpm[QI + b] -= eps
+                xmp[QI + a] -= eps; xmp[QI + b] += eps
+                xmm[QI + a] -= eps; xmm[QI + b] -= eps
+                fd = (f(xpp, o) - f(xpm, o) - f(xmp, o) + f(xmm, o)) / (4.0 * eps * eps)
+                assert abs(H[QI + a, QI + b] - fd) < 1e-7, f"mtq o={o} ({a},{b})"
+
+
 # TEST SECTION 13: Euler's equation - cross-product gyroscopic terms
 # ============================================================================
 

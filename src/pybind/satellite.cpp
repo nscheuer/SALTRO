@@ -1224,8 +1224,8 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
         // a = W_qidx[r][k]. (The q-w mixed block is set above and projected by
         // the block before this; only the q-q retraction term is missing.)
         {
-            static const int    W_qidx[4][3] = {{1,2,3},{0,3,2},{3,0,1},{2,1,0}};
-            static const double W_sign[4][3] = {{-1,-1,-1},{+1,-1,+1},{+1,+1,-1},{-1,+1,+1}};
+            // Reuse the W_qidx / W_sign encoding declared in the q-dot Jacobian
+            // block above (W[r,k] = W_sign[r][k] * q[W_qidx[r][k]]).
             const Vec3 w = x.segment<3>(AV_INDEX);
             for (int r = 0; r < 4; ++r) {
                 Vec4 gr = Vec4::Zero();
