@@ -103,21 +103,18 @@ def test_magic_dtorq_dbasestate_is_zero():
 # test_Magic.cpp -- once Tensor3 is bound to Python these tests will
 # light up. The C++ implementations are pinned to zero so this is
 # safe behaviour to defer.
-@pytest.mark.skip(reason="Tensor3<...> not yet bound to Python")
 def test_magic_ddtorq_dudu_is_zero():
     magic = saltro_py.Magic(valid_axis(), 0.1)
     H = np.asarray(magic.ddtorq_dudu(0.02, valid_base_state()))
     assert np.allclose(H, 0.0)
 
 
-@pytest.mark.skip(reason="Tensor3<1,7,3> not yet bound to Python")
 def test_magic_ddtorq_dudbasestate_is_zero():
     magic = saltro_py.Magic(valid_axis(), 0.1)
     H = np.asarray(magic.ddtorq_dudbasestate(0.02, valid_base_state()))
     assert np.allclose(H, 0.0)
 
 
-@pytest.mark.skip(reason="Tensor3<7,7,3> not yet bound to Python")
 def test_magic_ddtorq_dbasestatedbasestate_is_zero():
     magic = saltro_py.Magic(valid_axis(), 0.1)
     H = np.asarray(

@@ -4,6 +4,7 @@
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 
+#include "../tensor_py.h"  // Tensor3 type caster for ddtorq_* Hessian return types
 #include <saltro/pybind/actuators/MTQ.h>
 
 namespace py = pybind11;
