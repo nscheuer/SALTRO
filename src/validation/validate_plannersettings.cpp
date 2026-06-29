@@ -76,6 +76,12 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
+            // Validate per-pass disturbance override (mirrors the global check)
+            if (pass.override_disturbances && pass.disturbances.coeff_N < 0) {
+                error_msg = "pass disturbances.coeff_N invalid";
+                return false;
+            }
+
             // Validate cost configuration
             if (pass.cost.angle < 0.0 || !std::isfinite(pass.cost.angle)) {
                 error_msg = "cost.angle invalid";

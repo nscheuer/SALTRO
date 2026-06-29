@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 #include <saltro/limits.h>
 
-static constexpr int MAX_OUTER_PASSES = 2;
+static constexpr int MAX_OUTER_PASSES = 5;
 
 /**
  * @brief Initial trajectory configuration.
@@ -491,6 +491,15 @@ struct PassConfig {
     RegularizationConfig reg;
     LineSearchConfig linesearch;
     double dt = 1.0;
+
+    /// Per-pass disturbance override. When override_disturbances is true, this
+    /// pass uses `disturbances` instead of the global PlannerSettings.disturbances
+    /// -- letting a coarse-to-fine schedule stage disturbances on/off across
+    /// passes (e.g. pass 0 disturbance-free for fast convergence, pass 1 with
+    /// the full disturbance model for accuracy). Default false => inherit the
+    /// global disturbances (backward compatible).
+    bool override_disturbances = false;
+    DisturbanceConfig disturbances;
 };
 
 /**
