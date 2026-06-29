@@ -232,6 +232,8 @@ void runAndCheckCase(
 		jtime,
 		q_goal,
 		boresight,
+		Eigen::MatrixXd(0, 0),  // seed_X (empty -> controller warm-start)
+		Eigen::MatrixXd(0, 0),  // seed_U
 		X,
 		U,
 		K,

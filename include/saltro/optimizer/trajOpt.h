@@ -66,6 +66,13 @@ bool trajOpt(
 	const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 
+	// Optional warm-start seed (testing/iterate-and-refine). When seed_X/seed_U
+	// are non-empty they replace the controller rollout as the initial
+	// trajectory (zero-order-hold resampled to the solver's fixed-dt grid).
+	// Empty (0 cols) => default controller warm-start.
+	const Eigen::Ref<const Eigen::MatrixXd>& seed_X,
+	const Eigen::Ref<const Eigen::MatrixXd>& seed_U,
+
 	Eigen::Ref<Eigen::MatrixXd> X,
 	Eigen::Ref<Eigen::MatrixXd> U,
 	Eigen::Ref<Eigen::MatrixXd> K,

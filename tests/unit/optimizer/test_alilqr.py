@@ -365,3 +365,41 @@ def test_per_pass_disturbance_override_matches_global():
     assert np.linalg.norm(U_override_on - U_global_on) < 1e-9, "override does not match global"
     # ...and genuinely differs from the disturbance-free solve.
     assert np.linalg.norm(U_override_on - U_off) > 1e-6, "override had no effect"
+
+
+def _seed_setup():
+    s = create_planner_settings(10.0)
+    sat = create_satellite_rw(s)
+    jtime = np.array([0.22, 0.22 + 80.0 / SEC_PER_CENTURY])
+    qg = np.array([[np.sqrt(2)/2, np.sqrt(2)/2], [0, 0], [0, 0], [np.sqrt(2)/2, np.sqrt(2)/2]])
+    bs = np.array([[1.0, 1.0], [0.0, 0.0], [0.0, 0.0]])
+    x0 = np.hstack(([-0.01, 0.02, 0.03], [1.0, 0, 0, 0], [0.0, 0, 0]))
+    r0 = np.array([7000e3, 0.0, 0.0]); v0 = np.array([0.0, 7.5e3, 0.0])
+    return s, sat, (x0, r0, v0, jtime, qg, bs)
+
+
+def test_warm_start_reuse_seeds_the_solve():
+    """trajOpt can be seeded from a prior (X, U) instead of a controller rollout
+    (testing / iterate-and-refine). Seeding from the optimum round-trips back to
+    it; a coarse (zero-order-hold-resampled) seed still runs and -- crucially --
+    lands at a DIFFERENT converged trajectory than the optimal seed, proving the
+    seed genuinely steers the solve (the deterministic solver would give the same
+    result for every input if the seed were ignored)."""
+    s, sat, args = _seed_setup()
+    ok0, X0, U0, _ = saltro_py.trajOpt(s, sat, *args)
+    assert ok0
+
+    # Seed from the optimum -> converges right back to it.
+    ok1, X1, U1, _ = saltro_py.trajOpt(s, sat, *args, seed_X=X0, seed_U=U0)
+    assert ok1 and np.all(np.isfinite(X1))
+    assert np.linalg.norm(X1 - X0) < 1e-3
+
+    # Seed from a coarse half-resolution trajectory -> runs, valid, and the
+    # zero-order-hold resample produces a different converged result.
+    okc, Xc, Uc, _ = saltro_py.trajOpt(s, sat, *args, seed_X=X0[:, ::2], seed_U=U0[:, ::2])
+    assert okc and np.all(np.isfinite(Xc)) and Xc.shape == X0.shape
+    assert np.linalg.norm(X1 - Xc) > 1e-2          # different seeds -> different outcome
+
+    # Wrong-dimension seed is rejected.
+    with pytest.raises(Exception):
+        saltro_py.trajOpt(s, sat, *args, seed_X=np.zeros((3, 5)), seed_U=U0)

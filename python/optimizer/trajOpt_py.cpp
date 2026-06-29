@@ -19,7 +19,9 @@ py::tuple trajOpt_py(
 	const Eigen::Vector3d& v0,
 	const Eigen::Ref<const Eigen::VectorXd>& jtime,
 	const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
-	const Eigen::Ref<const Eigen::MatrixXd>& boresight
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& seed_X,
+	const Eigen::Ref<const Eigen::MatrixXd>& seed_U
 )
 {
 	const int N = static_cast<int>(jtime.size());
@@ -51,6 +53,8 @@ py::tuple trajOpt_py(
 		jtime,
 		q_goal,
 		boresight,
+		seed_X,
+		seed_U,
 		X,
 		U,
 		K,
@@ -84,6 +88,8 @@ void bind_trajOpt(py::module_& m)
 		py::arg("jtime"),
 		py::arg("q_goal"),
 		py::arg("boresight"),
+		py::arg("seed_X") = Eigen::MatrixXd(0, 0),
+		py::arg("seed_U") = Eigen::MatrixXd(0, 0),
 		R"doc(
 Run trajectory optimization.
 

@@ -188,6 +188,9 @@ bool trajOpt(
 	const Eigen::Ref<const Eigen::MatrixXd>& q_goal,
 	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
 
+	const Eigen::Ref<const Eigen::MatrixXd>& seed_X,
+	const Eigen::Ref<const Eigen::MatrixXd>& seed_U,
+
 	Eigen::Ref<Eigen::MatrixXd> X,
 	Eigen::Ref<Eigen::MatrixXd> U,
 	Eigen::Ref<Eigen::MatrixXd> K,
@@ -268,10 +271,39 @@ bool trajOpt(
 	};
 	settings_local.disturbances = pass_disturbances(0);
 
-	const bool warm_start_ok = warm_start(settings_local, satellite, x0, jtime_fixed.leftCols(N_fixed).transpose(), q_goal_fixed.leftCols(N_fixed), boresight_fixed.leftCols(N_fixed), N_fixed, R, V, B, S, rho, X, U);
+	if (seed_X.cols() > 0 || seed_U.cols() > 0) {
+		// Warm-start reuse: seed the initial trajectory from a prior (X, U)
+		// instead of a controller rollout. Zero-order-hold resample to the
+		// fixed-dt grid (so a seed at a different N/dt still works), and
+		// renormalize the seeded quaternions defensively.
+		if (seed_X.rows() != state_dim || seed_U.rows() != input_dim) {
+			throw std::runtime_error("trajOpt seed has wrong row dimension");
+		}
+		if (seed_X.cols() < 1 || seed_U.cols() < 1) {
+			throw std::runtime_error("trajOpt seed must have at least one column");
+		}
+		const int nsx = static_cast<int>(seed_X.cols());
+		const int nsu = static_cast<int>(seed_U.cols());
+		for (int i = 0; i < N_fixed; ++i) {
+			const double frac = (N_fixed > 1) ? static_cast<double>(i) / (N_fixed - 1) : 0.0;
+			const int sx = std::min(nsx - 1, static_cast<int>(std::lround(frac * (nsx - 1))));
+			const int su = std::min(nsu - 1, static_cast<int>(std::lround(frac * (nsu - 1))));
+			X.col(i) = seed_X.col(sx);
+			U.col(i) = seed_U.col(su);
+			Eigen::Vector4d q = X.col(i).segment<4>(Satellite::QUAT_INDEX);
+			const double qn = q.norm();
+			if (qn > 1e-12) {
+				X.col(i).segment<4>(Satellite::QUAT_INDEX) = q / qn;
+			}
+		}
+		// x0 still anchors the first knot exactly.
+		X.col(0).head(state_dim) = x0;
+	} else {
+		const bool warm_start_ok = warm_start(settings_local, satellite, x0, jtime_fixed.leftCols(N_fixed).transpose(), q_goal_fixed.leftCols(N_fixed), boresight_fixed.leftCols(N_fixed), N_fixed, R, V, B, S, rho, X, U);
 
-	if (!warm_start_ok) {
-		throw std::runtime_error("trajOpt failed to warm-start trajectory");
+		if (!warm_start_ok) {
+			throw std::runtime_error("trajOpt failed to warm-start trajectory");
+		}
 	}
 
 	for (int pass_idx = 0; pass_idx < settings_local.num_passes; ++pass_idx) {
