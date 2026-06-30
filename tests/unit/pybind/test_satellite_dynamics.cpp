@@ -956,6 +956,66 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Generic disturbance state Jacobian m
     }
 }
 
+TEST_CASE_METHOD(SatelliteDynamicsFixture,
+                 "Disturbance-torque Jacobian (jac_dist) matches finite differences",
+                 "[jacobians][finite-diff][disturbance]") {
+    // The third Jacobian from dynamicsJacobians is ∂f/∂τ_dist: an additive
+    // body-frame disturbance torque enters only the angular-velocity equation
+    // through the inverse inertia, so its angular-velocity block equals
+    // ∂wdot/∂τ and the attitude / RW-momentum blocks are zero. Validate against
+    // a finite difference of the dynamics w.r.t. an injected disturbance torque
+    // (gendist_torque). Feeds the disturbance-aware TVLQR (eq. 7.40).
+    const int step = 50;
+    const Eigen::Vector3d R_eci = R.col(step);
+    const Eigen::Vector3d B_eci = B.col(step);
+    const Eigen::Vector3d S_eci = S.col(step);
+    const Eigen::Vector3d V_eci = V.col(step);
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    if (sat.controlDim() > 0) u(0) = 0.05;
+
+    DisturbanceConfig dist;
+    auto [jac_x, jac_u, jac_dist] = sat.dynamicsJacobians(x, u, dist, R_eci, B_eci, S_eci, V_eci);
+    REQUIRE(jac_dist.rows() == sat.stateDim());
+    REQUIRE(jac_dist.cols() == 3);
+    REQUIRE(jac_dist.allFinite());
+
+    const double eps = 1e-3;
+    Satellite::MatX jac_dist_numerical = Satellite::MatX::Zero(sat.stateDim(), 3);
+    for (int i = 0; i < 3; ++i) {
+        DisturbanceConfig dp;
+        dp.plan_for_gendist = true;
+        Eigen::Vector3d tp = Eigen::Vector3d::Zero();
+        tp(i) = eps;
+        dp.gendist_torque = tp;
+        DisturbanceConfig dm;
+        dm.plan_for_gendist = true;
+        Eigen::Vector3d tm = Eigen::Vector3d::Zero();
+        tm(i) = -eps;
+        dm.gendist_torque = tm;
+        const Satellite::VecX f_plus = sat.dynamics(x, u, dp, R_eci, B_eci, S_eci, V_eci, 0);
+        const Satellite::VecX f_minus = sat.dynamics(x, u, dm, R_eci, B_eci, S_eci, V_eci, 0);
+        jac_dist_numerical.col(i) = (f_plus - f_minus) / (2.0 * eps);
+    }
+
+    // Angular-velocity block (the dominant, physically-primary term) matches
+    // the finite difference exactly.
+    REQUIRE((jac_dist.block(Satellite::AV_INDEX, 0, 3, 3)
+             - jac_dist_numerical.block(Satellite::AV_INDEX, 0, 3, 3))
+                .cwiseAbs().maxCoeff() < 1e-6);
+    REQUIRE(jac_dist.block(Satellite::AV_INDEX, 0, 3, 3).norm() > 1e-9);
+    // jac_dist models only that block; attitude / RW-momentum are zero. The true
+    // leakage into those blocks (a wheel-momentum coupling) is several orders
+    // below the angular-velocity term and is intentionally omitted; the check
+    // below bounds it at <1e-3 of that term.
+    REQUIRE(jac_dist.bottomRows(sat.stateDim() - 3).cwiseAbs().maxCoeff() < 1e-12);
+    const double av_scale = jac_dist_numerical.block(Satellite::AV_INDEX, 0, 3, 3).cwiseAbs().maxCoeff();
+    REQUIRE(jac_dist_numerical.bottomRows(sat.stateDim() - 3).cwiseAbs().maxCoeff() < 1e-3 * av_scale);
+}
+
 // ============================================================================
 // TEST SECTION 11: Dynamics Hessians - Dimensions and Basic Checks
 // ============================================================================

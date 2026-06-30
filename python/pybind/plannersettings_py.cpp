@@ -125,7 +125,8 @@ void bind_plannersettings(py::module_& m) {
         .def(py::init<>())
         .def_readwrite("dt_tvlqr", &TVLQRSettings::dt_tvlqr)
         .def_readwrite("tvlqr_len", &TVLQRSettings::tvlqr_len)
-        .def_readwrite("tvlqr_overlap", &TVLQRSettings::tvlqr_overlap);
+        .def_readwrite("tvlqr_overlap", &TVLQRSettings::tvlqr_overlap)
+        .def_readwrite("disturbance_aware", &TVLQRSettings::disturbance_aware);
 
     py::class_<PlannerSettings>(m, "PlannerSettings")
         .def(py::init<>())

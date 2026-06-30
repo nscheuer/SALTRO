@@ -32,6 +32,11 @@ static std::vector<Eigen::MatrixXd> compute_gains_chunked(
 ) {
 	const int total_gain_steps = std::max(0, static_cast<int>(X.cols()) - 1);
 	const int n_red = satellite.reducedStateDim();
+	// Disturbance-aware (eq. 7.40): each stitched gain becomes [K_x | K_τ] of
+	// width n_red + 3 (the extra 3 columns feed back the disturbance-torque
+	// error). Default off => plain n_red-wide reduced-state gains.
+	const bool dist_aware = settings.tvlqr.disturbance_aware;
+	const int gain_w = dist_aware ? n_red + 3 : n_red;
 	if (total_gain_steps == 0) {
 		return {};
 	}
@@ -56,9 +61,13 @@ static std::vector<Eigen::MatrixXd> compute_gains_chunked(
 
 		std::vector<Eigen::MatrixXd> K_chunk(static_cast<size_t>(chunk_gain_steps));
 		std::vector<Eigen::VectorXd> d_chunk(static_cast<size_t>(chunk_gain_steps));
+		std::vector<Eigen::MatrixXd> K_dist_chunk(static_cast<size_t>(dist_aware ? chunk_gain_steps : 0));
 		for (int k = 0; k < chunk_gain_steps; ++k) {
 			K_chunk[static_cast<size_t>(k)] = Eigen::MatrixXd::Zero(input_dim, n_red);
 			d_chunk[static_cast<size_t>(k)] = Eigen::VectorXd::Zero(input_dim);
+		}
+		for (int k = 0; dist_aware && k < chunk_gain_steps; ++k) {
+			K_dist_chunk[static_cast<size_t>(k)] = Eigen::MatrixXd::Zero(input_dim, 3);
 		}
 
 		Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
@@ -82,7 +91,10 @@ static std::vector<Eigen::MatrixXd> compute_gains_chunked(
 				reg,
 				K_chunk,
 				d_chunk,
-				deltaV
+				deltaV,
+				std::vector<Eigen::VectorXd>{},
+				std::vector<Eigen::VectorXd>{},
+				dist_aware ? &K_dist_chunk : nullptr
 			);
 			if (bp_ok) {
 				break;
@@ -92,14 +104,30 @@ static std::vector<Eigen::MatrixXd> compute_gains_chunked(
 
 		if (!bp_ok) {
 			K_chunk.assign(static_cast<size_t>(chunk_gain_steps), Eigen::MatrixXd::Zero(input_dim, n_red));
+			if (dist_aware) {
+				K_dist_chunk.assign(static_cast<size_t>(chunk_gain_steps), Eigen::MatrixXd::Zero(input_dim, 3));
+			}
+		}
+
+		// Assemble per-step blocks: [K_x | K_τ] when disturbance-aware, else K_x.
+		std::vector<Eigen::MatrixXd> blocks_chunk(static_cast<size_t>(chunk_gain_steps));
+		for (int k = 0; k < chunk_gain_steps; ++k) {
+			if (dist_aware) {
+				Eigen::MatrixXd aug(input_dim, gain_w);
+				aug.leftCols(n_red) = K_chunk[static_cast<size_t>(k)];
+				aug.rightCols(3) = K_dist_chunk[static_cast<size_t>(k)];
+				blocks_chunk[static_cast<size_t>(k)] = aug;
+			} else {
+				blocks_chunk[static_cast<size_t>(k)] = K_chunk[static_cast<size_t>(k)];
+			}
 		}
 
 		if (K_stitched.empty()) {
-			K_stitched.insert(K_stitched.end(), K_chunk.begin(), K_chunk.end());
+			K_stitched.insert(K_stitched.end(), blocks_chunk.begin(), blocks_chunk.end());
 		} else {
 			const int drop = std::min(overlap_steps, static_cast<int>(K_stitched.size()));
 			K_stitched.resize(static_cast<size_t>(static_cast<int>(K_stitched.size()) - drop));
-			K_stitched.insert(K_stitched.end(), K_chunk.begin(), K_chunk.end());
+			K_stitched.insert(K_stitched.end(), blocks_chunk.begin(), blocks_chunk.end());
 		}
 
 		int next_start = end_k + 1 - overlap_steps;
@@ -113,7 +141,7 @@ static std::vector<Eigen::MatrixXd> compute_gains_chunked(
 		K_stitched.resize(static_cast<size_t>(total_gain_steps));
 	}
 	if (static_cast<int>(K_stitched.size()) < total_gain_steps) {
-		K_stitched.resize(static_cast<size_t>(total_gain_steps), Eigen::MatrixXd::Zero(input_dim, n_red));
+		K_stitched.resize(static_cast<size_t>(total_gain_steps), Eigen::MatrixXd::Zero(input_dim, gain_w));
 	}
 
 	return K_stitched;
@@ -481,13 +509,15 @@ bool trajOpt(
 		);
 
 		const int n_red = satellite.reducedStateDim();
+		// Per-step gain width: n_red, or n_red+3 when disturbance-aware ([K_x|K_τ]).
+		const int gain_w = settings_local.tvlqr.disturbance_aware ? n_red + 3 : n_red;
 		const int gain_count = std::min(N_tracking - 1, static_cast<int>(K_gains.size()));
 		for (int k = 0; k < gain_count; ++k) {
-			const int col0 = k * n_red;
-			if (col0 + n_red > K.cols()) {
+			const int col0 = k * gain_w;
+			if (col0 + gain_w > K.cols()) {
 				break;
 			}
-			K.middleCols(col0, n_red) = K_gains[static_cast<size_t>(k)];
+			K.middleCols(col0, gain_w) = K_gains[static_cast<size_t>(k)];
 		}
 
 		N_fixed = N_tracking;

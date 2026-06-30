@@ -1608,39 +1608,59 @@ def test_quaternion_stays_normalized_with_nonzero_rw_momentum():
 # TEST SECTION 15: Disturbance-input Jacobian (∂f/∂τ_dist)
 # ============================================================================
 
-def test_third_jacobian_block_is_currently_unused_and_returned_as_zero():
-    """The third Jacobian returned by dynamicsJacobians is reserved for
-    ∂f/∂τ_dist but is not wired up — the C++ implementation allocates
-    and zeros it, then never writes to it (`C_unused` in
-    backwardpass.cpp). Pin that contract: if a future change starts
-    populating jac_dist without auditing the optimizer integration,
-    this test will flag it.
+def test_third_jacobian_is_disturbance_torque_sensitivity():
+    """The third Jacobian returned by dynamicsJacobians is ∂f/∂τ_dist: the
+    sensitivity of the state derivative to an additive (body-frame)
+    disturbance torque. The torque enters only the angular-velocity equation
+    via the inverse inertia (wdot = invJ·(tau_act + tau_dist − …)), so the
+    angular-velocity block equals ∂wdot/∂τ and the quaternion / RW-momentum
+    blocks are zero. Validated against a finite difference of the dynamics
+    w.r.t. an injected disturbance torque (gendist_torque). This Jacobian feeds
+    the disturbance-aware TVLQR (McKeen 2025, eq. 7.40).
     """
     fixture = TestSatelliteDynamicsFixture()
     fixture.setup_method()
 
     step = 50
+    sat = fixture.sat
+    AV = saltro_py.Satellite.AV_INDEX
+    R, B, S, V = (fixture.R[:, step], fixture.B[:, step],
+                  fixture.S[:, step], fixture.V[:, step])
 
-    x = np.zeros(fixture.sat.stateDim)
-    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x = np.zeros(sat.stateDim)
+    x[AV:AV + 3] = np.array([0.05, 0.02, 0.01])
     x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = np.array([1, 0, 0, 0])
-
-    u = np.zeros(fixture.sat.controlDim)
+    u = np.zeros(sat.controlDim)
     u[0] = 0.05
 
-    dist = saltro_py.DisturbanceConfig()
-    dist.plan_for_gg = True
-    dist.plan_for_aero = True
-    dist.plan_for_srp = True
+    _, _, jac_dist = sat.dynamicsJacobians(x, u, saltro_py.DisturbanceConfig(), R, B, S, V)
+    assert jac_dist.shape == (sat.stateDim, 3)
+    assert np.all(np.isfinite(jac_dist))
 
-    _, _, jac_dist = fixture.sat.dynamicsJacobians(
-        x, u, dist, fixture.R[:, step], fixture.B[:, step], fixture.S[:, step], fixture.V[:, step]
-    )
+    # Finite-difference ∂f/∂τ by injecting a constant body torque via gendist.
+    def f_with_torque(i, sign):
+        d = saltro_py.DisturbanceConfig()
+        d.plan_for_gendist = True
+        t = np.zeros(3)
+        t[i] = sign * 1e-3
+        d.gendist_torque = t
+        return np.array(sat.dynamics(x, u, d, R, B, S, V, 0))
 
-    assert jac_dist.shape == (fixture.sat.stateDim, 3)
-    assert np.allclose(jac_dist, 0.0, atol=0.0), (
-        "third Jacobian is documented as unused — should be exactly zero"
-    )
+    fd = np.zeros((sat.stateDim, 3))
+    for i in range(3):
+        fd[:, i] = (f_with_torque(i, +1) - f_with_torque(i, -1)) / 2e-3
+
+    # Angular-velocity block (the dominant, physically-primary term) must match
+    # the finite difference exactly.
+    assert np.allclose(jac_dist[AV:AV + 3, :], fd[AV:AV + 3, :], atol=1e-6)
+    assert np.linalg.norm(jac_dist[AV:AV + 3, :]) > 1e-9
+    # jac_dist models only that block; attitude and RW-momentum are zero. The
+    # true leakage into those blocks (a wheel-momentum coupling) is several
+    # orders below the angular-velocity term and is intentionally omitted; the
+    # check below bounds it at <1e-3 of that term.
+    assert np.allclose(jac_dist[AV + 3:, :], 0.0, atol=1e-12)
+    av_scale = np.max(np.abs(fd[AV:AV + 3, :]))
+    assert np.max(np.abs(fd[AV + 3:, :])) < 1e-3 * av_scale
 
 
 # ============================================================================

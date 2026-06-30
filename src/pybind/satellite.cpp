@@ -526,6 +526,15 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::dynamic
 
     // Apply accumulated quaternion derivatives to Jacobian
     jac_x.block<3, 4>(AV_INDEX, QUAT_INDEX) = invJcom_noRW_ * dwdot_dq;
+
+    // ∂wdot/∂τ_dist: an additive (body-frame) disturbance torque enters the
+    // dynamics through the inverse inertia, wdot = invJcom_noRW_·(tau_act +
+    // tau_dist − w×(Jcom·w + h_rw)), so the Jacobian of the state derivative
+    // w.r.t. the disturbance-torque error is invJcom_noRW_ in the angular-
+    // velocity block (and zero elsewhere). This is the D = ∂f/∂τ used by the
+    // disturbance-aware TVLQR (McKeen 2025, eq. 7.40); every other caller
+    // ignores jac_dist, so populating it here is otherwise inert.
+    jac_dist.block<3, 3>(AV_INDEX, 0) = invJcom_noRW_;
     
     // ∂wdot/∂h: from gyroscopic term -(w × h_rw) where h_rw = sum(h_i * axis_i)
     if (num_rw_ > 0) {

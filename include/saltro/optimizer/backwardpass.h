@@ -53,7 +53,8 @@ bool backwardPass(
 	std::vector<Eigen::VectorXd>& d,
 	Eigen::Ref<Eigen::Vector2d> deltaV,
 	const std::vector<Eigen::VectorXd>& lambda_aug,
-	const std::vector<Eigen::VectorXd>& mu_aug
+	const std::vector<Eigen::VectorXd>& mu_aug,
+	std::vector<Eigen::MatrixXd>* K_dist = nullptr
 );
 
 /**

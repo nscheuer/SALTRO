@@ -93,7 +93,8 @@ bool backwardPass(
 	std::vector<Eigen::VectorXd>& d,
 	Eigen::Ref<Eigen::Vector2d> deltaV,
 	const std::vector<Eigen::VectorXd>& lambda_aug,
-	const std::vector<Eigen::VectorXd>& mu_aug
+	const std::vector<Eigen::VectorXd>& mu_aug,
+	std::vector<Eigen::MatrixXd>* K_dist
 ) {
 	if (settings.passes[0].reg.use_sqrt_bp) {
 		// backwardPassSqrt is Gauss-Newton only: it has no DDP second-order
@@ -200,7 +201,18 @@ bool backwardPass(
 	// config here makes A_k/B_k disagree with the actual rollout whenever any
 	// plan_for_* flag is on, biasing the expected-decrease prediction.
 	const DisturbanceConfig& dist_config = settings.disturbances;
-	
+
+	// Disturbance-aware (eq. 7.40) TVLQR: when K_dist is requested, also build a
+	// feedback gain on the disturbance-torque error δτ. We augment the value
+	// function with a constant-δτ channel; Sxd is its δx–δτ coupling block
+	// (P̃_xτ), seeded at zero at the terminal knot. K_x, P_k, p_k and the
+	// feedforward d are left untouched (the δτ channel has no control authority
+	// and is unpenalized, so the state recursion is unchanged).
+	Eigen::MatrixXd Sxd;
+	if (K_dist != nullptr) {
+		Sxd = Eigen::MatrixXd::Zero(satellite.reducedStateDim(), 3);
+	}
+
 	// Backward loop: k from N-2 down to 0
 	for (int k = N - 2; k >= 0; --k) {
 		// Extract trajectory data at time k
@@ -484,11 +496,68 @@ bool backwardPass(
 			return false;
 		}
 
+		// Capture the incoming cost-to-go Hessian P_{k+1} before solveRiccattiStep
+		// overwrites P_k with the step-k value (needed for the δτ recursion).
+		Eigen::MatrixXd P_kp1_dist;
+		if (K_dist != nullptr) {
+			P_kp1_dist = P_k;
+		}
+
 		solveRiccattiStep(Q_uu_reg, Q_uu, Q_u, Q_ux, Q_xx, Q_x, k, K, d, deltaV, p_k, P_k);
 
 		if (!K[k].allFinite() || !d[k].allFinite() || !P_k.allFinite()) {
 			SALTRO_OPT_DLOG("[BP] FAIL k=" << k << " non-finite gains or value function");
 			return false;
+		}
+
+		if (K_dist != nullptr) {
+			// RK4-exact discrete disturbance Jacobian D = ∂x_{k+1}/∂τ, reduced.
+			// The (body-frame) disturbance torque enters the dynamics exactly
+			// like an additive control torque, so we propagate its continuous
+			// input Jacobian (jac_dist = ∂f/∂τ) through RK4 the same way the
+			// control Jacobian B is formed: append 3 dummy "disturbance controls"
+			// whose B-column is jac_dist and reuse rk4_jacobians. (A first-order
+			// dt·G·jac_dist form omits the attitude coupling, which over a full
+			// step is large — the disturbance perturbs ω, which integrates into
+			// q through the ∂q̇/∂ω kinematics carried by A_c.)
+			const int nu_aug = nu + 3;
+			Eigen::VectorXd u_aug = Eigen::VectorXd::Zero(nu_aug);
+			u_aug.head(nu) = u_k;
+			auto dist_jac_wrapper = [&](double /*t*/,
+			                            const Eigen::Ref<const Eigen::VectorXd>& x_local,
+			                            const Eigen::Ref<const Eigen::VectorXd>& u_local,
+			                            Eigen::Ref<Eigen::MatrixXd> A_c_out,
+			                            Eigen::Ref<Eigen::MatrixXd> B_c_out,
+			                            Eigen::Ref<Eigen::VectorXd> k_out) {
+				const Eigen::VectorXd u_real = u_local.head(nu);
+				auto [A_c, B_c, jac_dist_c] =
+					satellite.dynamicsJacobians(x_local, u_real, dist_config, R_k, B_k, S_k, V_k);
+				A_c_out = A_c;
+				B_c_out.leftCols(nu) = B_c;
+				B_c_out.rightCols(3) = jac_dist_c;
+				k_out = satellite.dynamics(x_local, u_real, dist_config, R_k, B_k, S_k, V_k, 0);
+			};
+			Eigen::MatrixXd A_aug_full = Eigen::MatrixXd::Zero(nx, nx);
+			Eigen::MatrixXd BD_full = Eigen::MatrixXd::Zero(nx, nu_aug);
+			rk4_jacobians(dist_jac_wrapper, x_k, u_aug, 0.0, dt, A_aug_full, BD_full);
+			const Eigen::MatrixXd D_k = G_kp1 * BD_full.rightCols(3);   // (nxr × 3)
+
+			// Augmented Riccati on [δx; δτ] with δτ_{k+1}=δτ, reusing the SAME
+			// gain / value-update form as solveRiccattiStep:
+			//   K_τ = -(Q_uu+ρI)^{-1} Bᵀ(P D + Sxd)
+			//   Sxd ← Aᵀ(P D + Sxd) + K_xᵀQ_uu K_τ + K_xᵀQ_uτ + Q_uxᵀK_τ
+			const Eigen::MatrixXd PD_S = P_kp1_dist * D_k + Sxd;        // (nxr × 3)
+			const Eigen::MatrixXd Q_utau = B_k_dyn.transpose() * PD_S;  // (nu  × 3)
+			const Eigen::MatrixXd K_tau = -Eigen::LLT<Eigen::MatrixXd>(Q_uu_reg).solve(Q_utau);
+			if (!K_tau.allFinite()) {
+				SALTRO_OPT_DLOG("[BP] FAIL k=" << k << " non-finite disturbance gain");
+				return false;
+			}
+			(*K_dist)[static_cast<std::size_t>(k)] = K_tau;
+			Sxd = A_k.transpose() * PD_S
+				+ K[k].transpose() * Q_uu * K_tau
+				+ K[k].transpose() * Q_utau
+				+ Q_ux.transpose() * K_tau;
 		}
 		SALTRO_OPT_DLOG("[BP] k=" << k << " reg=" << reg << " ||d||=" << d[k].norm());
 	}
