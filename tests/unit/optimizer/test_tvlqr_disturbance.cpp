@@ -5,6 +5,7 @@
 // [K_x | K_tau] of width reducedStateDim + 3. K_x is unchanged; K_tau feeds back
 // the disturbance-torque error. See the .py twin for the full rationale.
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cmath>
 #include <utility>
@@ -217,8 +218,7 @@ TEST_CASE("disturbance-aware TVLQR gains are deterministic",
 	REQUIRE((a.K - b.K).cwiseAbs().maxCoeff() == 0.0);
 }
 
-TEST_CASE("disturbance feedback improves tracking under a changing disturbance "
-          "(and is a no-op when it matches the plan)",
+TEST_CASE("disturbance feedback improves tracking under a changing disturbance",
           "[optimizer][tvlqr][disturbance]") {
 	const double dt = 10.0;
 	const double tf = 600.0;  // longer horizon so the sustained disturbance matters
@@ -254,15 +254,43 @@ TEST_CASE("disturbance feedback improves tracking under a changing disturbance "
 	// margins (ratios well below 1); the realized improvement is comfortably larger.
 	REQUIRE(rms_da < 0.9 * rms_so);
 	REQUIRE(peak_da < 0.92 * peak_so);
+}
 
-	// No mismatch (real == planned) => the mismatch torque is the exact zero
-	// vector, so the disturbance feedforward adds exactly 0 and the closed loop is
-	// bit-identical to state feedback alone. Assert exact equality (the .py twin
-	// uses rel=1e-9; here the values are byte-for-byte equal).
-	const auto [rms_so0, peak_so0] =
+TEST_CASE("disturbance feedback is a no-op when the disturbance matches the plan",
+          "[optimizer][tvlqr][disturbance]") {
+	// Twin of test_disturbance_feedback_is_a_noop_when_the_disturbance_matches
+	// _the_plan (.py). When the real dipole equals the planned one, the mismatch
+	// tau_est - tau_exp is identically zero, so the disturbance feedforward
+	// contributes nothing and the closed loop is bit-identical to state feedback
+	// alone -- no penalty for enabling the feature when the plan is right.
+	const double dt = 10.0;
+	const double tf = 600.0;
+	const Eigen::Vector3d m_plan(1.0, 0.6, -0.8);
+
+	const PlannerSettings settings = makeSettings(dt, true, true, m_plan);  // plan WITH disturbance
+	Satellite sat(rwInertia(), settings);
+	configureRW(sat);
+
+	const Solve r = solveRW(settings, tf);
+	REQUIRE(r.ok);
+
+	const Eigen::Vector3d r0(7000e3, 0.0, 0.0), v0(0.0, 7.5e3, 0.0);
+	ScalarRow jtime_full;
+	jtime_full.setZero();
+	for (int k = 0; k < r.N; ++k) jtime_full(0, k) = 0.22 + k * (dt / SEC_PER_CENTURY);
+	OrbitCols R, V, B, S;
+	ScalarRow rho;
+	R.setZero(); V.setZero(); B.setZero(); S.setZero(); rho.setZero();
+	REQUIRE(orbits::generate_orbit(r0, v0, jtime_full, r.N, 0, 0, 0, 0, 0, R, V, B, S, rho));
+
+	// No mismatch: the real dipole stays at the planned value (zero drift).
+	const auto [rms_so, peak_so] =
 		driftRollout(sat, r, R, V, B, S, rho, m_plan, Eigen::Vector3d::Zero(), dt, false);
-	const auto [rms_da0, peak_da0] =
+	const auto [rms_da, peak_da] =
 		driftRollout(sat, r, R, V, B, S, rho, m_plan, Eigen::Vector3d::Zero(), dt, true);
-	REQUIRE(rms_da0 == rms_so0);
-	REQUIRE(peak_da0 == peak_so0);
+	// Same tolerance as the .py twin: pytest.approx(rel=1e-9, abs=1e-12).
+	using Catch::Matchers::WithinAbs;
+	using Catch::Matchers::WithinRel;
+	REQUIRE_THAT(rms_da, WithinRel(rms_so, 1e-9) || WithinAbs(rms_so, 1e-12));
+	REQUIRE_THAT(peak_da, WithinRel(peak_so, 1e-9) || WithinAbs(peak_so, 1e-12));
 }
