@@ -422,8 +422,8 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Jacobian with different cost functi
     Eigen::Vector4d eci_target(1, 0, 0, 0);
     Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
     
-    // Test different cost function types
-    for (int cost_type = 0; cost_type < 5; ++cost_type) {
+    // Test different cost function types (implemented set: {0, 1, 2, 3})
+    for (int cost_type = 0; cost_type < 4; ++cost_type) {
         CostConfig cost_cfg;
         cost_cfg.ang_cost_func_type = cost_type;
         
@@ -1580,12 +1580,12 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     
     // Configure cost to include all attitude terms
     CostConfig cost_cfg;
-    cost_cfg.angle = 1e2;
+    cost_cfg.angle = 2e2;  // doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
     cost_cfg.ang_vel = 1e3;
     cost_cfg.ang_vel_mag = 1e2;
     cost_cfg.ang_vel_err_dir = 1e2;
     cost_cfg.control_mult = 0.1;
-    cost_cfg.ang_cost_func_type = 4;  // 1 - |q·q_goal|^2
+    cost_cfg.ang_cost_func_type = 1;  // 0.5 * (1 - |q·q_goal|)^2
     
     Eigen::Vector3d boresight(0.9, 0.2, 0.1);
     boresight.normalize();
@@ -1623,11 +1623,11 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     
     // Configure cost
     CostConfig cost_cfg;
-    cost_cfg.angle = 1e2;
+    cost_cfg.angle = 2e2;  // doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
     cost_cfg.ang_vel = 1e3;
     cost_cfg.control_mult = 0.1;
-    cost_cfg.ang_cost_func_type = 4;
-    
+    cost_cfg.ang_cost_func_type = 1;
+
     Eigen::Vector3d boresight(0.9, 0.2, 0.1);
     boresight.normalize();
     Eigen::Vector4d attitude_target(1.0, 0.0, 0.0, 0.0);
@@ -1672,8 +1672,8 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     
     // Cost configuration with angle cost enabled (this was causing the bug)
     CostConfig cost_cfg;
-    cost_cfg.angle = 1e2;
-    cost_cfg.angle_N = 1e2;
+    cost_cfg.angle = 2e2;    // doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
+    cost_cfg.angle_N = 2e2;  // doubled (see above)
     cost_cfg.ang_vel = 1e4;
     cost_cfg.ang_vel_N = 1e4;
     cost_cfg.ang_vel_mag = 5e1;
@@ -1681,7 +1681,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     cost_cfg.control_mult = 0.01;
     cost_cfg.mtq_control_weight = 1.0;
     cost_cfg.rw_control_weight = 1e3;
-    cost_cfg.ang_cost_func_type = 4;  // 1 - |qdot|^2
+    cost_cfg.ang_cost_func_type = 1;  // 0.5 * (1 - |qdot|)^2
     
     Eigen::Vector3d boresight(1.0, 0.0, 0.0);
     Eigen::Vector4d attitude_target(1.0, 0.0, 0.0, 0.0);
@@ -1726,12 +1726,12 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     
     // Cost configuration with angle cost enabled
     CostConfig cost_cfg;
-    cost_cfg.angle = 1e2;
+    cost_cfg.angle = 2e2;  // doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
     cost_cfg.ang_vel = 1e4;
     cost_cfg.control_mult = 0.01;
     cost_cfg.mtq_control_weight = 1.0;
     cost_cfg.rw_control_weight = 1e3;
-    cost_cfg.ang_cost_func_type = 4;
+    cost_cfg.ang_cost_func_type = 1;
     cost_cfg.use_cost_hess = true;
     
     Eigen::Vector3d boresight(1.0, 0.0, 0.0);
@@ -1791,12 +1791,12 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     
     // Cost with angle cost enabled (this was failing before the fix)
     CostConfig cost_cfg;
-    cost_cfg.angle = 1e2;  // Non-zero angle cost
+    cost_cfg.angle = 2e2;  // Non-zero angle cost (doubled: type 4 removed -> type 1)
     cost_cfg.ang_vel = 1e4;
     cost_cfg.control_mult = 0.01;
     cost_cfg.mtq_control_weight = 1.0;
     cost_cfg.rw_control_weight = 1e3;
-    cost_cfg.ang_cost_func_type = 4;
+    cost_cfg.ang_cost_func_type = 1;
     
     // Environment vectors
     Eigen::MatrixXd B_hist = Eigen::MatrixXd::Zero(3, N);

@@ -16,7 +16,7 @@ def _augmented_penalty_total(
     lambda_aug: list[np.ndarray] | None,
     mu_aug: list[np.ndarray] | None,
 ) -> float:
-    """Compute Σ_k [lambda_k^T c_k^+ + 0.5 * c_k^{+T} diag(mu_k) c_k^+]."""
+    """Match the C++ AL merit exactly for line-search seeding."""
     if lambda_aug is None or mu_aug is None:
         return 0.0
 
@@ -34,10 +34,11 @@ def _augmented_penalty_total(
             uk = np.zeros(satellite.controlDim)
 
         ck = np.asarray(satellite.constraints(k, N, xk, uk, S[:, k], cnst_cfg), dtype=float)
-        ck_pos = np.maximum(0.0, ck)
         lam_k = np.asarray(lambda_aug[k], dtype=float)
         mu_k = np.asarray(mu_aug[k], dtype=float)
-        total += float(lam_k @ ck_pos + 0.5 * np.sum(mu_k * ck_pos * ck_pos))
+        total += float(lam_k @ ck)
+        active_penalty = (ck > 0.0) | (lam_k > 0.0)
+        total += float(0.5 * np.sum(mu_k[active_penalty] * ck[active_penalty] * ck[active_penalty]))
 
     return total
 
@@ -104,12 +105,18 @@ def ilqr(
     boresight: np.ndarray,
     lambda_aug: list[np.ndarray],
     mu_aug: list[np.ndarray],
-    debug: bool = False,
-) -> tuple[np.ndarray, np.ndarray, str, list, list]:
+    debug: bool = False
+) -> tuple[np.ndarray, np.ndarray, str, list, list, dict]:
     passsettings = plannersettings.passes[pass_idx]
     
     snapshots = []
     transitions = []
+    info = {
+        "accepted_steps": 0,
+        "iterations": 0,
+        "last_delta_J": np.inf,
+        "final_cost": np.nan,
+    }
     
     # Warm-start snapshot
     if debug:
@@ -123,6 +130,7 @@ def ilqr(
                 "U": U.copy(),
                 "J": J,
                 "q_goal": q_goal.copy(),
+                "boresight": boresight.copy(),
                 "components": components,
                 "R": R.copy(),
                 "B": B.copy(),
@@ -130,6 +138,7 @@ def ilqr(
         )
 
     for iteration in range(passsettings.ilqr.max_iters):
+        info["iterations"] = iteration + 1
         reg = passsettings.reg.reg_init
 
         while reg <= passsettings.reg.reg_max:
@@ -189,6 +198,9 @@ def ilqr(
             U = U_new
 
             delta_J = abs(J_prev - J_new)
+            info["accepted_steps"] += 1
+            info["last_delta_J"] = float(delta_J)
+            info["final_cost"] = float(J_new)
 
             if debug:
                 components = compute_cost_components(X, U, satellite, q_goal, boresight, B, passsettings.cost)
@@ -198,6 +210,7 @@ def ilqr(
                         "U": U.copy(),
                         "J": J_new,
                         "q_goal": q_goal.copy(),
+                        "boresight": boresight.copy(),
                         "components": components,
                         "R": R.copy(),
                         "B": B.copy(),
@@ -206,16 +219,17 @@ def ilqr(
                 transitions.append({
                     "bp_ok": True,
                     "fp_ok": True,
+                    "accepted_steps": info["accepted_steps"],
                     "act_delta": delta_J,
                     "delta_tol_ok": delta_J <= passsettings.ilqr.cost_tol,
                 })
 
             if delta_J <= passsettings.ilqr.cost_tol:
-                return X, U, "converged", snapshots, transitions
+                return X, U, "converged", snapshots, transitions, info
 
             break
 
         if reg > passsettings.reg.reg_max:
-            return X, U, "reg_exceeded", snapshots, transitions
+            return X, U, "reg_exceeded", snapshots, transitions, info
 
-    return X, U, "max_iters", snapshots, transitions
+    return X, U, "max_iters", snapshots, transitions, info

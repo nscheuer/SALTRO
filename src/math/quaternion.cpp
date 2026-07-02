@@ -41,6 +41,22 @@ Mat43 findWMat(const Vec4& q) {
     return W;
 }
 
+Vec4 quatConj(const Vec4& q) {
+    return {q(0), -q(1), -q(2), -q(3)};
+}
+
+Vec4 quatMult(const Vec4& q1, const Vec4& q2) {
+    // Hamilton product q1 ⊗ q2 = L(q1) · q2, where L(q1) = [q1 | W(q1)].
+    // Splitting by scalar/vector part of q2:
+    //   L(q1) · q2 = q2(0) · q1 + W(q1) · q2_vec
+    return q2(0) * q1 + findWMat(q1) * q2.tail<3>();
+}
+
+double quatAngle(const Vec4& q_err) {
+    const double w = std::clamp(std::abs(q_err(0)), 0.0, 1.0);
+    return 2.0 * std::acos(w);
+}
+
 Mat43 quatNormJacobian(const Vec4& q) {
     double qn = q.norm();
     if (qn < 1e-12) {
@@ -103,11 +119,21 @@ std::array<Mat44, 3> ddrotmatTvecdqdq(const Vec4& /*q*/, const Vec3& v) {
         }
     }
 
-    for (int k = 0; k < 3; ++k) {
+    // qv–qv block of ∂²(Rᵀv)_m/∂q_a∂q_b (a,b ∈ {1,2,3}). From the raw-formula
+    //   (Rᵀv)_m = (q0² − |qv|²)v_m + 2(qv·v)qv_m + 2q0(qv×v)_m,
+    // the second derivative in the vector part is
+    //   ∂²(Rᵀv)_m/∂q_a∂q_b = −2 δ_ab v_m + 2 v_a δ_bm + 2 v_b δ_am,
+    // which is symmetric in (a,b) as Schwarz requires. The previous version wrote
+    // only the single term 2 v_b δ_am onto one row, leaving the block both
+    // incomplete and asymmetric (it disagreed with finite differences by O(1) and
+    // broke the symmetry of every Hessian that consumes this helper).
+    for (int m = 0; m < 3; ++m) {
         for (int a = 0; a < 3; ++a) {
             for (int b = 0; b < 3; ++b) {
-                const double val = (a == k) ? 2.0 * v(b) : 0.0;
-                output[static_cast<size_t>(k)](1 + a, 1 + b) += val;
+                const double val = -2.0 * (a == b ? 1.0 : 0.0) * v(m)
+                                   + 2.0 * v(a) * (b == m ? 1.0 : 0.0)
+                                   + 2.0 * v(b) * (a == m ? 1.0 : 0.0);
+                output[static_cast<size_t>(m)](1 + a, 1 + b) = val;
             }
         }
     }

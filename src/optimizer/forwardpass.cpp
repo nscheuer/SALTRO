@@ -180,7 +180,8 @@ bool forwardPass(
                     X_bar.col(k),
                     0.0,
                     dt,
-                    x_next
+                    x_next,
+                    Satellite::QUAT_INDEX
                 );
             } catch (const std::exception&) {
                 rollout_ok = false;

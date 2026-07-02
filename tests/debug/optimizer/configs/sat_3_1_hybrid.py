@@ -20,6 +20,6 @@ def create_satellite(plannersettings: saltro_py.PlannerSettings) -> saltro_py.Sa
     satellite.addMTQ(np.array([0.0, 0.0, 1.0]), 0.2)
 
     # Add reaction wheel
-    satellite.addRW(np.array([1.0, 0.0, 0.0]), 5.7e-6, 0.0023, 0.0, 0.0036)
+    satellite.addRW(np.array([1.0, 0.0, 0.0]), 0.0023, 5.7e-6, 0.0, 0.0036)
 
     return satellite
