@@ -176,6 +176,13 @@
   </a>
 </li>
 
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../datasheets/optimizer_settings.html">
+    Optimizer Settings Reference
+  </a>
+</li>
+
   </ul>
 </nav></div>
       
@@ -287,6 +294,13 @@
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../convergence_logic_tree.html">
     Convergence Logic Tree
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../datasheets/optimizer_settings.html">
+    Optimizer Settings Reference
   </a>
 </li>
 
@@ -792,7 +806,13 @@
 <dd class="field-odd"><p>Terminal angular velocity direction weight</p>
 </dd>
 <dt class="field-even">Param ang_cost_func_type<span class="colon">:</span></dt>
-<dd class="field-even"><p>Type of orientation error cost function used </p>
+<dd class="field-even"><p>Type of orientation error cost function used, as a shape f(d) of the inner alignment scalar d &amp;#8212; in quaternion mode d = q_goal . q (post hemisphere-alignment, so d in [0, 1]); in vector-pointing mode d = c = bs . R(q)^T r_hat (cosine of the boresight-to-target angle):<ul class="simple">
+<li><p>0: 1 - d (linear)</p></li>
+<li><p>1: 0.5 * (1 - d)^2 (quadratic, convex)</p></li>
+<li><p>2: acos(d) (raw angle)</p></li>
+<li><p>3: 0.5 * acos(d)^2 (squared angle) Type 4 ((1 - d)^2) was REMOVED: it is exactly type 1 with the constant 2 absorbed into the angle weight. Migrate by using type 1 with doubled angle weights (2 * 0.5*(1-d)^2 == (1-d)^2). </p></li>
+</ul>
+</p>
 </dd>
 <dt class="field-odd">Param use_cost_hess<span class="colon">:</span></dt>
 <dd class="field-odd"><p>If true, use analytic Hessians of cost </p>
@@ -1129,6 +1149,9 @@ Q_{uu} \leftarrow Q_{uu} + \rho I
 <dt class="field-odd">Param use_constraint_hess<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Use second derivatives of constraints </p>
 </dd>
+<dt class="field-even">Param psd_clamp_lxx<span class="colon">:</span></dt>
+<dd class="field-even"><p>TESTING/DIAGNOSTIC aid only &amp;#8212; NOT recommended for production. When true, the backward pass eigen-clamps each stage cost Hessian lxx to PSD (negative eigenvalues zeroed). Useful to prove that an indefinite cost Hessian is the culprit when a solve fails, but it runs an eigendecomposition per knot (slow) and masks model problems rather than fixing them. Default false; when false the backward pass is bitwise-identical to the unflagged code. </p>
+</dd>
 </dl>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
@@ -1180,6 +1203,11 @@ Q_{uu} \leftarrow Q_{uu} + \rho I
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig16psd_clip_quu_ddpE">
 <span id="_CPPv3N20RegularizationConfig16psd_clip_quu_ddpE"></span><span id="_CPPv2N20RegularizationConfig16psd_clip_quu_ddpE"></span><span id="RegularizationConfig::psd_clip_quu_ddp__b"></span><span class="target" id="structRegularizationConfig_1ad4f9922b078fdddf7fdfa5f8f529010b"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">psd_clip_quu_ddp</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig16psd_clip_quu_ddpE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N20RegularizationConfig13psd_clamp_lxxE">
+<span id="_CPPv3N20RegularizationConfig13psd_clamp_lxxE"></span><span id="_CPPv2N20RegularizationConfig13psd_clamp_lxxE"></span><span id="RegularizationConfig::psd_clamp_lxx__b"></span><span class="target" id="structRegularizationConfig_1a6ce5b2237b9376f259610316d7f1ca72"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">psd_clamp_lxx</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N20RegularizationConfig13psd_clamp_lxxE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 </div>
@@ -1537,6 +1565,7 @@ J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig17use_dynamics_hessE"><code class="docutils literal notranslate"><span class="pre">use_dynamics_hess</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig19use_constraint_hessE"><code class="docutils literal notranslate"><span class="pre">use_constraint_hess</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig16psd_clip_quu_ddpE"><code class="docutils literal notranslate"><span class="pre">psd_clip_quu_ddp</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N20RegularizationConfig13psd_clamp_lxxE"><code class="docutils literal notranslate"><span class="pre">psd_clamp_lxx</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv416LineSearchConfig"><code class="docutils literal notranslate"><span class="pre">LineSearchConfig</span></code></a><ul class="nav section-nav flex-column">
