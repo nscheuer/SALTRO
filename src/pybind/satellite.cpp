@@ -2620,30 +2620,43 @@ Satellite::constraintHessians(
     H_xx.slice(idx).block<3, 3>(AV_INDEX, AV_INDEX) = scale_av * Mat33::Identity();
     idx++;
 
-    // 2) Sun constraint Hessian: central finite differences of constraint Jacobian
-    // Constraint: c = [R(q)^T * sun_unit]_x - cos(limit)
-    // The chain rule through quaternion normalization makes the analytic form fragile,
-    // so we use central FD for robustness.  This is only called during the backward
-    // pass when use_constraint_hess is enabled.
+    // 2) Sun constraint Hessian (analytic).
+    // Constraint: c = [R(q)^T * sun_unit]_x - cos(limit) -- the x component of
+    // R(q)^T applied to a fixed inertial vector. constraints()/dynamics()
+    // normalize q internally, so c(q) = g(N(q)) with g(y) = [R_raw(y)^T sun]_x
+    // and N(q)=q/||q||. The Hessian is the same manifold form used for the
+    // dynamics attitude second derivatives:
+    //   d2c/dq2 = P*(d2g/dy2)*P  -  g_a q_c - q_a g_c - (g.q) d_ac + 3 (g.q) q_a q_c,
+    // where d2g/dy2 = ddrotmatTvecdqdq(q, sun_unit)[x-component] and g = dg/dy =
+    // drotmatTvecdq(q, sun_unit) x-column (raw-formula derivatives via the shared
+    // helpers; P = I4 - qq^T at ||q||=1). Replaces the previous finite-difference
+    // fallback -- the "analytic form is fragile" note no longer holds now that the
+    // rotation-Hessian helper is correct and the manifold term is applied once.
     const double sun_norm = sun_eci.norm();
     const int sun_idx = idx;
     if (std::isfinite(sun_norm) && sun_norm > 1e-12) {
-        const double eps = 1e-7;
-        for (int j = 0; j < stateDim(); ++j) {
-            VecX xp = x; xp(j) += eps;
-            VecX xm = x; xm(j) -= eps;
-            if (j >= QUAT_INDEX && j < QUAT_INDEX + 4) {
-                xp.segment<4>(QUAT_INDEX).normalize();
-                xm.segment<4>(QUAT_INDEX).normalize();
-            }
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+        const Vec4 q_raw = x.segment<4>(QUAT_INDEX);
+        const double q_norm = q_raw.norm();
+        if (q_norm > 1e-12) {
+            const Vec4 q = q_raw / q_norm;
+            const Vec3 sun_unit = sun_eci / sun_norm;
+            const Mat44 P = Mat44::Identity() - q * q.transpose();
 
-            auto [_, c_xp] = constraintJacobians(k, N, xp, u, sun_eci, cnst_cfg);
-            auto [_2, c_xm] = constraintJacobians(k, N, xm, u, sun_eci, cnst_cfg);
-            const Eigen::VectorXd fd_row =
-                (c_xp.row(sun_idx) - c_xm.row(sun_idx)).transpose() / (2.0 * eps);
-            auto col = H_xx.slice(sun_idx).col(j);
-            col.setZero();
-            col.head(stateDim()) = fd_row;
+            // Raw-formula x-component gradient and Hessian of (R^T sun_unit)_x.
+            const Vec4 g = saltro::math::drotmatTvecdq(q, sun_unit).col(0);  // q-indexed
+            const std::array<Mat44, 3> d2 = saltro::math::ddrotmatTvecdqdq(q, sun_unit);
+            const Mat44& Hx = d2[0];  // x-component 4x4
+
+            const double s = g.dot(q);
+            const Mat44 C = -(g * q.transpose() + q * g.transpose())
+                            - s * Mat44::Identity()
+                            + 3.0 * s * (q * q.transpose());
+            const Mat44 Hf = P * Hx * P + C;
+
+            for (int a = 0; a < 4; ++a)
+                for (int b = 0; b < 4; ++b)
+                    H_xx.slice(sun_idx)(QUAT_INDEX + a, QUAT_INDEX + b) = Hf(a, b);
         }
     }
     idx++;
@@ -2684,4 +2697,3 @@ Satellite::constraintHessians(
 
     return std::make_tuple(H_uu, H_ux, H_xx);
 }
-
