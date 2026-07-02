@@ -41,7 +41,7 @@ def create_planner_settings():
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
     cost.RWh_stiction_mult = 0.0
-    cost.RWh_ok_mult = 0.0
+    cost.RWh_knee_frac = 0.0
     cost.angle_N = 0.0
     cost.ang_vel_N = 0.0
     cost.ang_vel_mag_N = 0.0

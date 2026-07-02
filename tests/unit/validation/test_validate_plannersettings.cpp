@@ -412,22 +412,22 @@ TEST_CASE("Invalid cost.RWh_stiction_mult - exceeds 1.0", "[plannersettings][val
     REQUIRE(error_msg == "cost.RWh_stiction_mult invalid");
 }
 
-TEST_CASE("Invalid cost.RWh_ok_mult - negative", "[plannersettings][validation][cost]") {
+TEST_CASE("Invalid cost.RWh_knee_frac - negative", "[plannersettings][validation][cost]") {
     PlannerSettings settings = validSettings();
-    settings.passes[0].cost.RWh_ok_mult = -0.1;
+    settings.passes[0].cost.RWh_knee_frac = -0.1;
     std::string error_msg;
     
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "cost.RWh_ok_mult invalid");
+    REQUIRE(error_msg == "cost.RWh_knee_frac invalid");
 }
 
-TEST_CASE("Invalid cost.RWh_ok_mult - exceeds 1.0", "[plannersettings][validation][cost]") {
+TEST_CASE("Invalid cost.RWh_knee_frac - exceeds 1.0", "[plannersettings][validation][cost]") {
     PlannerSettings settings = validSettings();
-    settings.passes[0].cost.RWh_ok_mult = 1.1;
+    settings.passes[0].cost.RWh_knee_frac = 1.1;
     std::string error_msg;
     
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "cost.RWh_ok_mult invalid");
+    REQUIRE(error_msg == "cost.RWh_knee_frac invalid");
 }
 
 TEST_CASE("Invalid cost.angle_N - negative", "[plannersettings][validation][cost]") {

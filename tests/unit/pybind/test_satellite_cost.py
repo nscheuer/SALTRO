@@ -666,7 +666,7 @@ class TestCostHessians:
         cost_cfg = saltro.CostConfig()
         cost_cfg.rw_AM_weight = 1e4
         cost_cfg.rw_stic_weight = 1.0
-        cost_cfg.RWh_ok_mult = 0.8
+        cost_cfg.RWh_knee_frac = 0.8
         cost_cfg.RWh_stiction_mult = 0.01
         cost_cfg.RWh_desat_mult = 0.5
         
@@ -895,7 +895,7 @@ class TestRWMomentumCost:
         """RW momentum penalty should increase with magnitude."""
         cost_cfg = saltro.CostConfig()
         cost_cfg.rw_AM_weight = 1e4
-        cost_cfg.RWh_ok_mult = 0.8
+        cost_cfg.RWh_knee_frac = 0.8
         cost_cfg.RWh_desat_mult = 0.5
         cost_cfg.angle = 0.0
         cost_cfg.ang_vel = 0.0
@@ -923,7 +923,7 @@ class TestRWMomentumCost:
         """RW momentum cost should be minimal at low momentum values."""
         cost_cfg = saltro.CostConfig()
         cost_cfg.rw_AM_weight = 1e4
-        cost_cfg.RWh_ok_mult = 0.8
+        cost_cfg.RWh_knee_frac = 0.8
         cost_cfg.RWh_desat_mult = 0.5
         cost_cfg.angle = 0.0
         cost_cfg.ang_vel = 0.0
@@ -943,6 +943,165 @@ class TestRWMomentumCost:
         # Cost should be finite and dominated by RW momentum penalties at low values
         assert np.isfinite(cost), "Cost should be finite"
         assert cost > -1e-10, "Cost should be non-negative"
+
+    # ========================================================================
+    # RW momentum soft-cost redesign: C1 knee + desat + stiction parking
+    # (fixture wheels: h_max = 0.01) — python twins of the C++ cases in
+    # test_satellite_cost.cpp.
+    # ========================================================================
+
+    @staticmethod
+    def _rwh_only_cfg():
+        """Twin of rwhOnlyCfg() in test_satellite_cost.cpp."""
+        cfg = saltro.CostConfig()
+        cfg.angle = 0.0
+        cfg.ang_vel = 0.0
+        cfg.control_mult = 0.0
+        cfg.rw_AM_weight = 1e4
+        cfg.rw_stic_weight = 0.0
+        cfg.RWh_knee_frac = 0.5        # knee at 0.005
+        cfg.RWh_desat_mult = 0.5
+        cfg.RWh_stiction_mult = 0.0  # stiction off unless a test enables it
+        cfg.use_cost_hess = True     # exercise the real state-Hessian block
+        return cfg
+
+    def test_rw_momentum_cost_c1_continuity_at_the_knee(self, fixture):
+        """Twin of C++ 'RW momentum cost: C1 continuity at the knee'."""
+        cfg = self._rwh_only_cfg()
+        knee = 0.5 * 0.01
+        sat_direction = np.zeros(3)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.zeros(3)
+        u = np.zeros(fixture.sat.controlDim)
+        h_idx = fixture.sat.RW_MOMENTUM_INDEX
+
+        def eval_at(h):
+            x = np.zeros(fixture.sat.stateDim)
+            x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = [1, 0, 0, 0]
+            x[h_idx] = h
+            J = fixture.sat.stageCost(0, 10, x, u, sat_direction, eci_target, B_eci, cfg)
+            lx, _, _ = fixture.sat.stageCostJacobians(0, 10, x, u, sat_direction, eci_target, B_eci, cfg)
+            return J, lx[h_idx]
+
+        eps = 1e-9
+        J_lo, g_lo = eval_at(knee - eps)
+        J_hi, g_hi = eval_at(knee + eps)
+        # Value continuous and gradient continuous across the knee (the steep
+        # term has zero value AND zero slope there).
+        assert abs(J_hi - J_lo) <= 1e-4 * (1.0 + abs(J_lo)), \
+            f"Cost discontinuous at knee: {J_lo:.6e} vs {J_hi:.6e}"
+        assert abs(g_hi - g_lo) <= 1e-4 * (1.0 + abs(g_lo)), \
+            f"Gradient discontinuous at knee: {g_lo:.6e} vs {g_hi:.6e}"
+
+    def test_rw_momentum_cost_fd_gradient_and_hessian_per_regime(self, fixture):
+        """Twin of C++ 'RW momentum cost: FD gradient and Hessian per regime'."""
+        cfg = self._rwh_only_cfg()
+        cfg.rw_stic_weight = 50.0
+        cfg.RWh_stiction_mult = 0.1  # stiction band [0, 0.001)
+        sat_direction = np.zeros(3)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.zeros(3)
+        u = np.zeros(fixture.sat.controlDim)
+        h_idx = fixture.sat.RW_MOMENTUM_INDEX
+
+        # One probe per regime, away from all kinks (0, h_stic=0.001, knee=0.005).
+        for h0 in (0.0004, 0.003, 0.008, -0.003, -0.008):
+            x = np.zeros(fixture.sat.stateDim)
+            x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = [1, 0, 0, 0]
+            x[h_idx] = h0
+            eps = 1e-8
+
+            def cost_at(h):
+                xp = x.copy()
+                xp[h_idx] = h
+                return fixture.sat.stageCost(0, 10, xp, u, sat_direction, eci_target, B_eci, cfg)
+
+            def grad_at(h):
+                xp = x.copy()
+                xp[h_idx] = h
+                lx, _, _ = fixture.sat.stageCostJacobians(0, 10, xp, u, sat_direction, eci_target, B_eci, cfg)
+                return lx[h_idx]
+
+            g_fd = (cost_at(h0 + eps) - cost_at(h0 - eps)) / (2.0 * eps)
+            g_an = grad_at(h0)
+            assert abs(g_an - g_fd) <= 1e-3 * (1.0 + abs(g_fd)), \
+                f"h0={h0}: analytic grad {g_an:.6e} vs FD {g_fd:.6e}"
+
+            H_fd = (grad_at(h0 + eps) - grad_at(h0 - eps)) / (2.0 * eps)
+            lxx, _, _ = fixture.sat.stageCostHessians(0, 10, x, u, sat_direction, eci_target, B_eci, cfg)
+            assert abs(lxx[h_idx, h_idx] - H_fd) <= 1e-3 * (1.0 + abs(H_fd)), \
+                f"h0={h0}: analytic Hessian {lxx[h_idx, h_idx]:.6e} vs FD {H_fd:.6e}"
+            assert lxx[h_idx, h_idx] >= 0.0, \
+                f"h0={h0}: Hessian not PSD"  # PSD by construction in every regime
+
+    def test_stiction_subgradient_at_exactly_h_zero_is_zero(self, fixture):
+        """Twin of C++ 'Stiction: subgradient at exactly h == 0 is zero'."""
+        cfg = self._rwh_only_cfg()
+        cfg.rw_stic_weight = 100.0
+        cfg.RWh_stiction_mult = 0.5  # band [0, 0.005)
+        sat_direction = np.zeros(3)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.zeros(3)
+        u = np.zeros(fixture.sat.controlDim)
+        h_idx = fixture.sat.RW_MOMENTUM_INDEX
+
+        x = np.zeros(fixture.sat.stateDim)
+        x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = [1, 0, 0, 0]
+
+        lx0, _, _ = fixture.sat.stageCostJacobians(0, 10, x, u, sat_direction, eci_target, B_eci, cfg)
+        assert lx0[h_idx] == 0.0, "deterministic contract at the tent peak"
+
+        # Just off zero the ramp pushes |h| outward: dJ/dh < 0 for small h > 0.
+        x[h_idx] = 1e-6
+        lxp, _, _ = fixture.sat.stageCostJacobians(0, 10, x, u, sat_direction, eci_target, B_eci, cfg)
+        assert lxp[h_idx] < 0.0
+        x[h_idx] = -1e-6
+        lxm, _, _ = fixture.sat.stageCostJacobians(0, 10, x, u, sat_direction, eci_target, B_eci, cfg)
+        assert lxm[h_idx] > 0.0
+
+    def test_desat_stiction_park_the_wheel_at_h_star(self, fixture):
+        """Twin of C++ 'Desat + stiction park the wheel at h* = h_stic/2'."""
+        # Recipe: w_stic = rw_AM_weight * desat * (h_stic/h_max)^2 parks at h_stic/2.
+        cfg = self._rwh_only_cfg()                 # rw_AM_weight=1e4, desat=0.5
+        cfg.RWh_stiction_mult = 0.5                # h_stic = 0.005 (== knee; steep off below)
+        cfg.rw_stic_weight = 1e4 * 0.5 * 0.25      # = 1250
+        h_star = 0.5 * 0.005
+        sat_direction = np.zeros(3)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.zeros(3)
+        u = np.zeros(fixture.sat.controlDim)
+        h_idx = fixture.sat.RW_MOMENTUM_INDEX
+
+        def grad_at(h):
+            x = np.zeros(fixture.sat.stateDim)
+            x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = [1, 0, 0, 0]
+            x[h_idx] = h
+            lx, _, _ = fixture.sat.stageCostJacobians(0, 10, x, u, sat_direction, eci_target, B_eci, cfg)
+            return lx[h_idx]
+
+        scale = 1e4 * 0.5 * h_star / (0.01 * 0.01)  # desat gradient magnitude at h*
+        assert abs(grad_at(h_star)) <= 1e-6 * scale, \
+            f"gradient at h* not ~0: {grad_at(h_star):.6e}"
+        assert grad_at(0.8 * h_star) < 0.0  # below h*: pushed up toward h*
+        assert grad_at(1.2 * h_star) > 0.0  # above h*: pulled back toward h*
+
+    def test_rw_momentum_cost_desat_zero_leaves_sub_knee_region_free(self, fixture):
+        """Twin of C++ 'RW momentum cost: desat=0 leaves the sub-knee region free'."""
+        cfg = self._rwh_only_cfg()
+        cfg.RWh_desat_mult = 0.0
+        sat_direction = np.zeros(3)
+        eci_target = np.array([1.0, 0.0, 0.0, 0.0])
+        B_eci = np.zeros(3)
+        u = np.zeros(fixture.sat.controlDim)
+
+        def cost_at(h):
+            x = np.zeros(fixture.sat.stateDim)
+            x[fixture.sat.QUAT_INDEX:fixture.sat.QUAT_INDEX+4] = [1, 0, 0, 0]
+            x[fixture.sat.RW_MOMENTUM_INDEX] = h
+            return fixture.sat.stageCost(0, 10, x, u, sat_direction, eci_target, B_eci, cfg)
+
+        assert cost_at(0.004) == cost_at(0.0)   # below the knee: exactly free
+        assert cost_at(0.008) > cost_at(0.004)  # above the knee: steep term active
 
 
 # ============================================================================

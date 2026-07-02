@@ -631,7 +631,7 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Hessian w.r.t. RW momentum",
     CostConfig cost_cfg;
     cost_cfg.rw_AM_weight = 1e4;
     cost_cfg.rw_stic_weight = 1.0;
-    cost_cfg.RWh_ok_mult = 0.8;
+    cost_cfg.RWh_knee_frac = 0.8;
     cost_cfg.RWh_stiction_mult = 0.01;
     cost_cfg.RWh_desat_mult = 0.5;
     
@@ -755,7 +755,7 @@ TEST_CASE_METHOD(SatelliteCostFixture, "RW momentum penalty increases with momen
     
     CostConfig cost_cfg;
     cost_cfg.rw_AM_weight = 1e4;
-    cost_cfg.RWh_ok_mult = 0.8;
+    cost_cfg.RWh_knee_frac = 0.8;
     cost_cfg.RWh_desat_mult = 0.5;
     
     Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
@@ -965,7 +965,7 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Jacobian near RW momentum saturatio
     
     CostConfig cost_cfg;
     cost_cfg.rw_AM_weight = 1e4;
-    cost_cfg.RWh_ok_mult = 0.8;
+    cost_cfg.RWh_knee_frac = 0.8;
     cost_cfg.RWh_desat_mult = 0.5;
     
     Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
@@ -1846,7 +1846,7 @@ CostConfig rwhOnlyCfg() {
     cfg.control_mult = 0.0;
     cfg.rw_AM_weight = 1e4;
     cfg.rw_stic_weight = 0.0;
-    cfg.RWh_ok_mult = 0.5;        // knee at 0.005
+    cfg.RWh_knee_frac = 0.5;        // knee at 0.005
     cfg.RWh_desat_mult = 0.5;
     cfg.RWh_stiction_mult = 0.0;  // stiction off unless a test enables it
     cfg.use_cost_hess = true;     // exercise the real state-Hessian block

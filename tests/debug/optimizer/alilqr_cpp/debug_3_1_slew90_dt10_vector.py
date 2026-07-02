@@ -46,7 +46,7 @@ def create_planner_settings():
     cost.rw_AM_weight = 1e4
     cost.rw_stic_weight = 0.0
     cost.RWh_stiction_mult = 0.0
-    cost.RWh_ok_mult = 0.5   # free band below 50% h_max (validated: wheel used ~11%)
+    cost.RWh_knee_frac = 0.5   # free band below 50% h_max (validated: wheel used ~11%)
     cost.RWh_desat_mult = 0.05  # REQUIRED: flat free band grinds the outer loop (see plannersettings.h)
     cost.angle_N = 2e4   # doubled with the type-4 -> type-1 migration (see cost.angle)
     cost.ang_vel_N = 1e5  # strong terminal rate damping is what actually holds

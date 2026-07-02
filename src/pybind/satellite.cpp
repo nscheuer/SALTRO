@@ -1543,13 +1543,13 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
 
         // Momentum soft cost, C1 everywhere: a gentle "desat" quadratic over
         // the whole range plus a steep quadratic that turns on above the knee
-        // (RWh_ok_mult * h_max) with zero value AND zero slope there -- no
+        // (RWh_knee_frac * h_max) with zero value AND zero slope there -- no
         // cheaper-just-above-the-knee cliff and no gradient kink. The hard
         // ceiling (e.g. 80% of h_max) deliberately does NOT live in this cost:
         // the AL momentum constraint enforces it
         // (ConstraintConfig.rw_momentum_limit_scale) with its own per-family
         // penalty schedule. Cost shapes, constraint enforces.
-        const double knee = std::clamp(cost_cfg.RWh_ok_mult, 0.0, 1.0) * h_max;
+        const double knee = std::clamp(cost_cfg.RWh_knee_frac, 0.0, 1.0) * h_max;
         const double denom_high = std::max(1e-9, h_max - knee);
         const double desat = std::max(0.0, cost_cfg.RWh_desat_mult);
         const double scaled = z / h_max;
@@ -1830,7 +1830,7 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         // Momentum soft cost gradient (see stageCost): desat quadratic term is
         // smooth through h = 0 (gradient proportional to h); the steep term has
         // zero slope at the knee, so the total is C1.
-        const double knee = std::clamp(cost_cfg.RWh_ok_mult, 0.0, 1.0) * h_max;
+        const double knee = std::clamp(cost_cfg.RWh_knee_frac, 0.0, 1.0) * h_max;
         const double denom_high = std::max(1e-9, h_max - knee);
         const double desat = std::max(0.0, cost_cfg.RWh_desat_mult);
         const double sign_h = safeSign(h);
@@ -2198,7 +2198,7 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
 
         // Momentum soft cost Hessian (see stageCost): desat term everywhere,
         // steep term above the knee. Both positive -- PSD by construction.
-        const double knee = std::clamp(cost_cfg.RWh_ok_mult, 0.0, 1.0) * h_max;
+        const double knee = std::clamp(cost_cfg.RWh_knee_frac, 0.0, 1.0) * h_max;
         const double denom_high = std::max(1e-9, h_max - knee);
         const double desat = std::max(0.0, cost_cfg.RWh_desat_mult);
         lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) +=

@@ -137,8 +137,8 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
-            if (pass.cost.RWh_ok_mult < 0.0 || pass.cost.RWh_ok_mult > 1.0 || !std::isfinite(pass.cost.RWh_ok_mult)) {
-                error_msg = "cost.RWh_ok_mult invalid";
+            if (pass.cost.RWh_knee_frac < 0.0 || pass.cost.RWh_knee_frac > 1.0 || !std::isfinite(pass.cost.RWh_knee_frac)) {
+                error_msg = "cost.RWh_knee_frac invalid";
                 return false;
             }
 

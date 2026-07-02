@@ -439,23 +439,23 @@ def test_invalid_cost_rwh_stiction_mult_exceeds_one():
 
 
 def test_invalid_cost_rwh_ok_mult_negative():
-    """Negative cost.RWh_ok_mult should fail"""
+    """Negative cost.RWh_knee_frac should fail"""
     settings = valid_settings()
-    settings.passes[0].cost.RWh_ok_mult = -0.1
+    settings.passes[0].cost.RWh_knee_frac = -0.1
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
     
     assert not ok
-    assert error_msg == "cost.RWh_ok_mult invalid"
+    assert error_msg == "cost.RWh_knee_frac invalid"
 
 
 def test_invalid_cost_rwh_ok_mult_exceeds_one():
-    """cost.RWh_ok_mult exceeding 1.0 should fail"""
+    """cost.RWh_knee_frac exceeding 1.0 should fail"""
     settings = valid_settings()
-    settings.passes[0].cost.RWh_ok_mult = 1.1
+    settings.passes[0].cost.RWh_knee_frac = 1.1
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
     
     assert not ok
-    assert error_msg == "cost.RWh_ok_mult invalid"
+    assert error_msg == "cost.RWh_knee_frac invalid"
 
 
 def test_invalid_cost_angle_n_negative():

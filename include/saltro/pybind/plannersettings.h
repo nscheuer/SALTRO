@@ -135,7 +135,7 @@ struct ConstraintConfig {
  * @param rw_AM_weight Reaction wheel angular momentum penalty
  * @param rw_stic_weight Reaction wheel stiction penalty
  *
- * @param RWh_ok_mult Knee of the momentum soft cost, as a fraction of h_max
+ * @param RWh_knee_frac Knee of the momentum soft cost, as a fraction of h_max
  *        (default 0.5: free* region below 50% of saturation, steep quadratic
  *        above it; *free up to the desat term below). The hard ceiling does
  *        NOT live in this cost -- enforce it with
@@ -227,7 +227,7 @@ struct CostConfig {
     double rw_stic_weight = 1.0;
 
     double RWh_stiction_mult = 0.01;
-    double RWh_ok_mult = 0.5;
+    double RWh_knee_frac = 0.5;
     double RWh_desat_mult = 0.05;
 
     /// Terminal weights.  **Principle**: preserve the stage ratios.  If you

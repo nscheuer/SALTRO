@@ -50,7 +50,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("rw_AM_weight", &CostConfig::rw_AM_weight)
         .def_readwrite("rw_stic_weight", &CostConfig::rw_stic_weight)
         .def_readwrite("RWh_stiction_mult", &CostConfig::RWh_stiction_mult)
-        .def_readwrite("RWh_ok_mult", &CostConfig::RWh_ok_mult)
+        .def_readwrite("RWh_knee_frac", &CostConfig::RWh_knee_frac)
         .def_readwrite("RWh_desat_mult", &CostConfig::RWh_desat_mult)
         .def_readwrite("angle_N", &CostConfig::angle_N)
         .def_readwrite("ang_vel_N", &CostConfig::ang_vel_N)
