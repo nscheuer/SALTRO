@@ -371,8 +371,10 @@ def test_vector_mode_hess_omega_q_block():
 
 
 # ============================================================================
-# Vector-mode ANGLE COST refactor — 4 ang_cost_func_type values {0,1,2,3}.
-# (Type 4 ((1-c)^2) was removed: exactly type 1 with doubled angle weight.)
+# Vector-mode ANGLE COST refactor — ang_cost_func_type values {0,1,3}.
+# (Type 2 (raw acos) was removed: concave + singular at both poles; migrate
+#  to type 3 or 0.  Type 4 ((1-c)^2) was removed: exactly type 1 with doubled
+#  angle weight.)
 # ============================================================================
 
 def _vec_only_cfg(ang_cost_func_type):
@@ -396,7 +398,7 @@ def _vec_only_cfg(ang_cost_func_type):
     return cfg
 
 
-@pytest.mark.parametrize("act", [0, 1, 2, 3])
+@pytest.mark.parametrize("act", [0, 1, 3])
 def test_vec_ang_cost_grad_fd(act):
     sat = _make_satellite()
     x, u = _nominal_state(sat)
@@ -415,7 +417,7 @@ def test_vec_ang_cost_grad_fd(act):
                                 err_msg=f"[act={act}] q-grad mismatch")
 
 
-@pytest.mark.parametrize("act", [0, 1, 2, 3])
+@pytest.mark.parametrize("act", [0, 1, 3])
 def test_vec_ang_cost_hess_qq_fd(act):
     """(q,q) Hessian projected to tangent plane vs FD."""
     sat = _make_satellite()
@@ -452,7 +454,7 @@ def test_vec_ang_cost_aligned_zero_at_target():
     th = np.radians(30) / 2
     x[3:7] = np.array([np.cos(th), 0, 0, np.sin(th)])
     u = np.zeros(nu)
-    for act in range(4):
+    for act in (0, 1, 3):
         cfg = _vec_only_cfg(act)
         c = sat.stageCost(0, 100, x, u, _BORESIGHT, _TARGET_VEC, _B_ECI, cfg)
         assert abs(c) < 1e-8, f"[act={act}] cost at aligned q should be 0, got {c}"

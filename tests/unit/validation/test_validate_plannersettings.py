@@ -499,6 +499,9 @@ def test_invalid_cost_ang_vel_err_dir_n_negative():
     assert error_msg == "cost.ang_vel_err_dir_N invalid"
 
 
+_AFC_INVALID_MSG = "cost.ang_cost_func_type invalid (implemented set {0,1,3})"
+
+
 def test_invalid_cost_ang_cost_func_type_negative():
     """Negative cost.ang_cost_func_type should fail"""
     settings = valid_settings()
@@ -506,7 +509,17 @@ def test_invalid_cost_ang_cost_func_type_negative():
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
 
     assert not ok
-    assert error_msg == "cost.ang_cost_func_type invalid"
+    assert error_msg == _AFC_INVALID_MSG
+
+
+def test_invalid_cost_ang_cost_func_type_removed_type_2():
+    """Removed cost.ang_cost_func_type=2 (raw acos, concave + singular) should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.ang_cost_func_type = 2
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == _AFC_INVALID_MSG
 
 
 def test_invalid_cost_ang_cost_func_type_removed_type_4():
@@ -516,7 +529,7 @@ def test_invalid_cost_ang_cost_func_type_removed_type_4():
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
 
     assert not ok
-    assert error_msg == "cost.ang_cost_func_type invalid"
+    assert error_msg == _AFC_INVALID_MSG
 
 
 def test_invalid_cost_ang_cost_func_type_above_implemented_set():
@@ -526,12 +539,12 @@ def test_invalid_cost_ang_cost_func_type_above_implemented_set():
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
 
     assert not ok
-    assert error_msg == "cost.ang_cost_func_type invalid"
+    assert error_msg == _AFC_INVALID_MSG
 
 
 def test_valid_cost_ang_cost_func_type_implemented_set():
-    """All implemented types {0, 1, 2, 3} should pass"""
-    for cost_type in range(4):
+    """All implemented types {0, 1, 3} should pass"""
+    for cost_type in (0, 1, 3):
         settings = valid_settings()
         settings.passes[0].cost.ang_cost_func_type = cost_type
         ok, _ = saltro_py.validatePlannerSettings(settings)
