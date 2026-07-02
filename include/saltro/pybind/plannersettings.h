@@ -279,6 +279,35 @@ struct CostConfig {
     /// Default (false) preserves the current full-Hessian behavior.
     bool cost_hess_gauss_newton = false;
 
+    /// Opt-in curvature cap for the Gauss-Newton vec-pointing angle Hessian
+    /// (only active when `cost_hess_gauss_newton == true`). Default 0.0 =
+    /// disabled: exact GN behavior, zero change.
+    ///
+    /// **Why.** In vec mode the assembled GN angle-Hessian q-block is the
+    /// rank-1 PSD term `w_ang · f''(c) · dc·dcᵀ` (c = bs·Rᵀ·r̂). Because it's
+    /// rank-1, its single nonzero eigenvalue is *exactly*
+    ///   λ = w_ang · f''(c) · |dc|².
+    /// For the ½·acos² shape (`ang_cost_func_type == 3`) this eigenvalue
+    /// diverges like 1/sin θ toward the antipode (θ → 180°): measured
+    /// ≈ 71·w_ang at θ=170°, ≈ 7.2e5·w_ang at θ=179.999°. (The *full* exact
+    /// Hessian is not stiff there — its divergence is the negative azimuthal
+    /// cone, which regularization already handles.) The unbounded GN stiffness
+    /// collapses step sizes and stalls near-antipodal slews.
+    ///
+    /// **What.** When > 0 and GN mode is active, the assembled rank-1
+    /// eigenvalue is clamped to `gn_curvature_max · w_ang` by nonnegative
+    /// scaling of the (PSD) rank-1 term — so PSD-ness and the gradient are
+    /// untouched, and below the cap behavior is bit-identical. The knob is in
+    /// units of the angle weight: with the standard boresight parametrization
+    /// `|dc|² = 4 sin²θ`, so types 0/1 satisfy `f''·|dc|² ≤ 4` everywhere and a
+    /// cap ≥ 4 leaves them exact.
+    ///
+    /// **Cap ⇔ angle.** A cap C bounds the effective stiffness; type-3 GN is
+    /// clamped for all θ inside the angle where `f''(cos θ)·|dc|² = C`
+    /// (i.e. `4·f''(cos θ)·sin²θ = C`). Larger C ⇒ cap engages only closer to
+    /// the antipode. Typical useful values: C ≈ 10–50.
+    double gn_curvature_max = 0.0;
+
     /// Scale all terminal weights by `k`, preserving ratios with their
     /// stage counterparts.  `k=1` matches stage; `k=100` is strong terminal
     /// emphasis.

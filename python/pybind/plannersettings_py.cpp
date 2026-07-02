@@ -61,6 +61,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ang_cost_huber_delta", &CostConfig::ang_cost_huber_delta)
         .def_readwrite("use_cost_hess", &CostConfig::use_cost_hess)
         .def_readwrite("cost_hess_gauss_newton", &CostConfig::cost_hess_gauss_newton)
+        .def_readwrite("gn_curvature_max", &CostConfig::gn_curvature_max)
         .def("setTerminalEmphasis", &CostConfig::setTerminalEmphasis,
              py::arg("k") = 100.0,
              "Scale all terminal weights by k, preserving stage ratios.");

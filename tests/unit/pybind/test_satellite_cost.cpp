@@ -2903,3 +2903,116 @@ TEST_CASE_METHOD(SatelliteCostFixture,
         }
     }
 }
+
+Satellite::VecX stateAtAngle(int nx, double theta) {
+    Satellite::VecX x = Satellite::VecX::Zero(nx);
+    x.segment<4>(Satellite::QUAT_INDEX) =
+        Eigen::Vector4d(std::cos(theta / 2.0), 0.0, 0.0, std::sin(theta / 2.0));
+    return x;
+}
+
+
+double qBlockMaxEig(const Eigen::MatrixXd& lxx) {
+    Eigen::Matrix4d qb = lxx.block<4, 4>(Satellite::QUAT_INDEX, Satellite::QUAT_INDEX);
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> es(qb);
+    return es.eigenvalues().maxCoeff();
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "GN curvature cap disabled matches uncapped formula",
+    "[cost][gn_curvature_cap][hessian]") {
+    // With the cap disabled (0.0), the assembled rank-1 GN eigenvalue must
+    // equal the closed-form uncapped value w*f''*|dc|^2 = w*4*(1 - th*cot th)
+    // (|dc|^2 = 4 sin^2 th for this geometry). This is the pre-change behavior.
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    Eigen::Vector3d sat_direction(1.0, 0.0, 0.0);
+    Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+
+    const double weight = 3.0;
+    CostConfig base;
+    base.use_cost_hess = true;
+    base.cost_hess_gauss_newton = true;
+    base.ang_cost_func_type = 3;
+    base.angle = weight;
+    base.angle_N = weight;
+    base.gn_curvature_max = 0.0;  // disabled
+
+    for (double deg : {90.0, 150.0, 170.0, 179.0, 179.9}) {
+        const double th = deg * M_PI / 180.0;
+        Satellite::VecX x = stateAtAngle(sat.stateDim(), th);
+        auto [lxx, luu, lux] = sat.stageCostHessians(0, 10, x, u, sat_direction, eci_target, B_eci, base);
+        const double predicted = weight * 4.0 * (1.0 - th * std::cos(th) / std::sin(th));
+        REQUIRE_THAT(qBlockMaxEig(lxx), Catch::Matchers::WithinRel(predicted, 1e-9));
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "GN curvature cap clamps rank-1 eigenvalue and leaves gradient unchanged",
+    "[cost][gn_curvature_cap][hessian]") {
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    Eigen::Vector3d sat_direction(1.0, 0.0, 0.0);
+    Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+
+    const double weight = 3.0;
+    const double cap = 10.0;
+
+    CostConfig uncapped;
+    uncapped.use_cost_hess = true;
+    uncapped.cost_hess_gauss_newton = true;
+    uncapped.ang_cost_func_type = 3;
+    uncapped.angle = weight;
+    uncapped.angle_N = weight;
+
+    CostConfig capped = uncapped;
+    capped.gn_curvature_max = cap;
+
+    for (double deg : {170.0, 179.0, 179.9}) {
+        Satellite::VecX x = stateAtAngle(sat.stateDim(), deg * M_PI / 180.0);
+
+        auto [lxx_u, u1, u2] = sat.stageCostHessians(0, 10, x, u, sat_direction, eci_target, B_eci, uncapped);
+        auto [lxx_c, c1, c2] = sat.stageCostHessians(0, 10, x, u, sat_direction, eci_target, B_eci, capped);
+
+        // Uncapped is genuinely stiff (this is the problem we fix).
+        REQUIRE(qBlockMaxEig(lxx_u) > cap * weight);
+        // Capped eigenvalue is bounded by cap*weight (+small tol).
+        REQUIRE(qBlockMaxEig(lxx_c) <= cap * weight * (1.0 + 1e-9));
+
+        // Gradient is untouched by the Hessian cap.
+        auto [lx_u, lu_u, lux_u] = sat.stageCostJacobians(0, 10, x, u, sat_direction, eci_target, B_eci, uncapped);
+        auto [lx_c, lu_c, lux_c] = sat.stageCostJacobians(0, 10, x, u, sat_direction, eci_target, B_eci, capped);
+        REQUIRE((lx_u - lx_c).cwiseAbs().maxCoeff() == 0.0);
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "GN curvature cap is bit-identical below the cap angle",
+    "[cost][gn_curvature_cap][hessian]") {
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    Eigen::Vector3d sat_direction(1.0, 0.0, 0.0);
+    Eigen::Vector4d eci_target(std::nan(""), 1.0, 0.0, 0.0);
+    Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+
+    const double weight = 3.0;
+    const double cap = 50.0;  // engages only very close to the antipode
+
+    CostConfig uncapped;
+    uncapped.use_cost_hess = true;
+    uncapped.cost_hess_gauss_newton = true;
+    uncapped.ang_cost_func_type = 3;
+    uncapped.angle = weight;
+    uncapped.angle_N = weight;
+
+    CostConfig capped = uncapped;
+    capped.gn_curvature_max = cap;
+
+    // Angles whose eigenvalue is below cap*weight -> untouched, bit-identical.
+    for (double deg : {90.0, 120.0, 150.0, 160.0}) {
+        Satellite::VecX x = stateAtAngle(sat.stateDim(), deg * M_PI / 180.0);
+        auto [lxx_u, u1, u2] = sat.stageCostHessians(0, 10, x, u, sat_direction, eci_target, B_eci, uncapped);
+        auto [lxx_c, c1, c2] = sat.stageCostHessians(0, 10, x, u, sat_direction, eci_target, B_eci, capped);
+        REQUIRE(qBlockMaxEig(lxx_u) < cap * weight);          // confirm below cap
+        REQUIRE((lxx_u - lxx_c).cwiseAbs().maxCoeff() == 0.0);  // untouched
+    }
+}

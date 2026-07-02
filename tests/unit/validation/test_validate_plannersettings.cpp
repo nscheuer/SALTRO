@@ -1056,3 +1056,40 @@ TEST_CASE("Enabled PD goal-rate feedforward passes validation", "[plannersetting
     REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
     REQUIRE(settings.init_traj.pd_goal_rate_ff_enabled);
 }
+
+TEST_CASE("Invalid cost.gn_curvature_max - negative", "[plannersettings][validation][cost]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].cost.gn_curvature_max = -1.0;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "cost.gn_curvature_max invalid");
+}
+
+TEST_CASE("Invalid cost.gn_curvature_max - NaN", "[plannersettings][validation][cost]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].cost.gn_curvature_max = std::numeric_limits<double>::quiet_NaN();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "cost.gn_curvature_max invalid");
+}
+
+TEST_CASE("Invalid cost.gn_curvature_max - infinity", "[plannersettings][validation][cost]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].cost.gn_curvature_max = std::numeric_limits<double>::infinity();
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "cost.gn_curvature_max invalid");
+}
+
+TEST_CASE("Valid cost.gn_curvature_max - zero disables and positive allowed", "[plannersettings][validation][cost]") {
+    for (double cap : {0.0, 2.0, 10.0, 50.0}) {
+        PlannerSettings settings = validSettings();
+        settings.passes[0].cost.gn_curvature_max = cap;
+        std::string error_msg;
+
+        REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    }
+}

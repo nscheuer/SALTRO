@@ -2336,6 +2336,19 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         Eigen::Matrix3d H_red = f.fpp * (geom.dc * geom.dc.transpose());
         if (!cost_cfg.cost_hess_gauss_newton) {
             H_red += f.fp * geom.ddc;  // full exact Hessian
+        } else if (cost_cfg.gn_curvature_max > 0.0) {
+            // GN mode + curvature cap active. The GN q-block is the rank-1 PSD
+            // term f''·dc·dcᵀ, whose single nonzero eigenvalue is exactly
+            //   λ = f''·|dc|²
+            // (per unit angle weight). For the ½·acos² shape this diverges
+            // like 1/sinθ toward the antipode and stalls the solver. Clamp the
+            // eigenvalue to gn_curvature_max by nonnegative scaling of the
+            // rank-1 term — PSD-ness preserved, gradient untouched, below-cap
+            // behavior bit-identical.
+            const double lam = f.fpp * geom.dc.squaredNorm();
+            if (lam > cost_cfg.gn_curvature_max) {
+                H_red *= (cost_cfg.gn_curvature_max / lam);
+            }
         }
         // Lift reduced 3×3 → ambient q-block; the BP re-projects with Wᵀ.
         const auto W = saltro::math::findWMat(q);
