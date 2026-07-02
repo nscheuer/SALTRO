@@ -21,12 +21,20 @@ def make_zero_aug_terms(satellite, settings, X, U, S):
     return lambda_aug, mu_aug
 
 
-def rk4_step(f, x, dt):
-    k1 = f(x)
-    k2 = f(x + 0.5 * dt * k1)
-    k3 = f(x + 0.5 * dt * k2)
-    k4 = f(x + dt * k3)
-    return x + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
+def rk4_step(f, x, dt, quat_idx=None):
+    def renorm(state):
+        state = state.copy()
+        if quat_idx is not None:
+            q = state[quat_idx:quat_idx + 4]
+            state[quat_idx:quat_idx + 4] = q / np.linalg.norm(q)
+        return state
+
+    m = renorm(x)
+    k1 = f(m)
+    k2 = f(renorm(m + 0.5 * dt * k1))
+    k3 = f(renorm(m + 0.5 * dt * k2))
+    k4 = f(renorm(m + dt * k3))
+    return renorm(m + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4))
 
 
 class ForwardPassFixture:
@@ -149,7 +157,9 @@ class ForwardPassFixture:
                     int(max(0.0, round(self.rho[0, k])))
                 )
 
-            X[:, k + 1] = rk4_step(f, X[:, k], dt)
+            X[:, k + 1] = rk4_step(
+                f, X[:, k], dt, quat_idx=self.satellite.QUAT_INDEX
+            )
 
         J = self.satellite.totalCost(X, U, self.B, self.boresight, self.attitude_target_traj, cost_cfg)
         return X, U, J
@@ -245,7 +255,9 @@ def test_forward_pass_reduces_cost_and_matches_dynamics(fixture):
                 fixture.V[:, k],
                 int(max(0.0, round(fixture.rho[0, k])))
             )
-        x_next = rk4_step(f, X_new[:, k], dt)
+        x_next = rk4_step(
+            f, X_new[:, k], dt, quat_idx=fixture.satellite.QUAT_INDEX
+        )
         assert np.linalg.norm(x_next - X_new[:, k + 1]) < 1e-9
 
 

@@ -66,12 +66,20 @@ class WarmStartFixture:
         self.settings.passes[0].dt = dt_seconds
 
 
-def rk4_step(f, x, t, dt):
-    k1 = f(t, x)
-    k2 = f(t + 0.5 * dt, x + 0.5 * dt * k1)
-    k3 = f(t + 0.5 * dt, x + 0.5 * dt * k2)
-    k4 = f(t + dt, x + dt * k3)
-    return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+def rk4_step(f, x, t, dt, quat_idx=None):
+    def renorm(state):
+        state = state.copy()
+        if quat_idx is not None:
+            q = state[quat_idx:quat_idx + 4]
+            state[quat_idx:quat_idx + 4] = q / np.linalg.norm(q)
+        return state
+
+    m = renorm(x)
+    k1 = f(t, m)
+    k2 = f(t + 0.5 * dt, renorm(m + 0.5 * dt * k1))
+    k3 = f(t + 0.5 * dt, renorm(m + 0.5 * dt * k2))
+    k4 = f(t + dt, renorm(m + dt * k3))
+    return renorm(m + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4))
 
 
 @pytest.fixture
@@ -137,10 +145,9 @@ def test_warm_start_rk4_consistency_zero_controller(fixture):
             rho0,
         )
 
-    x_manual_next = rk4_step(dyn, fixture.x0, 0.0, dt)
-    q = x_manual_next[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4]
-    q = q / np.linalg.norm(q)
-    x_manual_next[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = q
+    x_manual_next = rk4_step(
+        dyn, fixture.x0, 0.0, dt, quat_idx=saltro_py.Satellite.QUAT_INDEX
+    )
 
     assert np.linalg.norm(X[:, 1] - x_manual_next) < 1e-11
 
