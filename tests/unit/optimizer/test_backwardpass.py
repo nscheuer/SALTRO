@@ -1367,6 +1367,104 @@ class TestBackwardPass:
 
         assert checked > 0
         assert max_err < 5e-3, max_indices
+    def test_psd_clamp_lxx_diagnostic_flag(self):
+        """Python twin of the C++ test "backward_pass psd_clamp_lxx diagnostic
+        flag".  psd_clamp_lxx is a TESTING/DIAGNOSTIC knob (default False).
+        Guards:
+         1. Regression: with the flag at its default (untouched settings) the
+            result is bitwise-identical to the flag explicitly set to False.
+         2. Flag on, well-conditioned problem: backward pass still succeeds
+            and results stay finite.
+         3. Flag on, indefinite-lxx scenario (analytic cost Hessian with the
+            concave raw-acos shape, heavy stage angle weight, large attitude
+            error): backward pass succeeds and results stay finite.
+        """
+        N_test = 5
+
+        def make_settings():
+            s = saltro_py.PlannerSettings()
+            s.disturbances.plan_for_aero = False
+            s.disturbances.plan_for_gg = False
+            s.disturbances.plan_for_srp = False
+            s.disturbances.plan_for_prop = False
+            s.disturbances.plan_for_gendist = False
+            s.disturbances.plan_for_resdipole = False
+            s.num_passes = 1
+            s.passes[0].dt = 0.5
+            s.passes[0].reg.reg_init = 1e-8
+            s.passes[0].reg.reg_scale = 10.0
+            s.passes[0].reg.reg_max = 1e4
+            return s
+
+        satellite_test = _make_test_satellite(make_settings())
+        nx = satellite_test.stateDim
+        nu = satellite_test.controlDim
+
+        x0 = np.zeros(nx)
+        x0[0:3] = np.array([0.01, -0.005, 0.008])
+        x0[3:7] = np.array([1.0, 0.0, 0.0, 0.0])
+
+        X = np.zeros((nx, N_test))
+        U = np.zeros((nu, N_test - 1))
+        R_test = np.zeros((3, N_test))
+        V_test = np.zeros((3, N_test))
+        B_test = np.zeros((3, N_test))
+        S_test = np.zeros((3, N_test))
+        rho_test = np.zeros((1, N_test))
+        boresight_test = np.zeros((3, N_test))
+
+        # Deterministic trajectory (no random draws) so repeated runs are
+        # comparable.
+        for k in range(N_test):
+            X[:, k] = x0
+            R_test[:, k] = np.array([7000e3, 0.0, 0.0])
+            V_test[:, k] = np.array([0.0, 7500.0, 0.0])
+            B_test[:, k] = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+            S_test[:, k] = np.array([1.0, 0.1, -0.05])
+            S_test[:, k] /= np.linalg.norm(S_test[:, k])
+            boresight_test[:, k] = np.array([1.0, 0.0, 0.0])
+
+        # Quaternion attitude target 120 deg about x away from the (identity)
+        # state quaternion, so d = q_goal . q = 0.5 and the raw-acos shape
+        # (type 2) has strongly negative curvature f''(d) < 0.
+        attitude_target_test = np.array([0.5, np.sqrt(3.0) / 2.0, 0.0, 0.0])
+        attitude_target_test_traj = make_attitude_traj(attitude_target_test, N_test)
+
+        def run_bp(set_flag, flag_value, indefinite_cost):
+            s = make_settings()
+            if set_flag:
+                s.passes[0].reg.psd_clamp_lxx = flag_value
+            if indefinite_cost:
+                s.passes[0].cost.use_cost_hess = True
+                s.passes[0].cost.ang_cost_func_type = 2  # raw acos: concave in d
+                s.passes[0].cost.angle = 1e5             # heavy stage angle weight
+                s.passes[0].cost.angle_N = 0.0           # keep terminal P_N PSD (clamp covers stage lxx only)
+            return saltro_py.backward_pass(
+                satellite_test, X, U, R_test, V_test, B_test, S_test, rho_test,
+                boresight_test, attitude_target_test_traj, s,
+                LAMBDA_AUG_ZERO, MU_AUG_ZERO, s.passes[0].reg.reg_init
+            )
+
+        # 1. Regression guard: default flag (untouched RegularizationConfig)
+        #    must be bitwise-identical to flag explicitly off.
+        ok_default, K_default, d_default, _ = run_bp(False, False, False)
+        ok_off, K_off, d_off, _ = run_bp(True, False, False)
+        assert ok_default
+        assert ok_off
+        assert np.array_equal(K_default, K_off)
+        assert np.array_equal(d_default, d_off)
+
+        # 2. Flag on, well-conditioned problem: succeeds, finite.
+        ok_on, K_on, d_on, _ = run_bp(True, True, False)
+        assert ok_on
+        assert np.all(np.isfinite(K_on))
+        assert np.all(np.isfinite(d_on))
+
+        # 3. Flag on, indefinite-lxx scenario: succeeds, finite.
+        ok_diag, K_diag, d_diag, _ = run_bp(True, True, True)
+        assert ok_diag
+        assert np.all(np.isfinite(K_diag))
+        assert np.all(np.isfinite(d_diag))
 
 
 if __name__ == "__main__":

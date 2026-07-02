@@ -20,13 +20,13 @@ cost/disturbance knob through saltro_py directly, resolves saltro_py from this
 worktree's own build/ relative to this file. No GenADCS import, no absolute
 paths.
 
-ang_cost_func_type = 4 ((1-c)^2, f''=2) is the documented default for the
-GN-PSD Hessian. On a build where afc=4 has been removed (PR #53), pass
-`--afc 1 --angle 2e4 --angle-N 2e6` (the numerically identical migration).
+ang_cost_func_type = 1 (0.5*(1-c)^2, f''=1) with doubled weights is the
+documented default for the GN-PSD Hessian — the numerically identical
+migration of the removed type 4 ((1-c)^2), whose weights were half these.
 
 Usage:
     python debug_3_1_spin_dt1.py
-    python debug_3_1_spin_dt1.py --afc 1 --angle 2e4 --angle-N 2e6   # post-#53
+    python debug_3_1_spin_dt1.py --afc 3                             # acos^2 shape
     python debug_3_1_spin_dt1.py --prop 3e-4 --tf 500                # hard case
 """
 import argparse
@@ -121,10 +121,11 @@ def main():
                     help="body +x prop torque (N m). 4e-5 = paper default.")
     ap.add_argument("--tf", type=float, default=240.0)
     ap.add_argument("--dt", type=float, default=1.0)
-    ap.add_argument("--afc", type=int, default=4, choices=[0, 1, 2, 3, 4],
-                    help="ang_cost_func_type. 4 = paper; use 1 on PR #53 builds.")
-    ap.add_argument("--angle", type=float, default=1e4)
-    ap.add_argument("--angle-N", type=float, default=1e6)
+    ap.add_argument("--afc", type=int, default=1, choices=[0, 1, 2, 3],
+                    help="ang_cost_func_type. 1 + doubled weights = the paper's "
+                         "removed type 4.")
+    ap.add_argument("--angle", type=float, default=2e4)
+    ap.add_argument("--angle-N", type=float, default=2e6)
     ap.add_argument("--no-gauss-newton", action="store_true")
     args = ap.parse_args()
     use_gn = not args.no_gauss_newton

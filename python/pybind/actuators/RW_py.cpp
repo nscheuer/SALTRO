@@ -3,6 +3,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 
+#include "../tensor_py.h"  // Tensor3 type caster for ddtorq_* Hessian return types
 #include <saltro/pybind/actuators/RW.h>
 
 namespace py = pybind11;
@@ -95,5 +96,20 @@ ndarray (1, 1)
         .def("dstor_torq_dbasestate", &RW::dstor_torq_dbasestate,
              py::arg("u"),
              py::arg("x"),
-             "Jacobian of storage torque with respect to base state");
+             "Jacobian of storage torque with respect to base state")
+        .def("ddtorq_dudu",
+             py::overload_cast<double, const RW::BaseState&>(&RW::ddtorq_dudu, py::const_),
+             py::arg("u"),
+             py::arg("x"),
+             "Hessian of torque w.r.t. control input (zero — RW torque is affine in u).")
+        .def("ddtorq_dudbasestate",
+             py::overload_cast<double, const RW::BaseState&>(&RW::ddtorq_dudbasestate, py::const_),
+             py::arg("u"),
+             py::arg("x"),
+             "Mixed Hessian ∂²τ/(∂u ∂x) (zero — RW torque has no base-state dependence).")
+        .def("ddtorq_dbasestatedbasestate",
+             py::overload_cast<double, const RW::BaseState&>(&RW::ddtorq_dbasestatedbasestate, py::const_),
+             py::arg("u"),
+             py::arg("x"),
+             "Hessian of torque w.r.t. base state (zero — RW torque has no base-state dependence).");
 }

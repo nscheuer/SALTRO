@@ -162,7 +162,11 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
-            if (pass.cost.ang_cost_func_type < 0) {
+            // Implemented set is {0,1,2,3}; anything else used to silently
+            // fall through to acos (type 2) in the cost switches — reject it
+            // here instead. Type 2 itself is deprecated (gradient blows up
+            // near alignment and it is concave); prefer type 3.
+            if (pass.cost.ang_cost_func_type < 0 || pass.cost.ang_cost_func_type > 3) {
                 error_msg = "cost.ang_cost_func_type invalid";
                 return false;
             }

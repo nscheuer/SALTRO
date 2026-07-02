@@ -51,3 +51,4 @@ Documentation
 
    Code Documentation <code_documentation>
    Convergence Logic Tree <convergence_logic_tree>
+   Optimizer Settings Reference <datasheets/optimizer_settings>

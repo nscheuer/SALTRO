@@ -414,8 +414,8 @@ class TestCostJacobians:
         eci_target = np.array([1.0, 0.0, 0.0, 0.0])
         B_eci = np.zeros(3)
         
-        # Test all 5 cost function types (0-4)
-        for cost_type in range(5):
+        # Test all 4 cost function types (0-3)
+        for cost_type in range(4):
             cost_cfg = saltro.CostConfig()
             cost_cfg.ang_cost_func_type = cost_type
             
@@ -439,12 +439,12 @@ class TestCostJacobians:
         
         # Configure cost with all attitude terms
         cost_cfg = saltro.CostConfig()
-        cost_cfg.angle = 1e2
+        cost_cfg.angle = 2e2  # doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
         cost_cfg.ang_vel = 1e3
         cost_cfg.ang_vel_mag = 1e2
         cost_cfg.ang_vel_err_dir = 1e2
         cost_cfg.control_mult = 0.1
-        cost_cfg.ang_cost_func_type = 4  # 1 - |q·q_goal|^2
+        cost_cfg.ang_cost_func_type = 1  # 0.5 * (1 - |q·q_goal|)^2
         
         boresight = np.array([0.9, 0.2, 0.1])
         boresight /= np.linalg.norm(boresight)
@@ -475,8 +475,8 @@ class TestCostJacobians:
         
         # Cost with angle cost enabled (this was causing line search failures before fix)
         cost_cfg = saltro.CostConfig()
-        cost_cfg.angle = 1e2
-        cost_cfg.angle_N = 1e2
+        cost_cfg.angle = 2e2    # doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
+        cost_cfg.angle_N = 2e2  # doubled (see above)
         cost_cfg.ang_vel = 1e4
         cost_cfg.ang_vel_N = 1e4
         cost_cfg.ang_vel_mag = 5e1
@@ -484,7 +484,7 @@ class TestCostJacobians:
         cost_cfg.control_mult = 0.01
         cost_cfg.mtq_control_weight = 1.0
         cost_cfg.rw_control_weight = 1e3
-        cost_cfg.ang_cost_func_type = 4
+        cost_cfg.ang_cost_func_type = 1
         
         boresight = np.array([1.0, 0.0, 0.0])
         eci_target = np.array([1.0, 0.0, 0.0, 0.0])
@@ -694,24 +694,24 @@ class TestCostHessians:
         
         # Cost with angle cost
         cost_cfg = saltro.CostConfig()
-        cost_cfg.angle = 1e2
+        cost_cfg.angle = 2e2  # doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
         cost_cfg.ang_vel = 1e3
         cost_cfg.control_mult = 0.1
-        cost_cfg.ang_cost_func_type = 4
-        
+        cost_cfg.ang_cost_func_type = 1
+
         boresight = np.array([0.9, 0.2, 0.1])
         boresight /= np.linalg.norm(boresight)
         eci_target = np.array([1.0, 0.0, 0.0, 0.0])
         B_eci = np.array([5e-5, 2e-5, 3e-5])
-        
+
         # Get analytical Hessian
         lxx_analytical, _, _ = fixture.sat.stageCostHessians(
             5, 10, x, u, boresight, eci_target, B_eci, cost_cfg)
-        
+
         # Extract quaternion block
         q_idx = fixture.sat.QUAT_INDEX
         H_qq = lxx_analytical[q_idx:q_idx+4, q_idx:q_idx+4]
-        
+
         # Check: H_qq * q should be near zero (right multiplication)
         H_q_product = np.dot(H_qq, q)
         right_proj_error = np.linalg.norm(H_q_product)
@@ -731,10 +731,10 @@ class TestCostHessians:
         
         # Cost with angle cost
         cost_cfg = saltro.CostConfig()
-        cost_cfg.angle = 1e2
+        cost_cfg.angle = 2e2  # doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
         cost_cfg.ang_vel = 1e3
         cost_cfg.control_mult = 0.1
-        cost_cfg.ang_cost_func_type = 4
+        cost_cfg.ang_cost_func_type = 1
         
         boresight = np.array([0.9, 0.2, 0.1])
         boresight /= np.linalg.norm(boresight)
@@ -768,12 +768,12 @@ class TestCostHessians:
         
         # Cost with angle cost enabled
         cost_cfg = saltro.CostConfig()
-        cost_cfg.angle = 1e2
+        cost_cfg.angle = 2e2  # doubled: type 4 ((1-d)^2) removed -> type 1 (0.5*(1-d)^2)
         cost_cfg.ang_vel = 1e4
         cost_cfg.control_mult = 0.01
         cost_cfg.mtq_control_weight = 1.0
         cost_cfg.rw_control_weight = 1e3
-        cost_cfg.ang_cost_func_type = 4
+        cost_cfg.ang_cost_func_type = 1
         cost_cfg.use_cost_hess = True
         
         boresight = np.array([1.0, 0.0, 0.0])
