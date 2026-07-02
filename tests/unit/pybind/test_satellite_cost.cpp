@@ -1828,3 +1828,208 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     
     REQUIRE(jacobians_valid);
 }
+// ============================================================================
+// TEST SECTION 10: afc=3 Taylor protection — quaternion-goal mode
+// ============================================================================
+// C++ twin of test_afc3_taylor_matches_half_theta_squared_near_alignment
+// (tests/unit/pybind/test_satellite_cost_omega_ff.py), extended to the
+// quaternion-goal branches.  In quat mode the inner scalar is
+// d = |q_goal·q| = cos(θ/2) (post-hemisphere-alignment, d ∈ [0, 1]), so
+// h(d) = ½·acos²(d) = ½·(θ/2)².  The d = +1 removable singularity of the
+// acos² shape is exactly the alignment limit; the derivatives must approach
+// the analytic Taylor limits dh/dd → −1 and d²h/dd² → 1/3 at d = 1, instead
+// of the unprotected forms' −0/0 (→ 0) gradient and ∞ − ∞ (→ ~1e12) Hessian.
+
+namespace {
+
+constexpr double kPi = 3.14159265358979323846;
+
+CostConfig afc3AngleOnlyCfg() {
+    CostConfig cfg;
+    cfg.angle = 1.0;
+    cfg.angle_N = 1.0;
+    cfg.ang_vel = 0.0;
+    cfg.ang_vel_N = 0.0;
+    cfg.ang_vel_mag = 0.0;
+    cfg.ang_vel_err_dir = 0.0;
+    cfg.ang_vel_err_dir_ratio = 0.0;
+    cfg.ang_vel_roll_ratio = 1.0;
+    cfg.control_mult = 0.0;
+    cfg.mtq_control_weight = 0.0;
+    cfg.rw_control_weight = 0.0;
+    cfg.rw_AM_weight = 0.0;
+    cfg.rw_stic_weight = 0.0;
+    cfg.RWh_max_mult = 1.0;
+    cfg.RWh_ok_mult = 0.0;
+    cfg.RWh_stiction_mult = 0.0;
+    cfg.ang_cost_func_type = 3;
+    cfg.use_cost_hess = true;
+    return cfg;
+}
+
+// Goal quaternion at rotation angle theta (rad) about +x from identity.
+Eigen::Vector4d quatGoalAtAngle(double theta) {
+    return Eigen::Vector4d(std::cos(0.5 * theta), std::sin(0.5 * theta), 0.0, 0.0);
+}
+
+}  // namespace
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc3 Taylor quat-mode cost matches half theta squared near alignment",
+    "[cost][afc3][taylor][quat_mode]") {
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const CostConfig cfg = afc3AngleOnlyCfg();
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+
+    // Rotation angles spanning the realistic pointing-error range plus
+    // extremes near the d = +1 singularity, mirroring the Python vec-mode
+    // sweep.  atol floor absorbs the ~0.5-ulp rounding of cos(θ/2) at the
+    // smallest angle (1 − d ≈ 1e-11 there).
+    for (double theta_deg : {0.001, 0.01, 0.1, 1.0, 10.0, 60.0, 120.0, 179.0}) {
+        const double theta = theta_deg * kPi / 180.0;
+        const double expected = 0.5 * (0.5 * theta) * (0.5 * theta);
+        const double cost =
+            sat.stageCost(0, 100, x, u, bs, quatGoalAtAngle(theta), B_eci, cfg);
+        REQUIRE_THAT(cost, Catch::Matchers::WithinRel(expected, 1e-6) ||
+                           Catch::Matchers::WithinAbs(expected, 1e-15));
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc3 Taylor quat-mode gradient and Hessian match finite differences near alignment",
+    "[jacobians][hessians][afc3][taylor][quat_mode][finite-diff]") {
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const CostConfig cfg = afc3AngleOnlyCfg();
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+    const Eigen::Vector4d q = x.segment<4>(QI);
+    const Eigen::Matrix4d proj = Eigen::Matrix4d::Identity() - q * q.transpose();
+
+    // Angles chosen to hit all three regimes of the protection:
+    //   0.05° → full Taylor (1 − d < 1e-6), 0.5° → blend zone, 2° → exact.
+    for (double theta_deg : {0.05, 0.5, 2.0}) {
+        const double theta = theta_deg * kPi / 180.0;
+        const Eigen::Vector4d target = quatGoalAtAngle(theta);
+
+        // --- Gradient vs central finite differences (q-block) ---
+        auto [lx, Lu, lux] = sat.stageCostJacobians(
+            0, 100, x, u, bs, target, B_eci, cfg);
+        Eigen::Vector4d g_fd;
+        const double eps_g = 1e-6;
+        for (int j = 0; j < 4; ++j) {
+            Satellite::VecX xp = x, xm = x;
+            xp(QI + j) += eps_g;
+            xm(QI + j) -= eps_g;
+            const double cp = sat.stageCost(0, 100, xp, u, bs, target, B_eci, cfg);
+            const double cm = sat.stageCost(0, 100, xm, u, bs, target, B_eci, cfg);
+            g_fd(j) = (cp - cm) / (2.0 * eps_g);
+        }
+        g_fd = proj * g_fd;  // cost normalizes q → FD grad lives in tangent space
+        for (int j = 0; j < 4; ++j) {
+            const double tol = 1e-8 + 1e-4 * std::abs(g_fd(j));
+            REQUIRE_THAT(lx(QI + j), Catch::Matchers::WithinAbs(g_fd(j), tol));
+        }
+
+        // --- Hessian vs central second differences (projected q-block) ---
+        auto [lxx, luu, lux2] = sat.stageCostHessians(
+            0, 100, x, u, bs, target, B_eci, cfg);
+        Eigen::Matrix4d H_fd;
+        const double eps_h = 1e-4;
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                Satellite::VecX xpp = x, xmm = x, xpm = x, xmp = x;
+                xpp(QI + i) += eps_h; xpp(QI + j) += eps_h;
+                xmm(QI + i) -= eps_h; xmm(QI + j) -= eps_h;
+                xpm(QI + i) += eps_h; xpm(QI + j) -= eps_h;
+                xmp(QI + i) -= eps_h; xmp(QI + j) += eps_h;
+                const double cpp = sat.stageCost(0, 100, xpp, u, bs, target, B_eci, cfg);
+                const double cmm = sat.stageCost(0, 100, xmm, u, bs, target, B_eci, cfg);
+                const double cpm = sat.stageCost(0, 100, xpm, u, bs, target, B_eci, cfg);
+                const double cmp2 = sat.stageCost(0, 100, xmp, u, bs, target, B_eci, cfg);
+                H_fd(i, j) = (cpp + cmm - cpm - cmp2) / (4.0 * eps_h * eps_h);
+            }
+        }
+        const Eigen::Matrix4d H_fd_proj = proj * H_fd * proj;
+        const Eigen::Matrix4d H_ana_proj =
+            proj * lxx.block<4, 4>(QI, QI) * proj;
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                const double tol = 1e-4 + 1e-3 * std::abs(H_fd_proj(i, j));
+                REQUIRE_THAT(H_ana_proj(i, j),
+                             Catch::Matchers::WithinAbs(H_fd_proj(i, j), tol));
+            }
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc3 Taylor quat-mode derivatives match analytic limits at d=1",
+    "[jacobians][hessians][afc3][taylor][quat_mode]") {
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const CostConfig cfg = afc3AngleOnlyCfg();  // w_ang = 1
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
+
+    SECTION("near-aligned (theta = 1e-4 rad, deep in the Taylor zone)") {
+        // 1 − d ≈ 1.25e-9 ≪ 1e-6: the exact c-formula is already in the
+        // catastrophic-cancellation regime here (the unprotected Hessian
+        // expression is off by O(10) or worse), while the extraction below
+        // is still numerically clean.
+        const double theta = 1e-4;
+        const double s = std::sin(0.5 * theta);  // ‖(I − qqᵀ)·q_goal‖
+        const Eigen::Vector4d target = quatGoalAtAngle(theta);
+
+        // lx_q = w·(dh/dd)·(q_goal − d·q) = (dh/dd)·[0, s, 0, 0].
+        auto [lx, Lu, lux] = sat.stageCostJacobians(
+            0, 100, x, u, bs, target, B_eci, cfg);
+        const double dh_dd = lx(QI + 1) / s;
+        REQUIRE_THAT(dh_dd, Catch::Matchers::WithinAbs(-1.0, 1e-6));
+        REQUIRE_THAT(lx(QI + 0), Catch::Matchers::WithinAbs(0.0, 1e-12));
+        REQUIRE_THAT(lx(QI + 2), Catch::Matchers::WithinAbs(0.0, 1e-12));
+        REQUIRE_THAT(lx(QI + 3), Catch::Matchers::WithinAbs(0.0, 1e-12));
+
+        // H_qq = P·(d²h/dd²·q_g·q_gᵀ − (dh/dd)·d·I)·P with P = diag(0,1,1,1):
+        //   H(1,1) = d²h/dd²·s² − (dh/dd)·d,   H(2,2) = H(3,3) = −(dh/dd)·d.
+        auto [lxx, luu, lux2] = sat.stageCostHessians(
+            0, 100, x, u, bs, target, B_eci, cfg);
+        REQUIRE_THAT(lxx(QI + 2, QI + 2),
+                     Catch::Matchers::WithinAbs(1.0, 1e-6));  // PwA: −(dh/dd)·d → +1
+        const double d2h_dd2 =
+            (lxx(QI + 1, QI + 1) - lxx(QI + 2, QI + 2)) / (s * s);
+        REQUIRE_THAT(d2h_dd2, Catch::Matchers::WithinAbs(1.0 / 3.0, 1e-3));
+    }
+
+    SECTION("exactly aligned (d = 1)") {
+        // q_goal ∥ q: gradient projects to exactly zero, and the Hessian
+        // q-block reduces to the PwA tangent projector −(dh/dd)·d·P = +P.
+        // The unprotected expressions gave dh/dd = −0/√(1e-12) = 0 (wrong
+        // limit; kills the PwA term) and d²h/dd² ≈ 1e12 (∞ − ∞ garbage).
+        const Eigen::Vector4d target(1, 0, 0, 0);
+
+        auto [lx, Lu, lux] = sat.stageCostJacobians(
+            0, 100, x, u, bs, target, B_eci, cfg);
+        for (int j = 0; j < 4; ++j) {
+            REQUIRE_THAT(lx(QI + j), Catch::Matchers::WithinAbs(0.0, 1e-12));
+        }
+
+        auto [lxx, luu, lux2] = sat.stageCostHessians(
+            0, 100, x, u, bs, target, B_eci, cfg);
+        const Eigen::Matrix4d expected =
+            Eigen::Vector4d(0, 1, 1, 1).asDiagonal();
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                REQUIRE_THAT(lxx(QI + i, QI + j),
+                             Catch::Matchers::WithinAbs(expected(i, j), 1e-9));
+            }
+        }
+    }
+}

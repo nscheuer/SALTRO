@@ -514,3 +514,68 @@ def test_afc3_taylor_matches_half_theta_squared_near_alignment():
             cost, expected, rtol=1e-6, atol=1e-20,
             err_msg=f"afc=3 cost at θ={theta_deg}° differs from ½·θ²: "
                     f"got {cost:.6e}, expected {expected:.6e}")
+
+
+def test_afc3_taylor_matches_half_theta_squared_near_alignment_quat_mode():
+    """Quaternion-goal twin of the test above.  In quat mode the inner scalar
+    is d = |q_goal·q| = cos(θ/2) (post-hemisphere-alignment, d ∈ [0, 1]), so
+    the afc=3 cost is ½·acos²(d) = ½·(θ/2)² and d → +1 (alignment) is exactly
+    the Taylor-protected region.  Beyond the cost value, this also pins the
+    analytic Taylor limits of the quat-mode derivative branches:
+    dh/dd → −1 and d²h/dd² → 1/3 at d = 1 (the unprotected expressions gave
+    dh/dd → 0 and d²h/dd² ≈ 1e12 there)."""
+    sat = _make_satellite()
+    cfg = _vec_only_cfg(3)
+    cfg.angle = 1.0
+    cfg.angle_N = 1.0
+
+    QI = saltro.Satellite.QUAT_INDEX
+    x = np.zeros(sat.stateDim)
+    x[QI] = 1.0  # identity attitude
+    boresight = np.array([0., 0., 1.])
+    B_eci = np.array([0., 0., 0.])
+    u = np.zeros(sat.controlDim)
+
+    def qgoal(theta):
+        return np.array([np.cos(theta / 2), np.sin(theta / 2), 0.0, 0.0])
+
+    # Cost sweep: rotation angle θ about +x; cost = ½·(θ/2)².  atol floor
+    # absorbs the ~0.5-ulp rounding of cos(θ/2) at the smallest angle.
+    for theta_deg in [0.001, 0.01, 0.1, 1.0, 10.0, 60.0, 120.0, 179.0]:
+        theta = np.deg2rad(theta_deg)
+        cost = sat.stageCost(0, 100, x, u, boresight, qgoal(theta), B_eci, cfg)
+        expected = 0.5 * (theta / 2) ** 2
+        np.testing.assert_allclose(
+            cost, expected, rtol=1e-6, atol=1e-15,
+            err_msg=f"afc=3 quat-mode cost at θ={theta_deg}° differs from "
+                    f"½·(θ/2)²: got {cost:.6e}, expected {expected:.6e}")
+
+    # Analytic Taylor limits near d = 1 (θ = 1e-4 rad, deep in the Taylor
+    # zone where the unprotected c-formula is already catastrophic).
+    theta = 1e-4
+    s = np.sin(theta / 2)  # ‖(I − qqᵀ)·q_goal‖
+    lx, _, _ = sat.stageCostJacobians(0, 100, x, u, boresight, qgoal(theta),
+                                      B_eci, cfg)
+    # lx_q = w·(dh/dd)·(q_goal − d·q) = (dh/dd)·[0, s, 0, 0] with w = 1.
+    dh_dd = lx[QI + 1] / s
+    np.testing.assert_allclose(dh_dd, -1.0, atol=1e-6,
+                               err_msg="quat-mode afc=3 dh/dd limit at d→1")
+    lxx, _, _ = sat.stageCostHessians(0, 100, x, u, boresight, qgoal(theta),
+                                      B_eci, cfg)
+    # H_qq = P·(d²h/dd²·q_g·q_gᵀ − (dh/dd)·d·I)·P with P = diag(0,1,1,1):
+    #   H[1,1] = d²h/dd²·s² − (dh/dd)·d,   H[2,2] = H[3,3] = −(dh/dd)·d.
+    np.testing.assert_allclose(lxx[QI + 2, QI + 2], 1.0, atol=1e-6,
+                               err_msg="quat-mode afc=3 PwA term −(dh/dd)·d")
+    d2h_dd2 = (lxx[QI + 1, QI + 1] - lxx[QI + 2, QI + 2]) / s**2
+    np.testing.assert_allclose(d2h_dd2, 1.0 / 3.0, atol=1e-3,
+                               err_msg="quat-mode afc=3 d²h/dd² limit at d→1")
+
+    # Exactly aligned (d = 1): gradient projects to zero and the Hessian
+    # q-block reduces to the PwA tangent projector +P (not 0 / 1e12 garbage).
+    lx0, _, _ = sat.stageCostJacobians(0, 100, x, u, boresight, qgoal(0.0),
+                                       B_eci, cfg)
+    np.testing.assert_allclose(lx0[QI:QI + 4], 0.0, atol=1e-12)
+    lxx0, _, _ = sat.stageCostHessians(0, 100, x, u, boresight, qgoal(0.0),
+                                       B_eci, cfg)
+    np.testing.assert_allclose(lxx0[QI:QI + 4, QI:QI + 4],
+                               np.diag([0., 1., 1., 1.]), atol=1e-9)

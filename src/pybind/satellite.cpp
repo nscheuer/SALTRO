@@ -1485,8 +1485,12 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                 ang_cost = std::acos(qdot_aligned);
                 break;
             case 3: {
-                const double phi = std::acos(qdot_aligned);
-                ang_cost = 0.5 * phi * phi;
+                // Route through the shared shape helper so the c = +1 Taylor
+                // protection applies in quaternion mode too.  The quat-mode
+                // inner scalar d = |q_goal·q| is post-hemisphere-alignment
+                // (d ∈ [0, 1]), so d → +1 (alignment) is exactly the
+                // protected region.
+                ang_cost = angCostShape(qdot_aligned, 3).f;
                 break;
             }
             // NOTE: type 4 ((1-d)²) was removed: it is exactly type 1 with the
@@ -1839,9 +1843,10 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 break;
             }
             case 3: {  // ang_cost = 0.5 * acos(|qdot|)^2
-                const double phi = std::acos(qdot_aligned);
-                const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
-                d_ang_cost_dqdot = -phi / denom;  // Always negative
+                // Shared Taylor-protected shape: dh/dd → −1 at d = +1, where
+                // the raw −acos(d)/√(1−d²+1e-12) form degenerates to −0/1e-6
+                // (i.e. → 0, the wrong limit) as d → 1.
+                d_ang_cost_dqdot = angCostShape(qdot_aligned, 3).fp;  // Always negative
                 break;
             }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
@@ -2119,11 +2124,13 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 2:
                 d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
                 break;
-            case 3: {
-                const double phi = std::acos(std::clamp(d, 0.0, 1.0));
-                d2h_dd2 = 1.0 / one_minus_d2 - phi * d / (one_minus_d2 * sqrt_omd2);
+            case 3:
+                // Shared Taylor-protected shape: d²h/dd² → 1/3 at d = +1,
+                // where the raw 1/(1−d²) − acos(d)·d/[(1−d²)·√(1−d²)] form
+                // suffers catastrophic cancellation (∞ − ∞, evaluating to
+                // ~1e12 in double precision instead of 1/3).
+                d2h_dd2 = angCostShape(d, 3).fpp;
                 break;
-            }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             // Unreachable for validated settings; no silent acos fallback.
             default: throw invalid_argument("ang_cost_func_type invalid");
@@ -2136,11 +2143,9 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 0: dh_dd = -1.0; break;
             case 1: dh_dd = -(1.0 - d); break;
             case 2: dh_dd = -1.0 / sqrt_omd2; break;
-            case 3: {
-                const double phi2 = std::acos(std::clamp(d, 0.0, 1.0));
-                dh_dd = -phi2 / sqrt_omd2;
+            case 3:
+                dh_dd = angCostShape(d, 3).fp;  // Taylor-protected: → −1 at d = +1
                 break;
-            }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             // Unreachable for validated settings; no silent acos fallback.
             default: throw invalid_argument("ang_cost_func_type invalid");
