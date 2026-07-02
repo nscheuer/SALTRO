@@ -324,6 +324,42 @@ TEST_CASE("backward_pass sqrt: use_sqrt_bp flag routes backwardPass to the sqrt 
 	REQUIRE(dV_sqrt == dV_flag);
 }
 
+TEST_CASE("backward_pass sqrt: DDP flags force the dense path", "[backward_pass][sqrt][dispatch][ddp]") {
+	// backwardPassSqrt has no DDP second-order path. When use_sqrt_bp is set
+	// together with use_dynamics_hess/use_constraint_hess (possible for
+	// callers that skip validatePlannerSettings, e.g. the direct python
+	// bindings), backwardPass must fall back to the dense DDP pass instead of
+	// silently dropping the curvature terms.
+	BackwardPassSqrtFixture fixture(6);
+	TrajectoryData td = fixture.makeTrajectory(true);
+	const std::vector<Eigen::VectorXd> c_list = fixture.collectConstraints(td);
+
+	std::vector<Eigen::VectorXd> lambda_aug;
+	std::vector<Eigen::VectorXd> mu_aug;
+	BackwardPassSqrtFixture::makeConstAug(c_list, 1.0, 100.0, lambda_aug, mu_aug);
+
+	// Baseline: dense pass with DDP second-order terms enabled.
+	fixture.settings.passes[0].reg.use_sqrt_bp = false;
+	fixture.settings.passes[0].reg.use_dynamics_hess = true;
+	fixture.settings.passes[0].reg.use_constraint_hess = true;
+
+	std::vector<Eigen::MatrixXd> K_dense, K_flag;
+	std::vector<Eigen::VectorXd> d_dense, d_flag;
+	Eigen::Vector2d dV_dense = Eigen::Vector2d::Zero();
+	Eigen::Vector2d dV_flag = Eigen::Vector2d::Zero();
+
+	REQUIRE(fixture.runDense(td, lambda_aug, mu_aug, K_dense, d_dense, dV_dense));
+
+	// Same settings plus use_sqrt_bp: the dispatch must take the dense path
+	// and produce bit-identical results.
+	fixture.settings.passes[0].reg.use_sqrt_bp = true;
+	REQUIRE(fixture.runDense(td, lambda_aug, mu_aug, K_flag, d_flag, dV_flag));
+
+	REQUIRE(relGainDelta(K_dense, K_flag) == 0.0);
+	REQUIRE(relFeedforwardDelta(d_dense, d_flag) == 0.0);
+	REQUIRE(dV_dense == dV_flag);
+}
+
 TEST_CASE("backward_pass sqrt: N=1 edge case", "[backward_pass][sqrt][n1_edge_case]") {
 	BackwardPassSqrtFixture fixture(1);
 	TrajectoryData td = fixture.makeTrajectory(false);

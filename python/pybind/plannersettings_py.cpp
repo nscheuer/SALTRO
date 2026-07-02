@@ -103,7 +103,7 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("use_dynamics_hess", &RegularizationConfig::use_dynamics_hess)
         .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess)
         .def_readwrite("psd_clip_quu_ddp", &RegularizationConfig::psd_clip_quu_ddp)
-        .def_readwrite("psd_clamp_lxx", &RegularizationConfig::psd_clamp_lxx);
+        .def_readwrite("psd_clamp_lxx", &RegularizationConfig::psd_clamp_lxx)
         .def_readwrite("use_sqrt_bp", &RegularizationConfig::use_sqrt_bp);
 
     py::class_<LineSearchConfig>(m, "LineSearchConfig")

@@ -1,0 +1,8 @@
+[ 32%] Built target saltro
+[ 96%] Built target Catch2
+[ 98%] Built target Catch2WithMain
+[ 98%] Building CXX object CMakeFiles/optimizer_test_alilqr.dir/tests/unit/optimizer/test_alilqr.cpp.o
+[100%] Linking CXX executable unit_tests/optimizer/optimizer_test_alilqr
+[100%] Built target optimizer_test_alilqr
+[ 51%] Built target saltro
+[100%] Built target saltro_py
