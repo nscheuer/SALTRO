@@ -597,6 +597,13 @@
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController11setGoalRateERKN5Eigen8Vector3dE">
+<span id="_CPPv3N6saltro10controller12PDController11setGoalRateERKN5Eigen8Vector3dE"></span><span id="_CPPv2N6saltro10controller12PDController11setGoalRateERKN5Eigen8Vector3dE"></span><span id="saltro::controller::PDController::setGoalRate__Eigen::Vector3dCR"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1abc27c273cfce3f1502a67041aa167db4"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">setGoalRate</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">omega_des</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController11setGoalRateERKN5Eigen8Vector3dE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Set a desired body-frame angular rate to feed forward. </p>
+<p>When set finite, find_u damps ω toward this rate (τ_des += -kd·(ω - ω_des)) instead of toward zero, matching OldPlanner smartbdot’s goal-rate feedforward (<code class="docutils literal notranslate"><span class="pre">wkdes</span></code>). Pass a non-finite/NaN vector (the default) to disable. </p>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK6saltro10controller12PDController4kp_qEv">
 <span id="_CPPv3NK6saltro10controller12PDController4kp_qEv"></span><span id="_CPPv2NK6saltro10controller12PDController4kp_qEv"></span><span id="saltro::controller::PDController::kp_qC"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1ac365a397ffea8f96307259a55bc51c08"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kp_q</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6saltro10controller12PDController4kp_qEv" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
@@ -638,6 +645,12 @@
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController9rw_scale_E">
 <span id="_CPPv3N6saltro10controller12PDController9rw_scale_E"></span><span id="_CPPv2N6saltro10controller12PDController9rw_scale_E"></span><span id="saltro::controller::PDController::rw_scale___double"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1a9d540b48ff70494ad85ede5ec47f3823"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_scale_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController9rw_scale_E" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController10omega_des_E">
+<span id="_CPPv3N6saltro10controller12PDController10omega_des_E"></span><span id="_CPPv2N6saltro10controller12PDController10omega_des_E"></span><span id="saltro::controller::PDController::omega_des___Eigen::Vector3d"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1afb472ecd01970544835f222a622bb0ba"></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">omega_des_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Constant</span></span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">numeric_limits</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">quiet_NaN</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">)</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController10omega_des_E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Optional goal-rate feedforward; NaN entries disable it. </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -702,6 +715,7 @@
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller12PDController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"><code class="docutils literal notranslate"><span class="pre">find_u()</span></code></a></li>
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController8setGainsEdd"><code class="docutils literal notranslate"><span class="pre">setGains()</span></code></a></li>
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController10setRWScaleEd"><code class="docutils literal notranslate"><span class="pre">setRWScale()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController11setGoalRateERKN5Eigen8Vector3dE"><code class="docutils literal notranslate"><span class="pre">setGoalRate()</span></code></a></li>
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller12PDController4kp_qEv"><code class="docutils literal notranslate"><span class="pre">kp_q()</span></code></a></li>
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller12PDController4kd_wEv"><code class="docutils literal notranslate"><span class="pre">kd_w()</span></code></a></li>
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller12PDController7rwScaleEv"><code class="docutils literal notranslate"><span class="pre">rwScale()</span></code></a></li>
@@ -709,6 +723,7 @@
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController5kp_q_E"><code class="docutils literal notranslate"><span class="pre">kp_q_</span></code></a></li>
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController5kd_w_E"><code class="docutils literal notranslate"><span class="pre">kd_w_</span></code></a></li>
 <li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController9rw_scale_E"><code class="docutils literal notranslate"><span class="pre">rw_scale_</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController10omega_des_E"><code class="docutils literal notranslate"><span class="pre">omega_des_</span></code></a></li>
 </ul>
 </li>
 </ul>

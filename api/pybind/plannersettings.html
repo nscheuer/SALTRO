@@ -543,6 +543,13 @@
 <span id="_CPPv3N14InitTrajConfig14initcontrollerE"></span><span id="_CPPv2N14InitTrajConfig14initcontrollerE"></span><span id="InitTrajConfig::initcontroller__i"></span><span class="target" id="structInitTrajConfig_1ab5c407736bc60e3d5a42c5a1feaa04c4"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">initcontroller</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N14InitTrajConfig14initcontrollerE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N14InitTrajConfig23pd_goal_rate_ff_enabledE">
+<span id="_CPPv3N14InitTrajConfig23pd_goal_rate_ff_enabledE"></span><span id="_CPPv2N14InitTrajConfig23pd_goal_rate_ff_enabledE"></span><span id="InitTrajConfig::pd_goal_rate_ff_enabled__b"></span><span class="target" id="structInitTrajConfig_1a0efce8e6a8ad0255db0e3a5a38b1fa51"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">pd_goal_rate_ff_enabled</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N14InitTrajConfig23pd_goal_rate_ff_enabledE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Goal-rate feedforward toggle (ported from OldPlanner smartbdot). </p>
+<p>When true and initcontroller == 3, the PD warm-start feeds forward a desired body rate <code class="docutils literal notranslate"><span class="pre">ω_des</span></code> computed by finite-differencing the goal trajectory between consecutive knots (OldPlanner <code class="docutils literal notranslate"><span class="pre">wkdes</span></code>), adding a <code class="docutils literal notranslate"><span class="pre">-kd·</span></code>(ω - ω_des) damping term toward the goal rate instead of damping ω toward zero. Default off preserves the rate-to-zero behavior. </p>
+</dd></dl>
+
 </div>
 </dd></dl>
 
@@ -1482,6 +1489,7 @@ J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv416MAX_OUTER_PASSES"><code class="docutils literal notranslate"><span class="pre">MAX_OUTER_PASSES</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv414InitTrajConfig"><code class="docutils literal notranslate"><span class="pre">InitTrajConfig</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14InitTrajConfig14initcontrollerE"><code class="docutils literal notranslate"><span class="pre">initcontroller</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N14InitTrajConfig23pd_goal_rate_ff_enabledE"><code class="docutils literal notranslate"><span class="pre">pd_goal_rate_ff_enabled</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv417DisturbanceConfig"><code class="docutils literal notranslate"><span class="pre">DisturbanceConfig</span></code></a><ul class="nav section-nav flex-column">
