@@ -4,6 +4,7 @@
 #include <saltro/pybind/disturbances/srpdisturbance.h>
 #include <saltro/math/integrators/rk4.h>
 
+#include <cassert>
 #include <stdexcept>
 #include <cmath>
 #include <algorithm>
@@ -2718,6 +2719,36 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     const int n_constraints = 1 + 1 + (has_control_constraints
                                            ? (2 * num_mtq_ + 5 * num_rw_ + 2 * num_magic_)
                                            : 0);
+#ifndef NDEBUG
+    // Debug-only consistency check: constraintFamily() must stay in sync with
+    // the row layout emitted below. If a future change reorders/adds constraint
+    // rows without updating constraintFamily(), per-family AL penalties would
+    // silently be applied to the wrong rows — fail loudly here in Debug builds
+    // instead. Zero-cost in Release (the whole block compiles away).
+    {
+        int family_counts[static_cast<int>(ConstraintFamily::NumFamilies)] = {0};
+        for (int ci = 0; ci < n_constraints; ++ci) {
+            const int fam = constraintFamily(ci, !has_control_constraints);
+            assert(fam >= 0 && fam < static_cast<int>(ConstraintFamily::NumFamilies) &&
+                   "constraintFamily() out of sync with constraints() row layout");
+            ++family_counts[fam];
+        }
+        assert(family_counts[static_cast<int>(ConstraintFamily::AngularVelocity)] == 1);
+        assert(family_counts[static_cast<int>(ConstraintFamily::SunAvoidance)] == 1);
+        assert(family_counts[static_cast<int>(ConstraintFamily::MTQSaturation)] ==
+               (has_control_constraints ? 2 * num_mtq_ : 0));
+        assert(family_counts[static_cast<int>(ConstraintFamily::RWTorqueSat)] ==
+               (has_control_constraints ? 2 * num_rw_ : 0));
+        assert(family_counts[static_cast<int>(ConstraintFamily::RWMomentum)] ==
+               (has_control_constraints ? 2 * num_rw_ : 0));
+        assert(family_counts[static_cast<int>(ConstraintFamily::RWStiction)] ==
+               (has_control_constraints ? num_rw_ : 0));
+        assert(family_counts[static_cast<int>(ConstraintFamily::MagicTorqueSat)] ==
+               (has_control_constraints ? 2 * num_magic_ : 0));
+        // One past the end must be flagged as out of range.
+        assert(constraintFamily(n_constraints, !has_control_constraints) == -1);
+    }
+#endif
     VecX c(n_constraints);
     c.setZero();
 

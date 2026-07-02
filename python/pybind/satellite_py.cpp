@@ -436,6 +436,31 @@ Returns
 ndarray
     Constraint vector c where each entry should satisfy c_i <= 0
 )doc")
+        .def("constraintFamily", &Satellite::constraintFamily,
+             py::arg("constraint_idx"),
+             py::arg("is_terminal"),
+             R"doc(
+Map a constraint row index to its ConstraintFamily.
+
+Mirrors the row layout of constraints():
+row 0 -> ConstraintFamily.angular_velocity, row 1 -> ConstraintFamily.sun_avoidance,
+then (intermediate steps only) 2 rows per MTQ (mtq_saturation), 5 rows per RW
+(2 rw_torque_sat, 2 rw_momentum, 1 rw_stiction), 2 rows per Magic actuator
+(magic_torque_sat).
+
+Parameters
+----------
+constraint_idx : int
+    Row index into the constraint vector returned by constraints()
+is_terminal : bool
+    True for the terminal step (k == N-1), which only has the two state rows
+
+Returns
+-------
+int
+    Family index in [0, NumFamilies) — compare against ConstraintFamily values;
+    -1 if constraint_idx is out of range for this satellite/step type
+)doc")
         .def("constraintJacobians", &Satellite::constraintJacobians,
              py::arg("k"),
              py::arg("N"),
