@@ -113,7 +113,6 @@ def test_mtq_dtorq_dbasestate_with_zero_dB_dq():
     assert np.allclose(J, 0.0)
 
 
-@pytest.mark.skip(reason="Tensor3<1,7,3> not yet bound to Python")
 def test_mtq_ddtorq_dudbasestate_with_non_zero_dB_dq():
     axis = valid_axis()
     mtq = saltro_py.MTQ(axis, 1.0)
@@ -125,8 +124,10 @@ def test_mtq_ddtorq_dudbasestate_with_non_zero_dB_dq():
 
     H = mtq.ddtorq_dudbasestate(0.5, x, B, dB_dq)
 
-    assert H.shape[0] == 1
-    assert H.shape[1] == 7
+    # Tensor3<1,7,3> -> numpy (slices, rows, cols) = (3, 1, 7): one control row,
+    # 7 base-state columns, 3 torque-component slices.
+    assert H.shape == (3, 1, 7)
+    assert np.all(np.isfinite(H))
 
 
 def test_mtq_torque_matches_u_times_axis_cross_b_for_random_configs():
