@@ -433,6 +433,8 @@ TEST_CASE("per-pass disturbance override matches global", "[optimizer][alilqr][d
 			jtime,
 			q_goal,
 			boresight,
+			Eigen::MatrixXd(0, 0),  // seed_X (empty -> controller warm-start)
+			Eigen::MatrixXd(0, 0),  // seed_U
 			X,
 			U,
 			K,
@@ -459,4 +461,147 @@ TEST_CASE("per-pass disturbance override matches global", "[optimizer][alilqr][d
 	REQUIRE((U_override_on - U_global_on).norm() < 1e-9);
 	// ...and genuinely differs from the disturbance-free solve.
 	REQUIRE((U_override_on - U_off).norm() > 1e-6);
+}
+
+TEST_CASE("warm-start reuse seeds the solve", "[optimizer][alilqr][warmstart]") {
+	// C++ twin of the python test test_warm_start_reuse_seeds_the_solve:
+	// trajOpt can be seeded from a prior (X, U) instead of a controller rollout
+	// (testing / iterate-and-refine). Seeding from the optimum round-trips back
+	// to it; a coarse (zero-order-hold-resampled) seed still runs and --
+	// crucially -- lands at a DIFFERENT converged trajectory than the optimal
+	// seed, proving the seed genuinely steers the solve (the deterministic
+	// solver would give the same result for every input if the seed were
+	// ignored). A wrong-dimension seed is rejected.
+	const double dt_seconds = 10.0;
+	const double tf_seconds = 80.0;
+
+	const PlannerSettings settings = createRWPlannerSettings(dt_seconds);
+
+	Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+	J(0, 0) = 0.067;
+	J(1, 1) = 0.071;
+	J(2, 2) = 0.069;
+	Satellite satellite(J, settings);
+	satellite.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+	satellite.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+	satellite.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+	Satellite::VecX x0(satellite.stateDim());
+	x0.setZero();
+	x0.segment<3>(Satellite::AV_INDEX) = Eigen::Vector3d(-0.01, 0.02, 0.03);
+	x0.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+	x0.segment(satellite.RW_MOMENTUM_INDEX, 3) = Eigen::Vector3d::Zero();
+
+	const Eigen::Vector3d r0(7000e3, 0.0, 0.0);
+	const Eigen::Vector3d v0(0.0, 7.5e3, 0.0);
+
+	Eigen::VectorXd jtime(2);
+	jtime(0) = 0.22;
+	jtime(1) = 0.22 + tf_seconds / SEC_PER_CENTURY;
+
+	Eigen::MatrixXd q_goal(4, 2);
+	q_goal << std::sqrt(2.0) / 2.0, std::sqrt(2.0) / 2.0,
+			  0.0, 0.0,
+			  0.0, 0.0,
+			  std::sqrt(2.0) / 2.0, std::sqrt(2.0) / 2.0;
+
+	Eigen::MatrixXd boresight(3, 2);
+	boresight << 1.0, 1.0,
+				 0.0, 0.0,
+				 0.0, 0.0;
+
+	const int state_dim = satellite.stateDim();
+	const int input_dim = satellite.controlDim();
+	const int reduced_state_dim = satellite.reducedStateDim();
+
+	const auto solve = [&](const Eigen::MatrixXd& seed_X, const Eigen::MatrixXd& seed_U, int& N_out) {
+		Eigen::MatrixXd X = Eigen::MatrixXd::Zero(state_dim, limits::MAX_LENGTH_TRAJ);
+		Eigen::MatrixXd U = Eigen::MatrixXd::Zero(input_dim, limits::MAX_LENGTH_TRAJ);
+		Eigen::MatrixXd K = Eigen::MatrixXd::Zero(input_dim, reduced_state_dim * limits::MAX_LENGTH_TRAJ);
+		int N = static_cast<int>(jtime.size());
+
+		bool ok = false;
+		REQUIRE_NOTHROW(ok = optimizer::trajOpt(
+			settings,
+			satellite,
+			x0,
+			r0,
+			v0,
+			jtime,
+			q_goal,
+			boresight,
+			seed_X,
+			seed_U,
+			X,
+			U,
+			K,
+			state_dim,
+			input_dim,
+			N
+		));
+		REQUIRE(ok);
+		REQUIRE(N > 0);
+		N_out = N;
+
+		std::pair<Eigen::MatrixXd, Eigen::MatrixXd> result(X.leftCols(N), U.leftCols(N));
+		REQUIRE(result.first.allFinite());
+		REQUIRE(result.second.allFinite());
+		return result;
+	};
+
+	const Eigen::MatrixXd empty_seed(0, 0);
+
+	// Baseline solve: default controller warm-start.
+	int N0 = 0;
+	const auto [X0, U0] = solve(empty_seed, empty_seed, N0);
+
+	// Seed from the optimum -> converges right back to it.
+	int N1 = 0;
+	const auto [X1, U1] = solve(X0, U0, N1);
+	REQUIRE(N1 == N0);
+	REQUIRE((X1 - X0).norm() < 1e-3);
+
+	// Seed from a coarse half-resolution trajectory -> runs, valid, and the
+	// zero-order-hold resample produces a different converged result.
+	const int n_coarse = (N0 + 1) / 2;
+	Eigen::MatrixXd seed_X_coarse(state_dim, n_coarse);
+	Eigen::MatrixXd seed_U_coarse(input_dim, n_coarse);
+	for (int i = 0; i < n_coarse; ++i) {
+		seed_X_coarse.col(i) = X0.col(2 * i);
+		seed_U_coarse.col(i) = U0.col(2 * i);
+	}
+	int Nc = 0;
+	const auto [Xc, Uc] = solve(seed_X_coarse, seed_U_coarse, Nc);
+	REQUIRE(Nc == N0);
+	REQUIRE(Xc.rows() == X0.rows());
+	REQUIRE(Xc.cols() == X0.cols());
+	REQUIRE((X1 - Xc).norm() > 1e-2); // different seeds -> different outcome
+
+	// Wrong-dimension seed is rejected.
+	{
+		Eigen::MatrixXd X = Eigen::MatrixXd::Zero(state_dim, limits::MAX_LENGTH_TRAJ);
+		Eigen::MatrixXd U = Eigen::MatrixXd::Zero(input_dim, limits::MAX_LENGTH_TRAJ);
+		Eigen::MatrixXd K = Eigen::MatrixXd::Zero(input_dim, reduced_state_dim * limits::MAX_LENGTH_TRAJ);
+		int N = static_cast<int>(jtime.size());
+		const Eigen::MatrixXd seed_X_bad = Eigen::MatrixXd::Zero(3, 5);
+
+		REQUIRE_THROWS(optimizer::trajOpt(
+			settings,
+			satellite,
+			x0,
+			r0,
+			v0,
+			jtime,
+			q_goal,
+			boresight,
+			seed_X_bad,
+			U0,
+			X,
+			U,
+			K,
+			state_dim,
+			input_dim,
+			N
+		));
+	}
 }
