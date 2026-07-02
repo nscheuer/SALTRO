@@ -234,12 +234,11 @@ def alilqr(
         # Update lambda_k and mu_k elementwise (inequality constraints).
         clist = _collect_constraints(plannersettings, satellite, X, U, S)
         for k, ck in enumerate(clist):
-            ck_pos = np.maximum(0.0, ck)
             lambda_aug[k] = np.maximum(
                 0.0,
                 np.minimum(
                     passsettings.auglag.lag_mult_max,
-                    lambda_aug[k] + mu_aug[k] * ck_pos,
+                    lambda_aug[k] + mu_aug[k] * ck,
                 ),
             )
             mu_aug[k] = np.minimum(passsettings.auglag.penalty_max, phi_aug * mu_aug[k])

@@ -36,7 +36,7 @@ def create_planner_settings():
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1e-1
-    cost.rw_control_weight = 1.0
+    cost.rw_control_weight = 1e3
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0

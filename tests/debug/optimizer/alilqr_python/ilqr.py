@@ -16,7 +16,7 @@ def _augmented_penalty_total(
     lambda_aug: list[np.ndarray] | None,
     mu_aug: list[np.ndarray] | None,
 ) -> float:
-    """Compute Σ_k [lambda_k^T c_k^+ + 0.5 * c_k^{+T} diag(mu_k) c_k^+]."""
+    """Match the C++ AL merit exactly for line-search seeding."""
     if lambda_aug is None or mu_aug is None:
         return 0.0
 
@@ -34,10 +34,11 @@ def _augmented_penalty_total(
             uk = np.zeros(satellite.controlDim)
 
         ck = np.asarray(satellite.constraints(k, N, xk, uk, S[:, k], cnst_cfg), dtype=float)
-        ck_pos = np.maximum(0.0, ck)
         lam_k = np.asarray(lambda_aug[k], dtype=float)
         mu_k = np.asarray(mu_aug[k], dtype=float)
-        total += float(lam_k @ ck_pos + 0.5 * np.sum(mu_k * ck_pos * ck_pos))
+        total += float(lam_k @ ck)
+        active_penalty = (ck > 0.0) | (lam_k > 0.0)
+        total += float(0.5 * np.sum(mu_k[active_penalty] * ck[active_penalty] * ck[active_penalty]))
 
     return total
 
