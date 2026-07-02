@@ -1,0 +1,818 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Convergence Logic Tree &#8212; SALTRO 0.0.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=a95f357e85573c9b56d5" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=a95f357e85573c9b56d5" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <link rel="stylesheet" type="text/css" href="_static/saltro.css?v=8ed733f0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="_static/scripts/fontawesome.js?digest=a95f357e85573c9b56d5"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=a95f357e85573c9b56d5" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=a95f357e85573c9b56d5" />
+
+    <script src="_static/documentation_options.js?v=7026087e"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'convergence_logic_tree';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="validate_trajOpt" href="api/validation/validate_trajOpt.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  
+    
+    <script src="_static/searchtools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/rexlab.png" class="logo__image only-light" alt=""/>
+    <img src="_static/rexlab.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">SALTRO</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/ALTRO.html">
+    The working principle behind SALTRO
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/Installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/FC.html">
+    OBC (FC) usage guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="code_documentation.html">
+    Code Documentation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Convergence Logic Tree
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/ALTRO.html">
+    The working principle behind SALTRO
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/Installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="datasheets/FC.html">
+    OBC (FC) usage guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="code_documentation.html">
+    Code Documentation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Convergence Logic Tree
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item pst-sidebar-collapse"><button id="pst-collapse-sidebar-button" aria-expanded="true" aria-controls="pst-primary-sidebar"><svg class="pst-icon svg-inline--fa" role="img" aria-hidden="true" focusable="false" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <path fill="currentColor" d="M3 15.5C2.36232 15.5 1.74874 15.2564 1.28478 14.8189C0.820828 14.3815 0.541576 13.7832 0.504167 13.1467L0.5 13L0.5 3C0.499965 2.36232 0.743605 1.74874 1.18107 1.28478C1.61854 0.820828 2.21676 0.541576 2.85333 0.504167L3 0.5L13 0.5C13.6377 0.499965 14.2513 0.743605 14.7152 1.18107C15.1792 1.61854 15.4584 2.21676 15.4958 2.85333L15.5 3L15.5 13C15.5 13.6377 15.2564 14.2513 14.8189 14.7152C14.3815 15.1792 13.7832 15.4584 13.1467 15.4958L13 15.5L3 15.5ZM3 13.8333L10.5 13.8333L10.5 2.16667L3 2.16667C2.79589 2.16669 2.59889 2.24163 2.44636 2.37726C2.29383 2.5129 2.19638 2.69979 2.1725 2.9025L2.16667 3L2.16667 13C2.16669 13.2041 2.24163 13.4011 2.37726 13.5536C2.5129 13.7062 2.69979 13.8036 2.9025 13.8275L3 13.8333ZM6.65583 10.325L6.5775 10.2558L4.91083 8.58917C4.76735 8.44567 4.68116 8.25476 4.66843 8.05223C4.65569 7.84971 4.71729 7.6495 4.84167 7.48917L4.91083 7.41083L6.5775 5.74417C6.72747 5.59471 6.9287 5.50794 7.14032 5.50148C7.35194 5.49502 7.55809 5.56935 7.7169 5.70937C7.8757 5.8494 7.97525 6.04463 7.99533 6.25539C8.01541 6.46616 7.95451 6.67667 7.825 6.84417L7.75583 6.9225L6.67917 8L7.75583 9.0775C7.89931 9.22099 7.98551 9.41191 7.99824 9.61443C8.01097 9.81695 7.94938 10.0172 7.825 10.1775L7.75583 10.2558C7.61234 10.3993 7.42142 10.4855 7.2189 10.4982C7.01638 10.511 6.81617 10.4494 6.65583 10.325Z"/>
+  </svg>
+  <span class="pst-collapse-sidebar-label">Collapse Sidebar</span>
+  <span class="pst-expand-sidebar-label">Expand Sidebar</span>
+</button></div>
+        <div class="sidebar-primary-item">
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Convergence Logic Tree</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="convergence-logic-tree">
+<h1>Convergence Logic Tree<a class="headerlink" href="#convergence-logic-tree" title="Link to this heading">#</a></h1>
+<p>This page helps trace an AL-iLQR solve from the innermost line-search
+decision to the final AL-iLQR status. Use it when <code class="docutils literal notranslate"><span class="pre">trajOpt</span></code> reports a
+failure, when constraints are satisfied but the inner iLQR status is not
+<code class="docutils literal notranslate"><span class="pre">Converged</span></code>, or when a trajectory appears unchanged despite a successful
+return.</p>
+<p>The three layers are:</p>
+<div class="saltro-legend" aria-label="Convergence logic tree color legend">
+  <span class="saltro-pill saltro-pill-inner">Inner: line search / forward pass</span>
+  <span class="saltro-pill saltro-pill-middle">Middle: iLQR subproblem</span>
+  <span class="saltro-pill saltro-pill-outer">Outer: AL-iLQR constraints</span>
+</div><section id="how-to-read-the-tree">
+<h2>How To Read The Tree<a class="headerlink" href="#how-to-read-the-tree" title="Link to this heading">#</a></h2>
+<p>Start at the top of the outer layer. Each AL-iLQR outer iteration calls one
+iLQR subproblem. Each iLQR iteration repeatedly tries a backward pass and a
+forward-pass line search while increasing regularization. The forward pass is
+the only place where the state and control trajectory are actually accepted
+and overwritten.</p>
+<div class="saltro-tree">
+  <section class="saltro-layer saltro-outer">
+    <header>
+      <span class="saltro-layer-name">Outer Layer</span>
+      <h2>AL-iLQR loop</h2>
+      <p>Goal: satisfy all inequality constraints, then return a trajectory only if the inner solve made real progress or converged.</p>
+    </header>
+
+    <ol class="saltro-steps">
+      <li>
+        <div class="saltro-node saltro-node-action">
+          <strong>Initialize augmented terms</strong>
+          <p>Collect each constraint vector <code>c_k</code>. Initialize <code>lambda_aug</code> and <code>mu_aug</code> with the same per-timestep sizes.</p>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-call">
+          <strong>Call the iLQR subproblem</strong>
+          <p>Run the middle layer with the current augmented Lagrangian penalties.</p>
+        </div>
+        <div class="saltro-branch saltro-middle">
+          <span class="saltro-branch-label">enter middle layer</span>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-decision">
+          <strong>Did iLQR return a non-recoverable failure?</strong>
+          <p>Current recoverable statuses are <code>MaxIterations</code> and <code>RegularizationExceeded</code>, because either may still leave an improved trajectory.</p>
+        </div>
+        <div class="saltro-outcomes">
+          <div class="saltro-outcome saltro-bad">
+            <strong>Yes</strong>
+            <p>Return <code>ALILQRStatus::InnerFailed</code>.</p>
+          </div>
+          <div class="saltro-outcome saltro-good">
+            <strong>No</strong>
+            <p>Measure the maximum positive constraint violation.</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-decision">
+          <strong>Is <code>max_c <= constraint_tol</code>?</strong>
+          <p>This is the AL feasibility test. It is checked after every iLQR subproblem, even if the iLQR status is not <code>Converged</code>.</p>
+        </div>
+        <div class="saltro-outcomes">
+          <div class="saltro-outcome saltro-good">
+            <strong>Yes, and iLQR converged or accepted at least one forward-pass step</strong>
+            <p>Return <code>ALILQRStatus::Converged</code>. Constraint satisfaction is valid because the trajectory was optimized or the inner cost tolerance was reached.</p>
+          </div>
+          <div class="saltro-outcome saltro-bad">
+            <strong>Yes, but iLQR accepted zero steps</strong>
+            <p>Return <code>ALILQRStatus::InnerFailed</code>. This blocks false positives where the warm start was feasible but the optimizer never improved the trajectory.</p>
+          </div>
+          <div class="saltro-outcome saltro-warn">
+            <strong>No</strong>
+            <p>Update <code>lambda_aug</code> and <code>mu_aug</code>, then start another AL outer iteration.</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-stop">
+          <strong>Outer iteration budget exhausted</strong>
+          <p>If constraints never satisfy the tolerance, return <code>ALILQRStatus::MaxOuterIterations</code>.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="saltro-layer saltro-middle">
+    <header>
+      <span class="saltro-layer-name">Middle Layer</span>
+      <h2>iLQR subproblem</h2>
+      <p>Goal: locally reduce the augmented trajectory cost by alternating backward and forward passes.</p>
+    </header>
+
+    <ol class="saltro-steps">
+      <li>
+        <div class="saltro-node saltro-node-action">
+          <strong>Start iLQR iteration</strong>
+          <p>Set <code>reg = reg_init</code>. Telemetry starts with <code>accepted_steps = 0</code>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-decision">
+          <strong>Does the backward pass factorize successfully?</strong>
+          <p>The Riccati step requires a positive-definite regularized <code>Q_uu</code>.</p>
+        </div>
+        <div class="saltro-outcomes">
+          <div class="saltro-outcome saltro-warn">
+            <strong>No</strong>
+            <p>Increase regularization by <code>reg_scale</code> and retry the same iLQR iteration.</p>
+          </div>
+          <div class="saltro-outcome saltro-good">
+            <strong>Yes</strong>
+            <p>Build feedback gains <code>K</code>, feedforward terms <code>d</code>, and expected cost terms <code>deltaV</code>.</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-call">
+          <strong>Run forward-pass line search</strong>
+          <p>Try to roll out a new trajectory using <code>K</code>, <code>d</code>, and decreasing line-search step sizes.</p>
+        </div>
+        <div class="saltro-branch saltro-inner">
+          <span class="saltro-branch-label">enter inner layer</span>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-decision">
+          <strong>Did the forward pass accept a rollout?</strong>
+        </div>
+        <div class="saltro-outcomes">
+          <div class="saltro-outcome saltro-warn">
+            <strong>No</strong>
+            <p>Increase regularization by <code>reg_scale</code> and retry from the backward pass.</p>
+          </div>
+          <div class="saltro-outcome saltro-good">
+            <strong>Yes</strong>
+            <p>Overwrite <code>X</code> and <code>U</code>. Increment <code>accepted_steps</code>, store <code>last_delta_J</code>, and store <code>final_cost</code>.</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-decision">
+          <strong>Is <code>abs(J_prev - J_new) <= cost_tol</code>?</strong>
+        </div>
+        <div class="saltro-outcomes">
+          <div class="saltro-outcome saltro-good">
+            <strong>Yes</strong>
+            <p>Return <code>ILQRStatus::Converged</code> and <code>true</code>.</p>
+          </div>
+          <div class="saltro-outcome saltro-warn">
+            <strong>No</strong>
+            <p>Continue to the next iLQR iteration. The trajectory may still be useful because a forward pass was accepted.</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-stop">
+          <strong>Middle-layer terminal statuses</strong>
+          <p><code>RegularizationExceeded</code> means all regularization retries failed. <code>MaxIterations</code> means the cost tolerance was not reached before the iLQR iteration budget ended.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="saltro-layer saltro-inner">
+    <header>
+      <span class="saltro-layer-name">Inner Layer</span>
+      <h2>Forward pass and line search</h2>
+      <p>Goal: find one acceptable rollout that decreases cost consistently with the expected model reduction.</p>
+    </header>
+
+    <ol class="saltro-steps">
+      <li>
+        <div class="saltro-node saltro-node-action">
+          <strong>Try line-search step <code>alpha = 1, 1/2, 1/4, ...</code></strong>
+          <p>Initialize <code>X_bar</code> and <code>U_bar</code> from the current nominal trajectory.</p>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-decision">
+          <strong>Is the rollout dynamically valid?</strong>
+          <p>Reject the trial if the state is non-finite, the timestep is invalid, dynamics throw, the next state is invalid, or quaternion normalization fails.</p>
+        </div>
+        <div class="saltro-outcomes">
+          <div class="saltro-outcome saltro-warn">
+            <strong>No</strong>
+            <p>Reject this <code>alpha</code> and try the next smaller step.</p>
+          </div>
+          <div class="saltro-outcome saltro-good">
+            <strong>Yes</strong>
+            <p>Compute nominal cost plus augmented Lagrangian penalty terms.</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-decision">
+          <strong>Are augmented-constraint vector sizes consistent?</strong>
+          <p>The line search requires <code>lambda_aug[k]</code>, <code>mu_aug[k]</code>, and <code>c_k</code> to have matching sizes.</p>
+        </div>
+        <div class="saltro-outcomes">
+          <div class="saltro-outcome saltro-bad">
+            <strong>No</strong>
+            <p>Return forward-pass failure immediately.</p>
+          </div>
+          <div class="saltro-outcome saltro-good">
+            <strong>Yes</strong>
+            <p>Evaluate the line-search acceptance ratio.</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-decision">
+          <strong>Does the line-search ratio satisfy <code>beta1 <= z <= beta2</code>?</strong>
+        </div>
+        <div class="saltro-outcomes">
+          <div class="saltro-outcome saltro-good">
+            <strong>Yes</strong>
+            <p>Accept the rollout, overwrite <code>X</code> and <code>U</code>, return forward-pass success.</p>
+          </div>
+          <div class="saltro-outcome saltro-warn">
+            <strong>No</strong>
+            <p>Reject this <code>alpha</code> and keep searching.</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="saltro-node saltro-node-stop">
+          <strong>All line-search trials rejected</strong>
+          <p>Return forward-pass failure. The middle layer will usually increase regularization and retry.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+</div></section>
+<section id="status-reference">
+<h2>Status Reference<a class="headerlink" href="#status-reference" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table" id="id1">
+<caption><span class="caption-text">Where each status comes from and what to inspect</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 24.0%" />
+<col style="width: 30.0%" />
+<col style="width: 26.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Layer</p></th>
+<th class="head"><p>Status or return</p></th>
+<th class="head"><p>Meaning</p></th>
+<th class="head"><p>First places to inspect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Inner</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">forwardPass</span> <span class="pre">==</span> <span class="pre">true</span></code></p></td>
+<td><p>A line-search trial accepted and updated the trajectory.</p></td>
+<td><p>Accepted <code class="docutils literal notranslate"><span class="pre">alpha</span></code>, <code class="docutils literal notranslate"><span class="pre">J_prev</span></code>, <code class="docutils literal notranslate"><span class="pre">J_new</span></code>, <code class="docutils literal notranslate"><span class="pre">deltaV</span></code>, constraint penalties.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Inner</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">forwardPass</span> <span class="pre">==</span> <span class="pre">false</span></code></p></td>
+<td><p>No line-search step was accepted, or augmented constraint vector sizes mismatched.</p></td>
+<td><p>State validity, dynamics exceptions, <code class="docutils literal notranslate"><span class="pre">beta1</span></code>/<code class="docutils literal notranslate"><span class="pre">beta2</span></code>, <code class="docutils literal notranslate"><span class="pre">deltaV</span></code>, <code class="docutils literal notranslate"><span class="pre">lambda_aug</span></code> and <code class="docutils literal notranslate"><span class="pre">mu_aug</span></code> sizes.</p></td>
+</tr>
+<tr class="row-even"><td><p>Middle</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ILQRStatus::Converged</span></code></p></td>
+<td><p>The latest accepted rollout reached <code class="docutils literal notranslate"><span class="pre">abs(J_prev</span> <span class="pre">-</span> <span class="pre">J_new)</span> <span class="pre">&lt;=</span> <span class="pre">cost_tol</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">last_delta_J</span></code> and <code class="docutils literal notranslate"><span class="pre">cost_tol</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Middle</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ILQRStatus::MaxIterations</span></code></p></td>
+<td><p>iLQR accepted steps but never reached the cost tolerance before <code class="docutils literal notranslate"><span class="pre">max_iters</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accepted_steps</span></code>, <code class="docutils literal notranslate"><span class="pre">last_delta_J</span></code>, <code class="docutils literal notranslate"><span class="pre">max_iters</span></code>, cost scaling.</p></td>
+</tr>
+<tr class="row-even"><td><p>Middle</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ILQRStatus::RegularizationExceeded</span></code></p></td>
+<td><p>Backward or forward pass kept failing until <code class="docutils literal notranslate"><span class="pre">reg</span> <span class="pre">&gt;</span> <span class="pre">reg_max</span></code>.</p></td>
+<td><p>Whether <code class="docutils literal notranslate"><span class="pre">accepted_steps</span></code> is zero, backward-pass factorization, line-search rejection pattern, <code class="docutils literal notranslate"><span class="pre">reg_init</span></code>/<code class="docutils literal notranslate"><span class="pre">reg_scale</span></code>/<code class="docutils literal notranslate"><span class="pre">reg_max</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Outer</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ALILQRStatus::Converged</span></code></p></td>
+<td><p>Constraints are within tolerance and the iLQR subproblem either converged or accepted at least one rollout.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">max_constraint_violation</span></code>, <code class="docutils literal notranslate"><span class="pre">accepted_steps</span></code>, final trajectory quality.</p></td>
+</tr>
+<tr class="row-even"><td><p>Outer</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ALILQRStatus::InnerFailed</span></code></p></td>
+<td><p>The inner solve failed in a way AL-iLQR cannot safely accept, or constraints were satisfied with zero accepted trajectory updates.</p></td>
+<td><p>Warm-start feasibility, <code class="docutils literal notranslate"><span class="pre">accepted_steps</span> <span class="pre">==</span> <span class="pre">0</span></code>, first backward/forward failure reason.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Outer</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ALILQRStatus::MaxOuterIterations</span></code></p></td>
+<td><p>AL penalty updates did not drive constraints below <code class="docutils literal notranslate"><span class="pre">constraint_tol</span></code> before the outer iteration budget ended.</p></td>
+<td><p>Constraint component traces, penalty scaling, active constraints, actuator limits.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="common-diagnosis-paths">
+<h2>Common Diagnosis Paths<a class="headerlink" href="#common-diagnosis-paths" title="Link to this heading">#</a></h2>
+<div class="saltro-diagnosis-grid">
+  <article>
+    <h3>Constraints satisfied, but iLQR did not converge</h3>
+    <p>This can be acceptable if <code>accepted_steps > 0</code>. It means the trajectory was optimized, but the inner cost-delta tolerance was not the final stopping reason.</p>
+  </article>
+  <article>
+    <h3>Constraints satisfied with zero accepted steps</h3>
+    <p>Treat this as unsafe. The warm start may have been feasible, but the optimizer did not produce a new trajectory.</p>
+  </article>
+  <article>
+    <h3>Regularization exceeded after accepted steps</h3>
+    <p>The latest refinement attempt stalled, but previous accepted steps may still have produced a valid AL solution if constraints are now below tolerance.</p>
+  </article>
+  <article>
+    <h3>Max outer iterations</h3>
+    <p>The middle layer may be working, but AL penalty updates are not enforcing at least one active constraint quickly enough.</p>
+  </article>
+</div></section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="api/validation/validate_trajOpt.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">validate_trajOpt</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-to-read-the-tree">How To Read The Tree</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#status-reference">Status Reference</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#common-diagnosis-paths">Common Diagnosis Paths</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="_sources/convergence_logic_tree.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=a95f357e85573c9b56d5"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=a95f357e85573c9b56d5"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Niclas Scheuer, Patrick McKeen.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.19.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>
