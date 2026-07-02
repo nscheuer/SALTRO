@@ -147,12 +147,9 @@ TEST_CASE_METHOD(WarmStartFixture, "warm_start uses RK4 propagation consistently
 		x0,
 		0.0,
 		dt,
-		x_manual_next
+		x_manual_next,
+		Satellite::QUAT_INDEX
 	);
-
-	Eigen::Vector4d q = x_manual_next.segment<4>(Satellite::QUAT_INDEX);
-	q.normalize();
-	x_manual_next.segment<4>(Satellite::QUAT_INDEX) = q;
 
 	const Eigen::VectorXd x1 = X.col(1);
 	REQUIRE((x1 - x_manual_next).norm() < 1e-11);
@@ -192,4 +189,3 @@ TEST_CASE_METHOD(WarmStartFixture, "controllers produce expected warm_start beha
 	const double trajectory_delta = (X_exc - X_zero).norm();
 	REQUIRE(trajectory_delta > 1e-10);
 }
-

@@ -136,7 +136,8 @@ bool warm_start(
             xk,
             0.0,
             dt,
-            x_next
+            x_next,
+            Satellite::QUAT_INDEX
         );
 
         if (x_next.size() >= Satellite::QUAT_INDEX + 4) {
