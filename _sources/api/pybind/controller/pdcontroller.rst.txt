@@ -1,0 +1,6 @@
+pdcontroller
+============
+
+.. doxygenfile:: pybind/controller/pdcontroller.h
+   :project: saltro
+   :path: ../include/saltro

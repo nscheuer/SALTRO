@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>zerocontroller &#8212; SALTRO 0.0.0 documentation</title>
+    <title>pdcontroller &#8212; SALTRO 0.0.0 documentation</title>
   
   
   
@@ -43,12 +43,12 @@
     <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/controller/zerocontroller';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/pybind/controller/pdcontroller';</script>
     <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="disturbances" href="../disturbances/index.html" />
-    <link rel="prev" title="pdcontroller" href="pdcontroller.html" />
+    <link rel="next" title="zerocontroller" href="zerocontroller.html" />
+    <link rel="prev" title="integratedbdotcontroller" href="integratedbdotcontroller.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -422,8 +422,8 @@
 <li class="toctree-l2"><a class="reference internal" href="controller.html">controller</a></li>
 <li class="toctree-l2"><a class="reference internal" href="excitationcontroller.html">excitationcontroller</a></li>
 <li class="toctree-l2"><a class="reference internal" href="integratedbdotcontroller.html">integratedbdotcontroller</a></li>
-<li class="toctree-l2"><a class="reference internal" href="pdcontroller.html">pdcontroller</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">zerocontroller</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">pdcontroller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="zerocontroller.html">zerocontroller</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../disturbances/index.html">disturbances</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -482,7 +482,7 @@
     
     <li class="breadcrumb-item"><a href="index.html" class="nav-link">controller</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">zerocontroller</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">pdcontroller</span></li>
   </ul>
 </nav>
 </div>
@@ -499,9 +499,9 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="zerocontroller">
-<h1>zerocontroller<a class="headerlink" href="#zerocontroller" title="Link to this heading">#</a></h1>
-<p>Open-loop controller that outputs zero actuation. </p>
+  <section id="pdcontroller">
+<h1>pdcontroller<a class="headerlink" href="#pdcontroller" title="Link to this heading">#</a></h1>
+<p>Actuator-agnostic quaternion PD controller. </p>
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv46saltro">
 <span id="_CPPv36saltro"></span><span id="_CPPv26saltro"></span><span id="saltro"></span><span class="target" id="namespacesaltro"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">saltro</span></span></span><br /></dt>
@@ -509,71 +509,117 @@
 <dt class="sig sig-object cpp" id="_CPPv4N6saltro10controllerE">
 <span id="_CPPv3N6saltro10controllerE"></span><span id="_CPPv2N6saltro10controllerE"></span><span id="saltro::controller"></span><span class="target" id="namespacesaltro_1_1controller"></span><span class="k"><span class="pre">namespace</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">controller</span></span></span><br /></dt>
 <dd><dl class="cpp class">
-<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller14ZeroControllerE">
-<span id="_CPPv3N6saltro10controller14ZeroControllerE"></span><span id="_CPPv2N6saltro10controller14ZeroControllerE"></span><span id="saltro::controller::ZeroController"></span><span class="target" id="classsaltro_1_1controller_1_1ZeroController"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ZeroController</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="../../constants/constants.html#_CPPv46saltro" title="saltro"><span class="n"><span class="pre">saltro</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="controller.html#_CPPv4N6saltro10controllerE" title="saltro::controller"><span class="n"><span class="pre">controller</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="controller.html#_CPPv4N6saltro10controller10ControllerE" title="saltro::controller::Controller"><span class="n"><span class="pre">Controller</span></span></a><a class="headerlink" href="#_CPPv4N6saltro10controller14ZeroControllerE" title="Link to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDControllerE">
+<span id="_CPPv3N6saltro10controller12PDControllerE"></span><span id="_CPPv2N6saltro10controller12PDControllerE"></span><span id="saltro::controller::PDController"></span><span class="target" id="classsaltro_1_1controller_1_1PDController"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PDController</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="../../constants/constants.html#_CPPv46saltro" title="saltro"><span class="n"><span class="pre">saltro</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="controller.html#_CPPv4N6saltro10controllerE" title="saltro::controller"><span class="n"><span class="pre">controller</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="controller.html#_CPPv4N6saltro10controller10ControllerE" title="saltro::controller::Controller"><span class="n"><span class="pre">Controller</span></span></a><a class="headerlink" href="#_CPPv4N6saltro10controller12PDControllerE" title="Link to this definition">#</a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;zerocontroller.h&gt;</em></div>
-<p>Zero controller for open-loop trajectory validation. </p>
-<p>Implements a trivial control law that always outputs zero actuation, allowing the satellite to evolve under:<ul class="simple">
-<li><p>Passive dynamics (gravity gradient, wheel momentum exchange)</p></li>
-<li><p>Environmental disturbances (aerodynamic drag, SRP, magnetic residual dipole)</p></li>
-<li><p>No active control torques</p></li>
-</ul>
-</p>
-<p>This controller is primarily used for:<ul class="simple">
-<li><p>Validating reference trajectory tracking without feedback</p></li>
-<li><p>Benchmarking passive stability</p></li>
-<li><p>Testing disturbance models in isolation</p></li>
-<li><p>Debugging dynamics propagation without control coupling</p></li>
-</ul>
-</p>
-<p>The control output is always:  <div class="math notranslate nohighlight">
+<em>#include &lt;pdcontroller.h&gt;</em></div>
+<p>Actuator-agnostic quaternion PD controller. </p>
+<p>Computes a desired body-frame torque via quaternion or vector PD plus angular-rate damping, then allocates the torque across available actuators by least squares.</p>
+<p><strong>Quaternion goal</strong> ( <span class="math notranslate nohighlight">\(q_{\text{goal}}\)</span> a unit quaternion):  <div class="math notranslate nohighlight">
 \[
-\mathbf{u} = \mathbf{0} \in \mathbb{R}^{n_u}
+  \boldsymbol{\tau}_{\text{des}} = -k_p\,\mathbf{q}_{\text{err,vec}} - k_d\,\boldsymbol{\omega}
 \]</div>
- where <span class="math notranslate nohighlight">\(n_u\)</span> is the total actuator dimension (MTQs + RWs + magic torque). </p>
+</p>
+<p><strong>Vector goal</strong> ( <span class="math notranslate nohighlight">\(q_{\text{goal}}=[\mathrm{NaN}, \hat{r}_{\text{eci}}]\)</span>, matching the <a class="reference internal" href="../satellite.html#classSatellite"><span class="std std-ref">Satellite</span></a> stageCost sentinel):  <div class="math notranslate nohighlight">
+\[
+  \boldsymbol{\tau}_{\text{des}} =
+      +k_p\,\bigl(\mathbf{bs}_{\text{body}} \times R(q)^\top\hat{r}_{\text{eci}}\bigr)
+      - k_d\,\boldsymbol{\omega}
+\]</div>
+ The cross product has magnitude <span class="math notranslate nohighlight">\(\sin\theta_{\text{err}}\)</span> and points in the body-frame direction that rotates <span class="math notranslate nohighlight">\(\mathbf{bs}\)</span> toward <span class="math notranslate nohighlight">\(R^\top\hat{r}\)</span>.</p>
+<p>Allocation solves  <div class="math notranslate nohighlight">
+\[
+  \min_{\mathbf{u}} \;\|J\mathbf{u} - \boldsymbol{\tau}_{\text{des}}\|^2
+                  + \mathbf{u}^\top W \mathbf{u}
+\]</div>
+ where <span class="math notranslate nohighlight">\(J = \partial\boldsymbol{\tau}_{\text{actuator}}/\partial\mathbf{u}\)</span> is the numerical Jacobian of <a class="reference internal" href="../satellite.html#classSatellite_1af8f0bed8a43a21beaabe16c94020e39a"><span class="std std-ref">Satellite::actuatorTorque</span></a>, and <span class="math notranslate nohighlight">\(W\)</span> weights actuators by their inverse-squared authority (column norm of <span class="math notranslate nohighlight">\(J\)</span>). This dispatches through the satellite’s actuator mixing and is therefore agnostic to actuator topology — any MTQ/RW combination, or future actuator types.</p>
+<p>The result is clamped to actuator limits by <strong>uniform scale-to-max</strong>: if any channel would exceed its limit, all channels scale by the same factor so the torque direction is preserved. Independent per-channel clipping distorts the direction and can send <span class="math notranslate nohighlight">\(\boldsymbol{\tau}_{\text{actual}}\)</span> further from <span class="math notranslate nohighlight">\(\boldsymbol{\tau}_{\text{des}}\)</span> than no allocation at all.</p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller14ZeroController14ZeroControllerERK9Satellite">
-<span id="_CPPv3N6saltro10controller14ZeroController14ZeroControllerERK9Satellite"></span><span id="_CPPv2N6saltro10controller14ZeroController14ZeroControllerERK9Satellite"></span><span id="saltro::controller::ZeroController::ZeroController__SatelliteCR"></span><span class="target" id="classsaltro_1_1controller_1_1ZeroController_1a3ff586051b744c659c00fa6fa1130934"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ZeroController</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">satellite</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro10controller14ZeroController14ZeroControllerERK9Satellite" title="Link to this definition">#</a><br /></dt>
-<dd><p>Construct a zero controller. </p>
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController12PDControllerERK9Satellite">
+<span id="_CPPv3N6saltro10controller12PDController12PDControllerERK9Satellite"></span><span id="_CPPv2N6saltro10controller12PDController12PDControllerERK9Satellite"></span><span id="saltro::controller::PDController::PDController__SatelliteCR"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1afecaa962d5ed176224b2ed50a40a0d39"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PDController</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">satellite</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController12PDControllerERK9Satellite" title="Link to this definition">#</a><br /></dt>
+<dd><p>Construct a PD controller with auto-tuned gains. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>satellite</strong> – <a class="reference internal" href="../satellite.html#classSatellite"><span class="std std-ref">Satellite</span></a> model (used to determine control vector dimension) </p>
+<dd class="field-odd"><p><strong>satellite</strong> – <a class="reference internal" href="../satellite.html#classSatellite"><span class="std std-ref">Satellite</span></a> model (inertia, actuators) </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK6saltro10controller14ZeroController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE">
-<span id="_CPPv3NK6saltro10controller14ZeroController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"></span><span id="_CPPv2NK6saltro10controller14ZeroController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"></span><span id="saltro::controller::ZeroController::find_u__Satellite::VecXCR.Eigen::Vector3dCR.Eigen::Vector4dCR.Eigen::Vector3dCRC"></span><span class="target" id="classsaltro_1_1controller_1_1ZeroController_1a2722c48b43c87c20de8a58740e07050e"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../satellite.html#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">find_u</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../satellite.html#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">q_goal</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK6saltro10controller14ZeroController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE" title="Link to this definition">#</a><br /></dt>
-<dd><p>Return zero control input. </p>
-<p>Ignores all inputs and returns a zero control vector of appropriate dimension.</p>
+<dt class="sig sig-object cpp" id="_CPPv4NK6saltro10controller12PDController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE">
+<span id="_CPPv3NK6saltro10controller12PDController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"></span><span id="_CPPv2NK6saltro10controller12PDController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"></span><span id="saltro::controller::PDController::find_u__Satellite::VecXCR.Eigen::Vector3dCR.Eigen::Vector4dCR.Eigen::Vector3dCRC"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1a6cee68ab88edb881c3fcdb0a6c07cba0"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../satellite.html#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">find_u</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="../satellite.html#_CPPv49Satellite" title="Satellite"><span class="n"><span class="pre">Satellite</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="../satellite.html#_CPPv4N9Satellite4VecXE" title="Satellite::VecX"><span class="n"><span class="pre">VecX</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">B_eci</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector4d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">q_goal</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Vector3d</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">boresight_body</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK6saltro10controller12PDController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Compute control input via quaternion PD + least-squares allocation. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>x</strong> – Attitude state (unused) </p></li>
-<li><p><strong>B_eci</strong> – Magnetic field (unused) </p></li>
-<li><p><strong>q_goal</strong> – Goal quaternion (unused) </p></li>
-<li><p><strong>boresight_body</strong> – Boresight constraint (unused) </p></li>
+<li><p><strong>x</strong> – Attitude state (7+nRW): [ω(3), q(4), h_rw(nRW)] </p></li>
+<li><p><strong>B_eci</strong> – Magnetic field in ECI frame (T) </p></li>
+<li><p><strong>q_goal</strong> – Either a unit quaternion target (scalar-first) or <code class="docutils literal notranslate"><span class="pre">[NaN,</span> <span class="pre">r̂_eci]</span></code> for a vector-pointing target. </p></li>
+<li><p><strong>boresight_body</strong> – Boresight direction in body frame. Used by the vector-goal branch; ignored when q_goal is a quaternion. </p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Zero control vector (nu × 1) </p>
+<dd class="field-even"><p>Control vector (nu × 1): [m_mtq, τ_rw, …] </p>
 </dd>
 </dl>
 </dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController8setGainsEdd">
+<span id="_CPPv3N6saltro10controller12PDController8setGainsEdd"></span><span id="_CPPv2N6saltro10controller12PDController8setGainsEdd"></span><span id="saltro::controller::PDController::setGains__double.double"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1a9cf65e5257be0a7f59a72a93803cc5d0"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">setGains</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">kp_q</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">kd_w</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController8setGainsEdd" title="Link to this definition">#</a><br /></dt>
+<dd><p>Override auto-tuned gains (used by spike removal). </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController10setRWScaleEd">
+<span id="_CPPv3N6saltro10controller12PDController10setRWScaleEd"></span><span id="_CPPv2N6saltro10controller12PDController10setRWScaleEd"></span><span id="saltro::controller::PDController::setRWScale__double"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1ac2d8a6e4c0524f5ec535a925e1c3faa2"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">setRWScale</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">rw_scale</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController10setRWScaleEd" title="Link to this definition">#</a><br /></dt>
+<dd><p>Set <a class="reference internal" href="../actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> preference: 0 = MTQ-only, 1 = equal weight. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6saltro10controller12PDController4kp_qEv">
+<span id="_CPPv3NK6saltro10controller12PDController4kp_qEv"></span><span id="_CPPv2NK6saltro10controller12PDController4kp_qEv"></span><span id="saltro::controller::PDController::kp_qC"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1ac365a397ffea8f96307259a55bc51c08"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kp_q</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6saltro10controller12PDController4kp_qEv" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6saltro10controller12PDController4kd_wEv">
+<span id="_CPPv3NK6saltro10controller12PDController4kd_wEv"></span><span id="_CPPv2NK6saltro10controller12PDController4kd_wEv"></span><span id="saltro::controller::PDController::kd_wC"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1af6e00510de74336e01092a4e4e9bcf2d"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kd_w</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6saltro10controller12PDController4kd_wEv" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6saltro10controller12PDController7rwScaleEv">
+<span id="_CPPv3NK6saltro10controller12PDController7rwScaleEv"></span><span id="_CPPv2NK6saltro10controller12PDController7rwScaleEv"></span><span id="saltro::controller::PDController::rwScaleC"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1aa812cffb0497ee887fcb0aecfd8f1067"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rwScale</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK6saltro10controller12PDController7rwScaleEv" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-protected-functions">Protected Functions</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller14ZeroController13autoTuneGainsEv">
-<span id="_CPPv3N6saltro10controller14ZeroController13autoTuneGainsEv"></span><span id="_CPPv2N6saltro10controller14ZeroController13autoTuneGainsEv"></span><span id="saltro::controller::ZeroController::autoTuneGains"></span><span class="target" id="classsaltro_1_1controller_1_1ZeroController_1a8e5fed24b51346ebbc631fa4a54abc1c"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">autoTuneGains</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller14ZeroController13autoTuneGainsEv" title="Link to this definition">#</a><br /></dt>
-<dd><p>No-op gain tuning (zero controller has no gains). </p>
-<p>This method does nothing since the zero controller has no tunable parameters. </p>
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController13autoTuneGainsEv">
+<span id="_CPPv3N6saltro10controller12PDController13autoTuneGainsEv"></span><span id="_CPPv2N6saltro10controller12PDController13autoTuneGainsEv"></span><span id="saltro::controller::PDController::autoTuneGains"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1a0a271cad83b258db2ec8c4fb9f5f6c23"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">autoTuneGains</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController13autoTuneGainsEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Auto-tune to a conservative second-order response. </p>
+<p><span class="math notranslate nohighlight">\(\omega_n = 0.1\,\text{rad/s}\)</span>, <span class="math notranslate nohighlight">\(\zeta = 0.7\)</span>, based on the mean inertia tensor eigenvalue. </p>
 </dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-private-members">Private Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController5kp_q_E">
+<span id="_CPPv3N6saltro10controller12PDController5kp_q_E"></span><span id="_CPPv2N6saltro10controller12PDController5kp_q_E"></span><span id="saltro::controller::PDController::kp_q___double"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1a809b7d03f8cb11ef85ee366e1b30d10f"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kp_q_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController5kp_q_E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController5kd_w_E">
+<span id="_CPPv3N6saltro10controller12PDController5kd_w_E"></span><span id="_CPPv2N6saltro10controller12PDController5kd_w_E"></span><span id="saltro::controller::PDController::kd_w___double"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1ae89fad6a2c083c3f509af88fc6beea55"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kd_w_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController5kd_w_E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N6saltro10controller12PDController9rw_scale_E">
+<span id="_CPPv3N6saltro10controller12PDController9rw_scale_E"></span><span id="_CPPv2N6saltro10controller12PDController9rw_scale_E"></span><span id="saltro::controller::PDController::rw_scale___double"></span><span class="target" id="classsaltro_1_1controller_1_1PDController_1a9d540b48ff70494ad85ede5ec47f3823"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_scale_</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1.0</span></span><a class="headerlink" href="#_CPPv4N6saltro10controller12PDController9rw_scale_E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
 
 </div>
 </dd></dl>
@@ -595,20 +641,20 @@
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="pdcontroller.html"
+       href="integratedbdotcontroller.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">pdcontroller</p>
+        <p class="prev-next-title">integratedbdotcontroller</p>
       </div>
     </a>
     <a class="right-next"
-       href="../disturbances/index.html"
+       href="zerocontroller.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">disturbances</p>
+        <p class="prev-next-title">zerocontroller</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -633,10 +679,18 @@
     <ul class="pst-show_toc_level nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv46saltro"><code class="docutils literal notranslate"><span class="pre">saltro</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controllerE"><code class="docutils literal notranslate"><span class="pre">saltro::controller</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller14ZeroControllerE"><code class="docutils literal notranslate"><span class="pre">saltro::controller::ZeroController</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller14ZeroController14ZeroControllerERK9Satellite"><code class="docutils literal notranslate"><span class="pre">ZeroController()</span></code></a></li>
-<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller14ZeroController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"><code class="docutils literal notranslate"><span class="pre">find_u()</span></code></a></li>
-<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller14ZeroController13autoTuneGainsEv"><code class="docutils literal notranslate"><span class="pre">autoTuneGains()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDControllerE"><code class="docutils literal notranslate"><span class="pre">saltro::controller::PDController</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController12PDControllerERK9Satellite"><code class="docutils literal notranslate"><span class="pre">PDController()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller12PDController6find_uERKN9Satellite4VecXERKN5Eigen8Vector3dERKN5Eigen8Vector4dERKN5Eigen8Vector3dE"><code class="docutils literal notranslate"><span class="pre">find_u()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController8setGainsEdd"><code class="docutils literal notranslate"><span class="pre">setGains()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController10setRWScaleEd"><code class="docutils literal notranslate"><span class="pre">setRWScale()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller12PDController4kp_qEv"><code class="docutils literal notranslate"><span class="pre">kp_q()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller12PDController4kd_wEv"><code class="docutils literal notranslate"><span class="pre">kd_w()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6saltro10controller12PDController7rwScaleEv"><code class="docutils literal notranslate"><span class="pre">rwScale()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController13autoTuneGainsEv"><code class="docutils literal notranslate"><span class="pre">autoTuneGains()</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController5kp_q_E"><code class="docutils literal notranslate"><span class="pre">kp_q_</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController5kd_w_E"><code class="docutils literal notranslate"><span class="pre">kd_w_</span></code></a></li>
+<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6saltro10controller12PDController9rw_scale_E"><code class="docutils literal notranslate"><span class="pre">rw_scale_</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -649,7 +703,7 @@
   <div class="sidebar-secondary-item">
 
   <div class="tocsection sourcelink">
-    <a href="../../../_sources/api/pybind/controller/zerocontroller.rst.txt">
+    <a href="../../../_sources/api/pybind/controller/pdcontroller.rst.txt">
       <i class="fa-solid fa-file-lines"></i> Show Source
     </a>
   </div>
