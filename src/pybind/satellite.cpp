@@ -2265,24 +2265,28 @@ Satellite::constraintHessians(
     const int sun_idx = idx;
     if (std::isfinite(sun_norm) && sun_norm > 1e-12) {
         using Mat44 = Eigen::Matrix<double, 4, 4>;
-        const Vec4 q = x.segment<4>(QUAT_INDEX).normalized();
-        const Vec3 sun_unit = sun_eci / sun_norm;
-        const Mat44 P = Mat44::Identity() - q * q.transpose();
+        const Vec4 q_raw = x.segment<4>(QUAT_INDEX);
+        const double q_norm = q_raw.norm();
+        if (q_norm > 1e-12) {
+            const Vec4 q = q_raw / q_norm;
+            const Vec3 sun_unit = sun_eci / sun_norm;
+            const Mat44 P = Mat44::Identity() - q * q.transpose();
 
-        // Raw-formula x-component gradient and Hessian of (R^T sun_unit)_x.
-        const Vec4 g = saltro::math::drotmatTvecdq(q, sun_unit).col(0);  // q-indexed
-        const std::array<Mat44, 3> d2 = saltro::math::ddrotmatTvecdqdq(q, sun_unit);
-        const Mat44& Hx = d2[0];  // x-component 4x4
+            // Raw-formula x-component gradient and Hessian of (R^T sun_unit)_x.
+            const Vec4 g = saltro::math::drotmatTvecdq(q, sun_unit).col(0);  // q-indexed
+            const std::array<Mat44, 3> d2 = saltro::math::ddrotmatTvecdqdq(q, sun_unit);
+            const Mat44& Hx = d2[0];  // x-component 4x4
 
-        const double s = g.dot(q);
-        const Mat44 C = -(g * q.transpose() + q * g.transpose())
-                        - s * Mat44::Identity()
-                        + 3.0 * s * (q * q.transpose());
-        const Mat44 Hf = P * Hx * P + C;
+            const double s = g.dot(q);
+            const Mat44 C = -(g * q.transpose() + q * g.transpose())
+                            - s * Mat44::Identity()
+                            + 3.0 * s * (q * q.transpose());
+            const Mat44 Hf = P * Hx * P + C;
 
-        for (int a = 0; a < 4; ++a)
-            for (int b = 0; b < 4; ++b)
-                H_xx.slice(sun_idx)(QUAT_INDEX + a, QUAT_INDEX + b) = Hf(a, b);
+            for (int a = 0; a < 4; ++a)
+                for (int b = 0; b < 4; ++b)
+                    H_xx.slice(sun_idx)(QUAT_INDEX + a, QUAT_INDEX + b) = Hf(a, b);
+        }
     }
     idx++;
 
@@ -2322,4 +2326,3 @@ Satellite::constraintHessians(
 
     return std::make_tuple(H_uu, H_ux, H_xx);
 }
-
