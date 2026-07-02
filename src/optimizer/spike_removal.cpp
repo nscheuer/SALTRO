@@ -109,57 +109,6 @@ std::set<int> findGoalTransitions(const Eigen::Ref<const Eigen::MatrixXd>& attit
 	return transitions;
 }
 
-/// Check if any dominant control channel is saturated against the effective
-/// AL-imposed ceiling (u_max × control_limit_scale).
-///
-/// The AL penalty drives |u| to at most `control_limit_scale × u_max`
-/// (default 0.75).  Measuring saturation as a fraction of the hardware
-/// u_max was dead code — AL never let |u| reach 0.95·u_max.  We now scale
-/// by control_limit_scale so the threshold tracks whatever the user sets
-/// (e.g., 0.75 or 0.9).  `ratio_of_al_ceiling` defaults to 0.9, meaning
-/// "within 10% of the effective AL ceiling" ≈ saturated — gives a bit
-/// of margin to catch cases that are clearly AL-pegged but not
-/// numerically at the exact ceiling.
-bool isSaturated(
-	const Eigen::VectorXd& u,
-	const Satellite& satellite,
-	double control_limit_scale,
-	double ratio_of_al_ceiling = 0.9
-) {
-	const int n_mtq = satellite.numMTQ();
-	const int n_rw = satellite.numRW();
-	const double thresh = ratio_of_al_ceiling * control_limit_scale;
-	for (int i = 0; i < n_mtq; ++i) {
-		const double u_max = satellite.getMTQ(i).u_max();
-		if (u_max > 0 && std::abs(u(i)) >= thresh * u_max) return true;
-	}
-	for (int i = 0; i < n_rw; ++i) {
-		const double u_max = satellite.getRW(i).u_max();
-		if (u_max > 0 && std::abs(u(n_mtq + i)) >= thresh * u_max) return true;
-	}
-	return false;
-}
-
-/// Check if actuator torque opposes the pointing error.
-bool torqueOpposesError(
-	const Eigen::VectorXd& x,
-	const Eigen::Vector3d& tau_act,
-	const Eigen::Vector4d& target,
-	const Satellite& satellite
-) {
-	if (std::isnan(target(0))) return false;
-
-	const Eigen::Vector4d q = x.segment<4>(3);
-	const Eigen::Vector4d q_err = saltro::math::quatError(target, q);
-	const Eigen::Vector3d err_axis = q_err.tail<3>();
-	const double err_norm = err_axis.norm();
-	if (err_norm < 1e-8) return false;
-
-	const Eigen::Vector3d n_err = err_axis / err_norm;
-	const Eigen::Vector3d alpha = satellite.invInertiaNoRW() * tau_act;
-	return alpha.dot(n_err) < 0.0;
-}
-
 /// Extract environment vectors at knot k.
 struct Env {
 	Eigen::Vector3d R, B, S, V;
@@ -186,94 +135,6 @@ Env getEnv(
 }
 
 // ---------------------------------------------------------------------------
-// PD segment simulation
-// ---------------------------------------------------------------------------
-
-/// Simulate PD-controlled trajectory over n_steps knots.
-/// Returns (X_pd: nx × n_steps+1, U_pd: nu × n_steps).
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> simulatePDSegment(
-	const Satellite& satellite,
-	const saltro::controller::PDController& pd,
-	const Eigen::VectorXd& x_start,
-	const Eigen::Vector4d& q_target,
-	int n_steps,
-	const Eigen::Ref<const Eigen::MatrixXd>& B_slice,
-	const Eigen::Ref<const Eigen::MatrixXd>& S_slice,
-	const Eigen::Ref<const Eigen::MatrixXd>& R_slice,
-	const Eigen::Ref<const Eigen::MatrixXd>& V_slice,
-	const Eigen::Ref<const Eigen::MatrixXd>& rho_slice,
-	const DisturbanceConfig& dist_cfg,
-	double dt,
-	const SpikeRemovalConfig& cfg
-) {
-	const int nx = satellite.stateDim();
-	const int nu = satellite.controlDim();
-
-	Eigen::MatrixXd X_pd = Eigen::MatrixXd::Zero(nx, n_steps + 1);
-	Eigen::MatrixXd U_pd = Eigen::MatrixXd::Zero(nu, n_steps);
-	X_pd.col(0) = x_start;
-
-	for (int k = 0; k < n_steps; ++k) {
-		const Eigen::VectorXd& x_k = X_pd.col(k);
-		const Eigen::Vector3d B_k(B_slice.col(k));
-		const Eigen::Vector3d S_k(S_slice.col(k));
-		const Eigen::Vector3d R_k(R_slice.col(k));
-		const Eigen::Vector3d V_k(V_slice.col(k));
-		const int rho_k = static_cast<int>(std::max(0.0, std::round(rho_slice(0, k))));
-
-		// PDController handles allocation, authority weighting, and scale-to-max
-		// saturation internally.  boresight is unused by PD but required by
-		// the Controller interface.
-		Eigen::VectorXd u_k = pd.find_u(x_k, B_k, q_target, Eigen::Vector3d::Zero());
-		U_pd.col(k) = u_k;
-
-		Eigen::VectorXd x_next = satellite.dynamicsStepRK4(x_k, u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k);
-
-		// Clamp angular velocity
-		if (cfg.omega_max > 0.0) {
-			const double omega_norm = x_next.head<3>().norm();
-			if (omega_norm > cfg.omega_max) {
-				x_next.head<3>() *= cfg.omega_max / omega_norm;
-			}
-		}
-
-		X_pd.col(k + 1) = x_next;
-	}
-
-	return {X_pd, U_pd};
-}
-
-// ---------------------------------------------------------------------------
-// Keep-out check
-// ---------------------------------------------------------------------------
-
-bool keepoutClear(
-	const Satellite& satellite,
-	const Eigen::MatrixXd& X_pd,
-	const Eigen::MatrixXd& U_pd,
-	const Eigen::Ref<const Eigen::MatrixXd>& S,
-	const ConstraintConfig& cnst_cfg,
-	int N,
-	int t_enter
-) {
-	const int n_pd = static_cast<int>(X_pd.cols());
-	const int nu = satellite.controlDim();
-
-	for (int i = 0; i < n_pd; ++i) {
-		const int k = t_enter + i;
-		const Eigen::VectorXd u_k = (i < U_pd.cols()) ? Eigen::VectorXd(U_pd.col(i)) : Eigen::VectorXd::Zero(nu);
-		const Eigen::VectorXd S_k = (k < S.cols()) ? Eigen::VectorXd(S.col(k)) : Eigen::VectorXd(S.col(S.cols() - 1));
-
-		const Eigen::VectorXd c_k = satellite.constraints(k, N, X_pd.col(i), u_k, S_k, cnst_cfg);
-		// Index 1 = sun avoidance
-		if (c_k.size() > 1 && c_k(1) > 0.0) {
-			return false;
-		}
-	}
-	return true;
-}
-
-// ---------------------------------------------------------------------------
 // Substitute + blend + tail re-rollout
 // ---------------------------------------------------------------------------
 
@@ -293,6 +154,14 @@ void scaleToMax(Eigen::VectorXd& u, const Satellite& satellite) {
 		const double u_max = std::abs(satellite.getRW(i).u_max());
 		if (u_max > 0.0) {
 			const double r = std::abs(u(n_mtq + i)) / u_max;
+			if (r > max_ratio) max_ratio = r;
+		}
+	}
+	const int n_magic = satellite.numMagic();
+	for (int i = 0; i < n_magic; ++i) {
+		const double u_max = std::abs(satellite.getMagic(i).u_max());
+		if (u_max > 0.0) {
+			const double r = std::abs(u(n_mtq + n_rw + i)) / u_max;
 			if (r > max_ratio) max_ratio = r;
 		}
 	}
@@ -384,6 +253,284 @@ void substituteAndBlend(
 }
 
 } // anonymous namespace
+
+// ===========================================================================
+// Internal building blocks (exposed via spike_removal_detail for unit tests)
+// ===========================================================================
+
+namespace spike_removal_detail {
+
+/// Check if any dominant control channel is saturated against the effective
+/// AL-imposed ceiling (u_max × control_limit_scale).
+///
+/// The AL penalty drives |u| to at most `control_limit_scale × u_max`
+/// (default 0.75).  Measuring saturation as a fraction of the hardware
+/// u_max was dead code — AL never let |u| reach 0.95·u_max.  We now scale
+/// by control_limit_scale so the threshold tracks whatever the user sets
+/// (e.g., 0.75 or 0.9).  `ratio_of_al_ceiling` defaults to 0.9, meaning
+/// "within 10% of the effective AL ceiling" ≈ saturated — gives a bit
+/// of margin to catch cases that are clearly AL-pegged but not
+/// numerically at the exact ceiling.
+///
+/// Covers all three actuator families: without the Magic loop, the
+/// physics-limited filter could never vote when the opposing torque came
+/// from a Magic actuator, and the pass-2 control-effort gate was
+/// permanently false on Magic-only actuator sets.
+bool isSaturated(
+	const Eigen::VectorXd& u,
+	const Satellite& satellite,
+	double control_limit_scale,
+	double ratio_of_al_ceiling
+) {
+	const int n_mtq = satellite.numMTQ();
+	const int n_rw = satellite.numRW();
+	const int n_magic = satellite.numMagic();
+	const double thresh = ratio_of_al_ceiling * control_limit_scale;
+	for (int i = 0; i < n_mtq; ++i) {
+		const double u_max = satellite.getMTQ(i).u_max();
+		if (u_max > 0 && std::abs(u(i)) >= thresh * u_max) return true;
+	}
+	for (int i = 0; i < n_rw; ++i) {
+		const double u_max = satellite.getRW(i).u_max();
+		if (u_max > 0 && std::abs(u(n_mtq + i)) >= thresh * u_max) return true;
+	}
+	for (int i = 0; i < n_magic; ++i) {
+		const double u_max = satellite.getMagic(i).u_max();
+		if (u_max > 0 && std::abs(u(n_mtq + n_rw + i)) >= thresh * u_max) return true;
+	}
+	return false;
+}
+
+/// Check if actuator torque opposes the pointing error (i.e., is actively
+/// driving the attitude toward the goal).
+///
+/// Quaternion goal: measure the angular acceleration J⁻¹·τ against the error
+/// quaternion's vector part, which points AWAY from the goal (the correcting
+/// PD torque is −k_p·q_err.vec) — so α·n_err < 0 means correcting.
+///
+/// Vector-pointing goal ([NaN, x, y, z] sentinel): the error axis is
+/// boresight_body × r_body — the axis that rotates the boresight toward the
+/// target direction (same convention as PDController's vec-goal branch, where
+/// the correcting torque is +k_p·(bs × r_body)).  That axis points TOWARD the
+/// goal, so it is negated to reuse the shared "α·n_err < 0 ⇒ correcting"
+/// predicate.  Previously this returned false for all vec-mode targets,
+/// disabling the physics-limited filter in vector-pointing mode.
+bool torqueOpposesError(
+	const Eigen::VectorXd& x,
+	const Eigen::Vector3d& tau_act,
+	const Eigen::Vector4d& target,
+	const Eigen::Vector3d& boresight_body,
+	const Satellite& satellite
+) {
+	const Eigen::Vector4d q = x.segment<4>(3);
+	const double qn = q.norm();
+	if (!std::isfinite(qn) || qn < 1e-12) return false;
+
+	Eigen::Vector3d n_err;
+	if (std::isnan(target(0))) {
+		// Vector-pointing mode: target = [NaN, r̂_eci].
+		Eigen::Vector3d r_eci = target.tail<3>();
+		const double rn = r_eci.norm();
+		if (!std::isfinite(rn) || rn < 1e-12) return false;
+		r_eci /= rn;
+
+		Eigen::Vector3d bs = boresight_body;
+		const double bsn = bs.norm();
+		if (!std::isfinite(bsn) || bsn < 1e-12) return false;
+		bs /= bsn;
+
+		// r_body = R(q)^T · r̂_eci  (target direction expressed in body frame)
+		const Eigen::Vector3d r_body = saltro::math::rotationMatrix(q).transpose() * r_eci;
+		const Eigen::Vector3d corr_axis = bs.cross(r_body);  // rotates bs toward target
+		const double cn = corr_axis.norm();
+		if (cn < 1e-8) return false;  // boresight (anti-)aligned: no error axis
+		n_err = -corr_axis / cn;      // negate: away-from-goal, like q_err.vec
+	} else {
+		const Eigen::Vector4d q_err = saltro::math::quatError(target, q);
+		const Eigen::Vector3d err_axis = q_err.tail<3>();
+		const double err_norm = err_axis.norm();
+		if (err_norm < 1e-8) return false;
+		n_err = err_axis / err_norm;
+	}
+
+	const Eigen::Vector3d alpha = satellite.invInertiaNoRW() * tau_act;
+	return alpha.dot(n_err) < 0.0;
+}
+
+/// Simulate PD-controlled trajectory over n_steps knots.
+/// Returns (X_pd: nx × n_steps+1, U_pd: nu × n_steps).
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> simulatePDSegment(
+	const Satellite& satellite,
+	const saltro::controller::PDController& pd,
+	const Eigen::VectorXd& x_start,
+	const Eigen::Vector4d& q_target,
+	int n_steps,
+	const Eigen::Ref<const Eigen::MatrixXd>& B_slice,
+	const Eigen::Ref<const Eigen::MatrixXd>& S_slice,
+	const Eigen::Ref<const Eigen::MatrixXd>& R_slice,
+	const Eigen::Ref<const Eigen::MatrixXd>& V_slice,
+	const Eigen::Ref<const Eigen::MatrixXd>& rho_slice,
+	const DisturbanceConfig& dist_cfg,
+	double dt,
+	const SpikeRemovalConfig& cfg
+) {
+	const int nx = satellite.stateDim();
+	const int nu = satellite.controlDim();
+
+	Eigen::MatrixXd X_pd = Eigen::MatrixXd::Zero(nx, n_steps + 1);
+	Eigen::MatrixXd U_pd = Eigen::MatrixXd::Zero(nu, n_steps);
+	X_pd.col(0) = x_start;
+
+	for (int k = 0; k < n_steps; ++k) {
+		const Eigen::VectorXd& x_k = X_pd.col(k);
+		const Eigen::Vector3d B_k(B_slice.col(k));
+		const Eigen::Vector3d S_k(S_slice.col(k));
+		const Eigen::Vector3d R_k(R_slice.col(k));
+		const Eigen::Vector3d V_k(V_slice.col(k));
+		const int rho_k = static_cast<int>(std::max(0.0, std::round(rho_slice(0, k))));
+
+		// PDController handles allocation, authority weighting, and scale-to-max
+		// saturation internally.  boresight is unused by PD but required by
+		// the Controller interface.
+		Eigen::VectorXd u_k = pd.find_u(x_k, B_k, q_target, Eigen::Vector3d::Zero());
+		U_pd.col(k) = u_k;
+
+		Eigen::VectorXd x_next = satellite.dynamicsStepRK4(x_k, u_k, dt, dist_cfg, R_k, B_k, S_k, V_k, rho_k);
+
+		// Clamp angular velocity
+		if (cfg.omega_max > 0.0) {
+			const double omega_norm = x_next.head<3>().norm();
+			if (omega_norm > cfg.omega_max) {
+				x_next.head<3>() *= cfg.omega_max / omega_norm;
+			}
+		}
+
+		X_pd.col(k + 1) = x_next;
+	}
+
+	return {X_pd, U_pd};
+}
+
+/// Keep-out check.
+bool keepoutClear(
+	const Satellite& satellite,
+	const Eigen::MatrixXd& X_pd,
+	const Eigen::MatrixXd& U_pd,
+	const Eigen::Ref<const Eigen::MatrixXd>& S,
+	const ConstraintConfig& cnst_cfg,
+	int N,
+	int t_enter
+) {
+	const int n_pd = static_cast<int>(X_pd.cols());
+	const int nu = satellite.controlDim();
+
+	for (int i = 0; i < n_pd; ++i) {
+		const int k = t_enter + i;
+		const Eigen::VectorXd u_k = (i < U_pd.cols()) ? Eigen::VectorXd(U_pd.col(i)) : Eigen::VectorXd::Zero(nu);
+		const Eigen::VectorXd S_k = (k < S.cols()) ? Eigen::VectorXd(S.col(k)) : Eigen::VectorXd(S.col(S.cols() - 1));
+
+		const Eigen::VectorXd c_k = satellite.constraints(k, N, X_pd.col(i), u_k, S_k, cnst_cfg);
+		// Index 1 = sun avoidance
+		if (c_k.size() > 1 && c_k(1) > 0.0) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/// Cost backstop — C++ port of the Python prototype's compare_costs
+/// (tests/debug/optimizer/alilqr_python/spike_removal.py).  Returns true iff
+/// the PD-substituted window is strictly cheaper than the original window
+/// under the pass's stage cost, summed over [t_enter, t_exit).
+///
+/// For all-no-goal windows (every attitude target in the window is the NaN
+/// sentinel with no direction — i.e. isnan(target(0,k)) for all k), the
+/// comparison window is extended into the first 15% of the next goal segment,
+/// with BOTH sides using the original tail trajectory there (mirroring the
+/// Python semantics; the extension terms are identical on both sides).
+bool compareCosts(
+	const Satellite& satellite,
+	const Eigen::Ref<const Eigen::MatrixXd>& X_orig,
+	const Eigen::Ref<const Eigen::MatrixXd>& U_orig,
+	const Eigen::MatrixXd& X_pd,
+	const Eigen::MatrixXd& U_pd,
+	int t_enter,
+	int t_exit,
+	const Eigen::Ref<const Eigen::MatrixXd>& B,
+	const Eigen::Ref<const Eigen::MatrixXd>& boresight,
+	const Eigen::Ref<const Eigen::MatrixXd>& attitude_target,
+	const CostConfig& cost_cfg,
+	int N,
+	double* cost_orig_out,
+	double* cost_pd_out
+) {
+	const int nu = satellite.controlDim();
+	const int n_main = t_exit - t_enter;
+
+	// Main comparison window [t_enter, t_exit).
+	std::vector<int> extended_window;
+	extended_window.reserve(static_cast<std::size_t>(n_main));
+	for (int k = t_enter; k < t_exit; ++k) extended_window.push_back(k);
+
+	// No-goal window: extend 15% into the next goal segment (original tail on
+	// both sides).  Matches the Python _find_goal_transitions-based lookup:
+	// with an all-NaN window, the next goal segment starts at the first
+	// non-NaN target knot at/after t_exit.
+	bool all_no_goal = true;
+	for (int k = t_enter; k < t_exit; ++k) {
+		if (!std::isnan(attitude_target(0, k))) { all_no_goal = false; break; }
+	}
+	if (all_no_goal) {
+		int next_goal_start = -1;
+		for (int t = t_exit; t < N; ++t) {
+			if (!std::isnan(attitude_target(0, t))) { next_goal_start = t; break; }
+		}
+		if (next_goal_start >= 0) {
+			const int remaining = N - next_goal_start;
+			const int ext_len = std::max(1, static_cast<int>(0.15 * remaining));
+			const int ext_end = std::min(next_goal_start + ext_len, N - 1);
+			for (int k = next_goal_start; k < ext_end; ++k) extended_window.push_back(k);
+		}
+	}
+
+	double cost_orig = 0.0;
+	double cost_pd = 0.0;
+	for (std::size_t idx = 0; idx < extended_window.size(); ++idx) {
+		const int k = extended_window[idx];
+		const bool in_main = static_cast<int>(idx) < n_main;
+
+		const Eigen::VectorXd x_orig_k = X_orig.col(k);
+		const Eigen::VectorXd u_orig_k = (k < U_orig.cols())
+			? Eigen::VectorXd(U_orig.col(k))
+			: Eigen::VectorXd::Zero(nu);
+
+		Eigen::VectorXd x_pd_k;
+		Eigen::VectorXd u_pd_k;
+		if (in_main) {
+			x_pd_k = X_pd.col(static_cast<int>(idx));
+			u_pd_k = (static_cast<int>(idx) < U_pd.cols())
+				? Eigen::VectorXd(U_pd.col(static_cast<int>(idx)))
+				: Eigen::VectorXd::Zero(nu);
+		} else {
+			// Extension window: both sides use the original tail.
+			x_pd_k = x_orig_k;
+			u_pd_k = u_orig_k;
+		}
+
+		const Eigen::Vector3d bs_k(boresight.col(k).head<3>());
+		const Eigen::Vector4d tgt_k(attitude_target.col(k).head<4>());
+		const Eigen::Vector3d B_k(B.col(k).head<3>());
+
+		cost_orig += satellite.stageCost(k, N, x_orig_k, u_orig_k, bs_k, tgt_k, B_k, cost_cfg);
+		cost_pd += satellite.stageCost(k, N, x_pd_k, u_pd_k, bs_k, tgt_k, B_k, cost_cfg);
+	}
+
+	if (cost_orig_out) *cost_orig_out = cost_orig;
+	if (cost_pd_out) *cost_pd_out = cost_pd;
+	return cost_pd < cost_orig;
+}
+
+} // namespace spike_removal_detail
 
 // ===========================================================================
 // Public API
@@ -492,8 +639,10 @@ std::vector<SpikeCandidate> detectSpikes(
 			++n_checked;
 			const Eigen::VectorXd u_k = U.col(ck);
 			const Eigen::Vector3d tau = satellite.actuatorTorque(X.col(ck), u_k, B.col(ck));
-			if (isSaturated(u_k, satellite, cnst_cfg.control_limit_scale) &&
-			    torqueOpposesError(X.col(ck), tau, attitude_target.col(ck), satellite)) {
+			if (spike_removal_detail::isSaturated(u_k, satellite, cnst_cfg.control_limit_scale) &&
+			    spike_removal_detail::torqueOpposesError(
+			        X.col(ck), tau, attitude_target.col(ck),
+			        Eigen::Vector3d(boresight.col(ck).head<3>()), satellite)) {
 				++physics_limited_votes;
 			}
 		}
@@ -571,7 +720,7 @@ std::vector<SpikeCandidate> detectSpikes(
 			// Pass 2 control-effort heuristic: "is there meaningful command at this knot?"
 			// Use hardware u_max (scale=1.0) + 50% threshold — this is about detecting
 			// any significant effort, not proximity to the AL ceiling.
-			if (isSaturated(U.col(ck), satellite, 1.0, 0.5)) {
+			if (spike_removal_detail::isSaturated(U.col(ck), satellite, 1.0, 0.5)) {
 				has_control_effort = true;
 				break;
 			}
@@ -821,7 +970,7 @@ bool applySpikeRemoval(
 		// PD target: spike exit state
 		const Eigen::Vector4d q_target = X.col(t_exit).segment<4>(3);
 
-		auto [X_pd, U_pd] = simulatePDSegment(
+		auto [X_pd, U_pd] = spike_removal_detail::simulatePDSegment(
 			satellite, pd, X.col(t_enter), q_target, n_steps,
 			B_slice, S_slice, R_slice, V_slice, rho_slice,
 			dist_cfg, dt, cfg
@@ -847,8 +996,28 @@ bool applySpikeRemoval(
 			continue;
 		}
 
+		// Cost backstop (port of the Python prototype's compare_costs): only
+		// accept the PD window when it is strictly cheaper than the original
+		// window under this pass's stage cost.  Rejecting more-expensive
+		// substitutions prevents finiteness/keepout-clean but cost-degrading
+		// PD segments (e.g. the Magic-only zero-drift acceptance path) from
+		// being spliced into the trajectory.
+		double cost_orig = 0.0;
+		double cost_pd = 0.0;
+		if (!spike_removal_detail::compareCosts(
+		        satellite, X, U, X_pd, U_pd, t_enter, t_exit,
+		        B, boresight, attitude_target, pass.cost, N,
+		        &cost_orig, &cost_pd)) {
+			if (cfg.verbose) {
+				std::cout << "[SpikeRemoval]   (" << t_enter << "," << t_exit
+				          << "): PD window costlier (orig=" << cost_orig
+				          << ", pd=" << cost_pd << ") -- skipping\n";
+			}
+			continue;
+		}
+
 		// Keep-out check
-		if (!keepoutClear(satellite, X_pd, U_pd, S, cnst_cfg, N, t_enter)) {
+		if (!spike_removal_detail::keepoutClear(satellite, X_pd, U_pd, S, cnst_cfg, N, t_enter)) {
 			if (cfg.verbose) {
 				std::cout << "[SpikeRemoval]   (" << t_enter << "," << t_exit
 				          << "): keep-out violation -- skipping\n";
