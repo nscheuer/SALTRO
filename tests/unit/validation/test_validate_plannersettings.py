@@ -504,9 +504,39 @@ def test_invalid_cost_ang_cost_func_type_negative():
     settings = valid_settings()
     settings.passes[0].cost.ang_cost_func_type = -1
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
+
     assert not ok
     assert error_msg == "cost.ang_cost_func_type invalid"
+
+
+def test_invalid_cost_ang_cost_func_type_removed_type_4():
+    """Removed cost.ang_cost_func_type=4 (was (1-d)^2) should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.ang_cost_func_type = 4
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "cost.ang_cost_func_type invalid"
+
+
+def test_invalid_cost_ang_cost_func_type_above_implemented_set():
+    """cost.ang_cost_func_type=5 (never implemented) should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.ang_cost_func_type = 5
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "cost.ang_cost_func_type invalid"
+
+
+def test_valid_cost_ang_cost_func_type_implemented_set():
+    """All implemented types {0, 1, 2, 3} should pass"""
+    for cost_type in range(4):
+        settings = valid_settings()
+        settings.passes[0].cost.ang_cost_func_type = cost_type
+        ok, _ = saltro_py.validatePlannerSettings(settings)
+
+        assert ok, f"ang_cost_func_type={cost_type} should be valid"
 
 
 # ============================================================================
