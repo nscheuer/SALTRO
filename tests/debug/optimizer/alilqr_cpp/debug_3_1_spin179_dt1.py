@@ -56,6 +56,7 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
 
 import saltro_py  # noqa: E402
+from final_viewer import plot_final_trajectory  # noqa: E402
 
 SEC2CENT = 1.0 / (36525.0 * 86400.0)
 MU_EARTH = 3.986004418e14  # m^3/s^2
@@ -229,6 +230,17 @@ def main():
         fig.tight_layout()
         fig.savefig(args.plot, dpi=120)
         print(f"  wrote {args.plot}")
+
+    plot_final_trajectory(
+        X,
+        U,
+        ps.passes[0].dt,
+        satellite=sat,
+        q_goal=qg,
+        boresight_body=bs,
+        jtime=jtime,
+        title=f"P2.2 spin 179 deg (ok={ok}, full_newton={not args.gauss_newton})",
+    )
 
 
 if __name__ == "__main__":
