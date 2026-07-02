@@ -9,7 +9,8 @@ namespace py = pybind11;
 void bind_plannersettings(py::module_& m) {
     py::class_<InitTrajConfig>(m, "InitTrajConfig")
         .def(py::init<>())
-        .def_readwrite("initcontroller", &InitTrajConfig::initcontroller);
+        .def_readwrite("initcontroller", &InitTrajConfig::initcontroller)
+        .def_readwrite("pd_goal_rate_ff_enabled", &InitTrajConfig::pd_goal_rate_ff_enabled);
 
     py::class_<DisturbanceConfig>(m, "DisturbanceConfig")
         .def(py::init<>())
