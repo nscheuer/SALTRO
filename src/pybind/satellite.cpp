@@ -1304,6 +1304,32 @@ AngCostShape angCostShape(double c, int type) {
     }
 }
 
+// θ-space cost shape g(θ) and its first two derivatives w.r.t. the pointing
+// angle θ.  Value-equivalent to angCostShape's f(c) under c = cos θ, but with
+// derivatives taken in θ (smooth) rather than c (singular at the poles):
+//   0: 1−cosθ    1: ½(1−cosθ)²    2: θ    3: ½θ²
+// Only type 3 (½θ²) has the constant-curvature GN payoff (g'' ≡ 1); type 2 is
+// linear in θ (g'' ≡ 0); types 0/1 keep θ-dependent curvature.  Used by the
+// opt-in `CostConfig::use_theta_cost_param` reparametrization.
+struct ThetaCostShape { double g, gp, gpp; };
+
+ThetaCostShape thetaCostShape(double theta, int type) {
+    const double c = std::cos(theta);
+    const double s = std::sin(theta);
+    switch (type) {
+        case 0: return { 1.0 - c, s, c };
+        case 1: { const double e = 1.0 - c; return { 0.5 * e * e, e * s, s * s + e * c }; }
+        case 2: return { theta, 1.0, 0.0 };
+        case 3: return { 0.5 * theta * theta, theta, 1.0 };
+        default: throw invalid_argument("ang_cost_func_type invalid");
+    }
+}
+
+// Below this pointing-angle sine the θ-reparametrization is at a pole: the
+// pointing direction is undefined (antipode cone tip) or the gradient vanishes
+// (aligned).  Guarded with isotropic / zero limits.
+constexpr double kThetaPoleEps = 1e-7;
+
 // Reduced-space geometry of c = bs·R(q)ᵀ·r̂.  The gradient and Hessian are
 // expressed in the attitude tangent space (basis W = findWMat(q)); `ddc`
 // carries the "Planning with Attitude" manifold-curvature correction
@@ -1393,10 +1419,17 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
         // Hessian), mirroring the PhD planner's veccost path.
         const Vec3 bs_unit = boresight_body.normalized();
         const Vec3 r_eci = attitude_target.tail(3).normalized();
-        const double c_val = std::clamp(
-            bs_unit.dot(saltro::math::rotationMatrix(q).transpose() * r_eci),
-            -1.0, 1.0);
-        ang_cost = angCostShape(c_val, cost_cfg.ang_cost_func_type).f;
+        const Vec3 b_body = saltro::math::rotationMatrix(q).transpose() * r_eci;
+        const double c_val = std::clamp(bs_unit.dot(b_body), -1.0, 1.0);
+        if (cost_cfg.use_theta_cost_param) {
+            // θ-space: θ = atan2(|bs×b|, bs·b) is accurate at both poles where
+            // acos(c) loses precision.  g(θ) is value-equivalent to f(c).
+            const double s_theta = bs_unit.cross(b_body).norm();
+            const double theta = std::atan2(s_theta, bs_unit.dot(b_body));
+            ang_cost = thetaCostShape(theta, cost_cfg.ang_cost_func_type).g;
+        } else {
+            ang_cost = angCostShape(c_val, cost_cfg.ang_cost_func_type).f;
+        }
     } else {
         switch (cost_cfg.ang_cost_func_type) {
             case 0:
@@ -1745,9 +1778,24 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         const Vec3 bs_unit = boresight_body.normalized();
         const Vec3 r_eci = attitude_target.tail(3).normalized();
         const VecPointingGeom geom = vecPointingGeom(q, bs_unit, r_eci);
-        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+        Eigen::Vector3d grad_red;
+        if (cost_cfg.use_theta_cost_param) {
+            // ∂θ/∂tangent = −(1/sinθ)·∂c/∂tangent  →  grad = g'(θ)·∂θ/∂tangent.
+            // This equals the c-space gradient f'(c)·∂c/∂tangent identically
+            // (f'(c) = −g'(θ)/sinθ); the win is pole-region accuracy of θ, sinθ.
+            const Vec3 b_body = saltro::math::rotationMatrix(q).transpose() * r_eci;
+            const double s_theta = bs_unit.cross(b_body).norm();
+            const double theta = std::atan2(s_theta, bs_unit.dot(b_body));
+            const ThetaCostShape g = thetaCostShape(theta, cost_cfg.ang_cost_func_type);
+            grad_red = (s_theta > kThetaPoleEps)
+                ? Eigen::Vector3d(-(g.gp / s_theta) * geom.dc)
+                : Eigen::Vector3d::Zero();  // aligned: g'→0; antipode: direction undefined
+        } else {
+            const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+            grad_red = f.fp * geom.dc;
+        }
         lx.segment<4>(QUAT_INDEX) =
-            w_ang_eff * f.fp * (saltro::math::findWMat(q) * geom.dc);
+            w_ang_eff * (saltro::math::findWMat(q) * grad_red);
     } else {
         double d_ang_cost_dqdot = 0.0;  // ∂(ang_cost)/∂(qdot)
         switch (cost_cfg.ang_cost_func_type) {
@@ -2014,11 +2062,51 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         const Vec3 bs_unit = boresight_body.normalized();
         const Vec3 r_eci = attitude_target.tail(3).normalized();
         const VecPointingGeom geom = vecPointingGeom(q, bs_unit, r_eci);
-        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+        const Eigen::Matrix3d dcdc = geom.dc * geom.dc.transpose();
 
-        Eigen::Matrix3d H_red = f.fpp * (geom.dc * geom.dc.transpose());
-        if (!cost_cfg.cost_hess_gauss_newton) {
-            H_red += f.fp * geom.ddc;  // full exact Hessian
+        Eigen::Matrix3d H_red;
+        if (cost_cfg.use_theta_cost_param) {
+            const Vec3 b_body = saltro::math::rotationMatrix(q).transpose() * r_eci;
+            const double c_theta = bs_unit.dot(b_body);
+            const double s_theta = bs_unit.cross(b_body).norm();
+            const double theta = std::atan2(s_theta, c_theta);
+            const ThetaCostShape g = thetaCostShape(theta, cost_cfg.ang_cost_func_type);
+            if (cost_cfg.cost_hess_gauss_newton) {
+                // Gauss–Newton, θ-space:  H = g''(θ)·û ûᵀ,  û = ∂θ/∂tangent unit
+                // (= ∂c/∂tangent normalized, sign irrelevant).  For g = ½θ² this
+                // is CONSTANT curvature 1·û ûᵀ — bounded at every angle,
+                // including the antipode, unlike c-space GN's f''(c)·∂c∂cᵀ which
+                // grows like 1/sinθ as θ→180°.
+                const double dc2 = geom.dc.squaredNorm();
+                if (dc2 > kThetaPoleEps * kThetaPoleEps) {
+                    H_red = g.gpp * (dcdc / dc2);
+                } else {
+                    // Pole: û undefined.  Use the isotropic off-boresight limit
+                    // g''·(I − bs·bsᵀ) (curvature in the 2 pointing DOF, 0 roll).
+                    H_red = g.gpp * (Eigen::Matrix3d::Identity()
+                                     - bs_unit * bs_unit.transpose());
+                }
+            } else if (s_theta > kThetaPoleEps) {
+                // Full exact θ-space Hessian:
+                //   H = (g''/sin²θ − g'·cosθ/sin³θ)·∂c∂cᵀ − (g'/sinθ)·∂²c
+                // Algebraically identical to the c-space full Hessian for the
+                // matching shape; the difference is pole-region accuracy.
+                const double s2 = s_theta * s_theta;
+                const double s3 = s2 * s_theta;
+                H_red = (g.gpp / s2 - g.gp * c_theta / s3) * dcdc
+                      - (g.gp / s_theta) * geom.ddc;
+            } else {
+                // Aligned pole for the full Hessian: fall back to the c-space
+                // assembly (analytically identical, floored, production-tested).
+                const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+                H_red = f.fpp * dcdc + f.fp * geom.ddc;
+            }
+        } else {
+            const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+            H_red = f.fpp * dcdc;
+            if (!cost_cfg.cost_hess_gauss_newton) {
+                H_red += f.fp * geom.ddc;  // full exact Hessian
+            }
         }
         // Lift reduced 3×3 → ambient q-block; the BP re-projects with Wᵀ.
         const auto W = saltro::math::findWMat(q);

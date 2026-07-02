@@ -243,6 +243,28 @@ struct CostConfig {
     /// Default (false) preserves the current full-Hessian behavior.
     bool cost_hess_gauss_newton = false;
 
+    /// EXPERIMENTAL (prototype, opt-in): reparametrize the vector-pointing
+    /// angle cost in the pointing angle θ instead of c = cos θ. The c-space
+    /// (acos) formulation is smooth in θ but singular in c; every acos patch
+    /// (Taylor at c=+1, √(1−c²) floors, GN 1/sinθ blow-up at c=−1) is a
+    /// parametrization artifact. This flag assembles the tangent-space cost
+    /// value / gradient / Hessian directly in θ, where
+    ///   θ = atan2(|bs×b|, bs·b)   (b = R(q)ᵀ·r̂, numerically stable at both poles)
+    /// and g(θ) is value-equivalent to the c-space shape f(c):
+    ///   type 0: 1−cosθ    type 1: ½(1−cosθ)²    type 2: θ    type 3: ½θ².
+    ///
+    /// Analytics: the FULL (Newton) θ-space Hessian is algebraically identical
+    /// to the c-space full Hessian for the matching shape — the only benefit
+    /// there is pole-region numerical accuracy. The real payoff is the
+    /// GAUSS-NEWTON Hessian: c-space GN is f''(c)·∂c∂cᵀ, which grows like
+    /// 1/sinθ as θ→180° (the razor near the antipode); θ-space GN is
+    /// g''(θ)·û ûᵀ, which for g=½θ² is CONSTANT curvature 1·û ûᵀ — bounded at
+    /// every angle including 179.999°.
+    ///
+    /// Quaternion-goal mode is unaffected (this only touches the vec-pointing
+    /// angle cost). Default false → c-space path is bit-identical.
+    bool use_theta_cost_param = false;
+
     /// Scale all terminal weights by `k`, preserving ratios with their
     /// stage counterparts.  `k=1` matches stage; `k=100` is strong terminal
     /// emphasis.
