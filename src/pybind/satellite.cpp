@@ -931,6 +931,35 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
         }
     }
 
+    // MTQ torque Hessian: τ_mtq = magvec × B_body = skew(magvec)·(R^T B_eci),
+    // magvec = Σ_i axis_i u_i. Linear in B_body, so only the d²(R^T B)/dq² term:
+    //   ∂²τ_l/∂q_j∂q_k = Σ_m skew(magvec)_{lm} · ∂²(R^T B)_m/∂q_j∂q_k
+    // (mirrors the residual-dipole block). Nonzero only when MTQs are commanding
+    // (u≠0); the previous code computed only the ∂²τ_mtq/∂u∂q mixed block, so the
+    // pure q-q term was missing for nonzero MTQ control.
+    if (num_mtq_ > 0 && B_eci.norm() > 1e-12) {
+        Vec3 magvec = Vec3::Zero();
+        for (int i = 0; i < num_mtq_; ++i) magvec += getMTQ(i).axis() * u(i);
+        if (magvec.norm() > 1e-15) {
+            const auto d2B_dq2 = saltro::math::ddrotmatTvecdqdq(q, B_eci);
+            const Mat33 skew_m = saltro::math::skewSymmetric(magvec);
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 4; ++j)
+                    for (int k = 0; k < 4; ++k) {
+                        double contrib = 0.0;
+                        for (int l = 0; l < 3; ++l) {
+                            double tau_hess_l = 0.0;
+                            for (int m = 0; m < 3; ++m)
+                                tau_hess_l += skew_m(l, m) * d2B_dq2[static_cast<size_t>(m)](j, k);
+                            contrib += invJcom_noRW_(i, l) * tau_hess_l;
+                        }
+                        if (std::isfinite(contrib))
+                            hess_xx.slice(AV_INDEX + i)(QUAT_INDEX + j, QUAT_INDEX + k) += contrib;
+                    }
+        }
+    }
+
+
     // =========================================================================
     // Quaternion Hessian: ∂²qdot_i/∂x_j∂x_k (indexed by output i = 0,1,2,3)
     // =========================================================================
@@ -1118,6 +1147,118 @@ std::tuple<Satellite::DynHessXX, Satellite::DynHessUX, Satellite::DynHessUU> Sat
             // Right-project quaternion columns of hess_ux
             hess_ux.slice(si).template block<NU, 4>(0, QUAT_INDEX) =
                 hess_ux.slice(si).template block<NU, 4>(0, QUAT_INDEX) * proj_q;
+        }
+    }
+
+    // =========================================================================
+    // Retraction curvature of the quaternion second derivative (manifold term)
+    // =========================================================================
+    // dynamics() normalizes q -> q/||q|| internally, so each output is
+    // f(q) = g(N(q)) with N(q)=q/||q||. The projection block above yields the
+    // P*H_raw*P part of the q-q blocks (and the correct single-sided projection
+    // of the q-w / q-h / u-q mixed blocks). The full second-order chain rule
+    // (Jackson 2021 "Planning with Attitude", eq. 15) additionally contributes,
+    // in the q-q block,
+    //   C_ac = -g_a q_c - q_a g_c - (g.q) d_ac + 3 (g.q) q_a q_c ,
+    // where g is the UNPROJECTED q-gradient of that output (the same gradient
+    // dynamicsJacobians builds before its (I-qq^T) projection). This term is
+    // added AFTER the projection -- it must not be re-projected (P*C*P != C).
+    // Required for the w-dot outputs and the h-dot outputs derived from them;
+    // the q-dot outputs are handled by their own block above.
+    {
+        using Mat44 = Eigen::Matrix<double, 4, 4>;
+
+        // Unprojected q-gradient of w-dot: invJ * sum(d tau / dq_raw), reusing
+        // the disturbance/MTQ first-derivative helpers (no (I-qq^T) projection).
+        Mat34 dtau_dq_raw = Mat34::Zero();
+        if (num_mtq_ > 0 && B_eci.norm() > 1e-12) {
+            Mat43 dB_dq = saltro::math::drotmatTvecdq(q, B_eci);
+            for (int a = 0; a < num_mtq_; ++a) {
+                const MTQ& mtq = getMTQ(a);
+                Mat73 dtau_dx = mtq.dtorq_dbasestate(u(a), x_base, B_body, dB_dq);
+                dtau_dq_raw += dtau_dx.block<4, 3>(3, 0).transpose();
+            }
+        }
+        if (dist.plan_for_gg && R_eci.norm() > 1e-6) {
+            try {
+                saltro::disturbances::GGDisturbance gg(Jcom_);
+                Mat43 dR_dq = saltro::math::drotmatTvecdq(q, R_eci);
+                Mat34 j = gg.dtorque_dq(x_base, dist, R_body, Jcom_, dR_dq.transpose());
+                if (j.allFinite()) dtau_dq_raw += j;
+            } catch (...) {}
+        }
+        if (dist.plan_for_aero && V_eci.norm() > 1e-6) {
+            try {
+                saltro::disturbances::DragDisturbance drag(geometry_config_);
+                Mat43 dV_dq = saltro::math::drotmatTvecdq(q, V_eci);
+                Mat34 j = drag.dtorque_dq(x_base, dist, V_body, dV_dq.transpose());
+                if (j.allFinite()) dtau_dq_raw += j;
+            } catch (...) {}
+        }
+        if (dist.plan_for_srp && S_eci.norm() > 1e-6) {
+            try {
+                saltro::disturbances::SRPDisturbance srp(geometry_config_);
+                Mat43 dS_dq = saltro::math::drotmatTvecdq(q, S_eci);
+                Mat34 j = srp.dtorque_dq(x_base, dist, S_body, dS_dq.transpose());
+                if (j.allFinite()) dtau_dq_raw += j;
+            } catch (...) {}
+        }
+        if (dist.plan_for_resdipole && B_eci.norm() > 1e-12) {
+            Mat43 dB_dq = saltro::math::drotmatTvecdq(q, B_eci);
+            Mat34 j = saltro::math::skewSymmetric(dist.res_dipole) * dB_dq.transpose();
+            if (j.allFinite()) dtau_dq_raw += j;
+        }
+        const Mat34 g_wdot = invJcom_noRW_ * dtau_dq_raw;  // rows = w-dot output, cols = q
+
+        auto curvature = [&](const Vec4& gv) -> Mat44 {
+            const double s = gv.dot(q);
+            return -(gv * q.transpose() + q * gv.transpose())
+                   - s * Mat44::Identity()
+                   + 3.0 * s * (q * q.transpose());
+        };
+
+        std::array<Mat44, 3> Cw;
+        for (int i = 0; i < 3; ++i) {
+            Cw[static_cast<size_t>(i)] = curvature(g_wdot.row(i).transpose());
+            for (int a = 0; a < 4; ++a)
+                for (int c = 0; c < 4; ++c)
+                    hess_xx.slice(AV_INDEX + i)(QUAT_INDEX + a, QUAT_INDEX + c)
+                        += Cw[static_cast<size_t>(i)](a, c);
+        }
+        // h-dot_k = -J_rw_k * sum_m axis_k(m) * w-dot_m
+        //   =>  C(h-dot_k) = -J_rw_k * sum_m axis_k(m) * C(w-dot_m)
+        if (num_rw_ > 0) {
+            for (int k = 0; k < num_rw_; ++k) {
+                const Vec3 axis_k = getRW(k).axis();
+                const double Jrw = getRW(k).wheelInertia();
+                for (int m = 0; m < 3; ++m) {
+                    const double coef = -Jrw * axis_k(m);
+                    for (int a = 0; a < 4; ++a)
+                        for (int c = 0; c < 4; ++c)
+                            hess_xx.slice(RW_MOMENTUM_INDEX + k)(QUAT_INDEX + a, QUAT_INDEX + c)
+                                += coef * Cw[static_cast<size_t>(m)](a, c);
+                }
+            }
+        }
+
+        // q-dot outputs: q-dot_r = 0.5 (W(q) w)_r. W is linear in q so the raw
+        // q-q Hessian is zero, but the normalization retraction term is not. The
+        // unprojected q-gradient is g_r[a] = 0.5 * sum_k W_sign[r][k] w_k for
+        // a = W_qidx[r][k]. (The q-w mixed block is set above and projected by
+        // the block before this; only the q-q retraction term is missing.)
+        {
+            // Reuse the W_qidx / W_sign encoding declared in the q-dot Jacobian
+            // block above (W[r,k] = W_sign[r][k] * q[W_qidx[r][k]]).
+            const Vec3 w = x.segment<3>(AV_INDEX);
+            for (int r = 0; r < 4; ++r) {
+                Vec4 gr = Vec4::Zero();
+                for (int kk = 0; kk < 3; ++kk)
+                    gr(W_qidx[r][kk]) += 0.5 * W_sign[r][kk] * w(kk);
+                const Mat44 Cr = curvature(gr);
+                for (int a = 0; a < 4; ++a)
+                    for (int c = 0; c < 4; ++c)
+                        hess_xx.slice(QUAT_INDEX + r)(QUAT_INDEX + a, QUAT_INDEX + c) += Cr(a, c);
+            }
         }
     }
 

@@ -1041,11 +1041,6 @@ def test_hessian_elements_are_finite():
         assert np.all(np.isfinite(hess_uu[i]))
 
 
-@pytest.mark.skip(
-    reason="Requires the analytic dynamics-Hessian fix in PR #21. "
-    "main currently computes a w-dependent d^2w_dot/dw^2 block when "
-    "the correct value is constant. Re-enable once PR #21 lands."
-)
 def test_hessians_are_symmetric_where_expected():
     """Test that Hessian matrices are symmetric where expected"""
     fixture = TestSatelliteDynamicsFixture()
@@ -1088,12 +1083,6 @@ def test_hessians_are_symmetric_where_expected():
 # does not. To test quaternion outputs properly we'd need tangent-space
 # perturbations (or a non-normalizing dynamics variant); leaving those out
 # here. The covered set still catches Bug 4 (which lives in ω outputs).
-@pytest.mark.skip(
-    reason="Requires the analytic dynamics-Hessian fix in PR #21. "
-    "main's d^2w_dot/dw^2 is w-dependent (it should be constant), "
-    "so analytic vs FD differs by ~10x on omega-output indices. "
-    "Re-enable once PR #21 lands."
-)
 @pytest.mark.parametrize("out_idx", [0, 1, 2, 7, 8, 9])
 def test_hessian_wrt_state_matches_finite_differences(out_idx):
     """Test that Hessian w.r.t. state matches finite differences for each
@@ -1177,7 +1166,308 @@ def test_hessian_wrt_state_matches_finite_differences(out_idx):
             )
 
 
+@pytest.mark.parametrize("out_idx", [0, 1, 2, 7, 8, 9])
+def test_hessian_wrt_state_matches_fd_at_non_identity_attitude(out_idx):
+    """Hessian vs finite differences at a NON-IDENTITY quaternion.
+
+    The identity-quaternion tests above are blind to the quaternion-coupled
+    (q0) terms of the attitude second derivative: at q=[1,0,0,0] the
+    normalization projector is diag(0,1,1,1) and the retraction-curvature
+    off-diagonals vanish. The disturbance Hessian assembly + the normalization
+    chain rule are exercised in full only off identity. The q-q disturbance
+    entries are O(1e-6), so a loose abs tolerance hides errors; we use a
+    converged step (eps=3e-4) and a magnitude-relative tolerance.
+    """
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    step = 50
+
+    q = np.array([0.6, -0.3, 0.5, 0.2])
+    q = q / np.linalg.norm(q)
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[saltro_py.Satellite.QUAT_INDEX:saltro_py.Satellite.QUAT_INDEX + 4] = q
+
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    dist.plan_for_gg = True
+    R_eci, B_eci, S_eci, V_eci = (fixture.R[:, step], fixture.B[:, step],
+                                  fixture.S[:, step], fixture.V[:, step])
+
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R_eci, B_eci, S_eci, V_eci)
+    H = np.array(hess_xx[out_idx])
+
+    eps = 3e-4
+    nx = fixture.sat.stateDim
+    QI = saltro_py.Satellite.QUAT_INDEX
+
+    def f(xx):
+        return fixture.sat.dynamics(xx, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
+
+    # Only the quaternion block carries the manifold subtlety; check it tightly.
+    fd = np.zeros((4, 4))
+    for a in range(4):
+        for b in range(a, 4):
+            xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+            xpp[QI + a] += eps; xpp[QI + b] += eps
+            xpm[QI + a] += eps; xpm[QI + b] -= eps
+            xmp[QI + a] -= eps; xmp[QI + b] += eps
+            xmm[QI + a] -= eps; xmm[QI + b] -= eps
+            v = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4.0 * eps * eps)
+            fd[a, b] = v
+            fd[b, a] = v
+
+    Hqq = H[QI:QI + 4, QI:QI + 4]
+    scale = np.abs(fd).max() + 1e-12
+    err = np.abs(Hqq - fd).max()
+    # Converged FD is good to ~1e-11 here; the pre-fix bug was ~5.6e-7 on an
+    # O(1e-7) entry, so a 1e-3 relative tolerance both passes the fix and would
+    # have caught the bug.
+    assert err <= 1e-3 * scale + 1e-9, (
+        f"out_idx={out_idx}: max|analytic-FD| over q-q block = {err:.3e} "
+        f"(scale {scale:.3e})\nanalytic=\n{Hqq}\nfd=\n{fd}"
+    )
+
+
+@pytest.mark.parametrize("out_idx", [3, 4, 5, 6])
+def test_qdot_hessian_matches_fd_at_non_identity_attitude(out_idx):
+    """q-dot (quaternion-output) Hessians at a non-identity quaternion.
+
+    q-dot = 0.5 W(q) w with q normalized internally. W is linear in q, so the
+    raw q-q Hessian is zero, but the normalization retraction term is not -- it
+    was previously left at zero (and these outputs were excluded from the FD
+    tests). Checks both the q-q and the q-w mixed blocks vs finite differences of
+    the renormalizing dynamics. Pure kinematics, so no disturbances are needed.
+    """
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    q = np.array([0.6, -0.3, 0.5, 0.2])
+    q = q / np.linalg.norm(q)
+    AV = saltro_py.Satellite.AV_INDEX
+    QI = saltro_py.Satellite.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[AV:AV + 3] = np.array([0.05, 0.02, 0.01])
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    R_eci, B_eci, S_eci, V_eci = (fixture.R[:, 50], fixture.B[:, 50],
+                                  fixture.S[:, 50], fixture.V[:, 50])
+
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R_eci, B_eci, S_eci, V_eci)
+    H = np.array(hess_xx[out_idx])
+
+    eps = 1e-4
+    idxs = list(range(AV, AV + 3)) + list(range(QI, QI + 4))
+
+    def f(xx):
+        return fixture.sat.dynamics(xx, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[out_idx]
+
+    scale = 0.0
+    err = 0.0
+    for a in idxs:
+        for b in idxs:
+            xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+            xpp[a] += eps; xpp[b] += eps
+            xpm[a] += eps; xpm[b] -= eps
+            xmp[a] -= eps; xmp[b] += eps
+            xmm[a] -= eps; xmm[b] -= eps
+            fd = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4.0 * eps * eps)
+            scale = max(scale, abs(fd))
+            err = max(err, abs(H[a, b] - fd))
+    assert err <= 1e-4 * (scale + 1.0), f"out_idx={out_idx}: max|analytic-FD| = {err:.3e} (scale {scale:.3e})"
+
+
+def test_mtq_hessian_wrt_q_matches_fd_at_nonzero_control():
+    """MTQ torque q-q Hessian at nonzero MTQ control, non-identity attitude.
+
+    tau_mtq = magvec x B_body (magvec = sum axis_i u_i), linear in B_body, so the
+    q-q Hessian is skew(magvec)*d2(R^T B)/dq2. It is zero only at u=0, so the
+    previous code (which computed only the d2/du dq mixed block) left it untested.
+    """
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    AV = saltro_py.Satellite.AV_INDEX
+    QI = saltro_py.Satellite.QUAT_INDEX
+    q = np.array([0.6, -0.3, 0.5, 0.2])
+    q = q / np.linalg.norm(q)
+    x = np.zeros(fixture.sat.stateDim)
+    x[AV:AV + 3] = np.array([0.05, 0.02, 0.01])
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+    u[0], u[1], u[2] = 0.15, -0.1, 0.08  # MTQ dipoles
+    dist = saltro_py.DisturbanceConfig()
+    R_eci = np.zeros(3)
+    B_eci = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+    S_eci = np.zeros(3)
+    V_eci = np.zeros(3)
+
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R_eci, B_eci, S_eci, V_eci)
+    eps = 1e-4
+
+    for o in [0, 1, 2]:
+        H = np.array(hess_xx[o])
+
+        def f(xx, o=o):
+            return fixture.sat.dynamics(xx, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[o]
+
+        block = H[QI:QI + 4, QI:QI + 4]
+        scale = np.abs(block).max() + 1e-30
+        for a in range(4):
+            for b in range(a, 4):
+                xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+                xpp[QI + a] += eps; xpp[QI + b] += eps
+                xpm[QI + a] += eps; xpm[QI + b] -= eps
+                xmp[QI + a] -= eps; xmp[QI + b] += eps
+                xmm[QI + a] -= eps; xmm[QI + b] -= eps
+                fd = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4.0 * eps * eps)
+                assert abs(block[a, b] - fd) < 1e-4 * scale + 1e-9, (
+                    f"out={o} ({a},{b}): analytic={block[a,b]:.6e} fd={fd:.6e}")
+
+
+def _rot_matrix(q):
+    """Body->ECI rotation (Euler-Rodrigues) for a unit quaternion [w,x,y,z]."""
+    w, x, y, z = q
+    return np.array([
+        [w*w + x*x - y*y - z*z, 2*(x*y - w*z),         2*(x*z + w*y)],
+        [2*(x*y + w*z),         w*w - x*x + y*y - z*z,  2*(y*z - w*x)],
+        [2*(x*z - w*y),         2*(y*z + w*x),          w*w - x*x - y*y + z*z],
+    ])
+
+
+@pytest.mark.parametrize("which", ["aero", "srp"])
+def test_disturbance_hessian_matches_fd_at_non_identity_with_geometry(which):
+    """Drag/SRP attitude Hessians vs FD at a non-identity quaternion, with real
+    surface geometry. The fixtures elsewhere have no faces, so these torques
+    (and their Hessians) are otherwise never exercised. A single asymmetric face
+    with strong, stable incidence keeps the active-set gate from flipping under
+    the FD perturbation. Both rely on the same normalization-chain-rule machinery
+    the gg fix corrected; this pins them off identity."""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+
+    cfg = saltro_py.GeometryConfig()
+    # area, centroid (offset lever), normal +x, eta_s, eta_d, eta_a, CD
+    cfg.addFace(saltro_py.GeometryFace(
+        1.0, np.array([0.3, 0.4, 0.1]), np.array([1.0, 0.0, 0.0]),
+        0.3, 0.2, 0.1, 2.2))
+    fixture.sat.setGeometryConfig(cfg)
+
+    q = np.array([0.6, -0.3, 0.5, 0.2])
+    q = q / np.linalg.norm(q)
+    QI = saltro_py.Satellite.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = np.array([0.05, 0.02, 0.01])
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+
+    dist = saltro_py.DisturbanceConfig()
+    R_eci = np.zeros(3)
+    B_eci = fixture.B[:, 50]
+    Rm = _rot_matrix(q)
+    if which == "aero":
+        dist.plan_for_aero = True
+        # body velocity strongly along +x so the face stays active under perturbation
+        V_eci = Rm @ np.array([5000.0, 300.0, 150.0])
+        S_eci = np.zeros(3)
+    else:
+        dist.plan_for_srp = True
+        S_eci = Rm @ (np.array([0.9, 0.3, 0.2]) / np.linalg.norm([0.9, 0.3, 0.2]))
+        V_eci = np.zeros(3)
+
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R_eci, B_eci, S_eci, V_eci)
+
+    eps = 1e-3  # eps^2 convergence verified; rel error ~2e-6 here
+
+    def f(xx, o):
+        return fixture.sat.dynamics(xx, u, dist, R_eci, B_eci, S_eci, V_eci, 0)[o]
+
+    for o in [0, 1, 2]:
+        H = np.array(hess_xx[o])
+        block = H[QI:QI + 4, QI:QI + 4]
+        scale = np.abs(block).max() + 1e-30
+        for a in range(4):
+            for b in range(a, 4):
+                xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+                xpp[QI + a] += eps; xpp[QI + b] += eps
+                xpm[QI + a] += eps; xpm[QI + b] -= eps
+                xmp[QI + a] -= eps; xmp[QI + b] += eps
+                xmm[QI + a] -= eps; xmm[QI + b] -= eps
+                fd = (f(xpp, o) - f(xpm, o) - f(xmp, o) + f(xmm, o)) / (4.0 * eps * eps)
+                rel = abs(block[a, b] - fd) / scale
+                assert rel < 1e-4, (
+                    f"{which} out={o} ({a},{b}): analytic={block[a,b]:.6e} "
+                    f"fd={fd:.6e} rel={rel:.2e}")
+
+
 # ============================================================================
+def test_qdot_output_hessian_matches_fd_at_non_identity():
+    """q-dot outputs (3-6): q-dot = 0.5 W(q) w. W is linear in q so the raw q-q
+    Hessian is zero, but the normalization retraction term is not. Verify the
+    q-q block vs finite differences at a non-identity attitude (these outputs
+    are excluded from the omega/h-dot FD test above)."""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    q = np.array([0.6, -0.3, 0.5, 0.2]); q = q / np.linalg.norm(q)
+    QI = saltro_py.Satellite.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[saltro_py.Satellite.AV_INDEX:saltro_py.Satellite.AV_INDEX + 3] = [0.05, 0.02, 0.01]
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+    dist = saltro_py.DisturbanceConfig()
+    R, B, S, V = (fixture.R[:, 50], fixture.B[:, 50], fixture.S[:, 50], fixture.V[:, 50])
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R, B, S, V)
+
+    def f(xx, o):
+        return fixture.sat.dynamics(xx, u, dist, R, B, S, V, 0)[o]
+
+    eps = 1e-4
+    for o in range(QI, QI + 4):           # q-dot outputs
+        H = np.array(hess_xx[o])
+        for a in range(4):
+            for b in range(a, 4):
+                xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+                xpp[QI + a] += eps; xpp[QI + b] += eps
+                xpm[QI + a] += eps; xpm[QI + b] -= eps
+                xmp[QI + a] -= eps; xmp[QI + b] += eps
+                xmm[QI + a] -= eps; xmm[QI + b] -= eps
+                fd = (f(xpp, o) - f(xpm, o) - f(xmp, o) + f(xmm, o)) / (4.0 * eps * eps)
+                assert abs(H[QI + a, QI + b] - fd) < 1e-7, f"qdot o={o} ({a},{b})"
+
+
+def test_mtq_dynamics_hessian_matches_fd_at_non_identity_nonzero_control():
+    """MTQ torque depends on q (B_body) and is linear in u, so its omega-dot q-q
+    Hessian is nonzero only for u != 0 -- not exercised by the u=0 tests. Verify
+    at a non-identity attitude with nonzero MTQ control."""
+    fixture = TestSatelliteDynamicsFixture()
+    fixture.setup_method()
+    q = np.array([0.6, -0.3, 0.5, 0.2]); q = q / np.linalg.norm(q)
+    AV = saltro_py.Satellite.AV_INDEX; QI = saltro_py.Satellite.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[AV:AV + 3] = [0.05, 0.02, 0.01]
+    x[QI:QI + 4] = q
+    u = np.zeros(fixture.sat.controlDim)
+    u[:fixture.sat.numMTQ] = np.array([0.15, -0.1, 0.08])[:fixture.sat.numMTQ]
+    dist = saltro_py.DisturbanceConfig()   # isolate MTQ torque q-dependence
+    R, B, S, V = (fixture.R[:, 50], fixture.B[:, 50], fixture.S[:, 50], fixture.V[:, 50])
+    hess_xx, _, _ = fixture.sat.dynamicsHessians(x, u, dist, R, B, S, V)
+
+    def f(xx, o):
+        return fixture.sat.dynamics(xx, u, dist, R, B, S, V, 0)[o]
+
+    eps = 1e-4
+    for o in range(3):                    # omega-dot outputs
+        H = np.array(hess_xx[o])
+        for a in range(4):
+            for b in range(a, 4):
+                xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+                xpp[QI + a] += eps; xpp[QI + b] += eps
+                xpm[QI + a] += eps; xpm[QI + b] -= eps
+                xmp[QI + a] -= eps; xmp[QI + b] += eps
+                xmm[QI + a] -= eps; xmm[QI + b] -= eps
+                fd = (f(xpp, o) - f(xpm, o) - f(xmp, o) + f(xmm, o)) / (4.0 * eps * eps)
+                assert abs(H[QI + a, QI + b] - fd) < 1e-7, f"mtq o={o} ({a},{b})"
+
+
 # TEST SECTION 13: Euler's equation - cross-product gyroscopic terms
 # ============================================================================
 

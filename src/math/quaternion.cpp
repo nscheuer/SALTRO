@@ -119,22 +119,21 @@ std::array<Mat44, 3> ddrotmatTvecdqdq(const Vec4& /*q*/, const Vec3& v) {
         }
     }
 
-    // q_v × q_v block: ∂²(R^T v)_k / ∂(q_v)_a ∂(q_v)_b.
-    // Deriving from R^T v = (q_0² - |q_v|²) v + 2 (q_v · v) q_v - 2 q_0 (q_v × v):
-    //   (1) (q_0² - Σ (q_v)_c²) v_k            →  -2 δ_{ab} v_k
-    //   (2) 2 (Σ (q_v)_c v_c) (q_v)_k           →  2 v_a δ_{bk} + 2 v_b δ_{ak}
-    //   (3) -2 q_0 ε_{kcd} (q_v)_c v_d          →  0 (linear in q_v)
-    // Total:  H_k[1+a, 1+b] = -2 δ_{ab} v_k + 2 v_a δ_{bk} + 2 v_b δ_{ak}
-    // Fixed 2026-04-23: prior implementation had only the (a==k)·2v_b term,
-    // missing the -2 δ_{ab} v_k diagonal and the 2 v_a δ_{bk} symmetric partner.
-    for (int k = 0; k < 3; ++k) {
+    // qv–qv block of ∂²(Rᵀv)_m/∂q_a∂q_b (a,b ∈ {1,2,3}). From the raw-formula
+    //   (Rᵀv)_m = (q0² − |qv|²)v_m + 2(qv·v)qv_m + 2q0(qv×v)_m,
+    // the second derivative in the vector part is
+    //   ∂²(Rᵀv)_m/∂q_a∂q_b = −2 δ_ab v_m + 2 v_a δ_bm + 2 v_b δ_am,
+    // which is symmetric in (a,b) as Schwarz requires. The previous version wrote
+    // only the single term 2 v_b δ_am onto one row, leaving the block both
+    // incomplete and asymmetric (it disagreed with finite differences by O(1) and
+    // broke the symmetry of every Hessian that consumes this helper).
+    for (int m = 0; m < 3; ++m) {
         for (int a = 0; a < 3; ++a) {
             for (int b = 0; b < 3; ++b) {
-                double val = 0.0;
-                if (a == b) val -= 2.0 * v(k);
-                if (b == k) val += 2.0 * v(a);
-                if (a == k) val += 2.0 * v(b);
-                output[static_cast<size_t>(k)](1 + a, 1 + b) += val;
+                const double val = -2.0 * (a == b ? 1.0 : 0.0) * v(m)
+                                   + 2.0 * v(a) * (b == m ? 1.0 : 0.0)
+                                   + 2.0 * v(b) * (a == m ? 1.0 : 0.0);
+                output[static_cast<size_t>(m)](1 + a, 1 + b) = val;
             }
         }
     }
