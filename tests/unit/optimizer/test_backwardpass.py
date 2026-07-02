@@ -1254,8 +1254,13 @@ class TestBackwardPass:
         assert np.all(np.isfinite(d))
         assert np.all(np.isfinite(deltaV))
 
-    def test_rk4_hessians_match_finite_difference_of_rk4_jacobians(self):
-        """Mirror the C++ FD sanity check for normalized RK4 Hessian composition."""
+    def test_rk4_hessians_match_double_finite_difference_of_normalized_step(self):
+        """Mirror the C++ FD sanity check for normalized RK4 Hessian composition.
+
+        Named distinctly from test_rk4_hessians_match_finite_difference_of_rk4_jacobians
+        above (which exercises the saltro_py.rk4_dynamics_hessians pybind path) so the
+        two do not shadow each other within this class.
+        """
         settings = saltro_py.PlannerSettings()
         settings.num_passes = 1
         settings.passes[0].dt = 0.05
