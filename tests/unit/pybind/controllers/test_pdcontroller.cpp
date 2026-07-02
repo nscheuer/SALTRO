@@ -36,6 +36,13 @@ std::unique_ptr<Satellite> makeSimpleSatellite() {
     return s;
 }
 
+std::unique_ptr<Satellite> makeSatelliteWithMagic() {
+    auto s = makeSimpleSatellite();
+    s->addMagic(Eigen::Vector3d::UnitX(), 2.0e-2);
+    s->addMagic(Eigen::Vector3d::UnitY(), 2.0e-2);
+    return s;
+}
+
 Satellite::VecX makeState(const Eigen::Vector3d& omega, const Eigen::Vector4d& q) {
     Satellite::VecX x = Satellite::VecX::Zero(8);
     x.segment<3>(Satellite::AV_INDEX) = omega;
@@ -280,6 +287,68 @@ TEST_CASE("warm_start dispatches initcontroller=3 to PDController",
     }
 
     // Start tumbling so PD actually has something to do.
+    Satellite::VecX x0 = makeState(Eigen::Vector3d(0.05, -0.03, 0.04),
+                                   Eigen::Vector4d(1.0, 0.0, 0.0, 0.0));
+
+    Eigen::MatrixXd X = Eigen::MatrixXd::Zero(sat->stateDim(), N);
+    Eigen::MatrixXd U = Eigen::MatrixXd::Zero(sat->controlDim(), N);
+
+    const bool ok = optimizer::warm_start(
+        settings, *sat, x0, jtime, q_goal, boresight, N, R, V, B, S, rho, X, U);
+    REQUIRE(ok);
+    REQUIRE(X.allFinite());
+    REQUIRE(U.allFinite());
+}
+
+TEST_CASE("PDController returns full controlDim output when magic actuators exist",
+          "[controller][pd][magic]") {
+    auto sat = makeSatelliteWithMagic();
+    controller::PDController pd(*sat);
+
+    const auto x = makeState(Eigen::Vector3d(0.02, -0.01, 0.03),
+                             Eigen::Vector4d(1.0, 0.0, 0.0, 0.0));
+    const Eigen::Vector3d B_eci(2.2e-3, -1.6e-3, 3.1e-3);
+    const Eigen::Vector4d q_goal_vec(std::nan(""), 1.0, 0.0, 0.0);
+    const Eigen::Vector3d boresight = Eigen::Vector3d::UnitZ();
+
+    const Satellite::VecX u = pd.find_u(x, B_eci, q_goal_vec, boresight);
+    REQUIRE(u.size() == sat->controlDim());
+    REQUIRE(u.allFinite());
+
+    const Eigen::Vector3d tau_actual = sat->actuatorTorque(x, u, B_eci);
+    REQUIRE(tau_actual.allFinite());
+    REQUIRE(tau_actual.norm() > 1e-9);
+}
+
+TEST_CASE("warm_start initcontroller=3 works with magic actuators present",
+          "[controller][pd][warm_start][magic]") {
+    auto sat = makeSatelliteWithMagic();
+
+    PlannerSettings settings;
+    settings.init_traj.initcontroller = 3;
+    settings.num_passes = 1;
+    settings.passes[0].dt = 1.0;
+
+    const int N = 5;
+    const double dt_sec = 1.0;
+    const double sec_per_century = 36525.0 * 86400.0;
+
+    Eigen::VectorXd jtime(N);
+    Eigen::MatrixXd q_goal = Eigen::MatrixXd::Zero(4, N);
+    Eigen::MatrixXd boresight = Eigen::MatrixXd::Zero(3, N);
+    Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> R; R.setZero();
+    Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> V; V.setZero();
+    Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> B; B.setZero();
+    Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> S; S.setZero();
+    Eigen::Matrix<double, 1, limits::MAX_LENGTH_TRAJ> rho; rho.setZero();
+
+    for (int k = 0; k < N; ++k) {
+        jtime(k) = 0.25 + (k * dt_sec) / sec_per_century;
+        q_goal(0, k) = 1.0;
+        boresight.col(k) = Eigen::Vector3d::UnitZ();
+        B.col(k) = Eigen::Vector3d(2.2e-5, -1.6e-5, 3.1e-5);
+    }
+
     Satellite::VecX x0 = makeState(Eigen::Vector3d(0.05, -0.03, 0.04),
                                    Eigen::Vector4d(1.0, 0.0, 0.0, 0.0));
 

@@ -50,7 +50,8 @@ Satellite::VecX PDController::find_u(
 ) const {
     const int n_mtq = satellite_.numMTQ();
     const int n_rw = satellite_.numRW();
-    const int nu = n_mtq + n_rw;
+    const int n_magic = satellite_.numMagic();
+    const int nu = satellite_.controlDim();
 
     Satellite::VecX u = Satellite::VecX::Zero(std::max(nu, 0));
     if (nu <= 0 || nu > saltro::limits::MAX_CTRL_DIM) return u;
@@ -176,6 +177,14 @@ Satellite::VecX PDController::find_u(
         const double u_max = std::abs(satellite_.getRW(i).u_max());
         if (u_max > 0.0) {
             const double r = std::abs(u_raw(n_mtq + i)) / u_max;
+            if (r > max_ratio) max_ratio = r;
+        }
+    }
+    for (int i = 0; i < n_magic; ++i) {
+        const int ui = n_mtq + n_rw + i;
+        const double u_max = std::abs(satellite_.getMagic(i).u_max());
+        if (u_max > 0.0) {
+            const double r = std::abs(u_raw(ui)) / u_max;
             if (r > max_ratio) max_ratio = r;
         }
     }
