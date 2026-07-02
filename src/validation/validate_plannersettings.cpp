@@ -39,7 +39,7 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
     // WARNING (not enforced): when the torque floor is enabled
     // (rw_stic_torque_theta > 0) together with cost-side bias-momentum
     // parking, the alignment rule
-    //   rw_stic_torque_theta * rw_stic_band_mult <= h*/h_max
+    //   rw_stic_torque_theta * rw_stic_band_mult * rw_momentum_limit_scale <= h*/h_max
     // (parking fraction; h* = h_stic/2 under the PR #54 recipe) must hold so
     // a parked wheel satisfies the floor at zero torque. The parking point is
     // determined by cost-side weights (CostConfig) which are not visible to

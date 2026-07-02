@@ -103,7 +103,9 @@ struct DisturbanceConfig {
  *        torque-floor constraint
  *          c = θ − |u|/u_lim − |h|/h_c ≤ 0
  *        with u_lim the (control_limit_scale-scaled) RW torque limit and
- *        h_c = rw_stic_band_mult · h_max. Semantics: at h = 0 the wheel must
+ *        h_c = rw_stic_band_mult · h_lim, where h_lim =
+ *        rw_momentum_limit_scale · h_max is the enforced (scaled) momentum
+ *        limit. Semantics: at h = 0 the wheel must
  *        hold at least θ·u_lim of torque; the requirement fades linearly and
  *        vanishes for |h| ≥ θ·h_c (c ≤ 0 with u = 0 iff |h| ≥ θ·h_c).
  *        Default 0.0 disables the floor — the row is then always satisfied,
@@ -114,13 +116,16 @@ struct DisturbanceConfig {
  *        ALIGNMENT RULE with bias-momentum parking (CostConfig::RWh_desat_mult
  *        recipe, parked at h* = h_stic/2): a parked wheel must satisfy the
  *        floor at zero torque, i.e. θ·h_c ≤ h*. Equivalently
- *        rw_stic_torque_theta · rw_stic_band_mult ≤ h* / h_max. With defaults
- *        (h_c = 0.005·h_max, θ = 0.9 when enabled, h_stic = 0.01·h_max,
+ *        rw_stic_torque_theta · rw_stic_band_mult · rw_momentum_limit_scale
+ *        ≤ h* / h_max. With defaults (rw_momentum_limit_scale = 1, so
+ *        h_c = 0.005·h_max, θ = 0.9 when enabled, h_stic = 0.01·h_max,
  *        h* = 0.005·h_max): θ·h_c = 0.0045·h_max < h* = 0.005·h_max (11%
- *        margin).
+ *        margin). A margin config (rw_momentum_limit_scale < 1) only
+ *        tightens this inequality.
  * @param rw_stic_band_mult Momentum half-width of the torque-floor band as a
- *        fraction of h_max: h_c = rw_stic_band_mult · h_max. Default 0.005 —
- *        half of the default cost-side stiction band
+ *        fraction of the enforced momentum limit h_lim =
+ *        rw_momentum_limit_scale · h_max: h_c = rw_stic_band_mult · h_lim.
+ *        Default 0.005 — half of the default cost-side stiction band
  *        (CostConfig::RWh_stiction_mult = 0.01). Deliberately independent of
  *        CostConfig; see the alignment rule above.
  */

@@ -321,3 +321,69 @@ def test_alilqr_hybrid_slew90_final_quality_and_constraints(tf_seconds: float, d
 		f"constraint violation too high: {max_violation:.3e}"
 	)
 
+
+
+def _run_stiction_warn_case(h0_per_wheel: float, capfd) -> str:
+	"""Twin of the C++ 'Stiction floor warning uses the scaled momentum limit'
+	helper: tiny trajOpt solve (the warning is emitted before the solve),
+	returns what trajOpt printed to stderr."""
+	plannersettings = create_planner_settings(10.0)
+	plannersettings.passes[0].ilqr.max_iters = 1
+	plannersettings.passes[0].auglag.max_outer_iters = 1
+
+	# Margin config: the enforced momentum limit (and hence the floor's band
+	# h_c) is scaled by rw_momentum_limit_scale.
+	plannersettings.constraints.rw_stic_torque_theta = 0.9
+	plannersettings.constraints.rw_stic_band_mult = 0.5
+	plannersettings.constraints.rw_momentum_limit_scale = 0.5
+	# Demand-band edge = theta*band*scale*h_max = 0.9*0.5*0.5*0.02 = 0.0045.
+	# (Unscaled it would be 0.009 — the over-warn regression this guards.)
+
+	satellite = create_satellite_rw(plannersettings)  # 3 RW, h_max = 0.02
+
+	w0 = np.zeros(3)
+	q0 = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+	h0 = np.full(3, h0_per_wheel, dtype=float)
+	x0 = np.hstack((w0, q0, h0))
+
+	r0 = np.array([7000e3, 0.0, 0.0], dtype=float)
+	v0 = np.array([0.0, 7.5e3, 0.0], dtype=float)
+	jtime = np.array([0.22, 0.22 + 30.0 / SEC_PER_CENTURY], dtype=float)
+	qgoal = np.array(
+		[[1.0, 1.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]], dtype=float
+	)
+	boresight = np.array(
+		[[1.0, 1.0], [0.0, 0.0], [0.0, 0.0]], dtype=float
+	)
+
+	capfd.readouterr()  # drop anything already buffered
+	try:
+		saltro_py.trajOpt(
+			plannersettings,
+			satellite,
+			x0,
+			r0,
+			v0,
+			jtime,
+			qgoal,
+			boresight,
+		)
+	except Exception:
+		# The 1-iteration budget may not converge and trajOpt raises on
+		# non-convergence; the warning under test is emitted before the
+		# solve, so the solve outcome is irrelevant here.
+		pass
+	return capfd.readouterr().err
+
+
+def test_stiction_floor_warning_uses_scaled_momentum_limit(capfd):
+	"""Twin of C++ 'Stiction floor warning uses the scaled momentum limit'."""
+	# Margin config near (just outside) the SCALED demand-band edge: must not
+	# warn. Pre-fix the warning used the unscaled h_max and over-warned here.
+	quiet = _run_stiction_warn_case(0.006, capfd)  # 0.0045 < 0.006 < 0.009
+	assert "starts inside the floor's demand band" not in quiet
+
+	# Inside the scaled edge: the warning must still fire.
+	loud = _run_stiction_warn_case(0.003, capfd)  # 0.003 < 0.0045
+	assert "starts inside the floor's demand band" in loud
+	assert "rw_momentum_limit_scale" in loud

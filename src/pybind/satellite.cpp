@@ -2784,7 +2784,8 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
 
         // RW stiction torque floor (direction-agnostic):
         //   c = θ − |u|/u_lim − |h|/h_c ≤ 0
-        // with h_c = rw_stic_band_mult · h_max. At h = 0 the wheel must hold
+        // with h_c = rw_stic_band_mult · h_lim (h_lim already carries
+        // rw_momentum_limit_scale). At h = 0 the wheel must hold
         // ≥ θ·u_lim of torque; the requirement fades to zero at |h| = θ·h_c
         // (c ≤ 0 with u = 0 iff |h| ≥ θ·h_c). θ = 0 (default) keeps the row
         // always satisfied — behavior-identical to the historical dead

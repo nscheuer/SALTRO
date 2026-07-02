@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
+#include <sstream>
+#include <string>
 
 #include <Eigen/Dense>
 
@@ -325,7 +328,86 @@ void runHybridCase(double tf_seconds, double dt_seconds) {
 	runAndCheckCase(settings, satellite, x0, tf_seconds, dt_seconds);
 }
 
+// Run a deliberately tiny trajOpt solve (the stiction-floor warning is emitted
+// before the solve) and return everything trajOpt printed to std::cerr.
+std::string runStictionWarnCase(double h0_per_wheel) {
+	PlannerSettings settings = createRWPlannerSettings(10.0);
+	settings.passes[0].ilqr.max_iters = 1;
+	settings.passes[0].auglag.max_outer_iters = 1;
+
+	// Margin config: the enforced momentum limit (and hence the floor's band
+	// h_c) is scaled by rw_momentum_limit_scale.
+	settings.constraints.rw_stic_torque_theta = 0.9;
+	settings.constraints.rw_stic_band_mult = 0.5;
+	settings.constraints.rw_momentum_limit_scale = 0.5;
+	// Demand-band edge = theta*band*scale*h_max = 0.9*0.5*0.5*0.02 = 0.0045.
+	// (Unscaled it would be 0.009 — the over-warn regression this guards.)
+
+	Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+	J(0, 0) = 0.067;
+	J(1, 1) = 0.071;
+	J(2, 2) = 0.069;
+	Satellite satellite(J, settings);
+	satellite.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+	satellite.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+	satellite.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+	Satellite::VecX x0(satellite.stateDim());
+	x0.setZero();
+	x0.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+	x0.segment(satellite.RW_MOMENTUM_INDEX, 3).setConstant(h0_per_wheel);
+
+	const Eigen::Vector3d r0(7000e3, 0.0, 0.0);
+	const Eigen::Vector3d v0(0.0, 7.5e3, 0.0);
+	Eigen::VectorXd jtime(2);
+	jtime(0) = 0.22;
+	jtime(1) = 0.22 + 30.0 / SEC_PER_CENTURY;
+
+	Eigen::MatrixXd q_goal(4, 2);
+	q_goal << 1.0, 1.0,
+			  0.0, 0.0,
+			  0.0, 0.0,
+			  0.0, 0.0;
+	Eigen::MatrixXd boresight(3, 2);
+	boresight << 1.0, 1.0,
+				 0.0, 0.0,
+				 0.0, 0.0;
+
+	const int state_dim = satellite.stateDim();
+	const int input_dim = satellite.controlDim();
+	Eigen::MatrixXd X = Eigen::MatrixXd::Zero(state_dim, limits::MAX_LENGTH_TRAJ);
+	Eigen::MatrixXd U = Eigen::MatrixXd::Zero(input_dim, limits::MAX_LENGTH_TRAJ);
+	Eigen::MatrixXd K = Eigen::MatrixXd::Zero(input_dim, satellite.reducedStateDim() * limits::MAX_LENGTH_TRAJ);
+	int N = static_cast<int>(jtime.size());
+
+	std::stringstream captured;
+	std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
+	try {
+		optimizer::trajOpt(settings, satellite, x0, r0, v0, jtime, q_goal, boresight,
+		                   X, U, K, state_dim, input_dim, N);
+	} catch (const std::exception&) {
+		// The 1-iteration budget may not converge and trajOpt throws on
+		// non-convergence; the warning under test is emitted before the
+		// solve, so the solve outcome is irrelevant here.
+	}
+	std::cerr.rdbuf(old_buf);
+	return captured.str();
+}
+
 } // namespace
+
+TEST_CASE("Stiction floor warning uses the scaled momentum limit",
+          "[optimizer][trajopt][stiction][warning]") {
+	// Margin config near (just outside) the SCALED demand-band edge: must not
+	// warn. Pre-fix the warning used the unscaled h_max and over-warned here.
+	const std::string quiet = runStictionWarnCase(0.006);  // 0.0045 < 0.006 < 0.009
+	REQUIRE(quiet.find("starts inside the floor's demand band") == std::string::npos);
+
+	// Inside the scaled edge: the warning must still fire.
+	const std::string loud = runStictionWarnCase(0.003);   // 0.003 < 0.0045
+	REQUIRE(loud.find("starts inside the floor's demand band") != std::string::npos);
+	REQUIRE(loud.find("rw_momentum_limit_scale") != std::string::npos);
+}
 
 TEST_CASE("AL-iLQR RW case tf=200 dt=10", "[optimizer][alilqr][rw]") {
 	runRWCase(200.0, 10.0);
