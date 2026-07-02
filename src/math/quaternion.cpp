@@ -41,6 +41,22 @@ Mat43 findWMat(const Vec4& q) {
     return W;
 }
 
+Vec4 quatConj(const Vec4& q) {
+    return {q(0), -q(1), -q(2), -q(3)};
+}
+
+Vec4 quatMult(const Vec4& q1, const Vec4& q2) {
+    // Hamilton product q1 ⊗ q2 = L(q1) · q2, where L(q1) = [q1 | W(q1)].
+    // Splitting by scalar/vector part of q2:
+    //   L(q1) · q2 = q2(0) · q1 + W(q1) · q2_vec
+    return q2(0) * q1 + findWMat(q1) * q2.tail<3>();
+}
+
+double quatAngle(const Vec4& q_err) {
+    const double w = std::clamp(std::abs(q_err(0)), 0.0, 1.0);
+    return 2.0 * std::acos(w);
+}
+
 Mat43 quatNormJacobian(const Vec4& q) {
     double qn = q.norm();
     if (qn < 1e-12) {

@@ -7,6 +7,7 @@
 #include <saltro/pybind/controller/controller.h>
 #include <saltro/pybind/controller/excitationcontroller.h>
 #include <saltro/pybind/controller/integratedbdotcontroller.h>
+#include <saltro/pybind/controller/pdcontroller.h>
 #include <saltro/pybind/controller/zerocontroller.h>
 
 namespace saltro::optimizer {
@@ -46,6 +47,9 @@ bool warm_start(
             break;
         case 2:
             active_controller = std::make_unique<controller::IntegratedBdotController>(satellite);
+            break;
+        case 3:
+            active_controller = std::make_unique<controller::PDController>(satellite);
             break;
         default:
             return false;

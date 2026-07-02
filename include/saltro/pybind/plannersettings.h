@@ -154,6 +154,46 @@ struct CostConfig {
     double ang_vel_err_dir = 0.0;
     double control_mult = 1.0;
 
+    /// Roll-axis weight fraction for the axis-aware ω cost in vector-pointing
+    /// mode (0 < ratio ≤ 1). 1.0 reduces W_ω to uniform `c.ang_vel · I`,
+    /// matching the current isotropic cost. Smaller values down-weight rotation
+    /// about the boresight, freeing the optimizer to spend control on the
+    /// 2-DOF off-axis pointing error. Ignored in quaternion-goal mode (all
+    /// 3 DOF are constrained there). Default is current behavior.
+    double ang_vel_roll_ratio = 1.0;
+
+    /// PSD-fraction knob β ∈ [0, 2) for the Lyapunov `α · err_dir · ω`
+    /// crossterm.  Realized scale is `α = β · √(c.angle · λ_min(W_ω))`,
+    /// keeping the (q_e_v, ω_e) block-quadratic PSD by construction.
+    /// 0 (default) disables the crossterm entirely.  If `ang_vel_err_dir`
+    /// is set nonzero, the back-compat path overrides α with that raw
+    /// value and ignores this ratio.
+    ///
+    /// Derivation (Schur complement bound):
+    /// The total (q_e_v, ω_e) block-quadratic with the angle cost,
+    /// ω cost, and this crossterm is
+    ///
+    ///   ½ [q_e_v; ω_e]^T · [ w_ang · I        ½α · D^T ] · [q_e_v]
+    ///                      [ ½α · D           W_ω      ]   [ω_e]
+    ///
+    /// where D = ∂err_dir/∂q_e_v and W_ω is the ω cost matrix
+    /// (`w_av · I` in quat mode; `w_av · (roll·bs·bs^T + (I − bs·bs^T))`
+    /// in vec mode with `ang_vel_roll_ratio` reduction).  The Schur
+    /// complement of the bottom-right block is PSD iff
+    ///
+    ///   w_ang · I − ¼ α² · D^T · W_ω^{-1} · D ≽ 0
+    ///   ⟺  α² · λ_max(D^T · W_ω^{-1} · D) ≤ 4 · w_ang.
+    ///
+    /// Since `err_dir` is a cross-product of unit vectors, ‖D‖ ≤ 1, so
+    /// λ_max(D^T · W_ω^{-1} · D) ≤ 1 / λ_min(W_ω).  The conservative
+    /// bound that always holds is therefore
+    ///
+    ///   α ≤ 2 · √(w_ang · λ_min(W_ω)).
+    ///
+    /// Setting α = β · √(w_ang · λ_min(W_ω)) with β ∈ [0, 2) is PSD by
+    /// construction.  FD-tested in `test_satellite_cost_omega_ff.py` at β=0.5.
+    double ang_vel_err_dir_ratio = 0.0;
+
     double mtq_control_weight = 1e3;
     double rw_control_weight = 1e8;
     double magic_control_weight = 0.0001;
@@ -164,6 +204,11 @@ struct CostConfig {
     double RWh_stiction_mult = 0.01;
     double RWh_ok_mult = 0.5;
 
+    /// Terminal weights.  **Principle**: preserve the stage ratios.  If you
+    /// set `angle_N` high without matching `ang_vel_N`, the optimizer chases
+    /// the target angle at max torque with no penalty for arriving at high ω.
+    /// Use `setTerminalEmphasis(k)` to scale all terminal weights uniformly
+    /// instead of editing fields individually.
     double angle_N = 1e4;
     double ang_vel_N = 1e5;
     double ang_vel_mag_N = 0.0;
@@ -171,6 +216,31 @@ struct CostConfig {
 
     int ang_cost_func_type = 2;
     bool use_cost_hess = false;
+
+    /// Gauss-Newton mode for the angle-cost (q,q) Hessian block. When true,
+    /// drop the second-order chain-rule term `f'(c)·d²c/dq²` (which can be
+    /// indefinite in vec mode where `c = bs·R^T·r̂` is degree-2 in q). Keep
+    /// the PwA manifold-curvature correction `−grad_dot_q · I_4` — it's the
+    /// sphere-tangent projection and is PSD when `f'·c < 0`, which holds
+    /// for our cost shapes in the aligned hemisphere.
+    ///
+    /// Effect by mode:
+    ///   - **Vec mode:** drops `f'·d²c/dq²`. Empirically improves convergence
+    ///     dramatically (PE_fin 6-22° → 0.2-6.6° on baseline scenarios).
+    ///   - **Quat mode:** has no `f'·d²d/dq²` term (d = q_g·q is linear in q),
+    ///     so this flag is a no-op.
+    /// Default (false) preserves the current full-Hessian behavior.
+    bool cost_hess_gauss_newton = false;
+
+    /// Scale all terminal weights by `k`, preserving ratios with their
+    /// stage counterparts.  `k=1` matches stage; `k=100` is strong terminal
+    /// emphasis.
+    void setTerminalEmphasis(double k) {
+        angle_N = k * angle;
+        ang_vel_N = k * ang_vel;
+        ang_vel_mag_N = k * ang_vel_mag;
+        ang_vel_err_dir_N = k * ang_vel_err_dir;
+    }
 };
 
 /**

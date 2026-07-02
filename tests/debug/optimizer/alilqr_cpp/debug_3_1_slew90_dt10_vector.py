@@ -18,11 +18,11 @@ def create_planner_settings():
     plannersettings.init_traj.initcontroller = 2
 
     plannersettings.num_passes = 1
-    plannersettings.passes[0].dt = 5.0
-    plannersettings.passes[0].ilqr.cost_tol = 1e-5
+    plannersettings.passes[0].dt = 10.0
+    plannersettings.passes[0].ilqr.cost_tol = 1e-3
     plannersettings.passes[0].ilqr.max_iters = 20
 
-    plannersettings.passes[0].auglag.max_outer_iters = 30
+    plannersettings.passes[0].auglag.max_outer_iters = 10
     plannersettings.passes[0].auglag.constraint_tol = 1e-3
 
     cost = plannersettings.passes[0].cost
@@ -32,7 +32,7 @@ def create_planner_settings():
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1e-1
-    cost.rw_control_weight = 1.0
+    cost.rw_control_weight = 1e3
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0
@@ -43,8 +43,9 @@ def create_planner_settings():
     cost.ang_vel_N = 1e1
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 0
+    cost.ang_cost_func_type = 4
     cost.use_cost_hess = True
+    cost.cost_hess_gauss_newton = True
 
     plannersettings.disturbances.plan_for_aero = False
     plannersettings.disturbances.plan_for_gg = False
@@ -71,9 +72,11 @@ def main():
     satellite = create_satellite(plannersettings)
 
     jtime = np.array([0.22, 0.22 + 1000 / (36525 * 86400)])
-    # Vector pointing version: 3D direction vectors for initial and final pointing
-    # Constant 90-degree slew goal: body z-axis must point toward inertial x-direction
-    # Initial error: identity quaternion has z-axis along z-direction (perpendicular to x-goal) = 90 degrees
+    # Vector pointing version: each goal column is [NaN, x, y, z], where the
+    # last three entries are the inertial target direction.
+    # This case asks the body +X boresight to point toward inertial -Y.
+    # With the identity quaternion, body +X is aligned with inertial +X, so the
+    # initial boresight-to-target error is 90 degrees.
     vector_goal = np.array([
         [np.nan, np.nan],
         [0.0, 0.0],  # x component (constant goal)
