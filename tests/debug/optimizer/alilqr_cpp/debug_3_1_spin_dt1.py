@@ -40,6 +40,7 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "build"))
 
 import saltro_py  # noqa: E402
+from final_viewer import plot_final_trajectory  # noqa: E402
 
 # Hundredths-of-a-Julian-century per second (TimeConstants.sec2cent), inlined
 # so the script needs nothing outside saltro_py.
@@ -125,8 +126,6 @@ def main():
     ap.add_argument("--angle", type=float, default=1e4)
     ap.add_argument("--angle-N", type=float, default=1e6)
     ap.add_argument("--no-gauss-newton", action="store_true")
-    ap.add_argument("--plot", metavar="PNG", default=None,
-                    help="optional path to write a diagnostic figure.")
     args = ap.parse_args()
     use_gn = not args.no_gauss_newton
 
@@ -193,28 +192,19 @@ def main():
         print(f"  -> no significant steady-state spin (|omega_z| < 1 deg/s)")
     print(f"  all finite: {bool(np.all(np.isfinite(X)) and np.all(np.isfinite(U)))}")
 
-    if args.plot:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
-        ax[0].plot(t_sec, omega_deg[:, 0], label=r"$\omega_x$")
-        ax[0].plot(t_sec, omega_deg[:, 1], label=r"$\omega_y$")
-        ax[0].plot(t_sec, omega_deg[:, 2], lw=2, label=r"$\omega_z$ (spin axis)")
-        ax[0].set_ylabel("body rate (deg/s)"); ax[0].legend(ncol=3, fontsize=9)
-        ax[0].set_title(f"P2.2 spin (ok={ok}, afc={args.afc}, GN={use_gn})")
-        ax[1].plot(t_sec, pe_deg, color="purple")
-        ax[1].set_ylabel("boresight err\nfrom ECI +z (deg)")
-        if h_rw is not None:
-            ax[2].plot(t_sec, h_rw * 1000.0)
-        ax[2].set_ylabel("RW momentum\n(mN m s)"); ax[2].set_xlabel("time (s)")
-        for a in ax:
-            a.grid(True, ls="--", alpha=0.4)
-        fig.tight_layout(); fig.savefig(args.plot, dpi=140); plt.close(fig)
-        print(f"  wrote {args.plot}")
-
     if not ok:
         raise RuntimeError("trajOpt did not converge")
+
+    plot_final_trajectory(
+        X,
+        U,
+        ps.passes[0].dt,
+        satellite=sat,
+        q_goal=vec_goal,
+        boresight_body=boresight,
+        jtime=jtime,
+        title=f"P2.2 spin (ok={ok}, afc={args.afc}, GN={use_gn})",
+    )
     return 0
 
 
