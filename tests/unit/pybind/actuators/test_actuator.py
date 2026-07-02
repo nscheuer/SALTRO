@@ -108,5 +108,30 @@ def test_actuator_base_class_derivatives_return_zero():
     assert np.allclose(J_x, 0.0)
 
 
+def test_actuator_base_class_hessians_are_callable_finite_and_zero():
+    """Smoke test: the Tensor3-returning base-class Hessians must actually be
+    callable from Python (requires the Tensor3<->numpy caster to be registered
+    in the actuator binding TU) and return finite, correctly-shaped zeros."""
+    axis = valid_axis()
+    act = saltro_py.Actuator(axis, 1.0)
+    x = valid_base_state()
+
+    # Tensor3<R,C,S> -> numpy (slices, rows, cols)
+    H_uu = act.ddtorq_dudu(0.5, x)
+    assert H_uu.shape == (3, 1, 1)
+    assert np.all(np.isfinite(H_uu))
+    assert np.allclose(H_uu, 0.0)
+
+    H_ux = act.ddtorq_dudbasestate(0.5, x)
+    assert H_ux.shape == (3, 1, 7)
+    assert np.all(np.isfinite(H_ux))
+    assert np.allclose(H_ux, 0.0)
+
+    H_xx = act.ddtorq_dbasestatedbasestate(0.5, x)
+    assert H_xx.shape == (3, 7, 7)
+    assert np.all(np.isfinite(H_xx))
+    assert np.allclose(H_xx, 0.0)
+
+
 def test_actuator_input_len_constant():
     assert saltro_py.Actuator.input_len == 1
