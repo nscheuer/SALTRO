@@ -1602,6 +1602,368 @@ class TestECITargetDualFormat:
         assert np.isfinite(J_switched)
         assert J_switched > J_aligned
 
+# ============================================================================
+# TEST SECTION 12: Singularity sweep + hemisphere-kink coverage
+# ============================================================================
+# Property tests over the full cost-shape parameter grid:
+#   cost type ∈ {0,1,2,3} × mode ∈ {vec (NaN ECI target), quat} × GN ∈ {on,off}.
+# We probe the attitude cost h(argument) where the inner scalar is
+#   c = bs·R(q)ᵀ·r̂  (vec mode, 2-DOF, argument ∈ [-1, 1]), or
+#   d = |q_goal·q|   (quat mode, hemisphere-aligned, argument ∈ [0, 1]).
+# The base attitude is identity, so the tangent projector is P = diag(0,1,1,1)
+# and only the q-components 1..3 carry gradient/Hessian signal.
+#
+# Coordinate conventions used here (physical angle θ):
+#   vec:  r̂ = [sinθ, 0, cosθ] with bs = +z ⇒ c = cosθ; θ→0 aligned pole
+#         (c→+1), θ→π antipode (c→−1, a GENUINE cusp for types 2/3).
+#   quat: q_goal = [cos(θ/2), sin(θ/2), 0, 0] ⇒ d = cos(θ/2); θ→0 aligned pole
+#         (d→+1), θ→π gives d→0 — the |·| hemisphere kink, NOT the d=−1 shape
+#         antipode (which hemisphere alignment makes unreachable).
+#
+# GN semantics discovered empirically and encoded below:
+#   - GN=False returns the full (exact) Hessian ⇒ matches central-difference FD.
+#   - GN=True in VEC mode drops the f'·∂²c chain term (the Gauss-Newton
+#     approximation) ⇒ deliberately does NOT match FD; we assert the rank-1
+#     GN eigen-structure instead (PSD for types 0/1/3, NSD for type 2).
+#   - GN flag is a NO-OP in QUAT mode (d is linear in q ⇒ no chain term to
+#     drop), so quat GN=True == quat GN=False == full Hessian ⇒ matches FD.
+
+import math as _math
+
+_SW_BS = np.array([0.0, 0.0, 1.0])
+_SW_B0 = np.zeros(3)
+_SW_DENSE_DEG = list(range(1, 180, 10)) + [179]      # 1°..171° step 10° + 179°
+_SW_BOUNDARY = [1e-2, 1e-3, 1e-4, 1e-5]              # rad, pole-approach sequence
+
+
+def _sweep_cfg(act, gn):
+    cfg = saltro.CostConfig()
+    cfg.angle = 1.0
+    cfg.angle_N = 1.0
+    cfg.ang_vel = 0.0
+    cfg.ang_vel_N = 0.0
+    cfg.ang_vel_mag = 0.0
+    cfg.ang_vel_mag_N = 0.0
+    cfg.ang_vel_err_dir = 0.0
+    cfg.ang_vel_err_dir_N = 0.0
+    cfg.ang_vel_err_dir_ratio = 0.0
+    cfg.ang_vel_roll_ratio = 1.0
+    cfg.control_mult = 0.0
+    cfg.mtq_control_weight = 0.0
+    cfg.rw_control_weight = 0.0
+    cfg.rw_AM_weight = 0.0
+    cfg.rw_stic_weight = 0.0
+    cfg.RWh_max_mult = 1.0
+    cfg.RWh_ok_mult = 0.0
+    cfg.RWh_stiction_mult = 0.0
+    cfg.use_cost_hess = True
+    cfg.ang_cost_func_type = act
+    cfg.cost_hess_gauss_newton = gn
+    return cfg
+
+
+def _sw_target(mode, theta):
+    if mode == "vec":
+        return np.array([np.nan, np.sin(theta), 0.0, np.cos(theta)])
+    return np.array([np.cos(theta / 2.0), np.sin(theta / 2.0), 0.0, 0.0])
+
+
+def _sw_base_state(sat):
+    x = np.zeros(sat.stateDim)
+    x[sat.QUAT_INDEX] = 1.0
+    return x
+
+
+def _sw_cost(sat, x, target, cfg):
+    return sat.stageCost(0, 100, x, np.zeros(sat.controlDim),
+                         _SW_BS, target, _SW_B0, cfg)
+
+
+def _sw_qgrad_fd(sat, x, target, cfg, eps=1e-6):
+    """Central-difference gradient on the q-block, tangent-projected."""
+    QI = sat.QUAT_INDEX
+    g = np.zeros(4)
+    for j in range(4):
+        xp = x.copy(); xp[QI + j] += eps
+        xm = x.copy(); xm[QI + j] -= eps
+        g[j] = (_sw_cost(sat, xp, target, cfg) - _sw_cost(sat, xm, target, cfg)) / (2 * eps)
+    q = x[QI:QI + 4]
+    return (np.eye(4) - np.outer(q, q)) @ g
+
+
+def _sw_qhess_fd(sat, x, target, cfg, eps=1e-4):
+    """Central 2nd-difference Hessian on the q-block, tangent-projected."""
+    QI = sat.QUAT_INDEX
+    H = np.zeros((4, 4))
+    for i in range(4):
+        for j in range(4):
+            xpp = x.copy(); xpp[QI + i] += eps; xpp[QI + j] += eps
+            xmm = x.copy(); xmm[QI + i] -= eps; xmm[QI + j] -= eps
+            xpm = x.copy(); xpm[QI + i] += eps; xpm[QI + j] -= eps
+            xmp = x.copy(); xmp[QI + i] -= eps; xmp[QI + j] += eps
+            H[i, j] = (_sw_cost(sat, xpp, target, cfg) + _sw_cost(sat, xmm, target, cfg)
+                       - _sw_cost(sat, xpm, target, cfg) - _sw_cost(sat, xmp, target, cfg)) \
+                / (4 * eps * eps)
+    q = x[QI:QI + 4]
+    P = np.eye(4) - np.outer(q, q)
+    return P @ H @ P
+
+
+def _sw_qblock_ana(sat, x, target, cfg):
+    """Analytic cost, tangent-projected q-gradient, tangent-projected q-Hess."""
+    QI = sat.QUAT_INDEX
+    u = np.zeros(sat.controlDim)
+    c = _sw_cost(sat, x, target, cfg)
+    lx, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, target, _SW_B0, cfg)
+    lxx, _, _ = sat.stageCostHessians(0, 100, x, u, _SW_BS, target, _SW_B0, cfg)
+    q = x[QI:QI + 4]
+    P = np.eye(4) - np.outer(q, q)
+    return c, P @ lx[QI:QI + 4], P @ lxx[QI:QI + 4, QI:QI + 4] @ P, lx, lxx
+
+
+class TestSingularitySweep:
+    """Task 1: singularity sweep property tests across all cost shapes."""
+
+    @pytest.mark.parametrize("act", [0, 1, 2, 3])
+    @pytest.mark.parametrize("mode", ["vec", "quat"])
+    @pytest.mark.parametrize("gn", [False, True])
+    def test_dense_sweep_finite_and_fd_consistent(self, fixture, act, mode, gn):
+        """(a) Dense alignment-angle sweep θ ∈ {1°..179°}: everything finite,
+        gradient matches central FD (curvature-scaled tol), Hessian matches FD
+        of the gradient where the full (non-GN) Hessian is in effect."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        cfg = _sweep_cfg(act, gn)
+        # Full Hessian is returned when GN is off, OR always in quat mode
+        # (the GN flag is a no-op there — d is linear in q).
+        full_hess = (not gn) or (mode == "quat")
+        for td in _SW_DENSE_DEG:
+            theta = _math.radians(td)
+            tgt = _sw_target(mode, theta)
+            c, gq, Hq, lx, lxx = _sw_qblock_ana(sat, x, tgt, cfg)
+            assert np.isfinite(c), f"cost non-finite mode={mode} act={act} θ={td}"
+            assert np.isfinite(lx).all(), f"grad non-finite mode={mode} act={act} θ={td}"
+            assert np.isfinite(lxx).all(), f"Hess non-finite mode={mode} act={act} θ={td}"
+
+            # Gradient vs central FD.  The assembled q-gradient stays finite and
+            # FD-accurate even near the poles (geometry factor cancels the raw
+            # 1/√(1−c²) blow-up), so no skip is needed on the dense grid.
+            gfd = _sw_qgrad_fd(sat, x, tgt, cfg)
+            for j in range(4):
+                tol = 1e-6 + 1e-4 * abs(gfd[j])
+                assert abs(gq[j] - gfd[j]) < tol, \
+                    f"grad[{j}] mode={mode} act={act} gn={gn} θ={td}: {gq[j]} vs {gfd[j]}"
+
+            # Genuine-singular regions: skip Hessian-FD within 1e-3 rad of the
+            # antipode for the acos/acos² shapes (vec types 2/3), where the cost
+            # curvature radius shrinks below the FD step and central differences
+            # stop tracking the (correctly diverging) analytic Hessian.  The
+            # dense grid never actually enters that band (nearest is 179° ≈
+            # 0.0175 rad away); the guard documents intent for completeness.
+            near_antipode = (mode == "vec" and act in (2, 3)
+                             and abs(_math.pi - theta) < 1e-3)
+            if full_hess and not near_antipode:
+                Hfd = _sw_qhess_fd(sat, x, tgt, cfg)
+                herr = np.max(np.abs(Hq - Hfd))
+                hscale = np.max(np.abs(Hfd))
+                assert herr < 1e-3 + 5e-2 * hscale, \
+                    f"Hess mode={mode} act={act} θ={td}: herr={herr:.2e} scale={hscale:.2e}"
+            elif not full_hess:
+                # GN=True vec mode: the GN Hessian is f''·(∂c/∂q)(∂c/∂q)ᵀ, a
+                # rank-1 form in the tangent block.  Assert the rank-1 structure
+                # (two tangent eigenvalues ≈ 0), and PSD for the f''≥0 shapes
+                # (types 0/1/3).  Type 2's f'' changes sign at c=0 (θ=90°), so
+                # its single nonzero eigenvalue flips sign along the sweep — no
+                # semidefiniteness assertion, only the rank-1 shape.
+                eig = np.linalg.eigvalsh(Hq)
+                mags = np.sort(np.abs(eig))
+                assert mags[-2] < 1e-6 + 1e-3 * mags[-1], \
+                    f"GN Hess not rank-1 act={act} θ={td}: eig={eig}"
+                if act in (0, 1, 3):
+                    assert eig.min() > -1e-6, f"GN type{act} not PSD θ={td}: {eig}"
+
+    @pytest.mark.parametrize("act", [0, 1, 2, 3])
+    @pytest.mark.parametrize("mode", ["vec", "quat"])
+    @pytest.mark.parametrize("gn", [False, True])
+    def test_boundary_approach_aligned_pole_finite(self, fixture, act, mode, gn):
+        """(b) Aligned-pole approach θ ∈ {1e-2..1e-5} rad: cost/grad/Hessian all
+        finite deep inside the c/d → +1 removable-singularity region (this is
+        exactly #30's Taylor-protected zone)."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        cfg = _sweep_cfg(act, gn)
+        for theta in _SW_BOUNDARY:
+            tgt = _sw_target(mode, theta)
+            _, _, _, lx, lxx = _sw_qblock_ana(sat, x, tgt, cfg)
+            c = _sw_cost(sat, x, tgt, cfg)
+            assert np.isfinite(c) and np.isfinite(lx).all() and np.isfinite(lxx).all(), \
+                f"non-finite at aligned pole mode={mode} act={act} gn={gn} θ={theta}"
+
+    @pytest.mark.parametrize("act", [0, 1, 2, 3])
+    @pytest.mark.parametrize("gn", [False, True])
+    def test_boundary_approach_antipode_vec_finite(self, fixture, act, gn):
+        """(b) Antipodal approach (vec only — quat has no reachable shape
+        antipode).  cost/grad/Hessian finite even as the geometry diverges;
+        the *magnitude* growth of the Hessian is checked separately."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        cfg = _sweep_cfg(act, gn)
+        for delta in _SW_BOUNDARY:
+            theta = _math.pi - delta
+            tgt = _sw_target("vec", theta)
+            _, _, _, lx, lxx = _sw_qblock_ana(sat, x, tgt, cfg)
+            c = _sw_cost(sat, x, tgt, cfg)
+            assert np.isfinite(c) and np.isfinite(lx).all() and np.isfinite(lxx).all(), \
+                f"non-finite at antipode act={act} gn={gn} δ={delta}"
+
+    def test_type3_antipode_genuine_divergence(self, fixture):
+        """(b) KNOWN-GENUINE divergence for type 3 at the vec antipode.  This is
+        a real cusp on the cost surface, not a bug — so instead of boundedness
+        we assert the correct SIGN and ~1/sinθ SCALING:
+          - Gauss-Newton max-eig grows POSITIVE and monotonically (f''·dc·dcᵀ,
+            f'' = ½·acos²'' → +∞ like +1/sinθ).
+          - full-Newton min-eig grows NEGATIVE and monotonically (the f'·∂²c
+            manifold-curvature term dominates → −1/sinθ).
+        The product eig·sin(δ) stays within a bounded band (empirically ≈ ±4π),
+        confirming the rate is exactly 1/sinθ and no faster."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        q = x[sat.QUAT_INDEX:sat.QUAT_INDEX + 4]
+        P = np.eye(4) - np.outer(q, q)
+        prev_gn = 0.0
+        prev_fn = 0.0
+        for delta in _SW_BOUNDARY:
+            theta = _math.pi - delta
+            tgt = _sw_target("vec", theta)
+            QI = sat.QUAT_INDEX
+            u = np.zeros(sat.controlDim)
+            Hq_gn, _, _ = sat.stageCostHessians(0, 100, x, u, _SW_BS, tgt, _SW_B0,
+                                                _sweep_cfg(3, True))
+            Hq_fn, _, _ = sat.stageCostHessians(0, 100, x, u, _SW_BS, tgt, _SW_B0,
+                                                _sweep_cfg(3, False))
+            eig_gn = np.linalg.eigvalsh(P @ Hq_gn[QI:QI + 4, QI:QI + 4] @ P)
+            eig_fn = np.linalg.eigvalsh(P @ Hq_fn[QI:QI + 4, QI:QI + 4] @ P)
+            gmax = eig_gn.max()
+            fmin = eig_fn.min()
+            assert gmax > 0.0, f"GN max-eig should be positive, got {gmax} at δ={delta}"
+            assert fmin < 0.0, f"FN min-eig should be negative, got {fmin} at δ={delta}"
+            assert gmax > prev_gn, f"GN max-eig not growing: {gmax} <= {prev_gn}"
+            assert fmin < prev_fn, f"FN min-eig not growing (−): {fmin} >= {prev_fn}"
+            # ~1/sinθ scaling: eig·sin(δ) bounded (empirically |·| ≈ 4π ≈ 12.57).
+            assert 1.0 < gmax * _math.sin(delta) < 100.0, \
+                f"GN scaling off: {gmax * _math.sin(delta)} at δ={delta}"
+            assert -100.0 < fmin * _math.sin(delta) < -1.0, \
+                f"FN scaling off: {fmin * _math.sin(delta)} at δ={delta}"
+            prev_gn, prev_fn = gmax, fmin
+
+    def test_type2_assembled_gradient_finite_both_poles(self, fixture):
+        """(b) Type 2 (acos): the raw ∂h/∂c = −1/√(1−c²) diverges at BOTH poles,
+        but the geometry factor ∂c/∂q → 0 at the same rate, so the ASSEMBLED
+        q-gradient stays finite.  Verified empirically: |g_q| = 2 (vec) / ≈1
+        (quat) across the full approach — no divergence to report."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        QI = sat.QUAT_INDEX
+        u = np.zeros(sat.controlDim)
+        approaches = [("vec", [t for t in _SW_BOUNDARY]),
+                      ("vec", [_math.pi - t for t in _SW_BOUNDARY]),
+                      ("quat", [t for t in _SW_BOUNDARY])]  # quat: aligned side only
+        for mode, angs in approaches:
+            for theta in angs:
+                tgt = _sw_target(mode, theta)
+                lx, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, tgt, _SW_B0,
+                                                  _sweep_cfg(2, False))
+                gnorm = np.linalg.norm(lx[QI:QI + 4])
+                assert np.isfinite(lx).all() and gnorm < 10.0, \
+                    f"type2 assembled grad blew up mode={mode} θ={theta}: |g|={gnorm}"
+
+    @pytest.mark.parametrize("mode", ["vec", "quat"])
+    def test_blend_zone_continuity_type3(self, fixture, mode):
+        """(c) #30's blend-zone edges: sweep omz = 1 − argument across the
+        below/at/above probes straddling the 1e-6 and 1e-4 thresholds and assert
+        value/grad/Hessian vary smoothly (no jump at the Taylor↔exact switch).
+        For type 3 near the aligned pole: cost ≈ omz (Taylor leading term),
+        |g_q| grows monotonically, and the projected max-eig ≈ 4·w_ang stays
+        essentially constant."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        cfg = _sweep_cfg(3, False)
+        for thr in (1e-6, 1e-4):
+            costs, gnorms, eigmaxs, omzs = [], [], [], []
+            for frac in (0.5, 1.0, 2.0):
+                omz = thr * frac
+                arg = 1.0 - omz  # c (vec) or d (quat)
+                theta = _math.acos(arg) if mode == "vec" else 2.0 * _math.acos(arg)
+                tgt = _sw_target(mode, theta)
+                c, gq, Hq, _, _ = _sw_qblock_ana(sat, x, tgt, cfg)
+                assert np.isfinite(c) and np.isfinite(gq).all() and np.isfinite(Hq).all()
+                costs.append(c); gnorms.append(np.linalg.norm(gq))
+                eigmaxs.append(np.linalg.eigvalsh(Hq).max()); omzs.append(omz)
+            # Cost ≈ omz across the blend (relative continuity + correctness).
+            for c, omz in zip(costs, omzs):
+                np.testing.assert_allclose(c, omz, rtol=2e-2,
+                                           err_msg=f"[{mode}] cost≠omz at blend edge {thr}")
+            # Monotone in omz (no reversal at the switch).
+            assert costs[0] < costs[1] < costs[2], f"[{mode}] cost not monotone @ {thr}"
+            assert gnorms[0] < gnorms[1] < gnorms[2], f"[{mode}] |g| not monotone @ {thr}"
+            # Projected max-eig near the aligned pole is flat across the blend
+            # (Hessian dominated by the PwA/manifold term).  The constant differs
+            # by mode: vec lifts the reduced Hessian through W with the full
+            # 2-DOF geometry (≈ 4·w_ang), quat's d-linear PwA term gives ≈ 1·w_ang.
+            expected_eig = 4.0 if mode == "vec" else 1.0
+            for e in eigmaxs:
+                assert abs(e - expected_eig) < 1e-2, \
+                    f"[{mode}] eigmax jumped at {thr}: {e} (expected ≈ {expected_eig})"
+
+
+class TestHemisphereKink:
+    """Task 2: quaternion-mode hemisphere kink at d = q·q_goal = 0."""
+
+    def test_quat_hemisphere_kink_finite_and_sign_flip(self, fixture):
+        """At a quaternion 180° from goal (q·q_goal = 0, the abs() kink) the
+        cost/gradient/Hessian are all FINITE for every cost shape.  Approaching
+        from either hemisphere (scalar part ±1e-6) the cost is continuous but
+        the q-gradient FLIPS SIGN — the expected C¹ kink of |q_goal·q|.  The
+        exact d=0 point resolves to the qdot≥0 (non-flipped) convention, so its
+        gradient sign matches the +hemisphere approach."""
+        sat = fixture.sat
+        QI = sat.QUAT_INDEX
+        x = _sw_base_state(sat)          # q = identity = [1,0,0,0]
+        u = np.zeros(sat.controlDim)
+
+        # Finiteness at exactly d = 0 for all cost shapes.
+        qg0 = np.array([0.0, 1.0, 0.0, 0.0])   # orthogonal to identity ⇒ d = 0
+        for act in (0, 1, 2, 3):
+            cfg = _sweep_cfg(act, False)
+            c = sat.stageCost(0, 100, x, u, _SW_BS, qg0, _SW_B0, cfg)
+            lx, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, qg0, _SW_B0, cfg)
+            lxx, _, _ = sat.stageCostHessians(0, 100, x, u, _SW_BS, qg0, _SW_B0, cfg)
+            assert np.isfinite(c) and np.isfinite(lx).all() and np.isfinite(lxx).all(), \
+                f"non-finite at d=0 kink, act={act}"
+
+        # Hemisphere-approach sign flip (use type 3; behavior is generic).
+        cfg = _sweep_cfg(3, False)
+        eps = 1e-6
+        qg_plus = np.array([+eps, 1.0, 0.0, 0.0]); qg_plus /= np.linalg.norm(qg_plus)
+        qg_minus = np.array([-eps, 1.0, 0.0, 0.0]); qg_minus /= np.linalg.norm(qg_minus)
+        c_plus = sat.stageCost(0, 100, x, u, _SW_BS, qg_plus, _SW_B0, cfg)
+        c_minus = sat.stageCost(0, 100, x, u, _SW_BS, qg_minus, _SW_B0, cfg)
+        g_plus, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, qg_plus, _SW_B0, cfg)
+        g_minus, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, qg_minus, _SW_B0, cfg)
+        g0, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, qg0, _SW_B0, cfg)
+
+        # Cost is continuous across the kink.
+        np.testing.assert_allclose(c_plus, c_minus, atol=1e-6,
+                                   err_msg="cost discontinuous across hemisphere kink")
+        # The q-gradient (slot QI+1) flips sign — the documented kink.
+        assert g_plus[QI + 1] * g_minus[QI + 1] < 0, \
+            f"expected gradient sign flip: {g_plus[QI + 1]} vs {g_minus[QI + 1]}"
+        np.testing.assert_allclose(g_plus[QI + 1], -g_minus[QI + 1], rtol=1e-4,
+                                   err_msg="hemisphere flip not antisymmetric")
+        # d=0 resolves to the +hemisphere convention (qdot=0 is not flipped).
+        assert np.sign(g0[QI + 1]) == np.sign(g_plus[QI + 1]), \
+            "d=0 gradient should match the +hemisphere approach convention"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

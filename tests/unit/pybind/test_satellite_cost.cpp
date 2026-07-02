@@ -2,6 +2,12 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <Eigen/Dense>
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <string>
+#include <vector>
+
 #include <saltro/pybind/satellite.h>
 #include <saltro/orbit_generation/generate_orbit.h>
 #include <saltro/math/integrators/rk4.h>
@@ -2032,4 +2038,376 @@ TEST_CASE_METHOD(SatelliteCostFixture,
             }
         }
     }
+}
+
+// ============================================================================
+// TEST SECTION 11: Singularity sweep + hemisphere-kink coverage
+// ============================================================================
+// C++ twin of TestSingularitySweep / TestHemisphereKink in
+// tests/unit/pybind/test_satellite_cost.py.  Property tests over the full
+// cost-shape grid: cost type ∈ {0,1,2,3} × mode ∈ {vec (NaN ECI target), quat}
+// × Gauss-Newton flag ∈ {on, off}.  Base attitude is identity, so the tangent
+// projector is P = diag(0,1,1,1) and only q-components 1..3 carry signal.
+//
+// Coordinate conventions (physical angle θ):
+//   vec:  r̂ = [sinθ,0,cosθ], bs = +z  ⇒  c = cosθ; θ→0 aligned pole (c→+1),
+//         θ→π genuine antipodal cusp (c→−1) for the acos/acos² shapes (2/3).
+//   quat: q_goal = [cos(θ/2),sin(θ/2),0,0]  ⇒  d = cos(θ/2); θ→0 aligned pole
+//         (d→+1), θ→π gives d→0 (the |·| hemisphere kink), NOT the unreachable
+//         d = −1 shape antipode (hemisphere alignment keeps d ∈ [0,1]).
+//
+// GN semantics: GN=False returns the full/exact Hessian (matches FD); GN=True
+// in VEC mode returns the rank-1 Gauss-Newton approximation (drops the f'·∂²c
+// chain term ⇒ does NOT match FD, asserted structurally instead); the GN flag
+// is a NO-OP in QUAT mode (d is linear in q ⇒ full Hessian either way).
+
+namespace {
+
+CostConfig sweepCfg(int act, bool gn) {
+    CostConfig cfg;
+    cfg.angle = 1.0;                 cfg.angle_N = 1.0;
+    cfg.ang_vel = 0.0;               cfg.ang_vel_N = 0.0;
+    cfg.ang_vel_mag = 0.0;           cfg.ang_vel_mag_N = 0.0;
+    cfg.ang_vel_err_dir = 0.0;       cfg.ang_vel_err_dir_N = 0.0;
+    cfg.ang_vel_err_dir_ratio = 0.0; cfg.ang_vel_roll_ratio = 1.0;
+    cfg.control_mult = 0.0;
+    cfg.mtq_control_weight = 0.0;    cfg.rw_control_weight = 0.0;
+    cfg.rw_AM_weight = 0.0;          cfg.rw_stic_weight = 0.0;
+    cfg.RWh_max_mult = 1.0;          cfg.RWh_ok_mult = 0.0;
+    cfg.RWh_stiction_mult = 0.0;
+    cfg.use_cost_hess = true;
+    cfg.ang_cost_func_type = act;
+    cfg.cost_hess_gauss_newton = gn;
+    return cfg;
+}
+
+// quat_mode: false = vec (NaN target), true = quat.
+Eigen::Vector4d sweepTarget(bool quat_mode, double theta) {
+    if (quat_mode) {
+        return Eigen::Vector4d(std::cos(0.5 * theta), std::sin(0.5 * theta), 0.0, 0.0);
+    }
+    return Eigen::Vector4d(std::nan(""), std::sin(theta), 0.0, std::cos(theta));
+}
+
+constexpr double kPiSweep = 3.14159265358979323846;
+
+// Tangent projector at q = identity is exactly diag(0,1,1,1).
+Eigen::Matrix4d tangentProjIdentity() {
+    Eigen::Vector4d d(0.0, 1.0, 1.0, 1.0);
+    return d.asDiagonal();
+}
+
+}  // namespace
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Singularity dense sweep: finite + FD-consistent across all cost shapes",
+    "[cost][jacobians][hessians][singularity][sweep][finite-diff]") {
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    const Eigen::Matrix4d P = tangentProjIdentity();
+
+    // 1°..171° step 10° plus 179°.
+    std::vector<double> degs;
+    for (double td = 1.0; td < 180.0; td += 10.0) degs.push_back(td);
+    degs.push_back(179.0);
+
+    auto qGradFD = [&](const Eigen::Vector4d& tgt, const CostConfig& cfg) {
+        Eigen::Vector4d g;
+        const double eps = 1e-6;
+        for (int j = 0; j < 4; ++j) {
+            Satellite::VecX xp = x, xm = x;
+            xp(QI + j) += eps; xm(QI + j) -= eps;
+            const double cp = sat.stageCost(0, 100, xp, u, bs, tgt, B0, cfg);
+            const double cm = sat.stageCost(0, 100, xm, u, bs, tgt, B0, cfg);
+            g(j) = (cp - cm) / (2.0 * eps);
+        }
+        return (P * g).eval();
+    };
+    auto qHessFD = [&](const Eigen::Vector4d& tgt, const CostConfig& cfg) {
+        Eigen::Matrix4d H;
+        const double eps = 1e-4;
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                Satellite::VecX xpp = x, xmm = x, xpm = x, xmp = x;
+                xpp(QI + i) += eps; xpp(QI + j) += eps;
+                xmm(QI + i) -= eps; xmm(QI + j) -= eps;
+                xpm(QI + i) += eps; xpm(QI + j) -= eps;
+                xmp(QI + i) -= eps; xmp(QI + j) += eps;
+                const double cpp = sat.stageCost(0, 100, xpp, u, bs, tgt, B0, cfg);
+                const double cmm = sat.stageCost(0, 100, xmm, u, bs, tgt, B0, cfg);
+                const double cpm = sat.stageCost(0, 100, xpm, u, bs, tgt, B0, cfg);
+                const double cmp = sat.stageCost(0, 100, xmp, u, bs, tgt, B0, cfg);
+                H(i, j) = (cpp + cmm - cpm - cmp) / (4.0 * eps * eps);
+            }
+        }
+        return (P * H * P).eval();
+    };
+
+    for (int act = 0; act <= 3; ++act) {
+        for (bool quat_mode : {false, true}) {
+            for (bool gn : {false, true}) {
+                const CostConfig cfg = sweepCfg(act, gn);
+                const bool full_hess = (!gn) || quat_mode;
+                for (double td : degs) {
+                    const double theta = td * kPiSweep / 180.0;
+                    const Eigen::Vector4d tgt = sweepTarget(quat_mode, theta);
+
+                    const double c = sat.stageCost(0, 100, x, u, bs, tgt, B0, cfg);
+                    auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, tgt, B0, cfg);
+                    auto [lxx, luu, lux2] = sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, cfg);
+                    REQUIRE(std::isfinite(c));
+                    REQUIRE(lx.allFinite());
+                    REQUIRE(lxx.allFinite());
+
+                    // Gradient vs central FD (assembled q-grad stays finite even
+                    // near poles — geometry factor cancels the raw 1/√(1−c²)).
+                    const Eigen::Vector4d gq = P * lx.segment<4>(QI);
+                    const Eigen::Vector4d gfd = qGradFD(tgt, cfg);
+                    for (int j = 0; j < 4; ++j) {
+                        const double tol = 1e-6 + 1e-4 * std::abs(gfd(j));
+                        REQUIRE_THAT(gq(j), Catch::Matchers::WithinAbs(gfd(j), tol));
+                    }
+
+                    // Skip Hessian-FD within 1e-3 rad of the antipode for the
+                    // acos/acos² shapes (vec types 2/3): the cost curvature radius
+                    // there shrinks below the FD step, so central differences stop
+                    // tracking the correctly-diverging analytic Hessian.  (The
+                    // dense grid never enters that band; guard documents intent.)
+                    const bool near_antipode =
+                        (!quat_mode && (act == 2 || act == 3) &&
+                         std::abs(kPiSweep - theta) < 1e-3);
+                    const Eigen::Matrix4d Hq = P * lxx.block<4, 4>(QI, QI) * P;
+                    if (full_hess && !near_antipode) {
+                        const Eigen::Matrix4d Hfd = qHessFD(tgt, cfg);
+                        const double herr = (Hq - Hfd).cwiseAbs().maxCoeff();
+                        const double hscale = Hfd.cwiseAbs().maxCoeff();
+                        REQUIRE(herr < 1e-3 + 5e-2 * hscale);
+                    } else if (!full_hess) {
+                        // GN=True vec mode: GN Hessian is rank-1 (f''·dc·dcᵀ).
+                        Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> es(Hq);
+                        Eigen::Vector4d ev = es.eigenvalues();          // ascending
+                        Eigen::Vector4d mags = ev.cwiseAbs();
+                        std::sort(mags.data(), mags.data() + 4);
+                        // Two tangent eigenvalues ≈ 0 ⇒ rank ≤ 1.
+                        REQUIRE(mags(2) < 1e-6 + 1e-3 * mags(3));
+                        if (act != 2) {
+                            // f'' ≥ 0 for types 0/1/3 ⇒ PSD.
+                            REQUIRE(ev.minCoeff() > -1e-6);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Singularity boundary-approach: finite from both poles across all shapes",
+    "[cost][jacobians][hessians][singularity][boundary]") {
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    const std::vector<double> boundary = {1e-2, 1e-3, 1e-4, 1e-5};
+
+    for (int act = 0; act <= 3; ++act) {
+        for (bool gn : {false, true}) {
+            const CostConfig cfg = sweepCfg(act, gn);
+
+            SECTION("aligned pole, act=" + std::to_string(act) +
+                    (gn ? " GN" : " full")) {
+                for (bool quat_mode : {false, true}) {
+                    for (double theta : boundary) {
+                        const Eigen::Vector4d tgt = sweepTarget(quat_mode, theta);
+                        const double c = sat.stageCost(0, 100, x, u, bs, tgt, B0, cfg);
+                        auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, tgt, B0, cfg);
+                        auto [lxx, luu, lux2] = sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, cfg);
+                        REQUIRE(std::isfinite(c));
+                        REQUIRE(lx.allFinite());
+                        REQUIRE(lxx.allFinite());
+                    }
+                }
+            }
+            // Antipodal approach: vec only (quat has no reachable shape antipode).
+            SECTION("vec antipode, act=" + std::to_string(act) +
+                    (gn ? " GN" : " full")) {
+                for (double delta : boundary) {
+                    const double theta = kPiSweep - delta;
+                    const Eigen::Vector4d tgt = sweepTarget(false, theta);
+                    const double c = sat.stageCost(0, 100, x, u, bs, tgt, B0, cfg);
+                    auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, tgt, B0, cfg);
+                    auto [lxx, luu, lux2] = sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, cfg);
+                    REQUIRE(std::isfinite(c));
+                    REQUIRE(lx.allFinite());
+                    REQUIRE(lxx.allFinite());
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Type-3 antipode genuine divergence: GN max-eig +1/sinθ, full-Newton min-eig -1/sinθ",
+    "[hessians][singularity][type3][antipode][genuine]") {
+    // KNOWN-GENUINE cusp on the cost surface (not a bug): assert correct sign
+    // and ~1/sinθ scaling rather than boundedness.
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    const Eigen::Matrix4d P = tangentProjIdentity();
+
+    double prev_gn = 0.0, prev_fn = 0.0;
+    for (double delta : {1e-2, 1e-3, 1e-4, 1e-5}) {
+        const double theta = kPiSweep - delta;
+        const Eigen::Vector4d tgt = sweepTarget(false, theta);
+        auto [lxxG, luuG, luxG] = sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, sweepCfg(3, true));
+        auto [lxxF, luuF, luxF] = sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, sweepCfg(3, false));
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> esG(P * lxxG.block<4, 4>(QI, QI) * P);
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> esF(P * lxxF.block<4, 4>(QI, QI) * P);
+        const double gmax = esG.eigenvalues().maxCoeff();
+        const double fmin = esF.eigenvalues().minCoeff();
+
+        REQUIRE(gmax > 0.0);                 // GN max-eig positive
+        REQUIRE(fmin < 0.0);                 // full-Newton min-eig negative
+        REQUIRE(gmax > prev_gn);             // monotonically growing
+        REQUIRE(fmin < prev_fn);             // monotonically growing (negative)
+        // ~1/sinθ: eig·sin(δ) bounded (empirically |·| ≈ 4π ≈ 12.57).
+        REQUIRE(gmax * std::sin(delta) > 1.0);
+        REQUIRE(gmax * std::sin(delta) < 100.0);
+        REQUIRE(fmin * std::sin(delta) < -1.0);
+        REQUIRE(fmin * std::sin(delta) > -100.0);
+        prev_gn = gmax; prev_fn = fmin;
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Type-2 assembled q-gradient stays finite at both poles (geometry cancellation)",
+    "[jacobians][singularity][type2]") {
+    // Type 2 (acos): raw ∂h/∂c = −1/√(1−c²) diverges at both poles, but ∂c/∂q →
+    // 0 at the same rate ⇒ assembled q-gradient stays finite (empirically
+    // |g_q| = 2 vec / ≈1 quat).  No divergence to report.
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    const CostConfig cfg = sweepCfg(2, false);
+    const std::vector<double> boundary = {1e-2, 1e-3, 1e-4, 1e-5};
+
+    auto checkFinite = [&](const Eigen::Vector4d& tgt) {
+        auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, tgt, B0, cfg);
+        REQUIRE(lx.allFinite());
+        REQUIRE(lx.segment<4>(QI).norm() < 10.0);
+    };
+    for (double theta : boundary)  checkFinite(sweepTarget(false, theta));             // vec aligned
+    for (double delta : boundary)  checkFinite(sweepTarget(false, kPiSweep - delta));  // vec antipode
+    for (double theta : boundary)  checkFinite(sweepTarget(true,  theta));             // quat aligned
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Blend-zone continuity for type 3 across 1e-6 and 1e-4 edges",
+    "[cost][jacobians][hessians][singularity][blend][type3]") {
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    const Eigen::Matrix4d P = tangentProjIdentity();
+    const CostConfig cfg = sweepCfg(3, false);
+
+    for (bool quat_mode : {false, true}) {
+        const double expected_eig = quat_mode ? 1.0 : 4.0;
+        for (double thr : {1e-6, 1e-4}) {
+            std::array<double, 3> costs{}, gnorms{}, eigmaxs{}, omzs{};
+            int idx = 0;
+            for (double frac : {0.5, 1.0, 2.0}) {
+                const double omz = thr * frac;
+                const double arg = 1.0 - omz;   // c (vec) or d (quat)
+                const double theta =
+                    quat_mode ? 2.0 * std::acos(arg) : std::acos(arg);
+                const Eigen::Vector4d tgt = sweepTarget(quat_mode, theta);
+                const double c = sat.stageCost(0, 100, x, u, bs, tgt, B0, cfg);
+                auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, tgt, B0, cfg);
+                auto [lxx, luu, lux2] = sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, cfg);
+                REQUIRE(std::isfinite(c));
+                REQUIRE(lx.allFinite());
+                REQUIRE(lxx.allFinite());
+                Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> es(P * lxx.block<4, 4>(QI, QI) * P);
+                costs[idx] = c;
+                gnorms[idx] = (P * lx.segment<4>(QI)).norm();
+                eigmaxs[idx] = es.eigenvalues().maxCoeff();
+                omzs[idx] = omz;
+                ++idx;
+            }
+            // Cost ≈ omz across the blend (continuity + correctness).
+            for (int i = 0; i < 3; ++i) {
+                REQUIRE_THAT(costs[i], Catch::Matchers::WithinRel(omzs[i], 2e-2));
+            }
+            // Monotone (no reversal at the Taylor↔exact switch).
+            REQUIRE(costs[0] < costs[1]);
+            REQUIRE(costs[1] < costs[2]);
+            REQUIRE(gnorms[0] < gnorms[1]);
+            REQUIRE(gnorms[1] < gnorms[2]);
+            // Projected max-eig flat across the blend (mode-dependent constant).
+            for (double e : eigmaxs) {
+                REQUIRE_THAT(e, Catch::Matchers::WithinAbs(expected_eig, 1e-2));
+            }
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Quaternion hemisphere kink at d=0: finite cost/grad/Hessian + gradient sign flip",
+    "[cost][jacobians][hessians][singularity][hemisphere][kink]") {
+    // At q·q_goal = 0 (the |·| kink) everything is finite for every cost shape.
+    // Approaching from either hemisphere (scalar part ±1e-6) the cost is
+    // continuous but the q-gradient flips sign — the expected C¹ kink.  The
+    // exact d=0 point resolves to the qdot≥0 (non-flipped) convention, matching
+    // the +hemisphere approach.
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+
+    const Eigen::Vector4d qg0(0.0, 1.0, 0.0, 0.0);  // orthogonal to identity ⇒ d = 0
+    for (int act = 0; act <= 3; ++act) {
+        const CostConfig cfg = sweepCfg(act, false);
+        const double c = sat.stageCost(0, 100, x, u, bs, qg0, B0, cfg);
+        auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, qg0, B0, cfg);
+        auto [lxx, luu, lux2] = sat.stageCostHessians(0, 100, x, u, bs, qg0, B0, cfg);
+        REQUIRE(std::isfinite(c));
+        REQUIRE(lx.allFinite());
+        REQUIRE(lxx.allFinite());
+    }
+
+    const CostConfig cfg = sweepCfg(3, false);
+    const double eps = 1e-6;
+    Eigen::Vector4d qg_plus(+eps, 1.0, 0.0, 0.0);  qg_plus.normalize();
+    Eigen::Vector4d qg_minus(-eps, 1.0, 0.0, 0.0); qg_minus.normalize();
+    const double c_plus  = sat.stageCost(0, 100, x, u, bs, qg_plus,  B0, cfg);
+    const double c_minus = sat.stageCost(0, 100, x, u, bs, qg_minus, B0, cfg);
+    auto [g_plus, gp_u, gp_ux]   = sat.stageCostJacobians(0, 100, x, u, bs, qg_plus,  B0, cfg);
+    auto [g_minus, gm_u, gm_ux]  = sat.stageCostJacobians(0, 100, x, u, bs, qg_minus, B0, cfg);
+    auto [g0, g0_u, g0_ux]       = sat.stageCostJacobians(0, 100, x, u, bs, qg0,      B0, cfg);
+
+    // Cost continuous across the kink.
+    REQUIRE_THAT(c_plus, Catch::Matchers::WithinAbs(c_minus, 1e-6));
+    // q-gradient (slot QI+1) flips sign — the documented kink.
+    REQUIRE(g_plus(QI + 1) * g_minus(QI + 1) < 0.0);
+    REQUIRE_THAT(g_plus(QI + 1), Catch::Matchers::WithinRel(-g_minus(QI + 1), 1e-4));
+    // d=0 resolves to the +hemisphere convention.
+    REQUIRE((g0(QI + 1) > 0.0) == (g_plus(QI + 1) > 0.0));
 }
