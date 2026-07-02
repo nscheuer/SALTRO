@@ -16,6 +16,11 @@ bool isRecoverableInnerFailure(const ILQRStatus status)
     return status == ILQRStatus::MaxIterations || status == ILQRStatus::RegularizationExceeded;
 }
 
+bool hasInnerProgress(const ILQRStatus status, const ILQRTelemetry& telemetry)
+{
+    return status == ILQRStatus::Converged || telemetry.accepted_steps > 0;
+}
+
 Eigen::VectorXd control_at_k(const Eigen::Ref<const Eigen::MatrixXd>& U, int k, int N, int control_dim)
 {
     if (U.cols() == N - 1 && k < N - 1) {
@@ -109,6 +114,7 @@ bool alilqr(
     for (int outer_iter = 0; outer_iter < aug.max_outer_iters; ++outer_iter) {
         double J = 0.0;
         ILQRStatus ilqr_status = ILQRStatus::MaxIterations;
+        ILQRTelemetry ilqr_telemetry;
         const bool ilqr_ok = iLQR(
             settings,
             satellite,
@@ -126,7 +132,8 @@ bool alilqr(
             lambda_aug,
             mu_aug,
             ilqr_status,
-            J
+            J,
+            ilqr_telemetry
         );
 
         if (!ilqr_ok) {
@@ -140,8 +147,12 @@ bool alilqr(
         const double max_c = max_constraint_violation(settings, satellite, X, U, S);
         max_constraint_violation_out = max_c;
         if (max_c <= aug.constraint_tol) {
-            status = ALILQRStatus::Converged;
-            return true;
+            if (hasInnerProgress(ilqr_status, ilqr_telemetry)) {
+                status = ALILQRStatus::Converged;
+                return true;
+            }
+            status = ALILQRStatus::InnerFailed;
+            return false;
         }
 
         const auto c_list = collect_constraints(settings, satellite, X, U, S);

@@ -46,9 +46,17 @@ jobs:
       - name: Run C++ tests
         run: |
           cd build
-          ctest --output-on-failure -E "optimizer_test_alilqr"
+          if [ "${{ matrix.build_type }}" = "Debug" ]; then
+            ctest --output-on-failure -E "optimizer_test_alilqr"
+          else
+            ctest --output-on-failure
+          fi
 
       - name: Run Python tests
         run: |
           cd tests
-          pytest -q -k "not test_alilqr"
+          if [ "${{ matrix.build_type }}" = "Debug" ]; then
+            pytest -q -k "not test_alilqr"
+          else
+            pytest -q
+          fi

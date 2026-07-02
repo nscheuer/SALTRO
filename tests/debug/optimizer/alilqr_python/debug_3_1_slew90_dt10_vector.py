@@ -10,14 +10,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "configs"))
 import saltro_py
 from sat_3_1_hybrid import create_satellite
 from trajOpt import trajOpt
-from ilqr_viewer import launch_viewer
+
 
 def create_planner_settings():
     plannersettings = saltro_py.PlannerSettings()
 
     # Warm-Start
     plannersettings.init_traj.initcontroller = 2
-    
+
     # Pass 0 Settings
     plannersettings.num_passes = 1
     plannersettings.passes[0].dt = 10.0
@@ -47,8 +47,9 @@ def create_planner_settings():
     cost.ang_vel_N = 1e1
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 3
+    cost.ang_cost_func_type = 4
     cost.use_cost_hess = True
+    cost.cost_hess_gauss_newton = True
 
     # Pass 0 Disturbance Settings
     plannersettings.disturbances.plan_for_aero = False
@@ -69,7 +70,7 @@ def create_planner_settings():
     plannersettings.passes[0].linesearch.max_iters = 24
     plannersettings.passes[0].linesearch.beta1 = 1e-10
     plannersettings.passes[0].linesearch.beta2 = 5000.0
-    
+
     return plannersettings
 
 
@@ -77,17 +78,22 @@ def main():
     plannersettings = create_planner_settings()
     satellite = create_satellite(plannersettings)
 
-    jtime = np.array([0.22, 0.22 + 1000/(36525 * 86400)])
+    jtime = np.array([0.22, 0.22 + 1000 / (36525 * 86400)])
+    # Vector pointing version: each goal column is [NaN, x, y, z], where the
+    # last three entries are the inertial target direction.
+    # This case asks the body +X boresight to point toward inertial -Y.
+    # With the identity quaternion, body +X is aligned with inertial +X, so the
+    # initial boresight-to-target error is 90 degrees.
     qgoal = np.array([
-        [np.sqrt(2)/2, np.sqrt(2)/2],
-        [0.0, 0.0],           
-        [0.0, 0.0],            
-        [np.sqrt(2)/2, np.sqrt(2)/2]
+        [np.nan, np.nan],
+        [0.0, 0.0],
+        [-1.0, -1.0],
+        [0.0, 0.0],
     ])
     boresight = np.array([
         [1.0, 1.0],
         [0.0, 0.0],
-        [0.0, 0.0]
+        [0.0, 0.0],
     ])
 
     w0 = np.array([0.01, 0.01, 0.01])
@@ -101,12 +107,14 @@ def main():
     X, U, stop_reason, snapshots, transitions, dt, cost_tol, elapsed_time = trajOpt(
         plannersettings, satellite, x0, r0, v0, jtime, qgoal, boresight, debug=True
     )
-    
+
     print(f"AL-iLQR finished: {stop_reason}")
     print(f"Final cost: {snapshots[-1]['J']:.6e}")
     print(f"Elapsed time: {elapsed_time:.3f} seconds")
-    
+
+    from ilqr_viewer import launch_viewer
     launch_viewer(snapshots, transitions, stop_reason, dt, cost_tol)
+
 
 if __name__ == "__main__":
     main()
