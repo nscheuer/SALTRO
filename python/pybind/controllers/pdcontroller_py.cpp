@@ -55,6 +55,10 @@ ndarray
              &PDController::setRWScale,
              py::arg("rw_scale"),
              "Set the reaction-wheel weighting preference in the allocator.")
+        .def("setGoalRate",
+             &PDController::setGoalRate,
+             py::arg("omega_des"),
+             "Set an optional body-rate feedforward target for damping.")
         .def_property_readonly("kp_q", &PDController::kp_q)
         .def_property_readonly("kd_w", &PDController::kd_w)
         .def_property_readonly("rwScale", &PDController::rwScale);

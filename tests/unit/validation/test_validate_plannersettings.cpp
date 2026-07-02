@@ -982,3 +982,23 @@ TEST_CASE("psd_clip_quu_ddp bool accepted by validation", "[plannersettings][val
         REQUIRE(settings.passes[0].reg.psd_clip_quu_ddp == val);
     }
 }
+
+// ============================================================================
+// PD warm-start goal-rate feedforward validation (G16)
+// ============================================================================
+
+TEST_CASE("Default pd_goal_rate_ff_enabled is off and valid", "[plannersettings][validation][pdff]") {
+    PlannerSettings settings = validSettings();
+    REQUIRE_FALSE(settings.init_traj.pd_goal_rate_ff_enabled);
+    std::string error_msg;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Enabled PD goal-rate feedforward passes validation", "[plannersettings][validation][pdff]") {
+    PlannerSettings settings = validSettings();
+    settings.init_traj.initcontroller = 3;
+    settings.init_traj.pd_goal_rate_ff_enabled = true;
+    std::string error_msg;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(settings.init_traj.pd_goal_rate_ff_enabled);
+}

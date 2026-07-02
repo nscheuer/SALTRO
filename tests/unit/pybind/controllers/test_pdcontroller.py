@@ -257,3 +257,22 @@ def test_warm_start_initcontroller_3_works_with_magic_actuators_present():
     assert ok
     assert np.all(np.isfinite(X))
     assert np.all(np.isfinite(U))
+
+
+def test_pdcontroller_setgoalrate_changes_the_damping_target():
+    sat = make_simple_satellite()
+    pd = saltro_py.PDController(sat)
+
+    x = make_state(np.array([0.0, 0.0, 0.05]), np.array([1.0, 0.0, 0.0, 0.0]))
+    B_eci = np.array([2.2e-3, -1.6e-3, 3.1e-3], dtype=float)
+    q_goal_vec = np.array([np.nan, 0.0, 0.0, 1.0], dtype=float)
+    boresight = np.array([0.0, 0.0, 1.0], dtype=float)
+
+    u_zero_ff = np.asarray(pd.find_u(x, B_eci, q_goal_vec, boresight))
+
+    pd.setGoalRate(np.array([0.0, 0.0, 0.05], dtype=float))
+    u_match_ff = np.asarray(pd.find_u(x, B_eci, q_goal_vec, boresight))
+
+    assert np.all(np.isfinite(u_zero_ff))
+    assert np.all(np.isfinite(u_match_ff))
+    assert np.linalg.norm(u_match_ff) < np.linalg.norm(u_zero_ff)

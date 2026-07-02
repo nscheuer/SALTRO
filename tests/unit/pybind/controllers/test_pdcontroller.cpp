@@ -361,3 +361,32 @@ TEST_CASE("warm_start initcontroller=3 works with magic actuators present",
     REQUIRE(X.allFinite());
     REQUIRE(U.allFinite());
 }
+
+// ----------------------------------------------------------------------------
+// Goal-rate feedforward (G16): setGoalRate shifts the damping target so the
+// commanded torque differs from the rate-to-zero case.
+// ----------------------------------------------------------------------------
+TEST_CASE("PDController setGoalRate changes the damping target",
+          "[controller][pd][ff]") {
+    auto sat = makeSimpleSatellite();
+    controller::PDController pd(*sat);
+
+    // Spin about +z, vector goal aligned (bs == target) so the only torque
+    // demand comes from rate damping.
+    const auto x = makeState(Eigen::Vector3d(0.0, 0.0, 0.05),
+                             Eigen::Vector4d(1.0, 0.0, 0.0, 0.0));
+    const Eigen::Vector3d B_eci(2.2e-3, -1.6e-3, 3.1e-3);
+    const Eigen::Vector4d q_goal_vec(std::nan(""), 0.0, 0.0, 1.0);
+    const Eigen::Vector3d boresight = Eigen::Vector3d::UnitZ();
+
+    const Satellite::VecX u_zero_ff = pd.find_u(x, B_eci, q_goal_vec, boresight);
+
+    // Feed forward exactly the current rate: ω_err = 0 → ~zero command.
+    pd.setGoalRate(Eigen::Vector3d(0.0, 0.0, 0.05));
+    const Satellite::VecX u_match_ff = pd.find_u(x, B_eci, q_goal_vec, boresight);
+
+    REQUIRE(u_zero_ff.allFinite());
+    REQUIRE(u_match_ff.allFinite());
+    // Matching the rate kills the damping demand, so the command shrinks.
+    REQUIRE(u_match_ff.norm() < u_zero_ff.norm());
+}
