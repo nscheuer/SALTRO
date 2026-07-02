@@ -477,6 +477,44 @@ TEST_CASE("Break gates: PenaltyMaxReached is reachable and carries a trajectory"
 	requireFinite(p.U);
 }
 
+TEST_CASE("Break gates: PenaltyMaxReached fires on RW configs",
+          "[optimizer][break_gates][budgets][per_family]") {
+	// Regression for the dead-gate bug: the RW stiction rows are non-positive
+	// by construction (away from the torque floor), so the RWStiction family
+	// never violates. The saturation conjunction only counts families that
+	// are currently violating (per the family violation telemetry) — their
+	// mu is irrelevant to the remaining infeasibility — so PenaltyMaxReached
+	// must fire as an early diagnosis on RW-carrying configs rather than
+	// grinding out the whole outer budget.
+	PlannerSettings settings = createRWPlannerSettings(10.0);
+	settings.constraints.wmax = 1e-4;                     // effectively unsatisfiable
+	settings.passes[0].auglag.penalty_init = 1e-1;
+	settings.passes[0].auglag.penalty_max = 1e-1;         // caps within one ramp
+	settings.passes[0].auglag.lag_mult_max = 1.0;         // lambda clamps -> stalls
+	settings.passes[0].auglag.max_outer_iters = 30;
+	settings.passes[0].auglag.max_total_iters = 0;        // isolate the penalty exit
+	Satellite satellite(rwInertia(), settings);
+	addRWTriad(satellite);
+	ProblemData p = prepareRWProblem(settings, satellite, 200.0, 10.0);
+
+	optimizer::ALILQRStatus status = optimizer::ALILQRStatus::MaxOuterIterations;
+	double max_c = 0.0;
+	optimizer::ALILQRTelemetry telemetry;
+	const bool ok = runALILQR(settings, satellite, p, status, max_c, telemetry);
+
+	REQUIRE_FALSE(ok);
+	REQUIRE(status == optimizer::ALILQRStatus::PenaltyMaxReached);
+	REQUIRE(max_c > settings.passes[0].auglag.constraint_tol);
+	// The vacuous stiction family must have zero recorded violation — the
+	// exact condition that used to veto the saturation conjunction.
+	REQUIRE(telemetry.max_c_family[static_cast<size_t>(ConstraintFamily::RWStiction)] == 0.0);
+	// Early diagnosis, not an outer-budget grind.
+	REQUIRE(static_cast<int>(telemetry.outer.size())
+	        < settings.passes[0].auglag.max_outer_iters);
+	requireFinite(p.X);
+	requireFinite(p.U);
+}
+
 // ----------------------------------------------------------------------------
 // 5. decide() truth table (BREAK_GATE_DESIGN.md §8)
 // ----------------------------------------------------------------------------

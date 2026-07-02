@@ -382,11 +382,26 @@ bool alilqr(
             mu_next[k] = (mu_aug[k] * aug.penalty_scale).cwiseMin(aug.penalty_max);
         }
 
-        // Penalty saturation: every (post-ramp) mu entry at the cap.
+        // Penalty saturation: every (post-ramp) mu entry at the cap —
+        // counting only entries whose family is CURRENTLY violating (per the
+        // family violation telemetry). Families with zero violation (notably
+        // RWStiction, whose rows are non-positive by construction away from
+        // the torque floor) are irrelevant to the remaining infeasibility:
+        // demanding their mu matter too would dilute the PenaltyMaxReached
+        // early diagnosis on RW configs.
         bool any_constraint = false;
         bool all_saturated = true;
         for (size_t k = 0; k < mu_next.size() && all_saturated; ++k) {
+            const auto& fams = family_id[k];
             for (int i = 0; i < mu_next[k].size(); ++i) {
+                const int f = fams[static_cast<size_t>(i)];
+                const bool family_violating =
+                    (f >= 0 && f < NUM_FAMILIES)
+                        ? (max_c_family[static_cast<size_t>(f)] > 0.0)
+                        : true;  // unknown family: keep it in the conjunction
+                if (!family_violating) {
+                    continue;
+                }
                 any_constraint = true;
                 if (mu_next[k](i) < aug.penalty_max) {
                     all_saturated = false;

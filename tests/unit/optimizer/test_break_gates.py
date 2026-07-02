@@ -2,10 +2,11 @@
 (BREAK_GATE_DESIGN.md sections 5-7), exercised through the saltro_py.alilqr
 telemetry dict.
 
-Covers the do-nothing guard (G15), settle-tier discipline, and the new
-terminal statuses (MaxTotalIterations / PenaltyMaxReached). The inner-solver
-check-order and stall-counter tests live in the C++ twin only (iLQR is not
-bound to Python)."""
+Covers the do-nothing guard (G15), settle-tier discipline, the new terminal
+statuses (MaxTotalIterations / PenaltyMaxReached), and — through the bound
+alilqr's per-outer telemetry, since iLQR itself is not bound to Python — the
+check-order (optimal warm start exits Converged with zero accepted steps) and
+stall-counter (slow grind exits via z_count) behaviors."""
 
 import sys
 from pathlib import Path
@@ -125,6 +126,51 @@ def test_feasible_start_with_zero_progress_inner_is_never_blessed():
 
 
 # ----------------------------------------------------------------------------
+# 1b. Check order (twin of "optimal warm start exits Converged with zero
+#     accepted steps" — via alilqr telemetry, since iLQR is not bound)
+# ----------------------------------------------------------------------------
+
+
+def test_optimal_warm_start_exits_converged_with_zero_accepted_steps():
+    """Solve once to convergence, then re-run alilqr on its own answer: every
+    inner solve of the second run must exit Converged off the first backward
+    pass — zero accepted steps, gradient-stationary — and the trajectory must
+    come back untouched (never RegularizationExceeded; the historical failure
+    mode when the convergence check lived after the forward pass)."""
+    ps = create_planner_settings(10.0)
+    ps.passes[0].ilqr.max_iters = 300
+    ps.passes[0].ilqr.grad_tol = 1e-2
+    ps.passes[0].ilqr.z_count_lim = 0     # no stall exit: run to the gradient
+    sat = create_satellite_rw(ps)
+    p = prepare_problem(ps, sat, 200.0, 10.0)
+
+    ok, X_opt, U_opt, status, _max_c, _tel = run_alilqr(ps, sat, p)
+    assert ok
+    assert status == "converged"
+
+    # Second solve from the optimum.
+    p["X"] = np.asarray(X_opt)
+    p["U"] = np.asarray(U_opt)
+    ok2, X2, U2, status2, max_c2, tel2 = run_alilqr(ps, sat, p)
+
+    assert ok2
+    assert status2 == "converged"
+    assert max_c2 <= ps.passes[0].auglag.constraint_tol
+    for rec in tel2["outer"]:
+        assert rec["inner_status"] == "converged"
+        assert rec["inner_status"] != "regularization_exceeded"
+        assert rec["accepted_steps"] == 0
+        assert rec["inner_iterations"] == 1
+        # The optimum is feasible, so every solve runs the strict (settle)
+        # tier and must exit via the stationary-gradient certificate.
+        assert rec["settle"]
+        assert rec["break_reason"] == "gradient_stationary"
+    # Zero accepted steps anywhere means the trajectory is untouched.
+    assert np.array_equal(np.asarray(X2), np.asarray(X_opt))
+    assert np.array_equal(np.asarray(U2), np.asarray(U_opt))
+
+
+# ----------------------------------------------------------------------------
 # 2. Settle discipline
 # ----------------------------------------------------------------------------
 
@@ -167,6 +213,41 @@ def test_settle_discipline_loose_then_strict_conjunctive_before_converged():
     assert last["inner_status"] == "converged"
     assert last["break_reason"] in ("strict_conjunction", "gradient_stationary")
     assert last["max_c"] <= ps.passes[0].auglag.constraint_tol
+
+
+# ----------------------------------------------------------------------------
+# 3. Stall counter (twin of "engineered slow grind exits via z_count with best
+#    trajectory" — via alilqr telemetry, since iLQR is not bound)
+# ----------------------------------------------------------------------------
+
+
+def test_slow_grind_exits_via_z_count_with_best_trajectory():
+    """Unreachable gradient/cost tolerances: every accepted step near the
+    optimum makes negligible relative progress, so the first inner solve must
+    trip the z_count stall counter (a usable non-failure exit, NOT inner
+    Converged) and hand back an actually-optimized trajectory."""
+    ps = create_planner_settings(10.0)
+    ps.passes[0].ilqr.max_iters = 100
+    ps.passes[0].ilqr.grad_tol = 1e-13    # unreachable: conjunction can't fire
+    ps.passes[0].ilqr.cost_tol = 1e-13
+    ps.passes[0].ilqr.z_count_lim = 3
+    sat = create_satellite_rw(ps)
+    p = prepare_problem(ps, sat, 200.0, 10.0)
+    X_warm = p["X"].copy()
+
+    _ok, X, U, _status, _max_c, tel = run_alilqr(ps, sat, p)
+
+    first = tel["outer"][0]
+    assert first["inner_status"] == "stalled"     # not a failure, not Converged
+    assert first["break_reason"] == "stalled"
+    assert first["accepted_steps"] >= ps.passes[0].ilqr.z_count_lim
+    assert first["inner_iterations"] < ps.passes[0].ilqr.max_iters
+
+    # The best trajectory is returned: finite and actually optimized
+    # (different from the warm start).
+    assert np.all(np.isfinite(np.asarray(X)))
+    assert np.all(np.isfinite(np.asarray(U)))
+    assert float(np.max(np.abs(np.asarray(X)[:, : X_warm.shape[1]] - X_warm))) > 0.0
 
 
 # ----------------------------------------------------------------------------
