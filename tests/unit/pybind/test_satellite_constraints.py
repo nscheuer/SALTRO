@@ -21,7 +21,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-ROOT = Path(__file__).resolve().parents[4]
+# tests/unit/pybind/<this file>: parents[0]=pybind, [1]=unit, [2]=tests, [3]=repo root
+ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "build"))
 import saltro_py
 
