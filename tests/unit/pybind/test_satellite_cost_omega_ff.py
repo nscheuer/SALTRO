@@ -579,3 +579,164 @@ def test_afc3_taylor_matches_half_theta_squared_near_alignment_quat_mode():
                                        B_eci, cfg)
     np.testing.assert_allclose(lxx0[QI:QI + 4, QI:QI + 4],
                                np.diag([0., 1., 1., 1.]), atol=1e-9)
+
+
+# ============================================================================
+# afc=3 bounded antipodal clamp at c = −1 ("big but not infinite").
+# ============================================================================
+# The c = −1 cusp of ½·acos²(c) is GENUINE (Puiseux: φ = π − √(2u)·(1+u/12+…),
+# u = 1+c), so it cannot be Taylor-removed like the c = +1 side.  Instead the
+# shape clamps below u < 1e-6: (f', f'') are the exact-formula pair evaluated
+# at the seam c_eff = −1 + 1e-6 and the value is extended linearly, keeping f
+# strictly increasing toward the antipode.  Documented bounds (weight = 1):
+#   |f'| ≤ 2220.442…,  f'' ≤ 1.110720…e9,
+#   assembled GN q-block max-eig ≤ f''·4·(1−c_eff²) ≈ 8885.76.
+# Twin of TEST SECTION 12 in tests/unit/pybind/test_satellite_cost.cpp.
+
+_AC_U_EFF = 1e-6
+_AC_C_EFF = -1.0 + _AC_U_EFF
+_AC_OMC2_EFF = 1.0 - _AC_C_EFF * _AC_C_EFF          # = 2·u_eff − u_eff²
+_AC_S_EFF = np.sqrt(_AC_OMC2_EFF)
+_AC_PHI_EFF = np.arccos(_AC_C_EFF)                  # ≈ π − √(2e-6)
+_AC_FP_CLAMP = -_AC_PHI_EFF / _AC_S_EFF             # ≈ −2220.442
+_AC_FPP_CLAMP = (1.0 / _AC_OMC2_EFF
+                 - _AC_PHI_EFF * _AC_C_EFF / (_AC_OMC2_EFF * _AC_S_EFF))  # ≈ 1.1107e9
+_AC_GN_EIG_BOUND = _AC_FPP_CLAMP * 4.0 * _AC_OMC2_EFF  # ≈ 8885.76 (× weight)
+
+
+def _ac_cfg(gn=False):
+    cfg = _vec_only_cfg(3)
+    cfg.angle = 1.0
+    cfg.angle_N = 1.0
+    cfg.cost_hess_gauss_newton = gn
+    return cfg
+
+
+def _ac_probe(sat, c):
+    """Vec-mode probe at cosine c: boresight +z, target in the x-z plane.
+
+    Returns (c_n, cost, lx, lxx_gn, lxx_fn) where c_n is the cosine the code
+    actually sees after it normalizes the target vector (replicated here so
+    exact-formula comparisons are bit-honest)."""
+    s = np.sqrt(max(1.0 - c * c, 0.0))
+    r = np.array([s, 0.0, c])
+    c_n = (r / np.linalg.norm(r))[2]  # replicate the code's .normalized()
+    tgt = np.array([np.nan, r[0], r[1], r[2]])
+    x = np.zeros(sat.stateDim)
+    x[saltro.Satellite.QUAT_INDEX] = 1.0
+    u = np.zeros(sat.controlDim)
+    bs = np.array([0.0, 0.0, 1.0])
+    b0 = np.zeros(3)
+    cost = sat.stageCost(0, 100, x, u, bs, tgt, b0, _ac_cfg())
+    lx, _, _ = sat.stageCostJacobians(0, 100, x, u, bs, tgt, b0, _ac_cfg())
+    lxx_gn, _, _ = sat.stageCostHessians(0, 100, x, u, bs, tgt, b0, _ac_cfg(gn=True))
+    lxx_fn, _, _ = sat.stageCostHessians(0, 100, x, u, bs, tgt, b0, _ac_cfg(gn=False))
+    return c_n, cost, lx, lxx_gn, lxx_fn
+
+
+def _ac_qblock_maxeig(sat, lxx):
+    QI = saltro.Satellite.QUAT_INDEX
+    P = np.diag([0.0, 1.0, 1.0, 1.0])  # tangent projector at identity
+    return np.linalg.eigvalsh(P @ lxx[QI:QI + 4, QI:QI + 4] @ P).max()
+
+
+def test_afc3_antipode_exact_above_clamp():
+    """(1) Above the clamp (u = 1+c ≥ 1e-6) the raw exact formula is in
+    effect: cost equals ½·acos²(c) with no clamping."""
+    sat = _make_satellite()
+    for u in (2e-6, 1e-5, 1e-4, 1e-2, 0.5):
+        c_n, cost, lx, _, _ = _ac_probe(sat, -1.0 + u)
+        expected = 0.5 * np.arccos(c_n) ** 2
+        np.testing.assert_allclose(
+            cost, expected, rtol=1e-14,
+            err_msg=f"afc=3 cost at u={u} deviates from the raw exact formula")
+        assert np.isfinite(lx).all()
+
+
+def test_afc3_antipode_clamped_below_threshold():
+    """(2) Below the clamp: f' and f'' equal the documented seam values,
+    the value is the linear extension (still monotone toward c = −1), and
+    everything is finite."""
+    sat = _make_satellite()
+    QI = saltro.Satellite.QUAT_INDEX
+    costs = []
+    for u in (9.9e-7, 1e-7, 1e-9, 1e-12, 0.0):
+        c = -1.0 + u
+        c_n, cost, lx, lxx_gn, lxx_fn = _ac_probe(sat, c)
+        # Value: linear extension f = f(c_eff) + f'_clamp·(c − c_eff).
+        expected = 0.5 * _AC_PHI_EFF ** 2 + _AC_FP_CLAMP * (c_n - _AC_C_EFF)
+        np.testing.assert_allclose(cost, expected, rtol=1e-12,
+                                   err_msg=f"clamped value at u={u}")
+        # f' via the assembled gradient: |lx_q| = |f'|·|∂c/∂θ| = |f'|·2·sinθ.
+        s_n = np.sqrt(max(1.0 - c_n * c_n, 0.0))
+        gnorm = np.linalg.norm(lx[QI:QI + 4])
+        np.testing.assert_allclose(gnorm, abs(_AC_FP_CLAMP) * 2.0 * s_n,
+                                   rtol=1e-9, atol=1e-12,
+                                   err_msg=f"clamped f' at u={u}")
+        # f'' via the assembled GN outer product: max-eig = f''·4·(1−c²).
+        np.testing.assert_allclose(_ac_qblock_maxeig(sat, lxx_gn),
+                                   _AC_FPP_CLAMP * 4.0 * (1.0 - c_n * c_n),
+                                   rtol=1e-9, atol=1e-12,
+                                   err_msg=f"clamped f'' at u={u}")
+        assert np.isfinite(cost) and np.isfinite(lx).all()
+        assert np.isfinite(lxx_gn).all() and np.isfinite(lxx_fn).all()
+        costs.append(cost)
+    # Monotone: f strictly increases as c decreases toward the antipode,
+    # including across the seam from the exact side.
+    _, cost_above, _, _, _ = _ac_probe(sat, -1.0 + 2e-6)
+    assert cost_above < costs[0]
+    for a, b in zip(costs, costs[1:]):
+        assert a < b, "clamped f must stay strictly increasing toward c = −1"
+
+
+def test_afc3_antipode_assembled_gn_bound_and_gradient():
+    """(3) Assembled check: GN q-block max-eig at θ = 179.999° is ≤ the
+    documented bound ≈ 8885.8·weight (measured ~7.2e5·weight unclamped), and
+    the escape gradient at θ = 179.9° (outside the micro-clamp) is the
+    unchanged ≈ 2θ ≈ 2π."""
+    sat = _make_satellite()
+    QI = saltro.Satellite.QUAT_INDEX
+    # θ = 179.999° (u ≈ 1.5e-10, deep inside the clamp).
+    theta = np.deg2rad(179.999)
+    c_n, cost, lx, lxx_gn, lxx_fn = _ac_probe(sat, np.cos(theta))
+    gmax = _ac_qblock_maxeig(sat, lxx_gn)
+    assert 0.0 < gmax <= _AC_GN_EIG_BOUND * (1.0 + 1e-9), \
+        f"GN max-eig {gmax} exceeds documented clamp bound {_AC_GN_EIG_BOUND}"
+    assert np.isfinite(lxx_fn).all()
+    # The bound holds across the whole antipodal approach (grow-then-fall-off
+    # of the assembled GN curvature, peak at the seam).
+    for theta_deg in np.linspace(179.0, 180.0, 41):
+        _, _, _, lxx_gn_i, _ = _ac_probe(sat, np.cos(np.deg2rad(theta_deg)))
+        assert _ac_qblock_maxeig(sat, lxx_gn_i) <= _AC_GN_EIG_BOUND * (1.0 + 1e-9)
+    # θ = 179.9° (u ≈ 1.52e-6 > 1e-6: outside the clamp): |g| = 2θ unchanged.
+    theta9 = np.deg2rad(179.9)
+    c_n9, _, lx9, _, _ = _ac_probe(sat, np.cos(theta9))
+    gnorm9 = np.linalg.norm(lx9[QI:QI + 4])
+    np.testing.assert_allclose(gnorm9, 2.0 * np.arccos(c_n9), rtol=1e-9,
+                               err_msg="antipode-escape gradient must be "
+                                       "unchanged outside the clamp")
+
+
+def test_afc3_antipode_fd_consistency_above_seam():
+    """(4) FD-consistency of f' (= df/dc) vs f just above the seam, and slope
+    continuity across the seam (the linear extension starts at exactly the
+    seam slope)."""
+    sat = _make_satellite()
+    QI = saltro.Satellite.QUAT_INDEX
+    # Just above the seam: central FD of the cost in c vs assembled f'.
+    c0 = -1.0 + 2e-6
+    delta = 1e-9
+    _, f_p, _, _, _ = _ac_probe(sat, c0 + delta)
+    _, f_m, _, _, _ = _ac_probe(sat, c0 - delta)
+    fp_fd = (f_p - f_m) / (2.0 * delta)
+    c_n0, _, lx0, _, _ = _ac_probe(sat, c0)
+    s_n0 = np.sqrt(1.0 - c_n0 * c_n0)
+    fp_ana = -np.linalg.norm(lx0[QI:QI + 4]) / (2.0 * s_n0)  # f' < 0 here
+    np.testing.assert_allclose(fp_ana, fp_fd, rtol=1e-4,
+                               err_msg="f' vs FD(f) just above the seam")
+    # Across the seam: FD slope ≈ f'_clamp (C¹ in f/f' by construction).
+    _, f_sp, _, _, _ = _ac_probe(sat, _AC_C_EFF + delta)
+    _, f_sm, _, _, _ = _ac_probe(sat, _AC_C_EFF - delta)
+    fp_seam_fd = (f_sp - f_sm) / (2.0 * delta)
+    np.testing.assert_allclose(fp_seam_fd, _AC_FP_CLAMP, rtol=1e-2,
+                               err_msg="slope continuity across the clamp seam")

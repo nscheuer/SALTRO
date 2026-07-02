@@ -2253,10 +2253,18 @@ TEST_CASE_METHOD(SatelliteCostFixture,
 }
 
 TEST_CASE_METHOD(SatelliteCostFixture,
-    "Type-3 antipode genuine divergence: GN max-eig +1/sinθ, full-Newton min-eig -1/sinθ",
-    "[hessians][singularity][type3][antipode][genuine]") {
-    // KNOWN-GENUINE cusp on the cost surface (not a bug): assert correct sign
-    // and ~1/sinθ scaling rather than boundedness.
+    "Type-3 antipode divergence clamped: grow then saturate at the clamp bound",
+    "[hessians][singularity][type3][antipode][clamp]") {
+    // GENUINE cusp on the cost surface, now handled by the bounded antipodal
+    // clamp (u = 1+c < 1e-6 evaluates the exact formula at the seam
+    // c_eff = −1 + 1e-6; see angCostShape in src/pybind/satellite.cpp).
+    // Eigenvalues GROW with ~1/sinθ scaling while the exact formula is in
+    // effect, then SATURATE at the documented clamp bounds:
+    //   GN max-eig ≤ f''_clamp·4·(1−c_eff²) ≈ +8885.76·w (peak at the seam,
+    //     then falls off as f''_clamp·4·(1−c²) with the frozen curvature);
+    //   FN min-eig saturates at ≈ 4·f'_clamp ≈ −8881.77·w.
+    // δ maps to u = 1−cos(δ) ≈ δ²/2: δ=1e-2 → u=5e-5 (exact region),
+    // δ=1e-3/1e-4/1e-5 → u=5e-7/5e-9/5e-11 (inside the clamp).
     const int QI = Satellite::QUAT_INDEX;
     Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
     x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
@@ -2264,6 +2272,16 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     const Eigen::Vector3d bs(0, 0, 1);
     const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
     const Eigen::Matrix4d P = tangentProjIdentity();
+
+    constexpr double kClampU = 1e-6;
+    const double c_eff = -1.0 + kClampU;
+    const double omc2_eff = 1.0 - c_eff * c_eff;
+    const double phi_eff = std::acos(c_eff);
+    const double fp_clamp = -phi_eff / std::sqrt(omc2_eff);        // ≈ −2220.44
+    const double fpp_clamp =
+        1.0 / omc2_eff - phi_eff * c_eff / (omc2_eff * std::sqrt(omc2_eff));
+    const double gn_bound = fpp_clamp * 4.0 * omc2_eff;            // ≈ +8885.76
+    const double fn_saturation = 4.0 * fp_clamp;                   // ≈ −8881.77
 
     double prev_gn = 0.0, prev_fn = 0.0;
     for (double delta : {1e-2, 1e-3, 1e-4, 1e-5}) {
@@ -2278,13 +2296,26 @@ TEST_CASE_METHOD(SatelliteCostFixture,
 
         REQUIRE(gmax > 0.0);                 // GN max-eig positive
         REQUIRE(fmin < 0.0);                 // full-Newton min-eig negative
-        REQUIRE(gmax > prev_gn);             // monotonically growing
-        REQUIRE(fmin < prev_fn);             // monotonically growing (negative)
-        // ~1/sinθ: eig·sin(δ) bounded (empirically |·| ≈ 4π ≈ 12.57).
-        REQUIRE(gmax * std::sin(delta) > 1.0);
-        REQUIRE(gmax * std::sin(delta) < 100.0);
-        REQUIRE(fmin * std::sin(delta) < -1.0);
-        REQUIRE(fmin * std::sin(delta) > -100.0);
+        // The structural clamp bounds hold everywhere on the approach.
+        REQUIRE(gmax <= gn_bound * (1.0 + 1e-9));
+        REQUIRE(fmin >= fn_saturation * 1.01);
+        if (1.0 - std::cos(delta) >= kClampU) {
+            // Exact region: monotone growth with ~1/sinθ scaling
+            // (empirically eig·sin(δ) ≈ ±4π ≈ ±12.57).
+            REQUIRE(gmax > prev_gn);
+            REQUIRE(fmin < prev_fn);
+            REQUIRE(gmax * std::sin(delta) > 1.0);
+            REQUIRE(gmax * std::sin(delta) < 100.0);
+            REQUIRE(fmin * std::sin(delta) < -1.0);
+            REQUIRE(fmin * std::sin(delta) > -100.0);
+        } else {
+            // Clamped region: FN min-eig saturates at ≈ 4·f'_clamp; the GN
+            // outer product decays as f''_clamp·4·(1−c²) (frozen f'').
+            REQUIRE_THAT(fmin, Catch::Matchers::WithinRel(fn_saturation, 1e-2));
+            const double c_here = std::cos(theta);
+            REQUIRE_THAT(gmax, Catch::Matchers::WithinRel(
+                fpp_clamp * 4.0 * (1.0 - c_here * c_here), 1e-6));
+        }
         prev_gn = gmax; prev_fn = fmin;
     }
 }
@@ -2410,4 +2441,169 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     REQUIRE_THAT(g_plus(QI + 1), Catch::Matchers::WithinRel(-g_minus(QI + 1), 1e-4));
     // d=0 resolves to the +hemisphere convention.
     REQUIRE((g0(QI + 1) > 0.0) == (g_plus(QI + 1) > 0.0));
+}
+
+// ============================================================================
+// TEST SECTION 12: afc=3 bounded antipodal clamp at c = −1
+// ============================================================================
+// C++ twin of the test_afc3_antipode_* tests in
+// tests/unit/pybind/test_satellite_cost_omega_ff.py.  The c = −1 cusp of
+// ½·acos²(c) is GENUINE (Puiseux: φ = π − √(2u)·(1 + u/12 + …), u = 1+c), so
+// it cannot be Taylor-removed like the c = +1 side.  Instead the shape clamps
+// below u < 1e-6: (f', f'') are the exact-formula pair evaluated at the seam
+// c_eff = −1 + 1e-6 and the value is extended linearly, keeping f strictly
+// increasing toward the antipode.  Documented bounds (weight = 1):
+//   |f'| ≤ 2220.442…,  f'' ≤ 1.110720…e9,
+//   assembled GN q-block max-eig ≤ f''·4·(1−c_eff²) ≈ 8885.76.
+
+namespace {
+
+constexpr double kAcClampU = 1e-6;
+const double kAcCEff = -1.0 + kAcClampU;
+const double kAcOmc2Eff = 1.0 - kAcCEff * kAcCEff;   // = 2·u_eff − u_eff²
+const double kAcSEff = std::sqrt(kAcOmc2Eff);
+const double kAcPhiEff = std::acos(kAcCEff);         // ≈ π − √(2e-6)
+const double kAcFpClamp = -kAcPhiEff / kAcSEff;      // ≈ −2220.442
+const double kAcFppClamp =
+    1.0 / kAcOmc2Eff - kAcPhiEff * kAcCEff / (kAcOmc2Eff * kAcSEff);  // ≈ 1.1107e9
+const double kAcGnEigBound = kAcFppClamp * 4.0 * kAcOmc2Eff;          // ≈ 8885.76
+
+struct AcProbe {
+    double c_n;        // cosine after the code's target normalization
+    double cost;
+    Eigen::Vector4d gq;                 // q-block gradient
+    Eigen::Matrix4d Hq_gn, Hq_fn;       // projected q-block Hessians
+};
+
+// Vec-mode probe at cosine c: boresight +z, target in the x-z plane; weight 1.
+AcProbe acProbe(const Satellite& sat, double c) {
+    const int QI = Satellite::QUAT_INDEX;
+    const double s = std::sqrt(std::max(1.0 - c * c, 0.0));
+    Eigen::Vector3d r(s, 0.0, c);
+    const double c_n = r.normalized()(2);  // replicate the code's .normalized()
+    const Eigen::Vector4d tgt(std::nan(""), r(0), r(1), r(2));
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x(QI) = 1.0;
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    const Eigen::Matrix4d P = tangentProjIdentity();
+
+    AcProbe p;
+    p.c_n = c_n;
+    p.cost = sat.stageCost(0, 100, x, u, bs, tgt, B0, sweepCfg(3, false));
+    auto [lx, lu, lux] =
+        sat.stageCostJacobians(0, 100, x, u, bs, tgt, B0, sweepCfg(3, false));
+    p.gq = lx.segment<4>(QI);
+    auto [lxxG, luuG, luxG] =
+        sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, sweepCfg(3, true));
+    auto [lxxF, luuF, luxF] =
+        sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, sweepCfg(3, false));
+    p.Hq_gn = P * lxxG.block<4, 4>(QI, QI) * P;
+    p.Hq_fn = P * lxxF.block<4, 4>(QI, QI) * P;
+    return p;
+}
+
+double acMaxEig(const Eigen::Matrix4d& H) {
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> es(H);
+    return es.eigenvalues().maxCoeff();
+}
+
+}  // namespace
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc3 antipode exact formula in effect above the clamp",
+    "[cost][afc3][antipode][clamp]") {
+    // (1) Above the clamp (u = 1+c ≥ 1e-6) the raw exact formula is in
+    // effect: cost equals ½·acos²(c) with no clamping.
+    for (double uu : {2e-6, 1e-5, 1e-4, 1e-2, 0.5}) {
+        const AcProbe p = acProbe(sat, -1.0 + uu);
+        const double phi = std::acos(p.c_n);
+        REQUIRE_THAT(p.cost, Catch::Matchers::WithinRel(0.5 * phi * phi, 1e-14));
+        REQUIRE(p.gq.allFinite());
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc3 antipode clamped derivatives and monotone linear extension below u=1e-6",
+    "[cost][jacobians][hessians][afc3][antipode][clamp]") {
+    // (2) Below the clamp: f' and f'' equal the documented seam values, the
+    // value is the linear extension (still strictly monotone toward c = −1),
+    // and everything is finite.
+    std::vector<double> costs;
+    for (double uu : {9.9e-7, 1e-7, 1e-9, 1e-12, 0.0}) {
+        const AcProbe p = acProbe(sat, -1.0 + uu);
+        // Value: linear extension f = f(c_eff) + f'_clamp·(c − c_eff).
+        const double expected =
+            0.5 * kAcPhiEff * kAcPhiEff + kAcFpClamp * (p.c_n - kAcCEff);
+        REQUIRE_THAT(p.cost, Catch::Matchers::WithinRel(expected, 1e-12));
+        // f' via the assembled gradient: |g_q| = |f'|·|∂c/∂θ| = |f'|·2·sinθ.
+        const double s_n = std::sqrt(std::max(1.0 - p.c_n * p.c_n, 0.0));
+        REQUIRE_THAT(p.gq.norm(),
+                     Catch::Matchers::WithinRel(-kAcFpClamp * 2.0 * s_n, 1e-9) ||
+                     Catch::Matchers::WithinAbs(0.0, 1e-12));
+        // f'' via the assembled GN outer product: max-eig = f''·4·(1−c²).
+        REQUIRE_THAT(acMaxEig(p.Hq_gn),
+                     Catch::Matchers::WithinRel(
+                         kAcFppClamp * 4.0 * (1.0 - p.c_n * p.c_n), 1e-9) ||
+                     Catch::Matchers::WithinAbs(0.0, 1e-12));
+        REQUIRE(std::isfinite(p.cost));
+        REQUIRE(p.gq.allFinite());
+        REQUIRE(p.Hq_gn.allFinite());
+        REQUIRE(p.Hq_fn.allFinite());
+        costs.push_back(p.cost);
+    }
+    // Monotone: f strictly increases as c decreases toward the antipode,
+    // including across the seam from the exact side.
+    const AcProbe above = acProbe(sat, -1.0 + 2e-6);
+    REQUIRE(above.cost < costs.front());
+    for (size_t i = 1; i < costs.size(); ++i) REQUIRE(costs[i - 1] < costs[i]);
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc3 antipode assembled GN bound at 179.999 deg, escape gradient unchanged at 179.9 deg",
+    "[hessians][jacobians][afc3][antipode][clamp]") {
+    // (3) Assembled check: GN q-block max-eig at θ = 179.999° is ≤ the
+    // documented bound ≈ 8885.8·weight (measured ~7.2e5·weight unclamped);
+    // the escape gradient at θ = 179.9° (outside the micro-clamp) is the
+    // unchanged ≈ 2θ ≈ 2π.
+    const double theta = 179.999 * kPiSweep / 180.0;
+    const AcProbe p = acProbe(sat, std::cos(theta));
+    const double gmax = acMaxEig(p.Hq_gn);
+    REQUIRE(gmax > 0.0);
+    REQUIRE(gmax <= kAcGnEigBound * (1.0 + 1e-9));
+    REQUIRE(p.Hq_fn.allFinite());
+    // The bound holds across the whole antipodal approach (grow-then-fall-off
+    // of the assembled GN curvature, peak at the seam θ ≈ 179.919°).
+    for (int i = 0; i <= 40; ++i) {
+        const double td = 179.0 + i * (1.0 / 40.0);
+        const AcProbe pi = acProbe(sat, std::cos(td * kPiSweep / 180.0));
+        REQUIRE(acMaxEig(pi.Hq_gn) <= kAcGnEigBound * (1.0 + 1e-9));
+    }
+    // θ = 179.9° (u ≈ 1.52e-6 > 1e-6: outside the clamp): |g| = 2θ unchanged.
+    const AcProbe p9 = acProbe(sat, std::cos(179.9 * kPiSweep / 180.0));
+    REQUIRE_THAT(p9.gq.norm(),
+                 Catch::Matchers::WithinRel(2.0 * std::acos(p9.c_n), 1e-9));
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc3 antipode FD consistency of f-prime just above and across the seam",
+    "[cost][jacobians][afc3][antipode][clamp][finite-diff]") {
+    // (4) FD-consistency of f' (= df/dc) vs f just above the seam, and slope
+    // continuity across the seam (the linear extension starts at exactly the
+    // seam slope — f and f' are continuous by construction).
+    const double c0 = -1.0 + 2e-6;
+    const double delta = 1e-9;
+    const double fp_fd =
+        (acProbe(sat, c0 + delta).cost - acProbe(sat, c0 - delta).cost) /
+        (2.0 * delta);
+    const AcProbe p0 = acProbe(sat, c0);
+    const double s_n0 = std::sqrt(1.0 - p0.c_n * p0.c_n);
+    const double fp_ana = -p0.gq.norm() / (2.0 * s_n0);  // f' < 0 here
+    REQUIRE_THAT(fp_ana, Catch::Matchers::WithinRel(fp_fd, 1e-4));
+    // Across the seam: FD slope ≈ f'_clamp (C¹ in f/f' by construction).
+    const double fp_seam_fd =
+        (acProbe(sat, kAcCEff + delta).cost - acProbe(sat, kAcCEff - delta).cost) /
+        (2.0 * delta);
+    REQUIRE_THAT(fp_seam_fd, Catch::Matchers::WithinRel(kAcFpClamp, 1e-2));
 }

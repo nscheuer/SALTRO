@@ -1816,20 +1816,33 @@ class TestSingularitySweep:
             assert np.isfinite(c) and np.isfinite(lx).all() and np.isfinite(lxx).all(), \
                 f"non-finite at antipode act={act} gn={gn} δ={delta}"
 
-    def test_type3_antipode_genuine_divergence(self, fixture):
-        """(b) KNOWN-GENUINE divergence for type 3 at the vec antipode.  This is
-        a real cusp on the cost surface, not a bug — so instead of boundedness
-        we assert the correct SIGN and ~1/sinθ SCALING:
-          - Gauss-Newton max-eig grows POSITIVE and monotonically (f''·dc·dcᵀ,
-            f'' = ½·acos²'' → +∞ like +1/sinθ).
-          - full-Newton min-eig grows NEGATIVE and monotonically (the f'·∂²c
-            manifold-curvature term dominates → −1/sinθ).
-        The product eig·sin(δ) stays within a bounded band (empirically ≈ ±4π),
-        confirming the rate is exactly 1/sinθ and no faster."""
+    def test_type3_antipode_divergence_clamped(self, fixture):
+        """(b) Type 3 at the vec antipode: a GENUINE cusp on the cost surface,
+        now handled by the bounded antipodal clamp (below u = 1+c < 1e-6 the
+        shape evaluates the exact formula at the seam c_eff = −1 + 1e-6; see
+        angCostShape in src/pybind/satellite.cpp).  Instead of unbounded
+        ~1/sinθ divergence, the eigenvalues GROW while the exact formula is in
+        effect, then SATURATE at the documented clamp bounds:
+          - Gauss-Newton max-eig grows like +1/sinθ, peaks at the seam
+            (≤ f''_clamp·4·(1−c_eff²) ≈ 8885.8·w), then falls off as
+            f''_clamp·4·(1−c²) with the frozen seam curvature.
+          - full-Newton min-eig grows like −1/sinθ, then saturates at
+            ≈ 4·f'_clamp ≈ −8881.8·w (the f'·∂²c term with clamped f').
+        δ ∈ _SW_BOUNDARY maps to u = 1−cos(δ) ≈ δ²/2: δ=1e-2 → u=5e-5 (exact
+        region), δ=1e-3/1e-4/1e-5 → u=5e-7/5e-9/5e-11 (inside the clamp)."""
         sat = fixture.sat
         x = _sw_base_state(sat)
         q = x[sat.QUAT_INDEX:sat.QUAT_INDEX + 4]
         P = np.eye(4) - np.outer(q, q)
+        clamp_u = 1e-6
+        c_eff = -1.0 + clamp_u
+        omc2_eff = 1.0 - c_eff * c_eff
+        phi_eff = _math.acos(c_eff)
+        fp_clamp = -phi_eff / _math.sqrt(omc2_eff)                 # ≈ −2220.44
+        fpp_clamp = (1.0 / omc2_eff
+                     - phi_eff * c_eff / (omc2_eff * _math.sqrt(omc2_eff)))
+        gn_bound = fpp_clamp * 4.0 * omc2_eff                      # ≈ +8885.76
+        fn_saturation = 4.0 * fp_clamp                             # ≈ −8881.77
         prev_gn = 0.0
         prev_fn = 0.0
         for delta in _SW_BOUNDARY:
@@ -1847,13 +1860,30 @@ class TestSingularitySweep:
             fmin = eig_fn.min()
             assert gmax > 0.0, f"GN max-eig should be positive, got {gmax} at δ={delta}"
             assert fmin < 0.0, f"FN min-eig should be negative, got {fmin} at δ={delta}"
-            assert gmax > prev_gn, f"GN max-eig not growing: {gmax} <= {prev_gn}"
-            assert fmin < prev_fn, f"FN min-eig not growing (−): {fmin} >= {prev_fn}"
-            # ~1/sinθ scaling: eig·sin(δ) bounded (empirically |·| ≈ 4π ≈ 12.57).
-            assert 1.0 < gmax * _math.sin(delta) < 100.0, \
-                f"GN scaling off: {gmax * _math.sin(delta)} at δ={delta}"
-            assert -100.0 < fmin * _math.sin(delta) < -1.0, \
-                f"FN scaling off: {fmin * _math.sin(delta)} at δ={delta}"
+            # The structural clamp bounds hold everywhere on the approach.
+            assert gmax <= gn_bound * (1.0 + 1e-9), \
+                f"GN max-eig above clamp bound: {gmax} > {gn_bound} at δ={delta}"
+            assert fmin >= fn_saturation * 1.01, \
+                f"FN min-eig below clamp saturation: {fmin} at δ={delta}"
+            if 1.0 - _math.cos(delta) >= clamp_u:
+                # Exact region: monotone growth with ~1/sinθ scaling
+                # (empirically eig·sin(δ) ≈ ±4π ≈ ±12.57).
+                assert gmax > prev_gn, f"GN max-eig not growing: {gmax} <= {prev_gn}"
+                assert fmin < prev_fn, f"FN min-eig not growing (−): {fmin} >= {prev_fn}"
+                assert 1.0 < gmax * _math.sin(delta) < 100.0, \
+                    f"GN scaling off: {gmax * _math.sin(delta)} at δ={delta}"
+                assert -100.0 < fmin * _math.sin(delta) < -1.0, \
+                    f"FN scaling off: {fmin * _math.sin(delta)} at δ={delta}"
+            else:
+                # Clamped region: FN min-eig saturates at ≈ 4·f'_clamp; the GN
+                # outer product decays as f''_clamp·4·(1−c²) (frozen f'').
+                np.testing.assert_allclose(
+                    fmin, fn_saturation, rtol=1e-2,
+                    err_msg=f"FN min-eig should saturate at 4·f'_clamp, δ={delta}")
+                c_here = _math.cos(theta)
+                np.testing.assert_allclose(
+                    gmax, fpp_clamp * 4.0 * (1.0 - c_here * c_here), rtol=1e-6,
+                    err_msg=f"GN max-eig should follow frozen-f'' decay, δ={delta}")
             prev_gn, prev_fn = gmax, fmin
 
     def test_type2_assembled_gradient_finite_both_poles(self, fixture):

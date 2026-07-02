@@ -1303,10 +1303,61 @@ namespace {
 // planner; it handles the catastrophic-cancellation regime where the exact
 // formula computes ∞ − ∞ in double precision.
 //
-// At c = −1, type 3 has a *genuine* cusp (acos(c)|_{c=−1} = π, not 0; the cost
-// gradient diverges as −π / √(1+c)).  Taylor protection cannot remove that —
-// it's a real non-smooth point on the cost surface, not a coordinate artifact.
-// Same for type 2 (acos) at both c = +1 and c = −1.
+// === Bounded antipodal clamp for type 3 at c = −1 ===============================
+//
+// At c = −1, type 3 has a *genuine* cusp (acos(c)|_{c=−1} = π, not 0).  With
+// u = 1 + c the Puiseux expansion is φ = acos(c) = π − √(2u)·(1 + u/12 + …),
+// so (in the df/dc sign convention used throughout this helper — f' < 0 means
+// "cost decreases as alignment c increases"):
+//
+//   f'(c)  = −φ/√(1−c²)                       = −π/√(2u) + 1 + O(√u) → −∞
+//   f''(c) = 1/(1−c²) − φ·c/[(1−c²)·√(1−c²)]  = π/(2√2·u^{3/2}) + O(u^{-1/2}) → +∞
+//
+// Unlike the c = +1 side this is NOT removable — but there is also NO
+// cancellation: the exact formula computes the divergence accurately all the
+// way down, and the code used to ride it to the omc2 ≥ 1e-12 floor
+// (f' ~ −3e6, f'' ~ 3e18 — absurdly stiff for the solver).  Taylor protection
+// cannot remove a genuine cusp, so instead we CLAMP: below u < kAntipodeClampU
+// the exact formula is evaluated at the seam u_eff = kAntipodeClampU
+// (c_eff = −1 + u_eff), giving a self-consistent (f', f'') pair, and the value
+// is extended linearly, f(c) = f_exact(c_eff) + f'_clamp·(c − c_eff), so f
+// stays strictly monotone (increasing toward the antipode) and line-search
+// merit still discriminates direction inside the clamp.
+//
+// Continuity at the seam: f, f', f'' are all continuous by construction (the
+// clamped triple IS the exact triple at u_eff).  Inside the clamp, f' is the
+// exact derivative of the extended (linear) f; the returned f'' is the frozen
+// seam curvature — a GN stiffness surrogate, NOT the second derivative of the
+// extended f (which is 0).  That deliberate inconsistency keeps the GN outer
+// product PSD and "big but finite"; no blend zone is needed because nothing
+// the solver consumes jumps at the seam (C¹-exactness of the surrogate f''
+// w.r.t. the extended f is deliberately not pursued).
+//
+// Choice of kAntipodeClampU — target "solver-friendly large", f'' ∈ [1e6, 1e9]
+// (assembled GN q-block max-eig = f''·|∂c/∂θ|² with |∂c/∂θ|² = 4·(1−c²), so
+// the bound is f''·4·(2u_eff − u_eff²), attained at the seam):
+//
+//   u_eff  |  |f'|_max  |  f''_max   |  assembled GN max-eig (× weight)
+//   1e-5   |  7.02e2    |  3.51e7    |  2.8e3
+//   1e-6   |  2.22e3    |  1.11e9    |  8.9e3    ← chosen
+//   1e-7   |  7.02e3    |  3.51e10   |  2.8e4
+//
+// u_eff = 1e-6 keeps the shape exact to within 0.046° of the antipode
+// (θ_seam = π − √(2e-6) ≈ 179.919°) while capping the worst-case assembled
+// GN stiffness at ≈ 8.9e3·weight (measured ~7.2e5·weight at θ = 179.999°
+// before the clamp).  The assembled tangent gradient (≈ 2θ ≈ 2π near the
+// antipode) is untouched outside the micro-clamp region, so the
+// antipode-escape force is preserved; inside it the gradient shrinks as
+// |f'_clamp|·2·sinθ → 0 at the exact antipode (a stationary point by
+// symmetry — unavoidable).
+//
+// Composition note: the separate PR-in-flight feat/gn-curvature-cap adds a
+// CONFIGURABLE assembled-eigenvalue cap.  This clamp is STRUCTURAL (shape
+// level, always on) and bounds the worst case even with that knob off; they
+// compose — the knob can only lower the assembled curvature further.
+//
+// Type 2 (acos) keeps its genuine ±1 cusps unprotected (assembled gradient is
+// finite there by geometry cancellation; see the singularity-sweep tests).
 struct AngCostShape { double f, fp, fpp; };
 
 inline AngCostShape angCostShape3Taylor(double omz) {
@@ -1358,6 +1409,32 @@ AngCostShape angCostShape(double c, int type) {
             };
         }
         // else: fall through to the exact-formula switch below
+    }
+
+    // Bounded antipodal clamp at c = −1 for type 3 (see the block comment
+    // above `AngCostShape` for the derivation, the u_eff table, and the
+    // composition note vs the feat/gn-curvature-cap knob).  Bounds
+    // |f'| ≤ 2.22e3 and f'' ≤ 1.11e9 (assembled GN q-block ≤ 8.9e3·weight);
+    // the value is extended linearly so f stays strictly increasing toward
+    // the antipode.  Only type 3 and only the c < 0 hemisphere; quat mode
+    // never reaches this (d = |q_goal·q| ∈ [0, 1]).
+    constexpr double kAntipodeClampU = 1e-6;
+
+    if (type == 3 && c < -1.0 + kAntipodeClampU) {
+        // Exact formula at the seam c_eff = −1 + kAntipodeClampU: a
+        // self-consistent (f', f'') pair (no cancellation on this side, so
+        // the exact expressions are accurate at u_eff = 1e-6).
+        const double c_eff = -1.0 + kAntipodeClampU;
+        const double omc2_eff = 1.0 - c_eff * c_eff;   // = 2·u_eff − u_eff²
+        const double s_eff = std::sqrt(omc2_eff);
+        const double phi_eff = std::acos(c_eff);       // ≈ π − √(2·u_eff)
+        const double fp_eff = -phi_eff / s_eff;                          // ≈ −2.22e3
+        const double fpp_eff =
+            1.0 / omc2_eff - phi_eff * c_eff / (omc2_eff * s_eff);       // ≈ +1.11e9
+        // Linear value extension: f' here is df/dc (f'_clamp < 0 and
+        // c − c_eff < 0 inside the clamp, so f grows toward the antipode).
+        return { 0.5 * phi_eff * phi_eff + fp_eff * (c - c_eff),
+                 fp_eff, fpp_eff };
     }
 
     switch (type) {
