@@ -510,7 +510,7 @@ def test_invalid_cost_ang_cost_func_type_negative():
 
 
 def test_invalid_cost_ang_cost_func_type_removed_type_4():
-    """Removed cost.ang_cost_func_type=4 (was 1 - d^2) should fail"""
+    """Removed cost.ang_cost_func_type=4 (was (1-d)^2) should fail"""
     settings = valid_settings()
     settings.passes[0].cost.ang_cost_func_type = 4
     ok, error_msg = saltro_py.validatePlannerSettings(settings)

@@ -476,7 +476,7 @@ TEST_CASE("Invalid cost.ang_cost_func_type - negative", "[plannersettings][valid
 
 TEST_CASE("Invalid cost.ang_cost_func_type - removed type 4", "[plannersettings][validation][cost]") {
     PlannerSettings settings = validSettings();
-    settings.passes[0].cost.ang_cost_func_type = 4;  // removed (was 1 - d^2)
+    settings.passes[0].cost.ang_cost_func_type = 4;  // removed (was (1-d)^2)
     std::string error_msg;
 
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
