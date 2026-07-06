@@ -595,9 +595,30 @@ public:
      * @param cnst_cfg Constraint configuration.
      * @return Constraint violation vector.
      */
-    VecX constraints(int k, int N, const VecX& x, const VecX& u, 
+    VecX constraints(int k, int N, const VecX& x, const VecX& u,
                     const Vec3& sun_eci, const ConstraintConfig& cnst_cfg) const;
-    
+
+    /**
+     * @brief Map a constraint index to its physical-family ID for per-family AL bookkeeping.
+     *
+     * Returns a value of `ConstraintFamily` (cast to int). For terminal step
+     * (k == N-1), only ω-magnitude and sun constraints are present; for
+     * non-terminal steps, the full set including actuator and RW constraints.
+     *
+     * The mapping matches the layout used in `constraints()`:
+     *   idx 0:         AngularVelocity
+     *   idx 1:         SunAvoidance
+     *   non-terminal:
+     *     each MTQ:  2 constraints of MTQSaturation
+     *     each RW:   2 RWTorqueSat + 2 RWMomentum + 1 RWStiction
+     *     each Magic:2 MagicTorqueSat
+     *
+     * @param constraint_idx 0-based index into the constraint vector for this k
+     * @param is_terminal true if k == N-1 (only ω + sun constraints active)
+     * @return integer in [0, ConstraintFamily::NumFamilies); -1 if out of range
+     */
+    int constraintFamily(int constraint_idx, bool is_terminal) const;
+
     /**
      * @brief Compute constraint Jacobians.
      * 

@@ -98,17 +98,31 @@ bool alilqr(
 )
 {
     const auto& aug = settings.passes[pass_idx].auglag;
+    const int NUM_FAMILIES = static_cast<int>(ConstraintFamily::NumFamilies);
 
     auto c0 = collect_constraints(settings, satellite, X, U, S);
     std::vector<Eigen::VectorXd> lambda_aug;
     std::vector<Eigen::VectorXd> mu_aug;
+    std::vector<std::vector<int>> family_id;  // family_id[k][i] = family of constraint i at step k
+    const int N_steps = static_cast<int>(c0.size());
     lambda_aug.reserve(c0.size());
     mu_aug.reserve(c0.size());
+    family_id.reserve(c0.size());
 
     const double mu_init = aug.penalty_init / aug.penalty_scale;
-    for (const auto& c_k : c0) {
-        lambda_aug.push_back(Eigen::VectorXd::Constant(c_k.size(), aug.lag_mult_init));
-        mu_aug.push_back(Eigen::VectorXd::Constant(c_k.size(), mu_init));
+    for (int k = 0; k < N_steps; ++k) {
+        const auto& c_k = c0[static_cast<size_t>(k)];
+        const bool is_terminal = (k == N_steps - 1);
+        const int nc = static_cast<int>(c_k.size());
+
+        std::vector<int> fams(static_cast<size_t>(nc));
+        for (int i = 0; i < nc; ++i) {
+            fams[static_cast<size_t>(i)] = satellite.constraintFamily(i, is_terminal);
+        }
+
+        lambda_aug.push_back(Eigen::VectorXd::Constant(nc, aug.lag_mult_init));
+        mu_aug.push_back(Eigen::VectorXd::Constant(nc, mu_init));
+        family_id.push_back(std::move(fams));
     }
 
     for (int outer_iter = 0; outer_iter < aug.max_outer_iters; ++outer_iter) {
@@ -156,6 +170,23 @@ bool alilqr(
         }
 
         const auto c_list = collect_constraints(settings, satellite, X, U, S);
+
+        // Per-family max violation at this outer iter: violation telemetry
+        // substrate for the outer-loop diagnostics/gates (which constraint
+        // class is binding, which families never violate).
+        std::vector<double> max_c_family(static_cast<size_t>(NUM_FAMILIES), 0.0);
+        for (size_t k = 0; k < c_list.size(); ++k) {
+            const auto& c_k = c_list[k];
+            const auto& fams = family_id[k];
+            for (int i = 0; i < c_k.size(); ++i) {
+                const double v = std::max(0.0, c_k(i));
+                const int f = fams[static_cast<size_t>(i)];
+                if (f >= 0 && f < NUM_FAMILIES && v > max_c_family[static_cast<size_t>(f)]) {
+                    max_c_family[static_cast<size_t>(f)] = v;
+                }
+            }
+        }
+
         for (size_t k = 0; k < c_list.size(); ++k) {
             // Dual update uses the RAW signed constraint value so lambda can
             // decrease for satisfied constraints (proper dual evolution); the

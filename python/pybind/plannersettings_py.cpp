@@ -38,6 +38,23 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("rw_stic_torque_theta", &ConstraintConfig::rw_stic_torque_theta)
         .def_readwrite("rw_stic_band_mult", &ConstraintConfig::rw_stic_band_mult);
 
+    py::enum_<ConstraintFamily>(m, "ConstraintFamily", R"doc(
+Constraint families for per-family AL bookkeeping.
+
+Each row of Satellite.constraints() belongs to one family (see
+Satellite.constraintFamily). The AL outer loop tracks the maximum violation
+per family for diagnostics and gating. The C++ sentinel
+ConstraintFamily::NumFamilies (= 7) is intentionally not exposed as an
+enum value.
+)doc")
+        .value("angular_velocity", ConstraintFamily::AngularVelocity)
+        .value("sun_avoidance", ConstraintFamily::SunAvoidance)
+        .value("mtq_saturation", ConstraintFamily::MTQSaturation)
+        .value("rw_torque_sat", ConstraintFamily::RWTorqueSat)
+        .value("rw_momentum", ConstraintFamily::RWMomentum)
+        .value("rw_stiction", ConstraintFamily::RWStiction)
+        .value("magic_torque_sat", ConstraintFamily::MagicTorqueSat);
+
     py::class_<CostConfig>(m, "CostConfig")
         .def(py::init<>())
         .def_readwrite("angle", &CostConfig::angle)

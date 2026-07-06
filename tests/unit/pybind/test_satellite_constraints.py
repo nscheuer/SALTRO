@@ -1932,3 +1932,103 @@ def test_stiction_hessian_fd_at_nonzero_momentum():
                     f"trial {trial}, row {row}, j {j}: "
                     f"ana={ana:.4e}, fd={fd:.4e}, h={h}"
                 )
+
+
+# ============================================================================
+# SECTION — constraintFamily() row → family mapping
+# ============================================================================
+
+def test_constraint_family_enum_is_exposed_with_expected_values():
+    """ConstraintFamily must be bound and match the documented C++ numbering."""
+    fam = saltro_py.ConstraintFamily
+    assert int(fam.angular_velocity) == 0
+    assert int(fam.sun_avoidance) == 1
+    assert int(fam.mtq_saturation) == 2
+    assert int(fam.rw_torque_sat) == 3
+    assert int(fam.rw_momentum) == 4
+    assert int(fam.rw_stiction) == 5
+    assert int(fam.magic_torque_sat) == 6
+    # NumFamilies (=7) is a C++ sentinel, deliberately NOT exposed as a value.
+    assert len(fam.__members__) == 7
+    assert "NumFamilies" not in fam.__members__
+
+
+def test_constraint_family_mapping_3mtq_1rw():
+    """Every constraint row of a 3MTQ+1RW satellite maps to the documented family.
+
+    Layout: [wmax, sun, 2 per MTQ, (2 torque + 2 momentum + 1 stiction) per RW].
+    """
+    settings = saltro_py.PlannerSettings()
+    sat = saltro_py.Satellite(valid_inertia(), settings)
+    sat.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+    sat.addMTQ(np.array([0.0, 1.0, 0.0]), 0.2)
+    sat.addMTQ(np.array([0.0, 0.0, 1.0]), 0.2)
+    sat.addRW(np.array([0.0, 0.0, 1.0]), 0.001, 1e-5, 0.0, 0.01)
+
+    fam = saltro_py.ConstraintFamily
+    expected = (
+        [int(fam.angular_velocity), int(fam.sun_avoidance)]
+        + [int(fam.mtq_saturation)] * (2 * 3)
+        + [int(fam.rw_torque_sat)] * 2
+        + [int(fam.rw_momentum)] * 2
+        + [int(fam.rw_stiction)] * 1
+    )
+
+    # The mapping must cover exactly the rows constraints() actually emits.
+    N = 5
+    x = make_state(np.zeros(3), identity_quat(), np.zeros(1))
+    u = zero_control(sat.controlDim)
+    c = sat.constraints(0, N, x, u, sun_z(), default_cnst_cfg())
+    assert len(c) == len(expected)
+
+    actual = [sat.constraintFamily(i, False) for i in range(len(expected))]
+    assert actual == expected
+
+    # One past the end is out of range.
+    assert sat.constraintFamily(len(expected), False) == -1
+
+    # Terminal step: only the two state rows exist.
+    c_term = sat.constraints(N - 1, N, x, u, sun_z(), default_cnst_cfg())
+    assert len(c_term) == 2
+    assert sat.constraintFamily(0, True) == int(fam.angular_velocity)
+    assert sat.constraintFamily(1, True) == int(fam.sun_avoidance)
+    assert sat.constraintFamily(2, True) == -1
+
+
+def test_constraint_family_mapping_with_magic_actuators():
+    """Magic rows follow the RW block: [wmax, sun, 2/MTQ, 5/RW, 2/Magic]."""
+    settings = saltro_py.PlannerSettings()
+    sat = saltro_py.Satellite(valid_inertia(), settings)
+    sat.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+    sat.addRW(np.array([0.0, 1.0, 0.0]), 0.001, 1e-5, 0.0, 0.01)
+    sat.addMagic(np.array([0.0, 0.0, 1.0]), 0.005)
+    sat.addMagic(np.array([1.0, 0.0, 0.0]), 0.005)
+
+    fam = saltro_py.ConstraintFamily
+    expected = (
+        [int(fam.angular_velocity), int(fam.sun_avoidance)]
+        + [int(fam.mtq_saturation)] * (2 * 1)
+        + [int(fam.rw_torque_sat)] * 2
+        + [int(fam.rw_momentum)] * 2
+        + [int(fam.rw_stiction)] * 1
+        + [int(fam.magic_torque_sat)] * (2 * 2)
+    )
+
+    N = 5
+    x = make_state(np.zeros(3), identity_quat(), np.zeros(1))
+    u = zero_control(sat.controlDim)
+    c = sat.constraints(0, N, x, u, sun_z(), default_cnst_cfg())
+    assert len(c) == len(expected)
+
+    actual = [sat.constraintFamily(i, False) for i in range(len(expected))]
+    assert actual == expected
+
+    assert sat.constraintFamily(len(expected), False) == -1
+
+    # Terminal step still stops after the two state rows.
+    assert sat.constraintFamily(0, True) == int(fam.angular_velocity)
+    assert sat.constraintFamily(1, True) == int(fam.sun_avoidance)
+    assert sat.constraintFamily(2, True) == -1
+
+
+

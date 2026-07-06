@@ -4,6 +4,7 @@
 #include <saltro/pybind/disturbances/srpdisturbance.h>
 #include <saltro/math/integrators/rk4.h>
 
+#include <cassert>
 #include <stdexcept>
 #include <cmath>
 #include <algorithm>
@@ -2718,6 +2719,37 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     const int n_constraints = 1 + 1 + (has_control_constraints
                                            ? (2 * num_mtq_ + 5 * num_rw_ + 2 * num_magic_)
                                            : 0);
+#ifndef NDEBUG
+    // Debug-only consistency check: constraintFamily() must stay in sync with
+    // the row layout emitted below. If a future change reorders/adds constraint
+    // rows without updating constraintFamily(), per-family AL bookkeeping
+    // (violation telemetry, gate diagnostics) would silently be attributed to
+    // the wrong rows — fail loudly here in Debug builds instead. Zero-cost in
+    // Release (the whole block compiles away).
+    {
+        int family_counts[static_cast<int>(ConstraintFamily::NumFamilies)] = {0};
+        for (int ci = 0; ci < n_constraints; ++ci) {
+            const int fam = constraintFamily(ci, !has_control_constraints);
+            assert(fam >= 0 && fam < static_cast<int>(ConstraintFamily::NumFamilies) &&
+                   "constraintFamily() out of sync with constraints() row layout");
+            ++family_counts[fam];
+        }
+        assert(family_counts[static_cast<int>(ConstraintFamily::AngularVelocity)] == 1);
+        assert(family_counts[static_cast<int>(ConstraintFamily::SunAvoidance)] == 1);
+        assert(family_counts[static_cast<int>(ConstraintFamily::MTQSaturation)] ==
+               (has_control_constraints ? 2 * num_mtq_ : 0));
+        assert(family_counts[static_cast<int>(ConstraintFamily::RWTorqueSat)] ==
+               (has_control_constraints ? 2 * num_rw_ : 0));
+        assert(family_counts[static_cast<int>(ConstraintFamily::RWMomentum)] ==
+               (has_control_constraints ? 2 * num_rw_ : 0));
+        assert(family_counts[static_cast<int>(ConstraintFamily::RWStiction)] ==
+               (has_control_constraints ? num_rw_ : 0));
+        assert(family_counts[static_cast<int>(ConstraintFamily::MagicTorqueSat)] ==
+               (has_control_constraints ? 2 * num_magic_ : 0));
+        // One past the end must be flagged as out of range.
+        assert(constraintFamily(n_constraints, !has_control_constraints) == -1);
+    }
+#endif
     VecX c(n_constraints);
     c.setZero();
 
@@ -2809,6 +2841,39 @@ Satellite::VecX Satellite::constraints(int k, int N, const VecX& x, const VecX& 
     }
 
     return c;
+}
+
+int Satellite::constraintFamily(int constraint_idx, bool is_terminal) const {
+    // Mirrors the layout in Satellite::constraints().
+    // Always present (k=N-1 stops here):
+    if (constraint_idx == 0) return static_cast<int>(ConstraintFamily::AngularVelocity);
+    if (constraint_idx == 1) return static_cast<int>(ConstraintFamily::SunAvoidance);
+    if (is_terminal) return -1;
+
+    int idx = 2;
+    // MTQ saturation: 2 per MTQ (upper, lower)
+    if (constraint_idx < idx + 2 * num_mtq_) {
+        return static_cast<int>(ConstraintFamily::MTQSaturation);
+    }
+    idx += 2 * num_mtq_;
+
+    // RW block: per RW, 2 torque-sat + 2 momentum-bound + 1 stiction = 5 constraints
+    for (int i = 0; i < num_rw_; ++i) {
+        if (constraint_idx < idx + 2) return static_cast<int>(ConstraintFamily::RWTorqueSat);
+        idx += 2;
+        if (constraint_idx < idx + 2) return static_cast<int>(ConstraintFamily::RWMomentum);
+        idx += 2;
+        if (constraint_idx < idx + 1) return static_cast<int>(ConstraintFamily::RWStiction);
+        idx += 1;
+    }
+
+    // Magic actuator saturation: 2 per Magic
+    if (constraint_idx < idx + 2 * num_magic_) {
+        return static_cast<int>(ConstraintFamily::MagicTorqueSat);
+    }
+    idx += 2 * num_magic_;
+
+    return -1;  // out of range
 }
 
 std::tuple<Satellite::MatX, Satellite::MatX> Satellite::constraintJacobians(

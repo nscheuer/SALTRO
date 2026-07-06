@@ -401,6 +401,22 @@ struct CostConfig {
  * @param total_cost_tol Total cost convergence tolerance
  */
 
+/// Constraint families for per-family AL bookkeeping.
+/// Each constraint in `Satellite::constraints()` belongs to one family;
+/// the AL outer loop tracks the maximum violation per-family rather than
+/// per-(constraint, timestep) so that outer-loop diagnostics (and, later,
+/// gates) can distinguish which physical constraint class is binding.
+enum class ConstraintFamily : int {
+    AngularVelocity = 0,   ///< (|ω|² - ω_max²)/ω_max²  (vec-pointing: bound mostly for sensor/safety)
+    SunAvoidance    = 1,   ///< sun_body.x() - cos(sun_limit)
+    MTQSaturation   = 2,   ///< |u_mtq| - lim   (clipped physically anyway; AL just keeps optimizer honest)
+    RWTorqueSat     = 3,   ///< |u_rw| - tau_lim
+    RWMomentum      = 4,   ///< |h| - h_max  (the binding constraint for spinning maneuvers; needs tight enforcement)
+    RWStiction      = 5,   ///< stiction row (≤ 0 away from the floor by construction; vacuous family)
+    MagicTorqueSat  = 6,
+    NumFamilies     = 7,
+};
+
 struct AugLagConfig {
     int max_outer_iters = 30;
 
