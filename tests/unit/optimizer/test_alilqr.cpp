@@ -41,9 +41,8 @@ PlannerSettings createRWPlannerSettings(double dt_seconds) {
 	cost.magic_control_weight = 0.0;
 	cost.rw_AM_weight = 0.0;
 	cost.rw_stic_weight = 0.0;
-	cost.RWh_max_mult = 0.0;
 	cost.RWh_stiction_mult = 0.0;
-	cost.RWh_ok_mult = 0.0;
+	cost.RWh_knee_frac = 0.0;
 	cost.angle_N = 0.0;
 	cost.ang_vel_N = 0.0;
 	cost.ang_vel_mag_N = 0.0;
@@ -95,9 +94,8 @@ PlannerSettings createHybridPlannerSettings(double dt_seconds) {
 	cost.magic_control_weight = 0.0;
 	cost.rw_AM_weight = 0.0;
 	cost.rw_stic_weight = 0.0;
-	cost.RWh_max_mult = 0.0;
 	cost.RWh_stiction_mult = 0.0;
-	cost.RWh_ok_mult = 0.0;
+	cost.RWh_knee_frac = 0.0;
 	cost.angle_N = 1e2;
 	cost.ang_vel_N = 1e1;
 	cost.ang_vel_mag_N = 0.0;

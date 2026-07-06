@@ -88,8 +88,6 @@ public:
         cfg.rw_control_weight = 0.0;
         cfg.rw_AM_weight = 0.0;
         cfg.rw_stic_weight = 0.0;
-        cfg.RWh_max_mult = 1.0;
-        cfg.RWh_ok_mult = 0.0;
         cfg.RWh_stiction_mult = 0.0;
         cfg.use_cost_hess = use_hess;
         cfg.setTerminalEmphasis(1.0);

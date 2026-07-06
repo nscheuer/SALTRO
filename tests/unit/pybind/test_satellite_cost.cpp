@@ -421,6 +421,10 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Jacobian with different cost functi
     Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
     x.segment<3>(Satellite::AV_INDEX) << 0.05, 0.02, 0.01;
     x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(0.9, 0.1, 0.1, 0.4).normalized();
+    // Wheels off the h = 0 stiction kink: the one-sided FD there reads the
+    // downhill slope while the analytic subgradient at exactly h == 0 is 0 by
+    // contract (covered by its own test).
+    x.segment<3>(Satellite::RW_MOMENTUM_INDEX) << 0.003, -0.002, 0.001;
     
     Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
     
@@ -633,9 +637,9 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Hessian w.r.t. RW momentum",
     CostConfig cost_cfg;
     cost_cfg.rw_AM_weight = 1e4;
     cost_cfg.rw_stic_weight = 1.0;
-    cost_cfg.RWh_max_mult = 0.8;
+    cost_cfg.RWh_knee_frac = 0.8;
     cost_cfg.RWh_stiction_mult = 0.01;
-    cost_cfg.RWh_ok_mult = 0.5;
+    cost_cfg.RWh_desat_mult = 0.5;
     
     Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
     Eigen::Vector4d eci_target(1, 0, 0, 0);
@@ -757,8 +761,8 @@ TEST_CASE_METHOD(SatelliteCostFixture, "RW momentum penalty increases with momen
     
     CostConfig cost_cfg;
     cost_cfg.rw_AM_weight = 1e4;
-    cost_cfg.RWh_max_mult = 0.8;
-    cost_cfg.RWh_ok_mult = 0.5;
+    cost_cfg.RWh_knee_frac = 0.8;
+    cost_cfg.RWh_desat_mult = 0.5;
     
     Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
     Eigen::Vector4d eci_target(1, 0, 0, 0);
@@ -967,7 +971,8 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Jacobian near RW momentum saturatio
     
     CostConfig cost_cfg;
     cost_cfg.rw_AM_weight = 1e4;
-    cost_cfg.RWh_max_mult = 0.8;
+    cost_cfg.RWh_knee_frac = 0.8;
+    cost_cfg.RWh_desat_mult = 0.5;
     
     Eigen::Vector3d sat_direction = Eigen::Vector3d::Zero();
     Eigen::Vector4d eci_target(1, 0, 0, 0);
@@ -1865,8 +1870,6 @@ CostConfig afc3AngleOnlyCfg() {
     cfg.rw_control_weight = 0.0;
     cfg.rw_AM_weight = 0.0;
     cfg.rw_stic_weight = 0.0;
-    cfg.RWh_max_mult = 1.0;
-    cfg.RWh_ok_mult = 0.0;
     cfg.RWh_stiction_mult = 0.0;
     cfg.ang_cost_func_type = 3;
     cfg.use_cost_hess = true;
@@ -2073,7 +2076,6 @@ CostConfig sweepCfg(int act, bool gn) {
     cfg.control_mult = 0.0;
     cfg.mtq_control_weight = 0.0;    cfg.rw_control_weight = 0.0;
     cfg.rw_AM_weight = 0.0;          cfg.rw_stic_weight = 0.0;
-    cfg.RWh_max_mult = 1.0;          cfg.RWh_ok_mult = 0.0;
     cfg.RWh_stiction_mult = 0.0;
     cfg.use_cost_hess = true;
     cfg.ang_cost_func_type = act;
@@ -3015,4 +3017,165 @@ TEST_CASE_METHOD(SatelliteCostFixture,
         REQUIRE(qBlockMaxEig(lxx_u) < cap * weight);          // confirm below cap
         REQUIRE((lxx_u - lxx_c).cwiseAbs().maxCoeff() == 0.0);  // untouched
     }
+}
+
+// RW momentum soft-cost redesign: C1 knee + desat + stiction parking
+// (fixture wheels: h_max = 0.01)
+// ============================================================================
+
+namespace {
+CostConfig rwhOnlyCfg() {
+    CostConfig cfg;
+    cfg.angle = 0.0;
+    cfg.ang_vel = 0.0;
+    cfg.control_mult = 0.0;
+    cfg.rw_AM_weight = 1e4;
+    cfg.rw_stic_weight = 0.0;
+    cfg.RWh_knee_frac = 0.5;        // knee at 0.005
+    cfg.RWh_desat_mult = 0.5;
+    cfg.RWh_stiction_mult = 0.0;  // stiction off unless a test enables it
+    cfg.use_cost_hess = true;     // exercise the real state-Hessian block
+    return cfg;
+}
+}  // namespace
+
+TEST_CASE_METHOD(SatelliteCostFixture, "RW momentum cost: C1 continuity at the knee",
+                 "[cost][rw-momentum][c1]") {
+    const CostConfig cfg = rwhOnlyCfg();
+    const double knee = 0.5 * 0.01;
+    const Eigen::Vector3d sat_dir = Eigen::Vector3d::Zero();
+    const Eigen::Vector4d tgt(1, 0, 0, 0);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+
+    auto eval = [&](double h) {
+        Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+        x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+        x(Satellite::RW_MOMENTUM_INDEX) = h;
+        const double J = sat.stageCost(0, 10, x, u, sat_dir, tgt, B0, cfg);
+        auto [lx, lu, lux] = sat.stageCostJacobians(0, 10, x, u, sat_dir, tgt, B0, cfg);
+        return std::make_pair(J, lx(Satellite::RW_MOMENTUM_INDEX));
+    };
+
+    const double eps = 1e-9;
+    auto [J_lo, g_lo] = eval(knee - eps);
+    auto [J_hi, g_hi] = eval(knee + eps);
+    // Value continuous and gradient continuous across the knee (the steep term
+    // has zero value AND zero slope there).
+    REQUIRE_THAT(J_hi, Catch::Matchers::WithinAbs(J_lo, 1e-4 * (1.0 + std::abs(J_lo))));
+    REQUIRE_THAT(g_hi, Catch::Matchers::WithinAbs(g_lo, 1e-4 * (1.0 + std::abs(g_lo))));
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, "RW momentum cost: FD gradient and Hessian per regime",
+                 "[cost][rw-momentum][fd]") {
+    CostConfig cfg = rwhOnlyCfg();
+    cfg.rw_stic_weight = 50.0;
+    cfg.RWh_stiction_mult = 0.1;  // stiction band [0, 0.001)
+    const Eigen::Vector3d sat_dir = Eigen::Vector3d::Zero();
+    const Eigen::Vector4d tgt(1, 0, 0, 0);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+
+    // One probe per regime, away from all kinks (0, h_stic=0.001, knee=0.005).
+    for (double h0 : {0.0004, 0.003, 0.008, -0.003, -0.008}) {
+        Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+        x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+        x(Satellite::RW_MOMENTUM_INDEX) = h0;
+        const int h_idx = Satellite::RW_MOMENTUM_INDEX;
+        const double eps = 1e-8;
+
+        auto cost_at = [&](double h) {
+            Satellite::VecX xp = x;
+            xp(h_idx) = h;
+            return sat.stageCost(0, 10, xp, u, sat_dir, tgt, B0, cfg);
+        };
+        auto grad_at = [&](double h) {
+            Satellite::VecX xp = x;
+            xp(h_idx) = h;
+            auto [lx, lu, lux] = sat.stageCostJacobians(0, 10, xp, u, sat_dir, tgt, B0, cfg);
+            return lx(h_idx);
+        };
+
+        const double g_fd = (cost_at(h0 + eps) - cost_at(h0 - eps)) / (2.0 * eps);
+        const double g_an = grad_at(h0);
+        REQUIRE_THAT(g_an, Catch::Matchers::WithinAbs(g_fd, 1e-3 * (1.0 + std::abs(g_fd))));
+
+        const double H_fd = (grad_at(h0 + eps) - grad_at(h0 - eps)) / (2.0 * eps);
+        auto [lxx, luu, lux2] = sat.stageCostHessians(0, 10, x, u, sat_dir, tgt, B0, cfg);
+        REQUIRE_THAT(lxx(h_idx, h_idx), Catch::Matchers::WithinAbs(H_fd, 1e-3 * (1.0 + std::abs(H_fd))));
+        REQUIRE(lxx(h_idx, h_idx) >= 0.0);  // PSD by construction in every regime
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, "Stiction: subgradient at exactly h == 0 is zero",
+                 "[cost][rw-stiction][kink]") {
+    CostConfig cfg = rwhOnlyCfg();
+    cfg.rw_stic_weight = 100.0;
+    cfg.RWh_stiction_mult = 0.5;  // band [0, 0.005)
+    const Eigen::Vector3d sat_dir = Eigen::Vector3d::Zero();
+    const Eigen::Vector4d tgt(1, 0, 0, 0);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+    const int h_idx = Satellite::RW_MOMENTUM_INDEX;
+
+    auto [lx0, lu0, lux0] = sat.stageCostJacobians(0, 10, x, u, sat_dir, tgt, B0, cfg);
+    REQUIRE(lx0(h_idx) == 0.0);  // deterministic contract at the tent peak
+
+    // Just off zero the ramp pushes |h| outward: dJ/dh < 0 for small h > 0.
+    x(h_idx) = 1e-6;
+    auto [lxp, lup, luxp] = sat.stageCostJacobians(0, 10, x, u, sat_dir, tgt, B0, cfg);
+    REQUIRE(lxp(h_idx) < 0.0);
+    x(h_idx) = -1e-6;
+    auto [lxm, lum, luxm] = sat.stageCostJacobians(0, 10, x, u, sat_dir, tgt, B0, cfg);
+    REQUIRE(lxm(h_idx) > 0.0);
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, "Desat + stiction park the wheel at h* = h_stic/2",
+                 "[cost][rw-stiction][parking]") {
+    // Recipe: w_stic = rw_AM_weight * desat * (h_stic/h_max)^2 parks at h_stic/2.
+    CostConfig cfg = rwhOnlyCfg();             // rw_AM_weight=1e4, desat=0.5
+    cfg.RWh_stiction_mult = 0.5;               // h_stic = 0.005 (== knee; steep off below)
+    cfg.rw_stic_weight = 1e4 * 0.5 * 0.25;     // = 1250
+    const double h_star = 0.5 * 0.005;
+    const Eigen::Vector3d sat_dir = Eigen::Vector3d::Zero();
+    const Eigen::Vector4d tgt(1, 0, 0, 0);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const int h_idx = Satellite::RW_MOMENTUM_INDEX;
+
+    auto grad_at = [&](double h) {
+        Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+        x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+        x(h_idx) = h;
+        auto [lx, lu, lux] = sat.stageCostJacobians(0, 10, x, u, sat_dir, tgt, B0, cfg);
+        return lx(h_idx);
+    };
+
+    const double scale = 1e4 * 0.5 * h_star / (0.01 * 0.01);  // desat gradient magnitude at h*
+    REQUIRE_THAT(grad_at(h_star), Catch::Matchers::WithinAbs(0.0, 1e-6 * scale));
+    REQUIRE(grad_at(0.8 * h_star) < 0.0);  // below h*: pushed up toward h*
+    REQUIRE(grad_at(1.2 * h_star) > 0.0);  // above h*: pulled back toward h*
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture, "RW momentum cost: desat=0 leaves the sub-knee region free",
+                 "[cost][rw-momentum][regression]") {
+    CostConfig cfg = rwhOnlyCfg();
+    cfg.RWh_desat_mult = 0.0;
+    const Eigen::Vector3d sat_dir = Eigen::Vector3d::Zero();
+    const Eigen::Vector4d tgt(1, 0, 0, 0);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+
+    auto cost_at = [&](double h) {
+        Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+        x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1, 0, 0, 0);
+        x(Satellite::RW_MOMENTUM_INDEX) = h;
+        return sat.stageCost(0, 10, x, u, sat_dir, tgt, B0, cfg);
+    };
+
+    REQUIRE(cost_at(0.004) == cost_at(0.0));   // below the knee: exactly free
+    REQUIRE(cost_at(0.008) > cost_at(0.004));  // above the knee: steep term active
 }
