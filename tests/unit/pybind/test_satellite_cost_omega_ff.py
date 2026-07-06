@@ -297,10 +297,7 @@ def test_vec_ang_cost_grad_fd(act):
     cfg = _vec_only_cfg(act)
     grad_ana, _, _ = sat.stageCostJacobians(0, 100, x, u,
                                             _BORESIGHT, _TARGET_VEC, _B_ECI, cfg)
-    grad_fd = _fd_grad_x(sat, x, u, cfg, target=_TARGET_VEC)
-    q = x[3:7]
-    proj = np.eye(4) - np.outer(q, q)
-    grad_fd[3:7] = proj @ grad_fd[3:7]
+    grad_fd = _projected_qblock_fd_grad(sat, x, u, cfg, target=_TARGET_VEC)
     np.testing.assert_allclose(grad_ana[0:3], 0, atol=1e-10,
                                 err_msg=f"[act={act}] ω-grad nonzero (should be 0)")
     np.testing.assert_allclose(grad_ana[7:], 0, atol=1e-10,
