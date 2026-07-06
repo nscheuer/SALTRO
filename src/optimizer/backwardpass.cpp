@@ -306,10 +306,11 @@ bool backwardPass(
 		}
 		
 		// Optional PSD clamp on lxx (reg.psd_clamp_lxx): non-convex cost
-		// functions (e.g. ang_cost_func_type=2, raw acos, which is concave
-		// in d) can produce indefinite Hessians whose negative eigenvalues
-		// compound through the Riccati recursion, making P_k and then Q_uu
-		// indefinite.
+		// Hessians (historically ang_cost_func_type=2, raw acos, which was
+		// concave in d — now removed; but the exact vec-mode angle-cost
+		// Hessian with the Gauss-Newton flag off can still be indefinite) can
+		// produce indefinite lxx whose negative eigenvalues compound through
+		// the Riccati recursion, making P_k and then Q_uu indefinite.
 		//
 		// TESTING/DIAGNOSTIC aid only -- NOT recommended for production.
 		// Turning it on proves that an indefinite cost Hessian is the

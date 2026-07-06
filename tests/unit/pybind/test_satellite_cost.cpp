@@ -428,8 +428,8 @@ TEST_CASE_METHOD(SatelliteCostFixture, "Cost Jacobian with different cost functi
     Eigen::Vector4d eci_target(1, 0, 0, 0);
     Eigen::Vector3d B_eci = Eigen::Vector3d::Zero();
     
-    // Test different cost function types (implemented set: {0, 1, 2, 3})
-    for (int cost_type = 0; cost_type < 4; ++cost_type) {
+    // Test different cost function types (implemented set: {0, 1, 3})
+    for (int cost_type : {0, 1, 3}) {
         CostConfig cost_cfg;
         cost_cfg.ang_cost_func_type = cost_type;
         
@@ -2045,13 +2045,13 @@ TEST_CASE_METHOD(SatelliteCostFixture,
 // ============================================================================
 // C++ twin of TestSingularitySweep / TestHemisphereKink in
 // tests/unit/pybind/test_satellite_cost.py.  Property tests over the full
-// cost-shape grid: cost type ∈ {0,1,2,3} × mode ∈ {vec (NaN ECI target), quat}
+// cost-shape grid: cost type ∈ {0,1,3} × mode ∈ {vec (NaN ECI target), quat}
 // × Gauss-Newton flag ∈ {on, off}.  Base attitude is identity, so the tangent
 // projector is P = diag(0,1,1,1) and only q-components 1..3 carry signal.
 //
 // Coordinate conventions (physical angle θ):
 //   vec:  r̂ = [sinθ,0,cosθ], bs = +z  ⇒  c = cosθ; θ→0 aligned pole (c→+1),
-//         θ→π genuine antipodal cusp (c→−1) for the acos/acos² shapes (2/3).
+//         θ→π genuine antipodal cusp (c→−1) for the acos² shape (3).
 //   quat: q_goal = [cos(θ/2),sin(θ/2),0,0]  ⇒  d = cos(θ/2); θ→0 aligned pole
 //         (d→+1), θ→π gives d→0 (the |·| hemisphere kink), NOT the unreachable
 //         d = −1 shape antipode (hemisphere alignment keeps d ∈ [0,1]).
@@ -2147,7 +2147,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
         return (P * H * P).eval();
     };
 
-    for (int act = 0; act <= 3; ++act) {
+    for (int act : {0, 1, 3}) {
         for (bool quat_mode : {false, true}) {
             for (bool gn : {false, true}) {
                 const CostConfig cfg = sweepCfg(act, gn);
@@ -2173,12 +2173,12 @@ TEST_CASE_METHOD(SatelliteCostFixture,
                     }
 
                     // Skip Hessian-FD within 1e-3 rad of the antipode for the
-                    // acos/acos² shapes (vec types 2/3): the cost curvature radius
+                    // acos² shape (vec type 3): the cost curvature radius
                     // there shrinks below the FD step, so central differences stop
                     // tracking the correctly-diverging analytic Hessian.  (The
                     // dense grid never enters that band; guard documents intent.)
                     const bool near_antipode =
-                        (!quat_mode && (act == 2 || act == 3) &&
+                        (!quat_mode && act == 3 &&
                          std::abs(kPiSweep - theta) < 1e-3);
                     const Eigen::Matrix4d Hq = P * lxx.block<4, 4>(QI, QI) * P;
                     if (full_hess && !near_antipode) {
@@ -2194,10 +2194,9 @@ TEST_CASE_METHOD(SatelliteCostFixture,
                         std::sort(mags.data(), mags.data() + 4);
                         // Two tangent eigenvalues ≈ 0 ⇒ rank ≤ 1.
                         REQUIRE(mags(2) < 1e-6 + 1e-3 * mags(3));
-                        if (act != 2) {
-                            // f'' ≥ 0 for types 0/1/3 ⇒ PSD.
-                            REQUIRE(ev.minCoeff() > -1e-6);
-                        }
+                        // f'' ≥ 0 for types 0/1/3 ⇒ PSD.  (Type 2, whose
+                        // f'' changed sign at c = 0, was removed.)
+                        REQUIRE(ev.minCoeff() > -1e-6);
                     }
                 }
             }
@@ -2216,7 +2215,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
     const std::vector<double> boundary = {1e-2, 1e-3, 1e-4, 1e-5};
 
-    for (int act = 0; act <= 3; ++act) {
+    for (int act : {0, 1, 3}) {
         for (bool gn : {false, true}) {
             const CostConfig cfg = sweepCfg(act, gn);
 
@@ -2321,31 +2320,6 @@ TEST_CASE_METHOD(SatelliteCostFixture,
 }
 
 TEST_CASE_METHOD(SatelliteCostFixture,
-    "Type-2 assembled q-gradient stays finite at both poles (geometry cancellation)",
-    "[jacobians][singularity][type2]") {
-    // Type 2 (acos): raw ∂h/∂c = −1/√(1−c²) diverges at both poles, but ∂c/∂q →
-    // 0 at the same rate ⇒ assembled q-gradient stays finite (empirically
-    // |g_q| = 2 vec / ≈1 quat).  No divergence to report.
-    const int QI = Satellite::QUAT_INDEX;
-    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
-    x.segment<4>(QI) = Eigen::Vector4d(1, 0, 0, 0);
-    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
-    const Eigen::Vector3d bs(0, 0, 1);
-    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
-    const CostConfig cfg = sweepCfg(2, false);
-    const std::vector<double> boundary = {1e-2, 1e-3, 1e-4, 1e-5};
-
-    auto checkFinite = [&](const Eigen::Vector4d& tgt) {
-        auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, tgt, B0, cfg);
-        REQUIRE(lx.allFinite());
-        REQUIRE(lx.segment<4>(QI).norm() < 10.0);
-    };
-    for (double theta : boundary)  checkFinite(sweepTarget(false, theta));             // vec aligned
-    for (double delta : boundary)  checkFinite(sweepTarget(false, kPiSweep - delta));  // vec antipode
-    for (double theta : boundary)  checkFinite(sweepTarget(true,  theta));             // quat aligned
-}
-
-TEST_CASE_METHOD(SatelliteCostFixture,
     "Blend-zone continuity for type 3 across 1e-6 and 1e-4 edges",
     "[cost][jacobians][hessians][singularity][blend][type3]") {
     const int QI = Satellite::QUAT_INDEX;
@@ -2414,7 +2388,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
 
     const Eigen::Vector4d qg0(0.0, 1.0, 0.0, 0.0);  // orthogonal to identity ⇒ d = 0
-    for (int act = 0; act <= 3; ++act) {
+    for (int act : {0, 1, 3}) {
         const CostConfig cfg = sweepCfg(act, false);
         const double c = sat.stageCost(0, 100, x, u, bs, qg0, B0, cfg);
         auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, qg0, B0, cfg);

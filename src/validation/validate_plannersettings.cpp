@@ -162,13 +162,17 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
-            // Implemented set is {0,1,2,3}; anything else used to silently
-            // fall through to acos (type 2) in the cost switches — reject it
-            // here instead. Type 2 itself is deprecated (gradient blows up
-            // near alignment and it is concave); prefer type 3.
-            if (pass.cost.ang_cost_func_type < 0 || pass.cost.ang_cost_func_type > 3) {
-                error_msg = "cost.ang_cost_func_type invalid";
-                return false;
+            // Implemented set is {0,1,3}; anything else (including the removed
+            // types 2 (raw acos, concave + singular at both poles) and 4
+            // ((1-d)², = type 1 with a doubled weight)) is rejected here so it
+            // can't reach the cost switches' throwing default. Migrate type 2
+            // -> type 3 (Taylor-protected acos²) or type 0 (linear-in-d).
+            {
+                const int afc = pass.cost.ang_cost_func_type;
+                if (afc != 0 && afc != 1 && afc != 3) {
+                    error_msg = "cost.ang_cost_func_type invalid (implemented set {0,1,3})";
+                    return false;
+                }
             }
 
             // Validate augmented Lagrangian configuration

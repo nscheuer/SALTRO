@@ -121,9 +121,9 @@ def main():
                     help="body +x prop torque (N m). 4e-5 = paper default.")
     ap.add_argument("--tf", type=float, default=240.0)
     ap.add_argument("--dt", type=float, default=1.0)
-    ap.add_argument("--afc", type=int, default=1, choices=[0, 1, 2, 3],
+    ap.add_argument("--afc", type=int, default=1, choices=[0, 1, 3],
                     help="ang_cost_func_type. 1 + doubled weights = the paper's "
-                         "removed type 4.")
+                         "removed type 4. Type 2 (raw acos) also removed.")
     ap.add_argument("--angle", type=float, default=2e4)
     ap.add_argument("--angle-N", type=float, default=2e6)
     ap.add_argument("--no-gauss-newton", action="store_true")

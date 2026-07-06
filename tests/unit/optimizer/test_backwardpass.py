@@ -1425,8 +1425,18 @@ class TestBackwardPass:
             boresight_test[:, k] = np.array([1.0, 0.0, 0.0])
 
         # Quaternion attitude target 120 deg about x away from the (identity)
-        # state quaternion, so d = q_goal . q = 0.5 and the raw-acos shape
-        # (type 2) has strongly negative curvature f''(d) < 0.
+        # state quaternion, so d = q_goal . q = 0.5.
+        #
+        # NOTE: this scenario used ang_cost_func_type=2 (raw acos, f''(d) < 0)
+        # to manufacture a genuinely indefinite stage lxx. Type 2 has been
+        # removed, and none of the remaining quaternion-mode shapes {0,1,3} are
+        # concave in the aligned hemisphere, so the indefinite_cost branch now
+        # runs a well-conditioned (PSD) stage Hessian. The assertions here are
+        # finiteness-only, so they still pass and still exercise the
+        # psd_clamp_lxx code path; but this no longer proves the clamp rescues
+        # a truly indefinite lxx. (Follow-up: reconstruct genuine
+        # indefiniteness via the vector-pointing exact Hessian with
+        # cost_hess_gauss_newton = False.)
         attitude_target_test = np.array([0.5, np.sqrt(3.0) / 2.0, 0.0, 0.0])
         attitude_target_test_traj = make_attitude_traj(attitude_target_test, N_test)
 
@@ -1436,7 +1446,7 @@ class TestBackwardPass:
                 s.passes[0].reg.psd_clamp_lxx = flag_value
             if indefinite_cost:
                 s.passes[0].cost.use_cost_hess = True
-                s.passes[0].cost.ang_cost_func_type = 2  # raw acos: concave in d
+                s.passes[0].cost.ang_cost_func_type = 3  # was 2 (raw acos, concave); type 2 removed
                 s.passes[0].cost.angle = 1e5             # heavy stage angle weight
                 s.passes[0].cost.angle_N = 0.0           # keep terminal P_N PSD (clamp covers stage lxx only)
             return saltro_py.backward_pass(

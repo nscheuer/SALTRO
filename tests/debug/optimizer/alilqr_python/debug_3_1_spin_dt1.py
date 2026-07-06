@@ -88,7 +88,7 @@ def main():
     parser.add_argument("--prop", type=float, default=4.0e-5)
     parser.add_argument("--tf", type=float, default=240.0)
     parser.add_argument("--dt", type=float, default=1.0)
-    parser.add_argument("--afc", type=int, default=4, choices=[0, 1, 2, 3, 4])
+    parser.add_argument("--afc", type=int, default=1, choices=[0, 1, 3])
     parser.add_argument("--angle", type=float, default=1e4)
     parser.add_argument("--angle-N", type=float, default=1e6, dest="angle_N")
     parser.add_argument("--no-gauss-newton", action="store_true")

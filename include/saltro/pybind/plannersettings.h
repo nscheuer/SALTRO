@@ -162,8 +162,14 @@ struct ConstraintConfig {
  *        boresight-to-target angle):
  *        - 0: 1 - d            (linear)
  *        - 1: 0.5 * (1 - d)^2  (quadratic, convex)
- *        - 2: acos(d)          (raw angle)
- *        - 3: 0.5 * acos(d)^2  (squared angle)
+ *        - 3: 0.5 * acos(d)^2  (squared angle, Taylor-protected at d = +1)
+ *        Default is 3 (the preferred well-conditioned shape).
+ *        Type 2 (acos(d), raw angle) was REMOVED: it is concave (f'' < 0,
+ *        anti-PSD under Gauss-Newton) and has a genuine gradient singularity
+ *        at BOTH poles, including perfect alignment (f' = -1/sqrt(1-d^2) ->
+ *        -inf at d = +1, an unremovable singularity unlike type 3's). Migrate
+ *        to type 3 (same acos family, convex-usable and Taylor-protected at
+ *        the aligned pole) or type 0 for a linear-in-d cost.
  *        Type 4 ((1 - d)^2) was REMOVED: it is exactly type 1 with the
  *        constant 2 absorbed into the angle weight. Migrate by using type 1
  *        with doubled angle weights (2 * 0.5*(1-d)^2 == (1-d)^2).
@@ -236,7 +242,7 @@ struct CostConfig {
     double ang_vel_mag_N = 0.0;
     double ang_vel_err_dir_N = 0.0;
 
-    int ang_cost_func_type = 2;
+    int ang_cost_func_type = 3;
     bool use_cost_hess = false;
 
     /// Gauss-Newton mode for the angle-cost (q,q) Hessian block. When true,

@@ -414,8 +414,8 @@ class TestCostJacobians:
         eci_target = np.array([1.0, 0.0, 0.0, 0.0])
         B_eci = np.zeros(3)
         
-        # Test all 4 cost function types (0-3)
-        for cost_type in range(4):
+        # Test the implemented cost function types {0, 1, 3}
+        for cost_type in (0, 1, 3):
             cost_cfg = saltro.CostConfig()
             cost_cfg.ang_cost_func_type = cost_type
             
@@ -1602,6 +1602,32 @@ class TestECITargetDualFormat:
         assert np.isfinite(J_switched)
         assert J_switched > J_aligned
 
+# ============================================================================
+# TEST SECTION 12: Singularity sweep + hemisphere-kink coverage
+# ============================================================================
+# Property tests over the full cost-shape parameter grid:
+#   cost type ∈ {0,1,3} × mode ∈ {vec (NaN ECI target), quat} × GN ∈ {on,off}.
+# We probe the attitude cost h(argument) where the inner scalar is
+#   c = bs·R(q)ᵀ·r̂  (vec mode, 2-DOF, argument ∈ [-1, 1]), or
+#   d = |q_goal·q|   (quat mode, hemisphere-aligned, argument ∈ [0, 1]).
+# The base attitude is identity, so the tangent projector is P = diag(0,1,1,1)
+# and only the q-components 1..3 carry gradient/Hessian signal.
+#
+# Coordinate conventions used here (physical angle θ):
+#   vec:  r̂ = [sinθ, 0, cosθ] with bs = +z ⇒ c = cosθ; θ→0 aligned pole
+#         (c→+1), θ→π antipode (c→−1, a GENUINE cusp for type 3).
+#   quat: q_goal = [cos(θ/2), sin(θ/2), 0, 0] ⇒ d = cos(θ/2); θ→0 aligned pole
+#         (d→+1), θ→π gives d→0 — the |·| hemisphere kink, NOT the d=−1 shape
+#         antipode (which hemisphere alignment makes unreachable).
+#
+# GN semantics discovered empirically and encoded below:
+#   - GN=False returns the full (exact) Hessian ⇒ matches central-difference FD.
+#   - GN=True in VEC mode drops the f'·∂²c chain term (the Gauss-Newton
+#     approximation) ⇒ deliberately does NOT match FD; we assert the rank-1
+#     GN eigen-structure instead (PSD: f'' ≥ 0 for all remaining shapes).
+#   - GN flag is a NO-OP in QUAT mode (d is linear in q ⇒ no chain term to
+#     drop), so quat GN=True == quat GN=False == full Hessian ⇒ matches FD.
+
 import math as _math
 
 _SW_BS = np.array([0.0, 0.0, 1.0])
@@ -1698,7 +1724,7 @@ def _sw_qblock_ana(sat, x, target, cfg):
 class TestSingularitySweep:
     """Task 1: singularity sweep property tests across all cost shapes."""
 
-    @pytest.mark.parametrize("act", [0, 1, 2, 3])
+    @pytest.mark.parametrize("act", [0, 1, 3])
     @pytest.mark.parametrize("mode", ["vec", "quat"])
     @pytest.mark.parametrize("gn", [False, True])
     def test_dense_sweep_finite_and_fd_consistent(self, fixture, act, mode, gn):
@@ -1729,12 +1755,12 @@ class TestSingularitySweep:
                     f"grad[{j}] mode={mode} act={act} gn={gn} θ={td}: {gq[j]} vs {gfd[j]}"
 
             # Genuine-singular regions: skip Hessian-FD within 1e-3 rad of the
-            # antipode for the acos/acos² shapes (vec types 2/3), where the cost
+            # antipode for the acos² shape (vec type 3), where the cost
             # curvature radius shrinks below the FD step and central differences
             # stop tracking the (correctly diverging) analytic Hessian.  The
             # dense grid never actually enters that band (nearest is 179° ≈
             # 0.0175 rad away); the guard documents intent for completeness.
-            near_antipode = (mode == "vec" and act in (2, 3)
+            near_antipode = (mode == "vec" and act == 3
                              and abs(_math.pi - theta) < 1e-3)
             if full_hess and not near_antipode:
                 Hfd = _sw_qhess_fd(sat, x, tgt, cfg)
@@ -1746,17 +1772,15 @@ class TestSingularitySweep:
                 # GN=True vec mode: the GN Hessian is f''·(∂c/∂q)(∂c/∂q)ᵀ, a
                 # rank-1 form in the tangent block.  Assert the rank-1 structure
                 # (two tangent eigenvalues ≈ 0), and PSD for the f''≥0 shapes
-                # (types 0/1/3).  Type 2's f'' changes sign at c=0 (θ=90°), so
-                # its single nonzero eigenvalue flips sign along the sweep — no
-                # semidefiniteness assertion, only the rank-1 shape.
+                # (types 0/1/3; type 2, whose f'' changed sign at c=0, was
+                # removed).
                 eig = np.linalg.eigvalsh(Hq)
                 mags = np.sort(np.abs(eig))
                 assert mags[-2] < 1e-6 + 1e-3 * mags[-1], \
                     f"GN Hess not rank-1 act={act} θ={td}: eig={eig}"
-                if act in (0, 1, 3):
-                    assert eig.min() > -1e-6, f"GN type{act} not PSD θ={td}: {eig}"
+                assert eig.min() > -1e-6, f"GN type{act} not PSD θ={td}: {eig}"
 
-    @pytest.mark.parametrize("act", [0, 1, 2, 3])
+    @pytest.mark.parametrize("act", [0, 1, 3])
     @pytest.mark.parametrize("mode", ["vec", "quat"])
     @pytest.mark.parametrize("gn", [False, True])
     def test_boundary_approach_aligned_pole_finite(self, fixture, act, mode, gn):
@@ -1773,7 +1797,7 @@ class TestSingularitySweep:
             assert np.isfinite(c) and np.isfinite(lx).all() and np.isfinite(lxx).all(), \
                 f"non-finite at aligned pole mode={mode} act={act} gn={gn} θ={theta}"
 
-    @pytest.mark.parametrize("act", [0, 1, 2, 3])
+    @pytest.mark.parametrize("act", [0, 1, 3])
     @pytest.mark.parametrize("gn", [False, True])
     def test_boundary_approach_antipode_vec_finite(self, fixture, act, gn):
         """(b) Antipodal approach (vec only — quat has no reachable shape
@@ -1860,27 +1884,6 @@ class TestSingularitySweep:
                     err_msg=f"GN max-eig should follow frozen-f'' decay, δ={delta}")
             prev_gn, prev_fn = gmax, fmin
 
-    def test_type2_assembled_gradient_finite_both_poles(self, fixture):
-        """(b) Type 2 (acos): the raw ∂h/∂c = −1/√(1−c²) diverges at BOTH poles,
-        but the geometry factor ∂c/∂q → 0 at the same rate, so the ASSEMBLED
-        q-gradient stays finite.  Verified empirically: |g_q| = 2 (vec) / ≈1
-        (quat) across the full approach — no divergence to report."""
-        sat = fixture.sat
-        x = _sw_base_state(sat)
-        QI = sat.QUAT_INDEX
-        u = np.zeros(sat.controlDim)
-        approaches = [("vec", [t for t in _SW_BOUNDARY]),
-                      ("vec", [_math.pi - t for t in _SW_BOUNDARY]),
-                      ("quat", [t for t in _SW_BOUNDARY])]  # quat: aligned side only
-        for mode, angs in approaches:
-            for theta in angs:
-                tgt = _sw_target(mode, theta)
-                lx, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, tgt, _SW_B0,
-                                                  _sweep_cfg(2, False))
-                gnorm = np.linalg.norm(lx[QI:QI + 4])
-                assert np.isfinite(lx).all() and gnorm < 10.0, \
-                    f"type2 assembled grad blew up mode={mode} θ={theta}: |g|={gnorm}"
-
     @pytest.mark.parametrize("mode", ["vec", "quat"])
     def test_blend_zone_continuity_type3(self, fixture, mode):
         """(c) #30's blend-zone edges: sweep omz = 1 − argument across the
@@ -1937,7 +1940,7 @@ class TestHemisphereKink:
 
         # Finiteness at exactly d = 0 for all cost shapes.
         qg0 = np.array([0.0, 1.0, 0.0, 0.0])   # orthogonal to identity ⇒ d = 0
-        for act in (0, 1, 2, 3):
+        for act in (0, 1, 3):
             cfg = _sweep_cfg(act, False)
             c = sat.stageCost(0, 100, x, u, _SW_BS, qg0, _SW_B0, cfg)
             lx, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, qg0, _SW_B0, cfg)

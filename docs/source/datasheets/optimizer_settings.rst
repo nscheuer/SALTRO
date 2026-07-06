@@ -385,8 +385,8 @@ for ``|h| > h_thresh``.
      - ``0.0``
      - Terminal legacy direction-error cross-term weight.
    * - ``ang_cost_func_type``
-     - ``2``
-     - Attitude-error shape selector. The implemented and validated set is ``{0,1,2,3}``. Type ``2`` is supported but less numerically friendly near alignment than type ``3``.
+     - ``3``
+     - Attitude-error shape selector. The implemented and validated set is ``{0,1,3}``. Type ``2`` (raw ``acos``) was removed: it is concave (anti-PSD under Gauss-Newton) and singular at both poles, including perfect alignment; migrate to type ``3`` (Taylor-protected ``acos²``) or type ``0`` (linear).
    * - ``use_cost_hess``
      - ``false``
      - If true, use analytic state Hessians of the cost in the backward pass. If false, SALTRO keeps control curvature but drops potentially troublesome second-order state curvature.
@@ -596,10 +596,11 @@ The implementation also guards against excessive cost growth using
 Practical Notes
 ---------------
 
-``ang_cost_func_type = 3`` is usually the safest curvature choice for pointing
-problems. Type ``2`` is valid, but its raw ``acos`` curvature is concave in the
-alignment scalar and is one of the reasons ``psd_clamp_lxx`` can become useful
-as a diagnosis tool.
+``ang_cost_func_type = 3`` (the default) is usually the safest curvature choice
+for pointing problems. The former type ``2`` (raw ``acos``) was removed: its
+curvature is concave in the alignment scalar (anti-PSD under Gauss-Newton) and
+its gradient is singular at both poles, including perfect alignment. Use type
+``3`` (Taylor-protected ``acos²``) or type ``0`` (linear) instead.
 
 ``use_cost_hess``, ``use_dynamics_hess``, and ``use_constraint_hess`` are the
 main switches that move SALTRO from a mostly Gauss-Newton-style model toward a

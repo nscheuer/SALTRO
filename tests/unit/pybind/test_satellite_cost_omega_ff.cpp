@@ -347,7 +347,7 @@ TEST_CASE_METHOD(SatelliteCostOmegaFixture,
     const double th = 30.0 * kPi / 180.0 / 2.0;
     x.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(std::cos(th), 0.0, 0.0, std::sin(th));
 
-    for (int act = 0; act <= 3; ++act) {
+    for (const int act : {0, 1, 3}) {  // implemented set (type 2 removed)
         CostConfig cfg = costCfg(1e2, 0.0, 0.0, 0.0, 1.0);
         cfg.ang_cost_func_type = act;
         const double cost = sat.stageCost(0, 100, x, u, boresight, target_vec, B_eci, cfg);

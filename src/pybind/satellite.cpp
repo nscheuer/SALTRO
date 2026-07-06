@@ -1356,8 +1356,10 @@ namespace {
 // level, always on) and bounds the worst case even with that knob off; they
 // compose — the knob can only lower the assembled curvature further.
 //
-// Type 2 (acos) keeps its genuine ±1 cusps unprotected (assembled gradient is
-// finite there by geometry cancellation; see the singularity-sweep tests).
+// (Type 2, raw acos, was removed: it was concave and singular at BOTH poles,
+// including the aligned pole c = +1 where its gradient −1/√(1−c²) → −∞ is a
+// genuine — not removable — singularity, unlike type 3's ½·acos² whose aligned
+// pole is removable and Taylor-protected below.)
 struct AngCostShape { double f, fp, fpp; };
 
 inline AngCostShape angCostShape3Taylor(double omz) {
@@ -1440,17 +1442,21 @@ AngCostShape angCostShape(double c, int type) {
     switch (type) {
         case 0: return { 1.0 - c, -1.0, 0.0 };
         case 1: { const double e = 1.0 - c; return { 0.5 * e * e, -e, 1.0 }; }
-        case 2: return { std::acos(c), -1.0 / s, -c / (omc2 * s) };
         case 3: {
             const double phi = std::acos(c);
             return { 0.5 * phi * phi, -phi / s,
                      1.0 / omc2 - phi * c / (omc2 * s) };
         }
+        // NOTE: type 2 (raw acos(c)) was removed: it is concave (f'' < 0,
+        // anti-PSD under GN) and singular at BOTH poles, including the aligned
+        // pole c = +1 where f' = −1/√(1−c²) → −∞ (genuine, not removable).
+        // Migrate to type 3 (same acos family, convex-usable + Taylor-
+        // protected at c = +1) or type 0 for a linear-in-c cost.
         // NOTE: type 4 ((1-c)²) was removed: it is exactly type 1 with the
         // constant 2 absorbed into the angle weight. Migrate by using type 1
         // (½(1-c)²) with doubled angle weight.
         // Unreachable for validated settings (validation rejects types
-        // outside {0,1,2,3}); throw instead of silently running acos.
+        // outside {0,1,3}); throw instead of silently running acos.
         default: throw invalid_argument("ang_cost_func_type invalid");
     }
 }
@@ -1558,9 +1564,6 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                 ang_cost = 0.5 * err * err;
                 break;
             }
-            case 2:
-                ang_cost = std::acos(qdot_aligned);
-                break;
             case 3: {
                 // Route through the shared shape helper so the c = +1 Taylor
                 // protection applies in quaternion mode too.  The quat-mode
@@ -1570,6 +1573,9 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                 ang_cost = angCostShape(qdot_aligned, 3).f;
                 break;
             }
+            // NOTE: type 2 (raw acos(d)) was removed -- see angCostShape():
+            // concave + singular at both poles. Migrate to type 3 (Taylor-
+            // protected acos²) or type 0 (linear).
             // NOTE: type 4 ((1-d)²) was removed: it is exactly type 1 with the
             // constant 2 absorbed into the angle weight. Migrate by using type 1
             // (0.5*(1-d)²) with doubled angle weight.
@@ -1914,11 +1920,6 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 d_ang_cost_dqdot = -err;  // Always negative
                 break;
             }
-            case 2: {  // ang_cost = acos(|qdot|)
-                const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
-                d_ang_cost_dqdot = -1.0 / denom;  // Always negative
-                break;
-            }
             case 3: {  // ang_cost = 0.5 * acos(|qdot|)^2
                 // Shared Taylor-protected shape: dh/dd → −1 at d = +1, where
                 // the raw −acos(d)/√(1−d²+1e-12) form degenerates to −0/1e-6
@@ -1926,6 +1927,7 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 d_ang_cost_dqdot = angCostShape(qdot_aligned, 3).fp;  // Always negative
                 break;
             }
+            // NOTE: type 2 (raw acos(d)) removed -- see stageCost().
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             // Unreachable for validated settings; no silent acos fallback.
             default: throw invalid_argument("ang_cost_func_type invalid");
@@ -2186,9 +2188,6 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         //   ∂²h/∂q² = f''(d) · q_g · q_g^T
         //   ∂h/∂q · q = f'(d) · d   (Euler deg-1)
         const double d = qdot_aligned;
-        const double d2 = d * d;
-        const double one_minus_d2 = std::max(1.0 - d2, 1e-12);
-        const double sqrt_omd2 = std::sqrt(one_minus_d2);
 
         double d2h_dd2 = 0.0;
         switch (cost_cfg.ang_cost_func_type) {
@@ -2198,9 +2197,6 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 1:
                 d2h_dd2 = 1.0;
                 break;
-            case 2:
-                d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
-                break;
             case 3:
                 // Shared Taylor-protected shape: d²h/dd² → 1/3 at d = +1,
                 // where the raw 1/(1−d²) − acos(d)·d/[(1−d²)·√(1−d²)] form
@@ -2208,6 +2204,8 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 // ~1e12 in double precision instead of 1/3).
                 d2h_dd2 = angCostShape(d, 3).fpp;
                 break;
+            // NOTE: type 2 (raw acos(d)) removed -- see stageCost(). Its
+            // curvature −d/[(1−d²)√(1−d²)] was concave (anti-PSD).
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             // Unreachable for validated settings; no silent acos fallback.
             default: throw invalid_argument("ang_cost_func_type invalid");
@@ -2219,10 +2217,10 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         switch (cost_cfg.ang_cost_func_type) {
             case 0: dh_dd = -1.0; break;
             case 1: dh_dd = -(1.0 - d); break;
-            case 2: dh_dd = -1.0 / sqrt_omd2; break;
             case 3:
                 dh_dd = angCostShape(d, 3).fp;  // Taylor-protected: → −1 at d = +1
                 break;
+            // NOTE: type 2 (raw acos(d)) removed -- see stageCost().
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             // Unreachable for validated settings; no silent acos fallback.
             default: throw invalid_argument("ang_cost_func_type invalid");

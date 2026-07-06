@@ -465,13 +465,25 @@ TEST_CASE("Invalid cost.ang_vel_err_dir_N - negative", "[plannersettings][valida
     REQUIRE(error_msg == "cost.ang_vel_err_dir_N invalid");
 }
 
+static const std::string kAfcInvalidMsg =
+    "cost.ang_cost_func_type invalid (implemented set {0,1,3})";
+
 TEST_CASE("Invalid cost.ang_cost_func_type - negative", "[plannersettings][validation][cost]") {
     PlannerSettings settings = validSettings();
     settings.passes[0].cost.ang_cost_func_type = -1;
     std::string error_msg;
 
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "cost.ang_cost_func_type invalid");
+    REQUIRE(error_msg == kAfcInvalidMsg);
+}
+
+TEST_CASE("Invalid cost.ang_cost_func_type - removed type 2", "[plannersettings][validation][cost]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].cost.ang_cost_func_type = 2;  // removed (raw acos, concave + singular)
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == kAfcInvalidMsg);
 }
 
 TEST_CASE("Invalid cost.ang_cost_func_type - removed type 4", "[plannersettings][validation][cost]") {
@@ -480,7 +492,7 @@ TEST_CASE("Invalid cost.ang_cost_func_type - removed type 4", "[plannersettings]
     std::string error_msg;
 
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "cost.ang_cost_func_type invalid");
+    REQUIRE(error_msg == kAfcInvalidMsg);
 }
 
 TEST_CASE("Invalid cost.ang_cost_func_type - above implemented set", "[plannersettings][validation][cost]") {
@@ -489,11 +501,11 @@ TEST_CASE("Invalid cost.ang_cost_func_type - above implemented set", "[plannerse
     std::string error_msg;
 
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "cost.ang_cost_func_type invalid");
+    REQUIRE(error_msg == kAfcInvalidMsg);
 }
 
-TEST_CASE("Valid cost.ang_cost_func_type - implemented set {0,1,2,3}", "[plannersettings][validation][cost]") {
-    for (int type = 0; type <= 3; ++type) {
+TEST_CASE("Valid cost.ang_cost_func_type - implemented set {0,1,3}", "[plannersettings][validation][cost]") {
+    for (int type : {0, 1, 3}) {
         PlannerSettings settings = validSettings();
         settings.passes[0].cost.ang_cost_func_type = type;
         std::string error_msg;
