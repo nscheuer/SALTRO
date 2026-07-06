@@ -758,7 +758,8 @@ cost_cfg : CostConfig
     - control effort weights
     - RW momentum management weights
     - magnetic alignment weights
-    - cost function type (linear, quadratic, arccos, etc.)
+    - angle cost shape via `ang_cost_func_type` in the implemented set
+      `{0, 1, 3, 5}` (`2` and `4` are retired)
 
 Returns
 -------
