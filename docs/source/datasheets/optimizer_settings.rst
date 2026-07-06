@@ -475,6 +475,22 @@ with a typical penalty growth rule of the form:
    * - ``total_cost_tol``
      - ``1e-2``
      - Convergence tolerance on total augmented objective change. Must be positive.
+   * - ``penalty_init_per_family`` / ``penalty_scale_per_family`` / ``penalty_max_per_family``
+     - empty
+     - Per-constraint-family AL penalty schedule (vector of length ``NumFamilies``,
+       indexed by ``ConstraintFamily``). Empty or wrong-sized vectors fall back to
+       the scalar values (bit-exact; wrong size warns). This is the supported
+       per-family surface.
+   * - ``family_contraction_ratio``
+     - ``0.0``
+     - **EXPERIMENTAL.** When ``> 0``, a family's penalty ramps only if its
+       violation failed to contract by this factor since the previous outer
+       iteration; ``0.0`` disables gating (every violated family ramps — the
+       classical behavior). No demonstrated benefit yet, and the one-step
+       violation signal can oscillate between physically coupled families
+       (e.g. MTQ torque vs RW momentum via allocation). Do not enable without
+       an A/B; dual-magnitude penalty floors (mu_f >= beta*max|lambda_f|) are
+       the planned principled replacement.
 
 ILQRConfig
 ----------
