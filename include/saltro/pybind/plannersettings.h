@@ -152,6 +152,15 @@ struct ConstraintConfig {
  *        - 0: 1 - d            (linear)
  *        - 1: 0.5 * (1 - d)^2  (quadratic, convex)
  *        - 3: 0.5 * acos(d)^2  (squared angle, Taylor-protected at d = +1)
+ *        - 5: pseudo-Huber in the angle theta = acos(d):
+ *             delta^2*(sqrt(1 + (theta/delta)^2) - 1), delta =
+ *             `ang_cost_huber_delta`. Quadratic near the goal (matches type
+ *             3's 0.5*theta^2 to O((theta/delta)^2)), linear at large angle
+ *             (bounded urgency: the demanded descent rate saturates at delta
+ *             instead of growing with the error, so large slews don't demand
+ *             instant acquisition), with a non-vanishing antipodal escape
+ *             gradient (~delta), unlike type 0's plateau. Taylor-protected at
+ *             d = +1 and antipode-clamped at d = -1 like type 3.
  *        Default is 3 (the preferred well-conditioned shape).
  *        Type 2 (acos(d), raw angle) was REMOVED: it is concave (f'' < 0,
  *        anti-PSD under Gauss-Newton) and has a genuine gradient singularity
@@ -232,6 +241,16 @@ struct CostConfig {
     double ang_vel_err_dir_N = 0.0;
 
     int ang_cost_func_type = 3;
+
+    /// Pseudo-Huber crossover angle δ (rad) for `ang_cost_func_type = 5`:
+    /// the pointing-angle scale at which the type-5 cost transitions from
+    /// quadratic (θ ≪ δ, matches type 3's ½θ²) to linear (θ ≫ δ, slope
+    /// saturates at δ — bounded urgency on large slews).  Default 0.35 rad
+    /// ≈ 20°.  Must be finite and > 0 (validated); ignored by the other
+    /// shapes.  Smaller δ ⇒ urgency saturates earlier (gentler large-angle
+    /// demands); δ → ∞ recovers type 3 exactly.
+    double ang_cost_huber_delta = 0.35;
+
     bool use_cost_hess = false;
 
     /// Gauss-Newton mode for the angle-cost (q,q) Hessian block. When true,

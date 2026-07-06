@@ -160,8 +160,9 @@ L(x, u) = w_ang · L_ang(q)
 | Linear | 0 | 1 - \|q̇\| | -1 |
 | Quadratic | 1 | 0.5·(1 - \|q̇\|)² | -(1 - \|q̇\|) |
 | Quadratic Angular | 3 | 0.5·acos²(\|q̇\|) | -acos(\|q̇\|)/√(1 - q̇²) |
+| Pseudo-Huber Angular | 5 | δ²(√(1+(θ/δ)²) − 1), θ = acos(\|q̇\|), δ = `ang_cost_huber_delta` | -(θ/√(1+(θ/δ)²))/√(1 - q̇²) |
 
-Implemented set: `{0, 1, 3}`, default **3**. Type 2 (raw `acos(|q̇|)`, derivative `-1/√(1 - q̇²)`) was **removed**: it is concave (anti-PSD under Gauss-Newton) and singular at both poles, including perfect alignment (q̇ = +1). Migrate to type 3 (same acos family, Taylor-protected at the aligned pole) or type 0. Type 4 (`1 - |q̇|²`) was also removed — it is type 1 with a doubled angle weight.
+Implemented set: `{0, 1, 3, 5}`, default **3**. Type 5 matches type 3's ½θ² near the goal (to O((θ/δ)²)) but its angle-gradient saturates at δ for θ ≫ δ (bounded urgency on large slews); retired ids 2/4 are not reused. Type 2 (raw `acos(|q̇|)`, derivative `-1/√(1 - q̇²)`) was **removed**: it is concave (anti-PSD under Gauss-Newton) and singular at both poles, including perfect alignment (q̇ = +1). Migrate to type 3 (same acos family, Taylor-protected at the aligned pole) or type 0. Type 4 (`1 - |q̇|²`) was also removed — it is type 1 with a doubled angle weight.
 
 **Special Handling**:
 - **Quaternion Alignment**: If q·q_goal < 0, flip q_goal → -q_goal to avoid sign discontinuities

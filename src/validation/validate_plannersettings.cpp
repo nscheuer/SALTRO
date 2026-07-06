@@ -162,15 +162,25 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 return false;
             }
 
-            // Implemented set is {0,1,3}; anything else (including the removed
-            // types 2 (raw acos, concave + singular at both poles) and 4
-            // ((1-d)², = type 1 with a doubled weight)) is rejected here so it
-            // can't reach the cost switches' throwing default. Migrate type 2
-            // -> type 3 (Taylor-protected acos²) or type 0 (linear-in-d).
+            // Implemented set is {0,1,3,5}; anything else (including the
+            // removed types 2 (raw acos, concave + singular at both poles)
+            // and 4 ((1-d)², = type 1 with a doubled weight) — retired ids
+            // are NOT reused) is rejected here so it can't reach the cost
+            // switches' throwing default. Migrate type 2 -> type 3
+            // (Taylor-protected acos²) or type 0 (linear-in-d).
             {
                 const int afc = pass.cost.ang_cost_func_type;
-                if (afc != 0 && afc != 1 && afc != 3) {
-                    error_msg = "cost.ang_cost_func_type invalid (implemented set {0,1,3})";
+                if (afc != 0 && afc != 1 && afc != 3 && afc != 5) {
+                    error_msg = "cost.ang_cost_func_type invalid (implemented set {0,1,3,5})";
+                    return false;
+                }
+                // Pseudo-Huber crossover angle (rad): must be finite and > 0.
+                // Rejected unconditionally (not just for type 5) so a bad
+                // value can't lurk behind a later shape switch; in particular
+                // type 5 with non-positive delta is always refused.
+                const double hd = pass.cost.ang_cost_huber_delta;
+                if (!(hd > 0.0) || !std::isfinite(hd)) {
+                    error_msg = "cost.ang_cost_huber_delta invalid (must be finite and > 0)";
                     return false;
                 }
             }

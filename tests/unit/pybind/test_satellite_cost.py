@@ -1606,7 +1606,7 @@ class TestECITargetDualFormat:
 # TEST SECTION 12: Singularity sweep + hemisphere-kink coverage
 # ============================================================================
 # Property tests over the full cost-shape parameter grid:
-#   cost type ∈ {0,1,3} × mode ∈ {vec (NaN ECI target), quat} × GN ∈ {on,off}.
+#   cost type ∈ {0,1,3,5} × mode ∈ {vec (NaN ECI target), quat} × GN ∈ {on,off}.
 # We probe the attitude cost h(argument) where the inner scalar is
 #   c = bs·R(q)ᵀ·r̂  (vec mode, 2-DOF, argument ∈ [-1, 1]), or
 #   d = |q_goal·q|   (quat mode, hemisphere-aligned, argument ∈ [0, 1]).
@@ -1724,7 +1724,7 @@ def _sw_qblock_ana(sat, x, target, cfg):
 class TestSingularitySweep:
     """Task 1: singularity sweep property tests across all cost shapes."""
 
-    @pytest.mark.parametrize("act", [0, 1, 3])
+    @pytest.mark.parametrize("act", [0, 1, 3, 5])
     @pytest.mark.parametrize("mode", ["vec", "quat"])
     @pytest.mark.parametrize("gn", [False, True])
     def test_dense_sweep_finite_and_fd_consistent(self, fixture, act, mode, gn):
@@ -1755,12 +1755,12 @@ class TestSingularitySweep:
                     f"grad[{j}] mode={mode} act={act} gn={gn} θ={td}: {gq[j]} vs {gfd[j]}"
 
             # Genuine-singular regions: skip Hessian-FD within 1e-3 rad of the
-            # antipode for the acos² shape (vec type 3), where the cost
+            # antipode for the acos-family shapes (vec types 3/5), where the cost
             # curvature radius shrinks below the FD step and central differences
             # stop tracking the (correctly diverging) analytic Hessian.  The
             # dense grid never actually enters that band (nearest is 179° ≈
             # 0.0175 rad away); the guard documents intent for completeness.
-            near_antipode = (mode == "vec" and act == 3
+            near_antipode = (mode == "vec" and act in (3, 5)
                              and abs(_math.pi - theta) < 1e-3)
             if full_hess and not near_antipode:
                 Hfd = _sw_qhess_fd(sat, x, tgt, cfg)
@@ -1773,14 +1773,21 @@ class TestSingularitySweep:
                 # rank-1 form in the tangent block.  Assert the rank-1 structure
                 # (two tangent eigenvalues ≈ 0), and PSD for the f''≥0 shapes
                 # (types 0/1/3; type 2, whose f'' changed sign at c=0, was
-                # removed).
+                # removed).  Type 5 (pseudo-Huber) is convex in θ but CONCAVE
+                # in c below the g''=g'·cotθ crossover (≈86° at δ=0.35): its
+                # single nonzero GN eigenvalue 4·[g''−g'·cotθ] is negative
+                # there, positive above, bounded by 4·w in magnitude.
                 eig = np.linalg.eigvalsh(Hq)
                 mags = np.sort(np.abs(eig))
                 assert mags[-2] < 1e-6 + 1e-3 * mags[-1], \
                     f"GN Hess not rank-1 act={act} θ={td}: eig={eig}"
-                assert eig.min() > -1e-6, f"GN type{act} not PSD θ={td}: {eig}"
+                if act != 5:
+                    assert eig.min() > -1e-6, f"GN type{act} not PSD θ={td}: {eig}"
+                else:
+                    assert eig.min() > -4.0 - 1e-6, \
+                        f"GN type5 below -4w bound θ={td}: {eig}"
 
-    @pytest.mark.parametrize("act", [0, 1, 3])
+    @pytest.mark.parametrize("act", [0, 1, 3, 5])
     @pytest.mark.parametrize("mode", ["vec", "quat"])
     @pytest.mark.parametrize("gn", [False, True])
     def test_boundary_approach_aligned_pole_finite(self, fixture, act, mode, gn):
@@ -1797,7 +1804,7 @@ class TestSingularitySweep:
             assert np.isfinite(c) and np.isfinite(lx).all() and np.isfinite(lxx).all(), \
                 f"non-finite at aligned pole mode={mode} act={act} gn={gn} θ={theta}"
 
-    @pytest.mark.parametrize("act", [0, 1, 3])
+    @pytest.mark.parametrize("act", [0, 1, 3, 5])
     @pytest.mark.parametrize("gn", [False, True])
     def test_boundary_approach_antipode_vec_finite(self, fixture, act, gn):
         """(b) Antipodal approach (vec only — quat has no reachable shape
@@ -1940,7 +1947,7 @@ class TestHemisphereKink:
 
         # Finiteness at exactly d = 0 for all cost shapes.
         qg0 = np.array([0.0, 1.0, 0.0, 0.0])   # orthogonal to identity ⇒ d = 0
-        for act in (0, 1, 3):
+        for act in (0, 1, 3, 5):
             cfg = _sweep_cfg(act, False)
             c = sat.stageCost(0, 100, x, u, _SW_BS, qg0, _SW_B0, cfg)
             lx, _, _ = sat.stageCostJacobians(0, 100, x, u, _SW_BS, qg0, _SW_B0, cfg)
@@ -1974,3 +1981,185 @@ class TestHemisphereKink:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
+
+
+# ============================================================================
+# TEST SECTION 13: afc=5 pseudo-Huber angle cost
+# ============================================================================
+# Python twin of C++ TEST SECTION 13 in tests/unit/pybind/test_satellite_cost.cpp.
+# Shape: g(θ) = δ²·(√(1+(θ/δ)²) − 1), θ = acos(c), δ = ang_cost_huber_delta.
+#   g'(θ) = θ/√(1+(θ/δ)²) — ≈ θ near the goal, saturates at δ for θ ≫ δ.
+#   c-space: f'(c) = −g'(θ)/sinθ, f''(c) = [g''(θ) − g'(θ)·cotθ]/sin²θ.
+# Assembled facts asserted below (vec mode, weight w):
+#   |g_q| = 2·w·g'(θ) ≤ 2·w·δ·π/√(π²+δ²) < 2·w·δ (bounded urgency, tight at
+#     the antipode; non-vanishing escape gradient unlike type 0's plateau);
+#   near-goal cost matches type 3's ½θ² with relative error −(θ/δ)²/4;
+#   antipodal GN divergence is δ-scaled (4·g'(π)/ε vs type 3's ~4π/ε) and
+#   clamped at the same u = 1e-6 seam as type 3.
+
+
+def _huber_cfg(delta, gn, weight=1.0):
+    cfg = _sweep_cfg(5, gn)
+    cfg.ang_cost_huber_delta = delta
+    cfg.angle = weight
+    cfg.angle_N = weight
+    return cfg
+
+
+class TestPseudoHuberCost:
+    """afc=5 pseudo-Huber shape: FD exactness, type-3 equivalence near the
+    goal, the 2·w·δ assembled-gradient bound, and the δ-scaled clamped
+    antipode."""
+
+    @pytest.mark.parametrize("delta", [0.1, 0.35, 1.0])
+    @pytest.mark.parametrize("mode", ["vec", "quat"])
+    @pytest.mark.parametrize("gn", [False, True])
+    def test_fd_grid_gradient_and_hessian(self, fixture, delta, mode, gn):
+        """θ ∈ {0.01°, 1°, 20°, 90°, 170°}: full-Newton (and quat mode, where
+        GN is a no-op) matches central FD in gradient AND Hessian; GN vec mode
+        asserts the rank-1 structure with the δ-dependent sign instead."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        cfg = _huber_cfg(delta, gn)
+        full_hess = (not gn) or (mode == "quat")
+        for td in (0.01, 1.0, 20.0, 90.0, 170.0):
+            theta = _math.radians(td)
+            tgt = _sw_target(mode, theta)
+            c, gq, Hq, lx, lxx = _sw_qblock_ana(sat, x, tgt, cfg)
+            assert np.isfinite(c) and np.isfinite(lx).all() and np.isfinite(lxx).all()
+
+            gfd = _sw_qgrad_fd(sat, x, tgt, cfg)
+            for j in range(4):
+                tol = 1e-6 + 1e-4 * abs(gfd[j])
+                assert abs(gq[j] - gfd[j]) < tol, \
+                    f"grad[{j}] δ={delta} {mode} gn={gn} θ={td}: {gq[j]} vs {gfd[j]}"
+
+            if full_hess:
+                Hfd = _sw_qhess_fd(sat, x, tgt, cfg)
+                herr = np.max(np.abs(Hq - Hfd))
+                hscale = np.max(np.abs(Hfd))
+                assert herr < 1e-3 + 5e-2 * hscale, \
+                    f"Hess δ={delta} {mode} θ={td}: err={herr:.2e} scale={hscale:.2e}"
+            else:
+                eig = np.linalg.eigvalsh(Hq)
+                mags = np.sort(np.abs(eig))
+                assert mags[-2] < 1e-6 + 1e-3 * mags[-1], \
+                    f"GN Hess not rank-1 δ={delta} θ={td}: {eig}"
+                # Magnitude 4·[g''−g'·cotθ]: > −4·w, < 4 + 4·δ/sinθ
+                # (g'' ≤ 1, g' < δ).
+                assert eig.min() > -4.0 - 1e-6
+                assert eig.max() < 4.0 + 4.0 * delta / _math.sin(theta) + 1e-6
+                # Sign follows g'' − g'·cotθ (negative below the crossover,
+                # positive above).
+                r = theta / delta
+                S = _math.sqrt(1.0 + r * r)
+                expected_sign = S ** -3 - (theta / S) / _math.tan(theta)
+                if expected_sign < -1e-9:
+                    assert eig.min() < 0.0, f"expected NSD δ={delta} θ={td}: {eig}"
+                elif expected_sign > 1e-9:
+                    assert eig.min() > -1e-6, f"expected PSD δ={delta} θ={td}: {eig}"
+
+    @pytest.mark.parametrize("delta", [0.35, 1.0])
+    @pytest.mark.parametrize("mode", ["vec", "quat"])
+    def test_near_goal_equivalence_to_type3(self, fixture, delta, mode):
+        """For θ ≪ δ: g₅(θ) = ½θ²·(1 − (θ/δ)²/4 + O((θ/δ)⁴)) — the cost ratio
+        to type 3 departs from 1 by exactly −(θ_shape/δ)²/4 (θ_shape = θ/2 in
+        quat mode, where the inner scalar is cos(θ/2)); gradients agree to the
+        same relative order."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        cfg5 = _huber_cfg(delta, False)
+        cfg3 = _sweep_cfg(3, False)
+        for td in (0.01, 0.1, 1.0):
+            theta = _math.radians(td)
+            th_shape = theta / 2.0 if mode == "quat" else theta
+            tgt = _sw_target(mode, theta)
+            c5, g5, _, _, _ = _sw_qblock_ana(sat, x, tgt, cfg5)
+            c3, g3, _, _, _ = _sw_qblock_ana(sat, x, tgt, cfg3)
+            expected = -(th_shape / delta) ** 2 / 4.0
+            measured = c5 / c3 - 1.0
+            assert abs(measured - expected) < 1e-8 + 0.05 * abs(expected), \
+                f"δ={delta} {mode} θ={td}: ratio-1={measured:.3e} vs {expected:.3e}"
+            gerr = np.linalg.norm(g5 - g3) / max(1e-300, np.linalg.norm(g3))
+            assert gerr < 1e-8 + 2.0 * (th_shape / delta) ** 2
+
+    @pytest.mark.parametrize("delta", [0.1, 0.35, 1.0])
+    @pytest.mark.parametrize("weight", [1.0, 3.0])
+    def test_assembled_gradient_bound_2wdelta(self, fixture, delta, weight):
+        """|g_q| = 2·w·g'(θ) ≤ 2·w·δ·π/√(π²+δ²) < 2·w·δ (vec mode; the
+        |∂c/∂θ| = 2·sinθ geometry factor cancels f's 1/sinθ, leaving the
+        bounded θ-space slope).  Tight at large angle, and the 179° escape
+        gradient stays ≥ 1.9·w·δ — bounded urgency WITHOUT type 0's antipodal
+        plateau."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        cfg = _huber_cfg(delta, False, weight)
+        bound = 2.0 * weight * delta * _math.pi / _math.sqrt(_math.pi ** 2 + delta ** 2)
+        gmax = 0.0
+        for td in range(1, 180):
+            theta = _math.radians(td)
+            _, gq, _, _, _ = _sw_qblock_ana(sat, x, _sw_target("vec", theta), cfg)
+            gn = np.linalg.norm(gq)
+            assert gn <= bound * (1.0 + 1e-9), f"θ={td}: |g|={gn} > {bound}"
+            gmax = max(gmax, gn)
+        assert gmax > 0.99 * bound, f"bound not tight: {gmax} vs {bound}"
+        _, g179, _, _, _ = _sw_qblock_ana(
+            sat, x, _sw_target("vec", _math.radians(179.0)), cfg)
+        assert np.linalg.norm(g179) > 1.9 * weight * delta
+
+    def test_antipode_divergence_delta_scaled_and_clamped(self, fixture):
+        """Exact region (u = 1+c ≥ 1e-6): assembled GN max-eig ≈ 4·g'(π)/ε —
+        the δ/π-scaled version of type 3's ~4π/ε — and the escape gradient is
+        ≈ 2·g'(π) ≈ 2δ·π/√(π²+δ²), NOT type 3's 2π.  Clamped region: (f', f'')
+        freeze at the type-5 seam values (δ=0.35: f' ≈ −246, f'' ≈ +1.23e8),
+        FN min-eig saturates at ≈ 4·f'_seam, GN decays with the frozen f''."""
+        sat = fixture.sat
+        x = _sw_base_state(sat)
+        delta_h = 0.35
+        cfgG = _huber_cfg(delta_h, True)
+        cfgF = _huber_cfg(delta_h, False)
+
+        c_eff = -1.0 + 1e-6
+        omc2_eff = 1.0 - c_eff * c_eff
+        s_eff = _math.sqrt(omc2_eff)
+        phi_eff = _math.acos(c_eff)
+        S_eff = _math.sqrt(1.0 + (phi_eff / delta_h) ** 2)
+        gp_eff = phi_eff / S_eff                       # ≈ g'(π) ≈ 0.3478
+        fp_seam = -gp_eff / s_eff                      # ≈ −246
+        fpp_seam = (S_eff ** -3 - gp_eff * c_eff / s_eff) / omc2_eff
+        gn_bound = fpp_seam * 4.0 * omc2_eff           # ≈ +984
+        fn_saturation = 4.0 * fp_seam                  # ≈ −984
+
+        # δ-scaling vs the type-3 seam curvature: ratio = g'(π)/π ≈ δ/π.
+        fpp_seam3 = 1.0 / omc2_eff - phi_eff * c_eff / (omc2_eff * s_eff)
+        np.testing.assert_allclose(fpp_seam / fpp_seam3, gp_eff / phi_eff,
+                                   rtol=1e-3)
+
+        prev_gn = 0.0
+        for eps in (1e-2, 1e-3, 1e-4, 1e-5):
+            theta = _math.pi - eps
+            tgt = _sw_target("vec", theta)
+            _, gF, HF, _, _ = _sw_qblock_ana(sat, x, tgt, cfgF)
+            _, _, HG, _, _ = _sw_qblock_ana(sat, x, tgt, cfgG)
+            gmax = np.linalg.eigvalsh(HG).max()
+            fmin = np.linalg.eigvalsh(HF).min()
+            assert gmax > 0.0 and fmin < 0.0
+            assert gmax <= gn_bound * (1.0 + 1e-6)
+            assert fmin >= fn_saturation * 1.01
+            if 1.0 - _math.cos(eps) >= 1e-6:
+                # Exact region: δ-scaled ~1/ε divergence + bounded escape grad.
+                assert gmax > prev_gn
+                np.testing.assert_allclose(gmax * eps, 4.0 * gp_eff, rtol=0.05)
+                np.testing.assert_allclose(np.linalg.norm(gF), 2.0 * gp_eff,
+                                           rtol=0.05)
+            else:
+                # Clamped region: FN saturation, frozen-f'' GN decay, linear
+                # gradient decay |f'_seam|·2·sinθ.
+                np.testing.assert_allclose(fmin, fn_saturation, rtol=1e-2)
+                c_here = _math.cos(theta)
+                np.testing.assert_allclose(
+                    gmax, fpp_seam * 4.0 * (1.0 - c_here * c_here), rtol=1e-5)
+                np.testing.assert_allclose(
+                    np.linalg.norm(gF), -fp_seam * 2.0 * _math.sin(theta),
+                    rtol=1e-5)
+            prev_gn = gmax

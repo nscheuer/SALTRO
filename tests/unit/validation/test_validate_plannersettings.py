@@ -499,7 +499,8 @@ def test_invalid_cost_ang_vel_err_dir_n_negative():
     assert error_msg == "cost.ang_vel_err_dir_N invalid"
 
 
-_AFC_INVALID_MSG = "cost.ang_cost_func_type invalid (implemented set {0,1,3})"
+_AFC_INVALID_MSG = "cost.ang_cost_func_type invalid (implemented set {0,1,3,5})"
+_HUBER_INVALID_MSG = "cost.ang_cost_huber_delta invalid (must be finite and > 0)"
 
 
 def test_invalid_cost_ang_cost_func_type_negative():
@@ -533,9 +534,9 @@ def test_invalid_cost_ang_cost_func_type_removed_type_4():
 
 
 def test_invalid_cost_ang_cost_func_type_above_implemented_set():
-    """cost.ang_cost_func_type=5 (never implemented) should fail"""
+    """cost.ang_cost_func_type=6 (never implemented) should fail"""
     settings = valid_settings()
-    settings.passes[0].cost.ang_cost_func_type = 5
+    settings.passes[0].cost.ang_cost_func_type = 6
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
 
     assert not ok
@@ -543,13 +544,50 @@ def test_invalid_cost_ang_cost_func_type_above_implemented_set():
 
 
 def test_valid_cost_ang_cost_func_type_implemented_set():
-    """All implemented types {0, 1, 3} should pass"""
-    for cost_type in (0, 1, 3):
+    """All implemented types {0, 1, 3, 5} should pass"""
+    for cost_type in (0, 1, 3, 5):
         settings = valid_settings()
         settings.passes[0].cost.ang_cost_func_type = cost_type
         ok, _ = saltro_py.validatePlannerSettings(settings)
 
         assert ok, f"ang_cost_func_type={cost_type} should be valid"
+
+
+def test_valid_cost_ang_cost_huber_delta_positive_values():
+    """Positive finite ang_cost_huber_delta values should pass (with type 5)"""
+    for delta in (1e-3, 0.1, 0.35, 1.0, 10.0):
+        settings = valid_settings()
+        settings.passes[0].cost.ang_cost_func_type = 5
+        settings.passes[0].cost.ang_cost_huber_delta = delta
+        ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+        assert ok, f"ang_cost_huber_delta={delta} should be valid: {error_msg}"
+
+
+def test_invalid_cost_ang_cost_huber_delta_nonpositive():
+    """Zero/negative ang_cost_huber_delta should fail — in particular type 5
+    with non-positive delta is always refused"""
+    for delta in (0.0, -0.35):
+        for cost_type in (5, 3):  # rejected regardless of the selected shape
+            settings = valid_settings()
+            settings.passes[0].cost.ang_cost_func_type = cost_type
+            settings.passes[0].cost.ang_cost_huber_delta = delta
+            ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+            assert not ok
+            assert error_msg == _HUBER_INVALID_MSG
+
+
+def test_invalid_cost_ang_cost_huber_delta_nonfinite():
+    """NaN/inf ang_cost_huber_delta should fail"""
+    for delta in (float("nan"), float("inf")):
+        settings = valid_settings()
+        settings.passes[0].cost.ang_cost_func_type = 5
+        settings.passes[0].cost.ang_cost_huber_delta = delta
+        ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+        assert not ok
+        assert error_msg == _HUBER_INVALID_MSG
 
 
 # ============================================================================
