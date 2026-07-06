@@ -616,3 +616,113 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass strict decrease rejects zero 
 	REQUIRE_THAT((X_strict - X_base).norm(), Catch::Matchers::WithinAbs(0.0, 1e-12));
 	REQUIRE_THAT((U_strict - U_base).norm(), Catch::Matchers::WithinAbs(0.0, 1e-12));
 }
+
+TEST_CASE_METHOD(ForwardPassFixture, "forward_pass rejects trials when backward pass predicts ascent", "[forward_pass][linesearch][ascent]") {
+	// G2 regression test: ΔV(α) = α·ΔV₀ + α²·ΔV₁ is the backward pass's
+	// PREDICTED cost change. When ΔV(α) ≥ 0 the z-ratio
+	//   z = (J_prev − J_new) / (−ΔV(α))
+	// flips sign: a cost-INCREASING trial (J_new > J_prev) paired with a
+	// predicted ascent gives z = (neg)/(neg) > 0, which the old line search
+	// accepted whenever β₁ ≤ z ≤ β₂. The fix rejects any trial with
+	// ΔV(α) ≥ 0 (OldPlanner's exp > 0 guard), so the line search keeps
+	// backtracking instead of accepting a cost increase.
+	REQUIRE(orbit_ok);
+
+	Eigen::MatrixXd X_base = Eigen::MatrixXd::Zero(satellite.stateDim(), N);
+	Eigen::MatrixXd U_base = Eigen::MatrixXd::Zero(satellite.controlDim(), N);
+	REQUIRE(warmStart(X_base, U_base));
+
+	EnvMatrices env = envMatrices();
+	const CostConfig& cost_cfg = settings.passes[0].cost;
+
+	std::vector<Eigen::MatrixXd> K_base(N - 1, Eigen::MatrixXd::Zero(satellite.controlDim(), satellite.stateDim()));
+	std::vector<Eigen::VectorXd> d_base(N - 1, Eigen::VectorXd::Zero(satellite.controlDim()));
+	Eigen::Vector2d deltaV_base = Eigen::Vector2d::Zero();
+
+	Eigen::MatrixXd U_bp = U_base.leftCols(N - 1);
+	REQUIRE(optimizer::backwardPass(
+		satellite,
+		X_base,
+		U_bp,
+		env.R,
+		env.V,
+		env.B,
+		env.S,
+		env.rho,
+		boresight,
+		attitude_target_traj,
+		settings,
+		settings.passes[0].reg.reg_init,
+		K_base,
+		d_base,
+		deltaV_base
+	));
+
+	const double J_prev = satellite.totalCost(X_base, U_bp, env.B, boresight, attitude_target_traj, cost_cfg);
+
+	// Scale the feedforward until the full step (α = 1) overshoots and
+	// INCREASES the cost.
+	const std::array<double, 4> scales = {2.0, 4.0, 6.0, 8.0};
+	bool found = false;
+	double chosen_scale = 1.0;
+	RolloutResult alpha1;
+
+	for (double scale : scales) {
+		std::vector<Eigen::VectorXd> d_scaled = d_base;
+		for (auto& dk : d_scaled) {
+			dk *= scale;
+		}
+		alpha1 = rolloutWithAlpha(1.0, K_base, d_scaled, settings, X_base, U_base, env);
+		if (alpha1.cost > J_prev) {
+			chosen_scale = scale;
+			found = true;
+			break;
+		}
+	}
+	REQUIRE(found);
+
+	std::vector<Eigen::VectorXd> d_scaled = d_base;
+	for (auto& dk : d_scaled) {
+		dk *= chosen_scale;
+	}
+
+	// Engineered ascent prediction: ΔV₀ = J(α=1) − J_prev > 0, ΔV₁ = 0.
+	// Under the pre-fix line search the α = 1 trial computes
+	//   z = (J_prev − J(α=1)) / (−ΔV₀) = 1 ∈ [β₁, β₂]
+	// and is ACCEPTED despite increasing the cost. With the ascent guard,
+	// ΔV(α) = α·ΔV₀ > 0 for every α, so EVERY trial must be rejected.
+	Eigen::Vector2d deltaV_ascent;
+	deltaV_ascent(0) = alpha1.cost - J_prev;
+	deltaV_ascent(1) = 0.0;
+	REQUIRE(deltaV_ascent(0) > 0.0);
+
+	Eigen::MatrixXd X_forward = X_base;
+	Eigen::MatrixXd U_forward = U_base;
+	double J_new = std::numeric_limits<double>::quiet_NaN();
+
+	const bool accepted = optimizer::forwardPass(
+		satellite,
+		X_forward,
+		U_forward,
+		K_base,
+		d_scaled,
+		deltaV_ascent,
+		env.B,
+		env.R,
+		env.V,
+		env.S,
+		env.rho,
+		boresight,
+		attitude_target_traj,
+		settings,
+		jtime,
+		J_prev,
+		J_new
+	);
+
+	REQUIRE_FALSE(accepted);
+	// Rejected line search must not touch the trajectory or report a new cost.
+	REQUIRE(J_new == J_prev);
+	REQUIRE((X_forward - X_base).norm() == 0.0);
+	REQUIRE((U_forward - U_base).norm() == 0.0);
+}

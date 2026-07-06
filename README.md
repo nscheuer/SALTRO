@@ -7,6 +7,12 @@
 
 Given a goal sequence, SALTRO will calculate an optimal, dynamically feasible trajectory for the satellite and the required inputs to satellite actuators to follow that trajectory. 
 
+<p align="center">
+  <a href="https://nscheuer.github.io/SALTRO/index.html">🛠 Documentation</a> •
+  <a href="docs/INSTALL.md">📘 Installation</a> •
+  <a href="docs/docs.md">📝 Generate Documentation</a> •
+</p>
+
 ## ✨ Key Features
 - ✅ Compatible with heterogeneous and underactuated actuator sets, including magnetorquers (MTQ), reaction wheels (RW), and thrusters
 - ✅ Inclusion of actuator, pointing, and desaturation constraints

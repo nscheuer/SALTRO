@@ -192,6 +192,30 @@ and overwritten.
          </li>
          <li>
            <div class="saltro-node saltro-node-decision">
+             <strong>Does the backward pass predict descent for this step?</strong>
+             <p>The predicted cost change is <code>dV(alpha) = alpha*dV0 + alpha^2*dV1</code>
+             from the backward pass. A trial is only meaningful when the model predicts
+             descent (<code>dV(alpha) &lt; -1e-16</code>); when it predicts ascent or no
+             change, the acceptance ratio <code>z</code> flips sign and a cost-increasing
+             rollout could otherwise be accepted.</p>
+           </div>
+           <div class="saltro-outcomes">
+             <div class="saltro-outcome saltro-warn">
+               <strong>No (predicted ascent / degenerate)</strong>
+               <p>Reject this <code>alpha</code> without rolling out and keep backtracking.
+               If every <code>alpha</code> is rejected this way, the forward pass fails and
+               regularization escalates — persistent ascent predictions usually mean stale
+               or indefinite curvature (check the cost Hessian mode and regularization
+               settings, not the dynamics).</p>
+             </div>
+             <div class="saltro-outcome saltro-good">
+               <strong>Yes</strong>
+               <p>Roll out the trial.</p>
+             </div>
+           </div>
+         </li>
+         <li>
+           <div class="saltro-node saltro-node-decision">
              <strong>Is the rollout dynamically valid?</strong>
              <p>Reject the trial if the state is non-finite, the timestep is invalid, dynamics throw, the next state is invalid, or quaternion normalization fails.</p>
            </div>
@@ -225,6 +249,8 @@ and overwritten.
          <li>
            <div class="saltro-node saltro-node-decision">
              <strong>Does the line-search ratio satisfy <code>beta1 <= z <= beta2</code>?</strong>
+             <p>With <code>ilqr.ls_strict_decrease</code> enabled, acceptance additionally
+             requires a strict merit decrease (<code>J_new &lt; J_prev</code>).</p>
            </div>
            <div class="saltro-outcomes">
              <div class="saltro-outcome saltro-good">

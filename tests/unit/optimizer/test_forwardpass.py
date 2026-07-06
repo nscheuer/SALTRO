@@ -487,3 +487,87 @@ def test_forward_pass_strict_decrease_rejects_zero_improvement_rollouts(fixture)
     np.testing.assert_allclose(U_relaxed, U_base, atol=1e-12)
     np.testing.assert_allclose(X_strict, X_base, atol=1e-12)
     np.testing.assert_allclose(U_strict, U_base, atol=1e-12)
+
+
+def test_forward_pass_rejects_trials_when_backward_pass_predicts_ascent(fixture):
+    """G2 regression twin of the C++ test "forward_pass rejects trials when
+    backward pass predicts ascent".
+
+    deltaV(alpha) = alpha*deltaV[0] + alpha^2*deltaV[1] is the backward
+    pass's PREDICTED cost change.  When deltaV(alpha) >= 0 the z-ratio
+        z = (J_prev - J_new) / (-deltaV(alpha))
+    flips sign: a cost-INCREASING trial (J_new > J_prev) paired with a
+    predicted ascent gives z = (neg)/(neg) > 0, which the old line search
+    accepted whenever beta1 <= z <= beta2.  The fix rejects any trial with
+    deltaV(alpha) >= 0 (OldPlanner's exp > 0 guard), so the line search
+    keeps backtracking instead of accepting a cost increase.
+    """
+    X_base, U_base = fixture.warm_start()
+
+    U_trim = U_base[:, : fixture.N - 1]
+    lambda_aug, mu_aug = make_zero_aug_terms(
+        fixture.satellite, fixture.settings, X_base, U_trim, fixture.S
+    )
+    ok, K, d, deltaV = saltro_py.backward_pass(
+        fixture.satellite,
+        X_base, U_trim,
+        fixture.R, fixture.V, fixture.B, fixture.S, fixture.rho,
+        fixture.boresight, fixture.attitude_target_traj,
+        fixture.settings,
+        lambda_aug, mu_aug,
+        fixture.settings.passes[0].reg.reg_init
+    )
+    assert ok
+
+    cost_cfg = fixture.settings.passes[0].cost
+    J_prev = fixture.satellite.totalCost(
+        X_base, U_trim, fixture.B, fixture.boresight,
+        fixture.attitude_target_traj, cost_cfg
+    )
+
+    K_list = [K[k] for k in range(K.shape[0])]
+
+    # Scale the feedforward until the full step (alpha = 1) overshoots and
+    # INCREASES the cost.
+    scales = [2.0, 4.0, 6.0, 8.0]
+    chosen_scale = None
+    alpha1_cost = None
+    for scale in scales:
+        d_scaled = d.copy()
+        d_scaled *= scale
+        d_list = [d_scaled[:, k] for k in range(d_scaled.shape[1])]
+        _, _, J_alpha1 = fixture.rollout_with_alpha(1.0, K_list, d_list, X_base, U_base)
+        if J_alpha1 > J_prev:
+            chosen_scale = scale
+            alpha1_cost = J_alpha1
+            break
+    assert chosen_scale is not None
+
+    d_scaled = d.copy()
+    d_scaled *= chosen_scale
+    d_list = [d_scaled[:, k] for k in range(d_scaled.shape[1])]
+
+    # Engineered ascent prediction: deltaV[0] = J(alpha=1) - J_prev > 0,
+    # deltaV[1] = 0.  Under the pre-fix line search the alpha = 1 trial
+    # computes z = (J_prev - J(alpha=1)) / (-deltaV[0]) = 1 in [beta1, beta2]
+    # and is ACCEPTED despite increasing the cost.  With the ascent guard,
+    # deltaV(alpha) = alpha*deltaV[0] > 0 for every alpha, so EVERY trial
+    # must be rejected.
+    deltaV_ascent = np.array([alpha1_cost - J_prev, 0.0])
+    assert deltaV_ascent[0] > 0.0
+
+    ok, X_forward, U_forward, J_new = saltro_py.forward_pass(
+        fixture.satellite,
+        X_base, U_base,
+        K_list, d_list, deltaV_ascent,
+        fixture.B, fixture.R, fixture.V, fixture.S, fixture.rho,
+        fixture.boresight, fixture.attitude_target_traj,
+        fixture.settings, lambda_aug, mu_aug,
+        fixture.jtime, J_prev
+    )
+
+    assert not ok
+    # Rejected line search must not touch the trajectory or report a new cost.
+    assert J_new == J_prev
+    assert np.linalg.norm(X_forward - X_base) == 0.0
+    assert np.linalg.norm(U_forward - U_base) == 0.0
