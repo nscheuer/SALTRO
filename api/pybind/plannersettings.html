@@ -968,6 +968,15 @@
 </p>
 </dd></dl>
 
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig16gn_curvature_maxE">
+<span id="_CPPv3N10CostConfig16gn_curvature_maxE"></span><span id="_CPPv2N10CostConfig16gn_curvature_maxE"></span><span id="CostConfig::gn_curvature_max__double"></span><span class="target" id="structCostConfig_1a330c0fc0ca1a8ba2a78e2de79cd18b8f"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">gn_curvature_max</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N10CostConfig16gn_curvature_maxE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Opt-in curvature cap for the Gauss-Newton vec-pointing angle Hessian (only active when <code class="docutils literal notranslate"><span class="pre">cost_hess_gauss_newton</span> <span class="pre">==</span> <span class="pre">true</span></code>). Default 0.0 = disabled: exact GN behavior, zero change.</p>
+<p><strong>Why.</strong> In vec mode the assembled GN angle-Hessian q-block is the rank-1 PSD term w_ang · f’(c) · dc·dcᵀ (c = bs·Rᵀ·r̂). Because it’s rank-1, its single nonzero eigenvalue is *exactly* λ = w_ang · f’(c) · |dc|². For the ½·acos² shape (<code class="docutils literal notranslate"><span class="pre">ang_cost_func_type</span> <span class="pre">==</span> <span class="pre">3</span></code>) this eigenvalue diverges like 1/sin θ toward the antipode (θ → 180°): measured ≈ 71·w_ang at θ=170°, ≈ 7.2e5·w_ang at θ=179.999°. (The <em>full</em> exact Hessian is not stiff there — its divergence is the negative azimuthal cone, which regularization already handles.) The unbounded GN stiffness collapses step sizes and stalls near-antipodal slews.</p>
+<p><strong>What.</strong> When &gt; 0 and GN mode is active, the assembled rank-1 eigenvalue is clamped to <code class="docutils literal notranslate"><span class="pre">gn_curvature_max</span> <span class="pre">·</span> <span class="pre">w_ang</span></code> by nonnegative scaling of the (PSD) rank-1 term — so PSD-ness and the gradient are untouched, and below the cap behavior is bit-identical. The knob is in units of the angle weight: with the standard boresight parametrization <code class="docutils literal notranslate"><span class="pre">|dc|²</span> <span class="pre">=</span> <span class="pre">4</span> <span class="pre">sin²θ</span></code>, so types 0/1 satisfy f’·|dc|² ≤ 4` everywhere and a cap ≥ 4 leaves them exact.</p>
+<p><strong>Cap ⇔ angle.</strong> A cap C bounds the effective stiffness; type-3 GN is clamped for all θ inside the angle where f’(cos θ)·|dc|² = C<code class="docutils literal notranslate"> <span class="pre">(i.e.</span></code>4·f’’(cos θ)·sin²θ = C`). Larger C ⇒ cap engages only closer to the antipode. Typical useful values: C ≈ 10–50. </p>
+</dd></dl>
+
 </div>
 </dd></dl>
 
@@ -1547,6 +1556,7 @@ J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig20ang_cost_huber_deltaE"><code class="docutils literal notranslate"><span class="pre">ang_cost_huber_delta</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig13use_cost_hessE"><code class="docutils literal notranslate"><span class="pre">use_cost_hess</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig22cost_hess_gauss_newtonE"><code class="docutils literal notranslate"><span class="pre">cost_hess_gauss_newton</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig16gn_curvature_maxE"><code class="docutils literal notranslate"><span class="pre">gn_curvature_max</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv412AugLagConfig"><code class="docutils literal notranslate"><span class="pre">AugLagConfig</span></code></a><ul class="nav section-nav flex-column">
