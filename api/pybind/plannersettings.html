@@ -700,7 +700,13 @@
 <dd class="field-odd"><p>Maximum allowable angular velocity magnitude (rad/s) </p>
 </dd>
 <dt class="field-even">Param sun_limit_angle<span class="colon">:</span></dt>
-<dd class="field-even"><p>Minimum allowed angle to sun direction (rad) </p>
+<dd class="field-even"><p>Minimum allowed angle to sun direction (rad)</p>
+</dd>
+<dt class="field-odd">Param rw_stic_torque_theta<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Torque floor θ ∈ [0, 1] of the per-RW stiction torque-floor constraint c = θ − |u|/u_lim − |h|/h_c ≤ 0 with u_lim the (control_limit_scale-scaled) <a class="reference internal" href="actuators/RW.html#classRW"><span class="std std-ref">RW</span></a> torque limit and h_c = rw_stic_band_mult · h_lim, where h_lim = rw_momentum_limit_scale · h_max is the enforced (scaled) momentum limit. Semantics: at h = 0 the wheel must hold at least θ·u_lim of torque; the requirement fades linearly and vanishes for |h| ≥ θ·h_c (c ≤ 0 with u = 0 iff |h| ≥ θ·h_c). Default 0.0 disables the floor — the row is then always satisfied, behavior-identical to the historical dead −(u·h)² row. Recommended opt-in value: 0.9. High-torque zero crossings satisfy the row throughout (|u|/u_lim ≥ θ alone suffices); chatter is handled by the dwell cost, not this constraint. ALIGNMENT RULE with bias-momentum parking (<a class="reference internal" href="#structCostConfig_1a39f50ed36f1a5012f5b2c30e816410f8"><span class="std std-ref">CostConfig::RWh_desat_mult</span></a> recipe, parked at h* = h_stic/2): a parked wheel must satisfy the floor at zero torque, i.e. θ·h_c ≤ h*. Equivalently rw_stic_torque_theta · rw_stic_band_mult · rw_momentum_limit_scale ≤ h* / h_max. With defaults (rw_momentum_limit_scale = 1, so h_c = 0.005·h_max, θ = 0.9 when enabled, h_stic = 0.01·h_max, h* = 0.005·h_max): θ·h_c = 0.0045·h_max &lt; h* = 0.005·h_max (11% margin). A margin config (rw_momentum_limit_scale &lt; 1) only tightens this inequality. </p>
+</dd>
+<dt class="field-even">Param rw_stic_band_mult<span class="colon">:</span></dt>
+<dd class="field-even"><p>Momentum half-width of the torque-floor band as a fraction of the enforced momentum limit h_lim = rw_momentum_limit_scale · h_max: h_c = rw_stic_band_mult · h_lim. Default 0.005 — half of the default cost-side stiction band (<a class="reference internal" href="#structCostConfig_1a5de96970c4b1bb4b411dcce3f2e20ec9"><span class="std std-ref">CostConfig::RWh_stiction_mult</span></a> = 0.01). Deliberately independent of <a class="reference internal" href="#structCostConfig"><span class="std std-ref">CostConfig</span></a>; see the alignment rule above. </p>
 </dd>
 </dl>
 <div class="breathe-sectiondef docutils container">
@@ -730,6 +736,16 @@
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig15sun_limit_angleE">
 <span id="_CPPv3N16ConstraintConfig15sun_limit_angleE"></span><span id="_CPPv2N16ConstraintConfig15sun_limit_angleE"></span><span id="ConstraintConfig::sun_limit_angle__double"></span><span class="target" id="structConstraintConfig_1a477471a578d8be92f8ebc747cca8ae47"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">sun_limit_angle</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">20.0</span></span><span class="w"> </span><span class="o"><span class="pre">*</span></span><span class="w"> </span><span class="n"><span class="pre">M_PI</span></span><span class="w"> </span><span class="o"><span class="pre">/</span></span><span class="w"> </span><span class="m"><span class="pre">180.0</span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig15sun_limit_angleE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig20rw_stic_torque_thetaE">
+<span id="_CPPv3N16ConstraintConfig20rw_stic_torque_thetaE"></span><span id="_CPPv2N16ConstraintConfig20rw_stic_torque_thetaE"></span><span id="ConstraintConfig::rw_stic_torque_theta__double"></span><span class="target" id="structConstraintConfig_1a79b9198dd21f06119cf660095c058a06"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_stic_torque_theta</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig20rw_stic_torque_thetaE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N16ConstraintConfig17rw_stic_band_multE">
+<span id="_CPPv3N16ConstraintConfig17rw_stic_band_multE"></span><span id="_CPPv2N16ConstraintConfig17rw_stic_band_multE"></span><span id="ConstraintConfig::rw_stic_band_mult__double"></span><span class="target" id="structConstraintConfig_1ad39570af7da09b0d14fe63604fa006cd"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">rw_stic_band_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.005</span></span><a class="headerlink" href="#_CPPv4N16ConstraintConfig17rw_stic_band_multE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 </div>
@@ -1547,6 +1563,8 @@ J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig5u_maxE"><code class="docutils literal notranslate"><span class="pre">u_max</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig4wmaxE"><code class="docutils literal notranslate"><span class="pre">wmax</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig15sun_limit_angleE"><code class="docutils literal notranslate"><span class="pre">sun_limit_angle</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig20rw_stic_torque_thetaE"><code class="docutils literal notranslate"><span class="pre">rw_stic_torque_theta</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N16ConstraintConfig17rw_stic_band_multE"><code class="docutils literal notranslate"><span class="pre">rw_stic_band_mult</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv410CostConfig"><code class="docutils literal notranslate"><span class="pre">CostConfig</span></code></a><ul class="nav section-nav flex-column">

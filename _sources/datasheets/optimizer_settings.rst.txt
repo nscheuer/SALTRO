@@ -267,12 +267,16 @@ Quaternion-goal mode uses one of these scalar attitude-error shapes with
    \begin{cases}
    1 - d & \texttt{ang\_cost\_func\_type = 0} \\
    \frac{1}{2}(1-d)^2 & \texttt{ang\_cost\_func\_type = 1} \\
-   \arccos(d) & \texttt{ang\_cost\_func\_type = 2} \\
-   \frac{1}{2}\arccos(d)^2 & \texttt{ang\_cost\_func\_type = 3}
+   \frac{1}{2}\arccos(d)^2 & \texttt{ang\_cost\_func\_type = 3} \\
+   \delta^2 \left(\sqrt{1 + \left(\frac{\arccos(d)}{\delta}\right)^2} - 1\right)
+   & \texttt{ang\_cost\_func\_type = 5}
    \end{cases}
 
 Vector-pointing mode uses the same shape family, but with
 ``d = c = b_s^\top R(q)^\top \hat{r}``.
+
+The implemented set is ``{0,1,3,5}``. Type ``2`` (raw ``acos``) and type
+``4`` were removed and are not reused.
 
 Base angular-velocity cost:
 

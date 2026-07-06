@@ -722,11 +722,14 @@ w_{\theta,N} h_{\theta,N}
 \begin{cases}
 1 - d &amp; \texttt{ang\_cost\_func\_type = 0} \\
 \frac{1}{2}(1-d)^2 &amp; \texttt{ang\_cost\_func\_type = 1} \\
-\arccos(d) &amp; \texttt{ang\_cost\_func\_type = 2} \\
-\frac{1}{2}\arccos(d)^2 &amp; \texttt{ang\_cost\_func\_type = 3}
+\frac{1}{2}\arccos(d)^2 &amp; \texttt{ang\_cost\_func\_type = 3} \\
+\delta^2 \left(\sqrt{1 + \left(\frac{\arccos(d)}{\delta}\right)^2} - 1\right)
+&amp; \texttt{ang\_cost\_func\_type = 5}
 \end{cases}\end{split}\]</div>
 <p>Vector-pointing mode uses the same shape family, but with
 <code class="docutils literal notranslate"><span class="pre">d</span> <span class="pre">=</span> <span class="pre">c</span> <span class="pre">=</span> <span class="pre">b_s^\top</span> <span class="pre">R(q)^\top</span> <span class="pre">\hat{r}</span></code>.</p>
+<p>The implemented set is <code class="docutils literal notranslate"><span class="pre">{0,1,3,5}</span></code>. Type <code class="docutils literal notranslate"><span class="pre">2</span></code> (raw <code class="docutils literal notranslate"><span class="pre">acos</span></code>) and type
+<code class="docutils literal notranslate"><span class="pre">4</span></code> were removed and are not reused.</p>
 <p>Base angular-velocity cost:</p>
 <div class="math notranslate nohighlight">
 \[\ell_{\omega,\text{quad}} = \frac{1}{2} w_{\omega} \lVert \omega \rVert^2\]</div>
