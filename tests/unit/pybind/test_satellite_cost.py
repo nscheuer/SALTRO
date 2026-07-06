@@ -1983,6 +1983,54 @@ if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
 
 
+def test_ang_vel_direction_cost_mixed_hessian_matches_fd():
+    """The angular-velocity-direction cost contributes a mixed d2L/dw dq term
+    (cross_cost = -sign(qdot) * w_avang * q_g^T W(q) w, bilinear in (q, w)); the
+    pure q-q term is zero. This block was previously dropped. Isolate the cost
+    (only ang_vel_err_dir on) and check the w-q / q-w blocks vs finite
+    differences at a non-identity attitude and nonzero rate."""
+    settings = saltro.PlannerSettings()
+    sat = saltro.Satellite(np.diag([0.067, 0.071, 0.069]), settings)
+    sat.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+    AV = saltro.Satellite.AV_INDEX
+    QI = saltro.Satellite.QUAT_INDEX
+
+    cfg = saltro.CostConfig()
+    for attr in ("angle", "ang_vel", "ang_vel_mag", "angle_N", "ang_vel_N",
+                 "rw_AM_weight", "control_mult", "mtq_control_weight", "rw_control_weight"):
+        if hasattr(cfg, attr):
+            setattr(cfg, attr, 0.0)
+    cfg.ang_vel_err_dir = 1.0
+    cfg.use_cost_hess = True
+
+    q = np.array([0.6, -0.3, 0.5, 0.2]); q = q / np.linalg.norm(q)
+    x = np.zeros(sat.stateDim)
+    x[AV:AV + 3] = [0.05, 0.02, 0.01]
+    x[QI:QI + 4] = q
+    u = np.zeros(sat.controlDim)
+    att = np.array([0.2, 0.5, -0.4, 0.7]); att = att / np.linalg.norm(att)
+    bs = np.array([1.0, 0.0, 0.0])
+    B = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+    k, N = 0, 10
+
+    lxx, _, _ = sat.stageCostHessians(k, N, x, u, bs, att, B, cfg)
+    lxx = np.array(lxx)
+
+    def L(xx):
+        return sat.stageCost(k, N, xx, u, bs, att, B, cfg)
+
+    eps = 1e-5
+    for a in range(3):       # angular-velocity index
+        for b in range(4):   # quaternion index
+            ia, ib = AV + a, QI + b
+            xpp, xpm, xmp, xmm = (x.copy() for _ in range(4))
+            xpp[ia] += eps; xpp[ib] += eps
+            xpm[ia] += eps; xpm[ib] -= eps
+            xmp[ia] -= eps; xmp[ib] += eps
+            xmm[ia] -= eps; xmm[ib] -= eps
+            fd = (L(xpp) - L(xpm) - L(xmp) + L(xmm)) / (4.0 * eps * eps)
+            assert abs(lxx[ia, ib] - fd) < 1e-6, f"(w{a},q{b}): {lxx[ia,ib]} vs {fd}"
+            assert abs(lxx[ia, ib] - lxx[ib, ia]) < 1e-12  # symmetric
 # ============================================================================
 # TEST SECTION 13: afc=5 pseudo-Huber angle cost
 # ============================================================================

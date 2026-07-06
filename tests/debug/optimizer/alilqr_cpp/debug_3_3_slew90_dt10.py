@@ -43,7 +43,7 @@ def create_planner_settings():
     cost.ang_vel_N = 0.0
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 3
+    cost.ang_cost_func_type = 1
     cost.use_cost_hess = True
 
     plannersettings.disturbances.plan_for_aero = False

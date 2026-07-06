@@ -2411,9 +2411,10 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
     // ω-related Hessian contributions — branched on path.
     //
     // Quat-mode legacy (`w_avang != 0` AND quaternion mode): cross_cost is
-    // bilinear in (q, ω). (q,q) Hessian is identically zero.  The (ω,q)
-    // cross-Hessian is analytically nonzero but intentionally skipped here to
-    // preserve existing behavior.
+    // bilinear in (q, ω). (q,q) Hessian is identically zero. The (ω,q)
+    // cross-Hessian (previously skipped) is filled in the else-branch below
+    // (PR #80): the gradient always carried this term, so dropping it broke
+    // gradient/Hessian consistency on the legacy path.
     //
     // All other paths (vec mode regardless of w_avang, or quat mode with
     // w_avang == 0): full Hessian of
@@ -2492,6 +2493,25 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 Hqq_om += alpha * w(b) * dderr_dir_dqdq[b];
             }
             lxx.block<4, 4>(QUAT_INDEX, QUAT_INDEX) += Hqq_om;
+        }
+    } else {
+        // Quat-mode legacy (w_avang != 0): cross_cost = -sign(qdot)*w_avang*
+        // (q_g^T W(q) w). W(q) is linear in q, so the pure q-q Hessian is zero,
+        // but the mixed q-w block is not:
+        //   d2cross/dq_j dw_k = -sign(qdot)*w_avang * sum_r q_g_r * dW_rk/dq_j,
+        //   dW_rk/dq_j = W_sign[r][k] * [j == W_qidx[r][k]].
+        // Previously dropped (the gradient carried the term but the Hessian
+        // didn't), which broke Newton consistency on this path (PR #80).
+        static const int    W_qidx[4][3] = {{1, 2, 3}, {0, 3, 2}, {3, 0, 1}, {2, 1, 0}};
+        static const double W_sign[4][3] = {{-1, -1, -1}, {1, -1, 1}, {1, 1, -1}, {-1, 1, 1}};
+        const double coef = -safeSign(qdot_aligned) * w_avang;
+        for (int kk = 0; kk < 3; ++kk) {
+            for (int r = 0; r < 4; ++r) {
+                const int j = W_qidx[r][kk];
+                const double val = coef * q_goal_aligned(r) * W_sign[r][kk];
+                lxx(QUAT_INDEX + j, AV_INDEX + kk) += val;
+                lxx(AV_INDEX + kk, QUAT_INDEX + j) += val;
+            }
         }
     }
 

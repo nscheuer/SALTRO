@@ -1,0 +1,57 @@
+[ 33%] Built target Catch2
+[ 34%] Built target Catch2WithMain
+[ 51%] Built target saltro
+[ 52%] Built target debug_generate_orbit
+[ 53%] Built target debug_satellite
+[ 54%] Built target math_test_angles
+[ 54%] Built target math_test_frames
+[ 54%] Built target debug_integratedbdotcontroller_mc
+[ 55%] Built target math_test_matrix
+[ 56%] Built target optimizer_test_backwardpass
+[ 56%] Built target math_test_quaternion
+[ 56%] Built target math_test_mrp
+[ 57%] Built target optimizer_test_alilqr
+[ 58%] Built target optimizer_test_backwardpass_al
+[ 59%] Built target orbit_generation_density_test_compute_density_harrispriester
+[ 59%] Built target optimizer_test_warm_start
+[ 61%] Built target optimizer_test_forwardpass
+[ 61%] Built target optimizer_test_tvlqr_gains
+[ 61%] Built target optimizer_test_forwardpass_al
+[ 62%] Built target orbit_generation_eclipse_test_compute_eclipse_cylinder
+[ 62%] Built target orbit_generation_magnetics_test_compute_magnetic_igrf8
+[ 62%] Built target orbit_generation_eclipse_test_compute_eclipse_penumbra
+[ 63%] Built target orbit_generation_magnetics_test_compute_magnetic_dipole
+[ 64%] Built target orbit_generation_magnetics_test_compute_magnetic_igrf13
+[ 65%] Built target orbit_generation_orbits_test_compute_orbit_J2_RK4
+[ 66%] Built target orbit_generation_test_generate_orbit
+[ 66%] Built target orbit_generation_orbits_test_compute_orbit_keplerian
+[ 66%] Built target orbit_generation_sun_test_compute_sun_noaa
+[ 67%] Built target orbit_generation_sun_test_compute_sun_nrelspa
+[ 68%] Built target orbit_generation_test_orbit_dispatchers
+[ 68%] Built target pybind_actuators_test_actuator
+[ 69%] Built target pybind_actuators_test_Magic
+[ 69%] Built target pybind_actuators_test_MTQ
+[ 70%] Built target pybind_actuators_test_RW
+[ 71%] Built target pybind_controllers_test_integratedbdotcontroller
+[ 72%] Built target pybind_disturbances_test_geometryconfig
+[ 73%] Built target pybind_controllers_test_pdcontroller
+[ 73%] Built target pybind_disturbances_test_dragdisturbance
+[ 74%] Built target pybind_disturbances_test_ggdisturbance
+[ 74%] Built target pybind_disturbances_test_srpdisturbance
+[ 75%] Built target pybind_test_satellite
+[ 75%] Built target pybind_test_satellite_constraints
+[ 76%] Building CXX object CMakeFiles/pybind_test_satellite_cost.dir/tests/unit/pybind/test_satellite_cost.cpp.o
+[ 77%] Built target pybind_test_satellite_cost_omega_ff
+[ 77%] Built target pybind_test_satellite_disturbances
+[ 78%] Built target pybind_test_satellite_dynamics
+[ 94%] Built target saltro_py
+[ 96%] Built target validation_test_validate_initialstate
+[ 96%] Built target validation_test_validate_boresight
+[ 96%] Built target validation_test_validate_juliantime
+[ 97%] Built target validation_test_validate_orbitstate
+[ 98%] Built target validation_test_validate_plannersettings
+[ 98%] Built target validation_test_validate_qgoal
+[100%] Built target validation_test_validate_satellite
+[100%] Built target validation_test_validate_trajopt
+[100%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_cost
+[100%] Built target pybind_test_satellite_cost

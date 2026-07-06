@@ -2868,3 +2868,38 @@ TEST_CASE_METHOD(SatelliteCostFixture,
         prev_gn = gmax;
     }
 }
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "Angular-velocity-direction cost: mixed d2L/dw dq matches finite differences",
+    "[cost][hessians][fd]") {
+    // cross_cost = -sign(qdot) * w_avang * (q_g^T W(q) w) is bilinear in (q, w);
+    // its mixed w-q Hessian block was previously dropped. Isolate the cost and
+    // check the w-q block at a non-identity attitude and nonzero rate.
+    CostConfig cost_cfg;          // all weights default; turn on only this one
+    cost_cfg.ang_vel_err_dir = 1.0;
+    cost_cfg.use_cost_hess = true;
+
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x.segment<3>(Satellite::AV_INDEX) = Eigen::Vector3d(0.05, 0.02, 0.01);
+    Eigen::Vector4d q(0.6, -0.3, 0.5, 0.2);
+    q.normalize();
+    x.segment<4>(Satellite::QUAT_INDEX) = q;
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+
+    Eigen::Vector3d sat_direction(1.0, 0.0, 0.0);
+    Eigen::Vector4d eci_target(0.2, 0.5, -0.4, 0.7);
+    eci_target.normalize();
+    Eigen::Vector3d B_eci(2.5e-5, -1.5e-5, 3.0e-5);
+    const int k = 0, N = 10;
+
+    auto Hxx = std::get<0>(sat.stageCostHessians(k, N, x, u, sat_direction, eci_target, B_eci, cost_cfg));
+    Satellite::MatX fd = costHessianFiniteDiff_xx(k, N, x, u, sat_direction, eci_target, B_eci, cost_cfg);
+
+    const int AV = Satellite::AV_INDEX, QI = Satellite::QUAT_INDEX;
+    for (int a = 0; a < 3; ++a) {
+        for (int b = 0; b < 4; ++b) {
+            REQUIRE(std::abs(Hxx(AV + a, QI + b) - fd(AV + a, QI + b)) < 1e-5);
+            REQUIRE(std::abs(Hxx(AV + a, QI + b) - Hxx(QI + b, AV + a)) < 1e-12);
+        }
+    }
+}
