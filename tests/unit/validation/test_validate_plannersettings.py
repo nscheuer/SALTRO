@@ -722,6 +722,147 @@ def test_invalid_auglag_penalty_scale_one():
     assert error_msg == "auglag.penalty_scale invalid"
 
 
+NUM_CONSTRAINT_FAMILIES = 7
+
+
+def test_valid_auglag_per_family_penalty_vectors_empty():
+    """Empty per-family penalty vectors should pass (scalar fallback)"""
+    settings = valid_settings()
+    settings.passes[0].auglag.penalty_init_per_family = []
+    settings.passes[0].auglag.penalty_max_per_family = []
+    settings.passes[0].auglag.penalty_scale_per_family = []
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert ok
+
+
+def test_valid_auglag_per_family_penalty_vectors_full_length():
+    """Per-family penalty vectors of length NumFamilies with positive entries should pass"""
+    settings = valid_settings()
+    settings.passes[0].auglag.penalty_init_per_family = [1e-1] * NUM_CONSTRAINT_FAMILIES
+    settings.passes[0].auglag.penalty_max_per_family = [1e8] * NUM_CONSTRAINT_FAMILIES
+    settings.passes[0].auglag.penalty_scale_per_family = [10.0] * NUM_CONSTRAINT_FAMILIES
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert ok
+
+
+def test_invalid_auglag_penalty_init_per_family_wrong_length():
+    """penalty_init_per_family with wrong length should fail"""
+    settings = valid_settings()
+    settings.passes[0].auglag.penalty_init_per_family = [1e-1] * 3
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.penalty_init_per_family invalid"
+
+
+def test_invalid_auglag_penalty_max_per_family_wrong_length():
+    """penalty_max_per_family with wrong length should fail"""
+    settings = valid_settings()
+    settings.passes[0].auglag.penalty_max_per_family = [1e8] * (NUM_CONSTRAINT_FAMILIES + 1)
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.penalty_max_per_family invalid"
+
+
+def test_invalid_auglag_penalty_scale_per_family_wrong_length():
+    """penalty_scale_per_family with wrong length should fail"""
+    settings = valid_settings()
+    settings.passes[0].auglag.penalty_scale_per_family = [10.0]
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.penalty_scale_per_family invalid"
+
+
+def test_invalid_auglag_penalty_init_per_family_zero_entry():
+    """penalty_init_per_family with a zero entry should fail"""
+    settings = valid_settings()
+    vec = [1e-1] * NUM_CONSTRAINT_FAMILIES
+    vec[4] = 0.0
+    settings.passes[0].auglag.penalty_init_per_family = vec
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.penalty_init_per_family invalid"
+
+
+def test_invalid_auglag_penalty_max_per_family_negative_entry():
+    """penalty_max_per_family with a negative entry should fail"""
+    settings = valid_settings()
+    vec = [1e8] * NUM_CONSTRAINT_FAMILIES
+    vec[0] = -1.0
+    settings.passes[0].auglag.penalty_max_per_family = vec
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.penalty_max_per_family invalid"
+
+
+def test_invalid_auglag_penalty_scale_per_family_nan_entry():
+    """penalty_scale_per_family with a NaN entry should fail"""
+    settings = valid_settings()
+    vec = [10.0] * NUM_CONSTRAINT_FAMILIES
+    vec[6] = math.nan
+    settings.passes[0].auglag.penalty_scale_per_family = vec
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.penalty_scale_per_family invalid"
+
+
+def test_invalid_auglag_penalty_init_per_family_infinity_entry():
+    """penalty_init_per_family with an infinite entry should fail"""
+    settings = valid_settings()
+    vec = [1e-1] * NUM_CONSTRAINT_FAMILIES
+    vec[2] = math.inf
+    settings.passes[0].auglag.penalty_init_per_family = vec
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.penalty_init_per_family invalid"
+
+
+def test_valid_auglag_family_contraction_ratio_zero_positive_negative():
+    """family_contraction_ratio of 0, positive, or negative (disabled) should pass"""
+    settings = valid_settings()
+
+    settings.passes[0].auglag.family_contraction_ratio = 0.0
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+    settings.passes[0].auglag.family_contraction_ratio = 0.5
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+    # Negative disables conditional ramping (same as zero) and is allowed.
+    settings.passes[0].auglag.family_contraction_ratio = -1.0
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+
+def test_invalid_auglag_family_contraction_ratio_nan():
+    """NaN family_contraction_ratio should fail"""
+    settings = valid_settings()
+    settings.passes[0].auglag.family_contraction_ratio = math.nan
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.family_contraction_ratio invalid"
+
+
+def test_invalid_auglag_family_contraction_ratio_infinity():
+    """Infinite family_contraction_ratio should fail"""
+    settings = valid_settings()
+    settings.passes[0].auglag.family_contraction_ratio = math.inf
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "auglag.family_contraction_ratio invalid"
+
+
 def test_invalid_auglag_constraint_tol_negative():
     """Negative auglag.constraint_tol should fail"""
     settings = valid_settings()

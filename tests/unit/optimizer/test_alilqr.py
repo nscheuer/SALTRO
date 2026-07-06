@@ -321,3 +321,220 @@ def test_alilqr_hybrid_slew90_final_quality_and_constraints(tf_seconds: float, d
 		f"constraint violation too high: {max_violation:.3e}"
 	)
 
+
+
+# ----------------------------------------------------------------------------
+# Per-family AL penalty schedule tests (Python twins of the C++ TEST_CASEs in
+# tests/unit/optimizer/test_alilqr.cpp).
+# ----------------------------------------------------------------------------
+
+NUM_FAMILIES = len(saltro_py.ConstraintFamily.__members__)
+
+
+def run_alilqr_direct_rw_case(mutate_settings):
+	"""Run saltro_py.alilqr directly (bypassing trajOpt's convergence-or-throw
+	policy) on the 3-RW satellite with a tightened wmax so the AngularVelocity
+	constraint is ACTIVE from the start (|w0| = 0.0374 rad/s > wmax). Twin of
+	runALILQRDirectRWCase() in test_alilqr.cpp."""
+	dt_seconds = 10.0
+	tf_seconds = 200.0
+
+	plannersettings = create_planner_settings(dt_seconds)
+	plannersettings.constraints.wmax = 0.02
+	plannersettings.passes[0].auglag.max_outer_iters = 3
+	plannersettings.passes[0].ilqr.max_iters = 10
+	mutate_settings(plannersettings)
+
+	satellite = create_satellite_rw(plannersettings)
+
+	x0 = np.hstack(
+		(
+			np.array([-0.01, 0.02, 0.03], dtype=float),
+			np.array([1.0, 0.0, 0.0, 0.0], dtype=float),
+			np.zeros(3),
+		)
+	)
+
+	n = int(tf_seconds / dt_seconds) + 1
+	jtime = 0.22 + np.arange(n, dtype=float) * (dt_seconds / SEC_PER_CENTURY)
+
+	qgoal = np.tile(
+		np.array([[np.sqrt(2.0) / 2.0], [0.0], [0.0], [np.sqrt(2.0) / 2.0]]), (1, n)
+	)
+	boresight = np.tile(np.array([[1.0], [0.0], [0.0]]), (1, n))
+
+	r0 = np.array([7000e3, 0.0, 0.0], dtype=float)
+	v0 = np.array([0.0, 7.5e3, 0.0], dtype=float)
+
+	ok_orbit, R, V, B, S, rho = saltro_py.generate_orbit(r0, v0, jtime, 1, 2, 0, 0, 0)
+	assert ok_orbit
+	rho = np.asarray(rho).reshape(1, -1)
+
+	ok_ws, X, U = saltro_py.warm_start(
+		plannersettings, satellite, x0, jtime, qgoal, boresight, R, V, B, S, rho
+	)
+	assert ok_ws
+
+	ok, X, U, _status, max_c = saltro_py.alilqr(
+		plannersettings,
+		0,
+		satellite,
+		X,
+		U,
+		R,
+		V,
+		B,
+		S,
+		rho,
+		jtime,
+		boresight,
+		qgoal,
+	)
+
+	assert np.all(np.isfinite(X))
+	assert np.all(np.isfinite(U))
+
+	return ok, np.asarray(X), np.asarray(U), max_c
+
+
+def test_per_family_empty_vectors_match_scalar_path_exactly():
+	"""Per-family vectors filled with the scalar values must take the
+	per-family code path yet reproduce the scalar behavior bit-exactly."""
+	ok_base, X_base, U_base, _ = run_alilqr_direct_rw_case(lambda s: None)
+
+	def fill_per_family(s):
+		aug = s.passes[0].auglag
+		aug.penalty_init_per_family = [aug.penalty_init] * NUM_FAMILIES
+		aug.penalty_max_per_family = [aug.penalty_max] * NUM_FAMILIES
+		aug.penalty_scale_per_family = [aug.penalty_scale] * NUM_FAMILIES
+
+	ok_pf, X_pf, U_pf, _ = run_alilqr_direct_rw_case(fill_per_family)
+
+	assert ok_base == ok_pf
+	assert float(np.max(np.abs(X_base - X_pf))) == 0.0
+	assert float(np.max(np.abs(U_base - U_pf))) == 0.0
+
+
+def test_per_family_wrong_size_vectors_fall_back_to_scalar_path():
+	"""Vectors of the wrong length are ignored (scalar fallback) by contract."""
+	ok_base, X_base, U_base, _ = run_alilqr_direct_rw_case(lambda s: None)
+
+	def wrong_sizes(s):
+		aug = s.passes[0].auglag
+		aug.penalty_init_per_family = [12345.0] * 3
+		aug.penalty_max_per_family = [0.5] * 2
+		aug.penalty_scale_per_family = [99.0] * 4
+
+	ok_ws, X_ws, U_ws, _ = run_alilqr_direct_rw_case(wrong_sizes)
+
+	assert ok_base == ok_ws
+	assert float(np.max(np.abs(X_base - X_ws))) == 0.0
+	assert float(np.max(np.abs(U_base - U_ws))) == 0.0
+
+
+def test_per_family_penalty_init_is_consumed():
+	"""Give the (active) AngularVelocity family a much larger initial penalty
+	than the scalar default: if the per-family value is actually consumed, the
+	AL landscape of the very first inner solve changes and the optimized
+	trajectory must differ from the scalar baseline."""
+	_, _X_base, U_base, _ = run_alilqr_direct_rw_case(lambda s: None)
+
+	def hot_av_family(s):
+		aug = s.passes[0].auglag
+		init = [aug.penalty_init] * NUM_FAMILIES
+		init[int(saltro_py.ConstraintFamily.angular_velocity)] = 1e3
+		aug.penalty_init_per_family = init
+
+	_, _X_hot, U_hot, _ = run_alilqr_direct_rw_case(hot_av_family)
+
+	assert float(np.max(np.abs(U_base - U_hot))) > 1e-12
+
+
+def test_per_family_contraction_ratio_zero_always_ramps_same_as_base():
+	"""family_contraction_ratio = 0 disables conditional ramping; combined with
+	per-family vectors equal to the scalars, the result must be identical to
+	the scalar baseline."""
+	ok_base, X_base, U_base, _ = run_alilqr_direct_rw_case(lambda s: None)
+
+	def ratio_zero(s):
+		aug = s.passes[0].auglag
+		aug.penalty_init_per_family = [aug.penalty_init] * NUM_FAMILIES
+		aug.penalty_max_per_family = [aug.penalty_max] * NUM_FAMILIES
+		aug.penalty_scale_per_family = [aug.penalty_scale] * NUM_FAMILIES
+		aug.family_contraction_ratio = 0.0
+
+	ok_rz, X_rz, U_rz, _ = run_alilqr_direct_rw_case(ratio_zero)
+
+	assert ok_base == ok_rz
+	assert float(np.max(np.abs(X_base - X_rz))) == 0.0
+	assert float(np.max(np.abs(U_base - U_rz))) == 0.0
+
+
+def test_trajopt_converges_with_per_family_config_and_conditional_ramping():
+	"""End-to-end sanity: the full planner still converges with per-family
+	penalties and conditional ramping enabled (constraints here are easily
+	satisfiable, so gating must not break convergence)."""
+	dt_seconds = 10.0
+	tf_seconds = 200.0
+
+	plannersettings = create_planner_settings(dt_seconds)
+	aug = plannersettings.passes[0].auglag
+	init = [aug.penalty_init] * NUM_FAMILIES
+	init[int(saltro_py.ConstraintFamily.rw_momentum)] = 1.0
+	aug.penalty_init_per_family = init
+	aug.penalty_max_per_family = [aug.penalty_max] * NUM_FAMILIES
+	aug.penalty_scale_per_family = [aug.penalty_scale] * NUM_FAMILIES
+	aug.family_contraction_ratio = 0.5
+
+	satellite = create_satellite_rw(plannersettings)
+
+	jtime = np.array([0.22, 0.22 + tf_seconds / SEC_PER_CENTURY], dtype=float)
+	qgoal = np.tile(
+		np.array([[np.sqrt(2.0) / 2.0], [0.0], [0.0], [np.sqrt(2.0) / 2.0]]), (1, 2)
+	)
+	boresight = np.tile(np.array([[1.0], [0.0], [0.0]]), (1, 2))
+
+	w0 = np.array([-0.01, 0.02, 0.03], dtype=float)
+	q0 = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+	h0 = np.zeros(3)
+	x0 = np.hstack((w0, q0, h0))
+
+	r0 = np.array([7000e3, 0.0, 0.0], dtype=float)
+	v0 = np.array([0.0, 7.5e3, 0.0], dtype=float)
+
+	ok, X, U, _ = saltro_py.trajOpt(
+		plannersettings,
+		satellite,
+		x0,
+		r0,
+		v0,
+		jtime,
+		qgoal,
+		boresight,
+	)
+
+	assert ok
+	assert np.all(np.isfinite(X))
+	assert np.all(np.isfinite(U))
+
+	final_w_norm = float(np.linalg.norm(X[0:3, -1]))
+	final_pointing_error_deg = quat_pointing_error_deg(X[3:7, -1], qgoal[:, -1])
+
+	n_steps = X.shape[1]
+	dt_centuries = dt_seconds / SEC_PER_CENTURY
+	jtime_fine = jtime[0] + np.arange(n_steps, dtype=float) * dt_centuries
+
+	ok_orbit, _R, _V, _B, S, _rho = saltro_py.generate_orbit(
+		r0, v0, jtime_fine, 0, 0, 0, 0, 0
+	)
+	assert ok_orbit
+
+	max_violation = max_constraint_violation(satellite, plannersettings, X, U, S)
+
+	assert final_w_norm < 2e-2, f"final angular velocity too high: {final_w_norm:.3e} rad/s"
+	assert final_pointing_error_deg < 5.0, (
+		f"final pointing error too high: {final_pointing_error_deg:.3f} deg"
+	)
+	assert max_violation <= plannersettings.passes[0].auglag.constraint_tol + 1e-6, (
+		f"constraint violation too high: {max_violation:.3e}"
+	)

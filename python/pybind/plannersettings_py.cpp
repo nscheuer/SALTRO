@@ -36,6 +36,24 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("wmax", &ConstraintConfig::wmax)
         .def_readwrite("sun_limit_angle", &ConstraintConfig::sun_limit_angle);
 
+    py::enum_<ConstraintFamily>(m, "ConstraintFamily", R"doc(
+Constraint families for per-family AL penalty management.
+
+Each row of Satellite.constraints() belongs to one family (see
+Satellite.constraintFamily). Per-family AugLagConfig vectors
+(penalty_init_per_family, penalty_max_per_family, penalty_scale_per_family)
+must have length NumFamilies = 7 to take effect; the C++ sentinel
+ConstraintFamily::NumFamilies (= 7) is intentionally not exposed as an
+enum value.
+)doc")
+        .value("angular_velocity", ConstraintFamily::AngularVelocity)
+        .value("sun_avoidance", ConstraintFamily::SunAvoidance)
+        .value("mtq_saturation", ConstraintFamily::MTQSaturation)
+        .value("rw_torque_sat", ConstraintFamily::RWTorqueSat)
+        .value("rw_momentum", ConstraintFamily::RWMomentum)
+        .value("rw_stiction", ConstraintFamily::RWStiction)
+        .value("magic_torque_sat", ConstraintFamily::MagicTorqueSat);
+
     py::class_<CostConfig>(m, "CostConfig")
         .def(py::init<>())
         .def_readwrite("angle", &CostConfig::angle)
@@ -74,6 +92,10 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("penalty_init", &AugLagConfig::penalty_init)
         .def_readwrite("penalty_max", &AugLagConfig::penalty_max)
         .def_readwrite("penalty_scale", &AugLagConfig::penalty_scale)
+        .def_readwrite("penalty_init_per_family", &AugLagConfig::penalty_init_per_family)
+        .def_readwrite("penalty_max_per_family", &AugLagConfig::penalty_max_per_family)
+        .def_readwrite("penalty_scale_per_family", &AugLagConfig::penalty_scale_per_family)
+        .def_readwrite("family_contraction_ratio", &AugLagConfig::family_contraction_ratio)
         .def_readwrite("constraint_tol", &AugLagConfig::constraint_tol)
         .def_readwrite("total_cost_tol", &AugLagConfig::total_cost_tol);
 

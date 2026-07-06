@@ -2,11 +2,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <vector>
 
 #include <Eigen/Dense>
 
 #include <saltro/limits.h>
+#include <saltro/optimizer/alilqr.h>
 #include <saltro/optimizer/trajOpt.h>
+#include <saltro/optimizer/warm_start.h>
 #include <saltro/orbit_generation/generate_orbit.h>
 #include <saltro/pybind/satellite.h>
 
@@ -325,7 +329,227 @@ void runHybridCase(double tf_seconds, double dt_seconds) {
 	runAndCheckCase(settings, satellite, x0, tf_seconds, dt_seconds);
 }
 
+// ----------------------------------------------------------------------------
+// Per-family AL penalty schedule tests
+// ----------------------------------------------------------------------------
+
+struct ALRunResult {
+	Eigen::MatrixXd X;
+	Eigen::MatrixXd U;
+	bool ok = false;
+	double max_c = 0.0;
+};
+
+// Run alilqr() directly (bypassing trajOpt's convergence-or-throw policy) on
+// the 3-RW satellite with a tightened wmax so the AngularVelocity constraint
+// is ACTIVE from the start (|w0| = 0.0374 rad/s > wmax). The initial state
+// violates the constraint, so penalty ramping is genuinely exercised and the
+// chosen per-family penalties influence the solution.
+ALRunResult runALILQRDirectRWCase(const std::function<void(PlannerSettings&)>& mutate_settings) {
+	const double dt_seconds = 10.0;
+	const double tf_seconds = 200.0;
+
+	PlannerSettings settings = createRWPlannerSettings(dt_seconds);
+	settings.constraints.wmax = 0.02;
+	settings.passes[0].auglag.max_outer_iters = 3;
+	settings.passes[0].ilqr.max_iters = 10;
+	mutate_settings(settings);
+
+	Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+	J(0, 0) = 0.067;
+	J(1, 1) = 0.071;
+	J(2, 2) = 0.069;
+	Satellite satellite(J, settings);
+	satellite.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+	satellite.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+	satellite.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+	Satellite::VecX x0(satellite.stateDim());
+	x0.setZero();
+	x0.segment<3>(Satellite::AV_INDEX) = Eigen::Vector3d(-0.01, 0.02, 0.03);
+	x0.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+
+	const int N = static_cast<int>(tf_seconds / dt_seconds) + 1;
+	REQUIRE(N <= limits::MAX_LENGTH_TRAJ);
+
+	Eigen::Matrix<double, 1, limits::MAX_LENGTH_TRAJ> jtime_full;
+	jtime_full.setZero();
+	for (int k = 0; k < N; ++k) {
+		jtime_full(k) = 0.22 + k * dt_seconds / SEC_PER_CENTURY;
+	}
+
+	Eigen::MatrixXd q_goal = Eigen::MatrixXd::Zero(4, N);
+	Eigen::MatrixXd boresight = Eigen::MatrixXd::Zero(3, N);
+	for (int k = 0; k < N; ++k) {
+		q_goal.col(k) = Eigen::Vector4d(std::sqrt(2.0) / 2.0, 0.0, 0.0, std::sqrt(2.0) / 2.0);
+		boresight.col(k) = Eigen::Vector3d::UnitX();
+	}
+
+	const Eigen::Vector3d r0(7000e3, 0.0, 0.0);
+	const Eigen::Vector3d v0(0.0, 7.5e3, 0.0);
+
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> R;
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> V;
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> B;
+	Eigen::Matrix<double, 3, limits::MAX_LENGTH_TRAJ> S;
+	Eigen::Matrix<double, 1, limits::MAX_LENGTH_TRAJ> rho;
+	R.setZero();
+	V.setZero();
+	B.setZero();
+	S.setZero();
+	rho.setZero();
+	REQUIRE(orbits::generate_orbit(r0, v0, jtime_full, N, 1, 2, 0, 0, 0, R, V, B, S, rho));
+
+	Eigen::MatrixXd X = Eigen::MatrixXd::Zero(satellite.stateDim(), limits::MAX_LENGTH_TRAJ);
+	Eigen::MatrixXd U = Eigen::MatrixXd::Zero(satellite.controlDim(), limits::MAX_LENGTH_TRAJ);
+
+	const Eigen::VectorXd jtime_vec = jtime_full.leftCols(N).transpose();
+	REQUIRE(optimizer::warm_start(settings, satellite, x0, jtime_vec, q_goal, boresight, N, R, V, B, S, rho, X, U));
+
+	ALRunResult result;
+	optimizer::ALILQRStatus status = optimizer::ALILQRStatus::MaxOuterIterations;
+	double max_c = 0.0;
+	REQUIRE_NOTHROW(result.ok = optimizer::alilqr(
+		settings,
+		0,
+		satellite,
+		X.leftCols(N),
+		U.leftCols(N),
+		R.leftCols(N),
+		V.leftCols(N),
+		B.leftCols(N),
+		S.leftCols(N),
+		rho.leftCols(N),
+		jtime_vec,
+		boresight,
+		q_goal,
+		status,
+		max_c
+	));
+
+	result.X = X.leftCols(N);
+	result.U = U.leftCols(N);
+	result.max_c = max_c;
+
+	for (int i = 0; i < result.X.rows(); ++i) {
+		for (int k = 0; k < N; ++k) {
+			REQUIRE(std::isfinite(result.X(i, k)));
+		}
+	}
+	for (int i = 0; i < result.U.rows(); ++i) {
+		for (int k = 0; k < N; ++k) {
+			REQUIRE(std::isfinite(result.U(i, k)));
+		}
+	}
+
+	return result;
+}
+
 } // namespace
+
+TEST_CASE("AL per-family penalties: empty vectors match scalar path exactly", "[optimizer][alilqr][per_family]") {
+	// Scalar baseline (per-family vectors left empty).
+	const ALRunResult base = runALILQRDirectRWCase([](PlannerSettings&) {});
+
+	// Per-family vectors explicitly filled with the scalar values must take
+	// the per-family code path yet reproduce the scalar behavior bit-exactly.
+	const ALRunResult per_family = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		const size_t nf = static_cast<size_t>(ConstraintFamily::NumFamilies);
+		aug.penalty_init_per_family.assign(nf, aug.penalty_init);
+		aug.penalty_max_per_family.assign(nf, aug.penalty_max);
+		aug.penalty_scale_per_family.assign(nf, aug.penalty_scale);
+	});
+
+	REQUIRE(base.ok == per_family.ok);
+	REQUIRE((base.X - per_family.X).cwiseAbs().maxCoeff() == 0.0);
+	REQUIRE((base.U - per_family.U).cwiseAbs().maxCoeff() == 0.0);
+}
+
+TEST_CASE("AL per-family penalties: wrong-size vectors fall back to scalar path", "[optimizer][alilqr][per_family]") {
+	const ALRunResult base = runALILQRDirectRWCase([](PlannerSettings&) {});
+
+	// Vectors of the wrong length are ignored (scalar fallback) by contract.
+	const ALRunResult wrong_size = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		aug.penalty_init_per_family.assign(3, 12345.0);
+		aug.penalty_max_per_family.assign(2, 0.5);
+		aug.penalty_scale_per_family.assign(4, 99.0);
+	});
+
+	REQUIRE(base.ok == wrong_size.ok);
+	REQUIRE((base.X - wrong_size.X).cwiseAbs().maxCoeff() == 0.0);
+	REQUIRE((base.U - wrong_size.U).cwiseAbs().maxCoeff() == 0.0);
+}
+
+TEST_CASE("AL per-family penalties: family-specific penalty_init is consumed", "[optimizer][alilqr][per_family]") {
+	const ALRunResult base = runALILQRDirectRWCase([](PlannerSettings&) {});
+
+	// Give the AngularVelocity family (which is ACTIVE in this scenario, see
+	// runALILQRDirectRWCase) a much larger initial penalty than the scalar
+	// default (1e-1). If the per-family value is actually consumed, the AL
+	// landscape of the very first inner solve changes and the optimized
+	// trajectory must differ from the scalar baseline.
+	const ALRunResult hot_family = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		const size_t nf = static_cast<size_t>(ConstraintFamily::NumFamilies);
+		aug.penalty_init_per_family.assign(nf, aug.penalty_init);
+		aug.penalty_init_per_family[static_cast<size_t>(ConstraintFamily::AngularVelocity)] = 1e3;
+	});
+
+	REQUIRE((base.U - hot_family.U).cwiseAbs().maxCoeff() > 1e-12);
+}
+
+TEST_CASE("AL per-family penalties: contraction ratio 0 means always ramp (same as base)", "[optimizer][alilqr][per_family]") {
+	const ALRunResult base = runALILQRDirectRWCase([](PlannerSettings&) {});
+
+	// family_contraction_ratio = 0 disables conditional ramping; combined
+	// with per-family vectors equal to the scalars, the result must be
+	// identical to the scalar baseline.
+	const ALRunResult ratio_zero = runALILQRDirectRWCase([](PlannerSettings& s) {
+		auto& aug = s.passes[0].auglag;
+		const size_t nf = static_cast<size_t>(ConstraintFamily::NumFamilies);
+		aug.penalty_init_per_family.assign(nf, aug.penalty_init);
+		aug.penalty_max_per_family.assign(nf, aug.penalty_max);
+		aug.penalty_scale_per_family.assign(nf, aug.penalty_scale);
+		aug.family_contraction_ratio = 0.0;
+	});
+
+	REQUIRE(base.ok == ratio_zero.ok);
+	REQUIRE((base.X - ratio_zero.X).cwiseAbs().maxCoeff() == 0.0);
+	REQUIRE((base.U - ratio_zero.U).cwiseAbs().maxCoeff() == 0.0);
+}
+
+TEST_CASE("AL per-family penalties: trajOpt converges with per-family config and conditional ramping", "[optimizer][alilqr][per_family]") {
+	// End-to-end sanity: the full planner still converges with per-family
+	// penalties and conditional ramping enabled (constraints here are easily
+	// satisfiable, so gating must not break convergence).
+	PlannerSettings settings = createRWPlannerSettings(10.0);
+	auto& aug = settings.passes[0].auglag;
+	const size_t nf = static_cast<size_t>(ConstraintFamily::NumFamilies);
+	aug.penalty_init_per_family.assign(nf, aug.penalty_init);
+	aug.penalty_max_per_family.assign(nf, aug.penalty_max);
+	aug.penalty_scale_per_family.assign(nf, aug.penalty_scale);
+	aug.penalty_init_per_family[static_cast<size_t>(ConstraintFamily::RWMomentum)] = 1.0;
+	aug.family_contraction_ratio = 0.5;
+
+	Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+	J(0, 0) = 0.067;
+	J(1, 1) = 0.071;
+	J(2, 2) = 0.069;
+	Satellite satellite(J, settings);
+	satellite.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+	satellite.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+	satellite.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+	Satellite::VecX x0(satellite.stateDim());
+	x0.setZero();
+	x0.segment<3>(Satellite::AV_INDEX) = Eigen::Vector3d(-0.01, 0.02, 0.03);
+	x0.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+	x0.segment(satellite.RW_MOMENTUM_INDEX, 3) = Eigen::Vector3d::Zero();
+
+	runAndCheckCase(settings, satellite, x0, 200.0, 10.0);
+}
 
 TEST_CASE("AL-iLQR RW case tf=200 dt=10", "[optimizer][alilqr][rw]") {
 	runRWCase(200.0, 10.0);
