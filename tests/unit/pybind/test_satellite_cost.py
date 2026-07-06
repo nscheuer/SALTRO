@@ -1602,32 +1602,6 @@ class TestECITargetDualFormat:
         assert np.isfinite(J_switched)
         assert J_switched > J_aligned
 
-# ============================================================================
-# TEST SECTION 12: Singularity sweep + hemisphere-kink coverage
-# ============================================================================
-# Property tests over the full cost-shape parameter grid:
-#   cost type ∈ {0,1,2,3} × mode ∈ {vec (NaN ECI target), quat} × GN ∈ {on,off}.
-# We probe the attitude cost h(argument) where the inner scalar is
-#   c = bs·R(q)ᵀ·r̂  (vec mode, 2-DOF, argument ∈ [-1, 1]), or
-#   d = |q_goal·q|   (quat mode, hemisphere-aligned, argument ∈ [0, 1]).
-# The base attitude is identity, so the tangent projector is P = diag(0,1,1,1)
-# and only the q-components 1..3 carry gradient/Hessian signal.
-#
-# Coordinate conventions used here (physical angle θ):
-#   vec:  r̂ = [sinθ, 0, cosθ] with bs = +z ⇒ c = cosθ; θ→0 aligned pole
-#         (c→+1), θ→π antipode (c→−1, a GENUINE cusp for types 2/3).
-#   quat: q_goal = [cos(θ/2), sin(θ/2), 0, 0] ⇒ d = cos(θ/2); θ→0 aligned pole
-#         (d→+1), θ→π gives d→0 — the |·| hemisphere kink, NOT the d=−1 shape
-#         antipode (which hemisphere alignment makes unreachable).
-#
-# GN semantics discovered empirically and encoded below:
-#   - GN=False returns the full (exact) Hessian ⇒ matches central-difference FD.
-#   - GN=True in VEC mode drops the f'·∂²c chain term (the Gauss-Newton
-#     approximation) ⇒ deliberately does NOT match FD; we assert the rank-1
-#     GN eigen-structure instead (PSD for types 0/1/3, NSD for type 2).
-#   - GN flag is a NO-OP in QUAT mode (d is linear in q ⇒ no chain term to
-#     drop), so quat GN=True == quat GN=False == full Hessian ⇒ matches FD.
-
 import math as _math
 
 _SW_BS = np.array([0.0, 0.0, 1.0])
