@@ -352,3 +352,109 @@ TEST_CASE("AL-iLQR hybrid case tf=1000 dt=20", "[optimizer][alilqr][hybrid]") {
 TEST_CASE("AL-iLQR hybrid case tf=1000 dt=5", "[optimizer][alilqr][hybrid]") {
 	runHybridCase(1000.0, 5.0);
 }
+
+TEST_CASE("per-pass disturbance override matches global", "[optimizer][alilqr][disturbances]") {
+	// C++ twin of the python test test_per_pass_disturbance_override_matches_global:
+	// a single-pass override of the disturbance config must reproduce the same
+	// solve as setting that config globally (and differ from a disturbance-free
+	// solve). This pins that the per-pass disturbances actually reach the inner
+	// solve -- no warm-start confound, since there is only one pass.
+	const double dt_seconds = 10.0;
+	const double tf_seconds = 80.0;
+	const Eigen::Vector3d gen_torque(2e-4, -1e-4, 1e-4);
+
+	const auto buildSettings = [&](bool global_on, bool override_on) {
+		PlannerSettings s = createRWPlannerSettings(dt_seconds);
+		s.num_passes = 1;
+		if (global_on) {
+			s.disturbances.plan_for_gendist = true;
+			s.disturbances.gendist_torque = gen_torque;
+		}
+		if (override_on) {
+			s.passes[0].override_disturbances = true;
+			s.passes[0].disturbances.plan_for_gendist = true;
+			s.passes[0].disturbances.gendist_torque = gen_torque;
+		}
+		return s;
+	};
+
+	const auto solve = [&](const PlannerSettings& settings) {
+		Eigen::Matrix3d J = Eigen::Matrix3d::Zero();
+		J(0, 0) = 0.067;
+		J(1, 1) = 0.071;
+		J(2, 2) = 0.069;
+		Satellite satellite(J, settings);
+		satellite.addRW(Eigen::Vector3d::UnitX(), 0.001, 1e-5, 0.0, 0.02);
+		satellite.addRW(Eigen::Vector3d::UnitY(), 0.001, 1e-5, 0.0, 0.02);
+		satellite.addRW(Eigen::Vector3d::UnitZ(), 0.001, 1e-5, 0.0, 0.02);
+
+		Satellite::VecX x0(satellite.stateDim());
+		x0.setZero();
+		x0.segment<3>(Satellite::AV_INDEX) = Eigen::Vector3d(-0.01, 0.02, 0.03);
+		x0.segment<4>(Satellite::QUAT_INDEX) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0);
+		x0.segment(satellite.RW_MOMENTUM_INDEX, 3) = Eigen::Vector3d::Zero();
+
+		const Eigen::Vector3d r0(7000e3, 0.0, 0.0);
+		const Eigen::Vector3d v0(0.0, 7.5e3, 0.0);
+
+		Eigen::VectorXd jtime(2);
+		jtime(0) = 0.22;
+		jtime(1) = 0.22 + tf_seconds / SEC_PER_CENTURY;
+
+		Eigen::MatrixXd q_goal(4, 2);
+		q_goal << std::sqrt(2.0) / 2.0, std::sqrt(2.0) / 2.0,
+				  0.0, 0.0,
+				  0.0, 0.0,
+				  std::sqrt(2.0) / 2.0, std::sqrt(2.0) / 2.0;
+
+		Eigen::MatrixXd boresight(3, 2);
+		boresight << 1.0, 1.0,
+					 0.0, 0.0,
+					 0.0, 0.0;
+
+		const int state_dim = satellite.stateDim();
+		const int input_dim = satellite.controlDim();
+		const int reduced_state_dim = satellite.reducedStateDim();
+
+		Eigen::MatrixXd X = Eigen::MatrixXd::Zero(state_dim, limits::MAX_LENGTH_TRAJ);
+		Eigen::MatrixXd U = Eigen::MatrixXd::Zero(input_dim, limits::MAX_LENGTH_TRAJ);
+		Eigen::MatrixXd K = Eigen::MatrixXd::Zero(input_dim, reduced_state_dim * limits::MAX_LENGTH_TRAJ);
+		int N = static_cast<int>(jtime.size());
+
+		bool ok = false;
+		REQUIRE_NOTHROW(ok = optimizer::trajOpt(
+			settings,
+			satellite,
+			x0,
+			r0,
+			v0,
+			jtime,
+			q_goal,
+			boresight,
+			X,
+			U,
+			K,
+			state_dim,
+			input_dim,
+			N
+		));
+		REQUIRE(ok);
+		REQUIRE(N > 0);
+
+		const Eigen::MatrixXd U_out = U.leftCols(N);
+		REQUIRE(U_out.allFinite());
+		return U_out;
+	};
+
+	const Eigen::MatrixXd U_global_on = solve(buildSettings(/*global_on=*/true, /*override_on=*/false));
+	const Eigen::MatrixXd U_override_on = solve(buildSettings(/*global_on=*/false, /*override_on=*/true));
+	const Eigen::MatrixXd U_off = solve(buildSettings(/*global_on=*/false, /*override_on=*/false));
+
+	REQUIRE(U_global_on.cols() == U_override_on.cols());
+	REQUIRE(U_global_on.cols() == U_off.cols());
+
+	// Per-pass override(ON) reproduces global(ON) to solver tolerance...
+	REQUIRE((U_override_on - U_global_on).norm() < 1e-9);
+	// ...and genuinely differs from the disturbance-free solve.
+	REQUIRE((U_override_on - U_off).norm() > 1e-6);
+}

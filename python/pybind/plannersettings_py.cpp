@@ -116,7 +116,9 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ilqr", &PassConfig::ilqr)
         .def_readwrite("reg", &PassConfig::reg)
         .def_readwrite("linesearch", &PassConfig::linesearch)
-        .def_readwrite("dt", &PassConfig::dt);
+        .def_readwrite("dt", &PassConfig::dt)
+        .def_readwrite("override_disturbances", &PassConfig::override_disturbances)
+        .def_readwrite("disturbances", &PassConfig::disturbances);
 
     py::class_<TVLQRSettings>(m, "TVLQRSettings")
         .def(py::init<>())

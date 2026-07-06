@@ -95,13 +95,29 @@ def test_invalid_num_passes_negative():
     assert error_msg == "num_passes out of range"
 
 
+def test_per_pass_disturbance_override_validates():
+    """A pass overriding disturbances must have a valid disturbance config."""
+    settings = valid_settings()
+    settings.num_passes = 1
+    settings.passes[0].override_disturbances = True
+    settings.passes[0].disturbances.coeff_N = -1
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert not ok
+    assert error_msg == "pass disturbances.coeff_N invalid"
+    # Not flagged when the pass does not override.
+    settings.passes[0].override_disturbances = False
+    ok2, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok2
+
+
 def test_invalid_num_passes_exceeds_maximum():
     """num_passes exceeding MAX_OUTER_PASSES should fail"""
     settings = valid_settings()
-    # MAX_OUTER_PASSES is 2 in the C++ code
-    settings.num_passes = 3
+    # MAX_OUTER_PASSES is 5 in the C++ code; len(passes) reflects it.
+    assert len(settings.passes) == 5
+    settings.num_passes = len(settings.passes) + 1
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
+
     assert not ok
     assert error_msg == "num_passes out of range"
 

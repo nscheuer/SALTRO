@@ -1092,3 +1092,17 @@ TEST_CASE("Valid cost.gn_curvature_max - zero disables and positive allowed", "[
         REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
     }
 }
+
+TEST_CASE("Per-pass disturbance override is validated", "[plannersettings][validation][passes]") {
+    PlannerSettings settings = validSettings();
+    settings.num_passes = 1;
+    settings.passes[0].override_disturbances = true;
+    settings.passes[0].disturbances.coeff_N = -1;
+    std::string error_msg;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "pass disturbances.coeff_N invalid");
+
+    // Not flagged when the pass does not override.
+    settings.passes[0].override_disturbances = false;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}

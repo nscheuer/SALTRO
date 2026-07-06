@@ -323,3 +323,45 @@ def test_alilqr_hybrid_slew90_final_quality_and_constraints(tf_seconds: float, d
 		f"constraint violation too high: {max_violation:.3e}"
 	)
 
+
+
+def test_per_pass_disturbance_override_matches_global():
+    """A single-pass override of the disturbance config must reproduce the same
+    solve as setting that config globally (and differ from a disturbance-free
+    solve). This pins that the per-pass disturbances actually reach the inner
+    solve -- no warm-start confound, since there is only one pass."""
+    dt, tf = 10.0, 80.0
+    GEN = np.array([2e-4, -1e-4, 1e-4])
+
+    def build(global_on, override_on):
+        s = create_planner_settings(dt)
+        s.num_passes = 1
+        if global_on:
+            s.disturbances.plan_for_gendist = True
+            s.disturbances.gendist_torque = GEN
+        if override_on:
+            s.passes[0].override_disturbances = True
+            s.passes[0].disturbances.plan_for_gendist = True
+            s.passes[0].disturbances.gendist_torque = GEN
+        return s
+
+    jtime = np.array([0.22, 0.22 + tf / SEC_PER_CENTURY])
+    qgoal = np.array([[np.sqrt(2)/2, np.sqrt(2)/2], [0, 0], [0, 0], [np.sqrt(2)/2, np.sqrt(2)/2]])
+    boresight = np.array([[1.0, 1.0], [0.0, 0.0], [0.0, 0.0]])
+    x0 = np.hstack(([-0.01, 0.02, 0.03], [1.0, 0, 0, 0], [0.0, 0, 0]))
+    r0 = np.array([7000e3, 0.0, 0.0]); v0 = np.array([0.0, 7.5e3, 0.0])
+
+    def solve(s):
+        sat = create_satellite_rw(s)
+        ok, X, U, _ = saltro_py.trajOpt(s, sat, x0, r0, v0, jtime, qgoal, boresight)
+        assert ok and np.all(np.isfinite(U))
+        return U
+
+    U_global_on = solve(build(global_on=True, override_on=False))
+    U_override_on = solve(build(global_on=False, override_on=True))
+    U_off = solve(build(global_on=False, override_on=False))
+
+    # Per-pass override(ON) reproduces global(ON) to solver tolerance...
+    assert np.linalg.norm(U_override_on - U_global_on) < 1e-9, "override does not match global"
+    # ...and genuinely differs from the disturbance-free solve.
+    assert np.linalg.norm(U_override_on - U_off) > 1e-6, "override had no effect"

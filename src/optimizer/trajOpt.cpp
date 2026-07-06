@@ -254,6 +254,20 @@ bool trajOpt(
 		throw std::runtime_error("trajOpt failed to generate orbit");
 	}
 
+	// Per-pass disturbances: a pass may override the global disturbance model
+	// (e.g. stage it off then on across a coarse-to-fine schedule). Save the
+	// global config; each pass's effective disturbances are written into the
+	// field the inner solve (alilqr -> iLQR -> forward/backward pass) reads. The
+	// warm-start seed uses pass 0's effective config so the seed matches the
+	// dynamics the first pass optimizes under.
+	const DisturbanceConfig global_disturbances = settings_local.disturbances;
+	auto pass_disturbances = [&](int p) -> const DisturbanceConfig& {
+		return settings_local.passes[p].override_disturbances
+			? settings_local.passes[p].disturbances
+			: global_disturbances;
+	};
+	settings_local.disturbances = pass_disturbances(0);
+
 	const bool warm_start_ok = warm_start(settings_local, satellite, x0, jtime_fixed.leftCols(N_fixed).transpose(), q_goal_fixed.leftCols(N_fixed), boresight_fixed.leftCols(N_fixed), N_fixed, R, V, B, S, rho, X, U);
 
 	if (!warm_start_ok) {
@@ -261,6 +275,8 @@ bool trajOpt(
 	}
 
 	for (int pass_idx = 0; pass_idx < settings_local.num_passes; ++pass_idx) {
+		settings_local.disturbances = pass_disturbances(pass_idx);
+
 		ALILQRStatus al_status = ALILQRStatus::MaxOuterIterations;
 		double max_c = 0.0;
 		const bool ok = alilqr(
