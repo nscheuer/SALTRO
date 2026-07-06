@@ -275,6 +275,63 @@ def test_backward_pass_sqrt_ddp_flags_force_the_dense_path():
     assert np.array_equal(dV_dense, dV_flag)
 
 
+@pytest.mark.parametrize("with_al", [False, True])
+def test_backward_pass_sqrt_disturbance_aware_k_dist_matches_dense_pass(with_al):
+    # Twin of "backward_pass sqrt: disturbance-aware K_dist matches dense
+    # pass". With settings.tvlqr.disturbance_aware set, backward_pass returns
+    # [K_x | K_tau] blocks of width reducedStateDim + 3 (eq. 7.40); the sqrt
+    # pass carries the delta-tau channel through the cost-to-go factor and the
+    # joint [F_x F_u] factor, so the full augmented gains must match the dense
+    # pass to the same tight tolerance as the plain gains.
+    fixture = BackwardPassSqrtFixture(8)
+    fixture.settings.tvlqr.disturbance_aware = True
+    # The fixture's default cost config carries no state weights (P_k stays
+    # zero and every gain with it); give it the balanced weights and a real
+    # quaternion target from the tvlqr_disturbance tests so both K_x and the
+    # K_tau channel are live.
+    c = fixture.settings.passes[0].cost
+    c.angle = 1e2
+    c.ang_vel = 1e2
+    c.angle_N = 1e2
+    c.ang_vel_N = 1e2
+    c.control_mult = 1.0
+    c.mtq_control_weight = 1e-2
+    c.rw_control_weight = 1.0
+    c.ang_cost_func_type = 3
+    c.use_cost_hess = True
+    traj = list(fixture.make_trajectory(force_active=with_al))
+    r2 = np.sqrt(0.5)
+    traj[8] = make_attitude_traj(np.array([r2, r2, 0.0, 0.0]), fixture.N)
+    traj = tuple(traj)
+    if with_al:
+        X, U = traj[0], traj[1]
+        S = traj[5]
+        c_list = fixture.collect_constraints(X, U, S)
+        lambda_aug, mu_aug = BackwardPassSqrtFixture.make_const_aug(c_list, 1.0, 100.0)
+    else:
+        lambda_aug, mu_aug = empty_aug()
+
+    ok_dense, K_dense, d_dense, dV_dense = fixture.run(traj, lambda_aug, mu_aug, use_sqrt_bp=False)
+    ok_sqrt, K_sqrt, d_sqrt, dV_sqrt = fixture.run(traj, lambda_aug, mu_aug, use_sqrt_bp=True)
+
+    assert ok_dense
+    assert ok_sqrt
+    nxr = 6 + 3  # reduced state dim for the 3-MTQ + 3-RW fixture satellite
+    assert K_dense.shape[2] == nxr + 3  # [K_x | K_tau]
+    assert K_sqrt.shape == K_dense.shape
+
+    # Full augmented gains, then the K_tau block specifically.
+    assert rel_delta(K_dense, K_sqrt) < 1e-8
+    assert rel_delta(K_dense[:, :, :nxr], K_sqrt[:, :, :nxr]) < 1e-8
+    assert rel_delta(K_dense[:, :, nxr:], K_sqrt[:, :, nxr:]) < 1e-8
+    assert rel_delta(d_dense, d_sqrt) < 1e-8
+    assert abs(dV_dense[0] - dV_sqrt[0]) <= 1e-8 * max(1.0, abs(dV_dense[0]))
+    assert abs(dV_dense[1] - dV_sqrt[1]) <= 1e-8 * max(1.0, abs(dV_dense[1]))
+
+    # The disturbance channel is live, not trivially-zero agreement.
+    assert np.max(np.abs(K_dense[:, :, nxr:])) > 1e-12
+
+
 def test_backward_pass_sqrt_n1_edge_case():
     fixture = BackwardPassSqrtFixture(1)
     traj = fixture.make_trajectory(force_active=False)

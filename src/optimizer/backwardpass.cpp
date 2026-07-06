@@ -107,7 +107,7 @@ bool backwardPass(
 		if (!ddp_terms_requested) {
 			return backwardPassSqrt(
 				satellite, X, U, R, V, B, S, rho, boresight, attitude_target,
-				settings, reg, K, d, deltaV, lambda_aug, mu_aug
+				settings, reg, K, d, deltaV, lambda_aug, mu_aug, K_dist
 			);
 		}
 		static std::atomic<bool> sqrt_ddp_warned{false};

@@ -38,7 +38,7 @@ SEC_PER_CENTURY = 36525.0 * 86400.0
 NRED = 9  # reducedStateDim for the 3-RW satellite: 6 + 3
 
 
-def _make_settings(dt_seconds, disturbance_aware, res_dipole=None):
+def _make_settings(dt_seconds, disturbance_aware, res_dipole=None, use_sqrt_bp=False):
     ps = saltro_py.PlannerSettings()
     ps.init_traj.initcontroller = 2
     ps.num_passes = 1
@@ -77,6 +77,7 @@ def _make_settings(dt_seconds, disturbance_aware, res_dipole=None):
     ps.passes[0].reg.reg_scale = 10.0
     ps.passes[0].reg.use_dynamics_hess = False
     ps.passes[0].reg.use_constraint_hess = False
+    ps.passes[0].reg.use_sqrt_bp = use_sqrt_bp
     ps.passes[0].linesearch.max_iters = 24
     ps.passes[0].linesearch.beta1 = 1e-10
     ps.passes[0].linesearch.beta2 = 5000.0
@@ -86,8 +87,8 @@ def _make_settings(dt_seconds, disturbance_aware, res_dipole=None):
     return ps
 
 
-def _solve(dt=10.0, tf=200.0, disturbance_aware=False, res_dipole=None):
-    ps = _make_settings(dt, disturbance_aware, res_dipole)
+def _solve(dt=10.0, tf=200.0, disturbance_aware=False, res_dipole=None, use_sqrt_bp=False):
+    ps = _make_settings(dt, disturbance_aware, res_dipole, use_sqrt_bp)
     sat = create_satellite_rw(ps)
     jtime = np.array([0.22, 0.22 + tf / SEC_PER_CENTURY])
     r2 = np.sqrt(2.0) / 2.0
@@ -258,6 +259,49 @@ def test_disturbance_feedback_is_a_noop_when_the_disturbance_matches_the_plan():
     # the closed loop is bit-identical to state feedback alone -- no penalty for
     # enabling the feature when the plan is right.
     r = _solve(tf=BEHAVIORAL_TF, disturbance_aware=True, res_dipole=M_PLAN)
+    assert r["ok"]
+    orbit = _orbit_for(r)
+    (rms_so, peak_so), (rms_da, peak_da) = _drift_rollout(r, orbit, np.zeros(3))
+    assert rms_da == pytest.approx(rms_so, rel=1e-9, abs=1e-12)
+    assert peak_da == pytest.approx(peak_so, rel=1e-9, abs=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Square-root backward pass (use_sqrt_bp): the disturbance-aware machinery is
+# wired through backwardPassSqrt, so the same behavioral guarantees must hold
+# with the sqrt pass doing both the solve and the TVLQR gain computation.
+# ---------------------------------------------------------------------------
+def test_disturbance_feedback_improves_tracking_with_sqrt_bp():
+    # Twin of test_disturbance_feedback_improves_tracking_under_a_changing_
+    # disturbance with use_sqrt_bp=True: the sqrt pass must converge and its
+    # [K_x | K_tau] gains must deliver tracking equivalent to the dense pass.
+    r_sqrt = _solve(tf=BEHAVIORAL_TF, disturbance_aware=True, res_dipole=M_PLAN,
+                    use_sqrt_bp=True)
+    assert r_sqrt["ok"]
+    orbit = _orbit_for(r_sqrt)
+    (rms_so, peak_so), (rms_da, peak_da) = _drift_rollout(r_sqrt, orbit, M_DRIFT)
+
+    assert np.isfinite(rms_so) and np.isfinite(rms_da)
+    # Same conservative margins as the dense-mode test.
+    assert rms_da < 0.9 * rms_so
+    assert peak_da < 0.92 * peak_so
+
+    # Equivalent tracking to the dense-mode solve: sqrt-vs-dense backward-pass
+    # parity is ~1e-8 per iteration, so the closed-loop tracking errors of the
+    # two solves agree far tighter than the behavioral margins.
+    r_dense = _solve(tf=BEHAVIORAL_TF, disturbance_aware=True, res_dipole=M_PLAN)
+    assert r_dense["ok"]
+    orbit_d = _orbit_for(r_dense)
+    (_, _), (rms_da_dense, peak_da_dense) = _drift_rollout(r_dense, orbit_d, M_DRIFT)
+    assert rms_da == pytest.approx(rms_da_dense, rel=5e-2)
+    assert peak_da == pytest.approx(peak_da_dense, rel=5e-2)
+
+
+def test_disturbance_feedback_is_a_noop_when_matching_with_sqrt_bp():
+    # Twin of test_disturbance_feedback_is_a_noop_when_the_disturbance_matches
+    # _the_plan with use_sqrt_bp=True.
+    r = _solve(tf=BEHAVIORAL_TF, disturbance_aware=True, res_dipole=M_PLAN,
+               use_sqrt_bp=True)
     assert r["ok"]
     orbit = _orbit_for(r)
     (rms_so, peak_so), (rms_da, peak_da) = _drift_rollout(r, orbit, np.zeros(3))
