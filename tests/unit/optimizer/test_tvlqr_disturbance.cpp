@@ -49,6 +49,12 @@ PlannerSettings makeSettings(double dt, bool disturbance_aware, bool plan_dist,
 	c.rw_control_weight = 1.0;
 	c.ang_cost_func_type = 3;
 	c.use_cost_hess = true;
+	// The re-keyed RW momentum cost (post-#54) has an always-on desat
+	// quadratic whose default weight (rw_AM_weight = 1e4) dominates this
+	// disturbance-dominated scenario and reshapes the plan the behavioral
+	// margins were tuned on. Pin a moderate weight: wheels stay in-band
+	// without the momentum cost strangling the disturbance-fighting plan.
+	c.rw_AM_weight = 1e2;
 	s.disturbances.plan_for_resdipole = plan_dist;
 	if (plan_dist) {
 		s.disturbances.res_dipole = res_dipole;
