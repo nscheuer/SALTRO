@@ -386,7 +386,10 @@ for ``|h| > h_thresh``.
      - Terminal legacy direction-error cross-term weight.
    * - ``ang_cost_func_type``
      - ``3``
-     - Attitude-error shape selector. The implemented and validated set is ``{0,1,3}``. Type ``2`` (raw ``acos``) was removed: it is concave (anti-PSD under Gauss-Newton) and singular at both poles, including perfect alignment; migrate to type ``3`` (Taylor-protected ``acos²``) or type ``0`` (linear).
+     - Attitude-error shape selector. The implemented and validated set is ``{0,1,3,5}``. Type ``2`` (raw ``acos``) was removed: it is concave (anti-PSD under Gauss-Newton) and singular at both poles, including perfect alignment; migrate to type ``3`` (Taylor-protected ``acos²``) or type ``0`` (linear). Type ``5`` is pseudo-Huber in the pointing angle (see ``ang_cost_huber_delta``).
+   * - ``ang_cost_huber_delta``
+     - ``0.35``
+     - Pseudo-Huber crossover angle δ (rad) for ``ang_cost_func_type = 5``: the cost is ``δ²(√(1+(θ/δ)²) − 1)``, quadratic (≈ ``½θ²``, matching type ``3``) for θ ≪ δ and linear with slope δ for θ ≫ δ — the demanded descent rate saturates instead of growing with the error (bounded urgency on large slews). Must be finite and > 0.
    * - ``use_cost_hess``
      - ``false``
      - If true, use analytic state Hessians of the cost in the backward pass. If false, SALTRO keeps control curvature but drops potentially troublesome second-order state curvature.
@@ -601,6 +604,13 @@ for pointing problems. The former type ``2`` (raw ``acos``) was removed: its
 curvature is concave in the alignment scalar (anti-PSD under Gauss-Newton) and
 its gradient is singular at both poles, including perfect alignment. Use type
 ``3`` (Taylor-protected ``acos²``) or type ``0`` (linear) instead.
+
+``ang_cost_func_type = 5`` (pseudo-Huber, crossover ``ang_cost_huber_delta``)
+keeps type 3's quadratic basin near the goal but caps the large-angle gradient
+at δ, so a large initial error does not translate into a proportionally large
+commanded correction. Consider it when large-slew scenarios over-command the
+actuators under type 3, or when the running-angle weight must be raised well
+above the terminal-matched band.
 
 ``use_cost_hess``, ``use_dynamics_hess``, and ``use_constraint_hess`` are the
 main switches that move SALTRO from a mostly Gauss-Newton-style model toward a
