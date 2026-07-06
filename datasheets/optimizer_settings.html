@@ -959,8 +959,10 @@ subproblems:</p>
 <td><p>Maximum number of inner iLQR iterations. Must be nonnegative.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">grad_tol</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-3</span></code></p></td>
-<td><p>Gradient-based convergence threshold. Must be positive.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.0</span></code></p></td>
+<td><p>Gradient-based convergence threshold on the maximum feedforward norm
+<code class="docutils literal notranslate"><span class="pre">max_k</span> <span class="pre">||d_k||</span></code>. <code class="docutils literal notranslate"><span class="pre">0</span></code> disables the gradient test (cost-only
+convergence). Must be finite and nonnegative.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cost_tol</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-1</span></code></p></td>
@@ -970,11 +972,31 @@ subproblems:</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
 <td><p>Maximum allowed number of consecutive near-zero-improvement steps before declaring stagnation. Must be nonnegative.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_cost</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ls_strict_decrease</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Line-search acceptance additionally requires a strict cost decrease
+(<code class="docutils literal notranslate"><span class="pre">J_new</span> <span class="pre">&lt;</span> <span class="pre">J_prev</span></code>) on top of the <code class="docutils literal notranslate"><span class="pre">beta1</span> <span class="pre">&lt;=</span> <span class="pre">z</span> <span class="pre">&lt;=</span> <span class="pre">beta2</span></code> ratio test
+(ALTRO-style; both costs include the augmented-Lagrangian merit terms).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">conjunctive_convergence</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Require ALL enabled convergence conditions (cost AND gradient) to hold
+simultaneously, as in original ALTRO. Default (disjunctive): either
+condition suffices. <code class="docutils literal notranslate"><span class="pre">grad_tol</span> <span class="pre">=</span> <span class="pre">0</span></code> disables the gradient condition in
+both modes.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">persistent_reg</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Carry regularization across iLQR iterations (ALTRO-style): decrease on
+accepted steps (down to <code class="docutils literal notranslate"><span class="pre">reg.reg_min</span></code>, then 0), increase with
+<code class="docutils literal notranslate"><span class="pre">reg.reg_scale</span></code>/<code class="docutils literal notranslate"><span class="pre">reg.reg_bump</span></code> on backward/forward-pass failures.
+Default (legacy): reset to <code class="docutils literal notranslate"><span class="pre">reg.reg_init</span></code> every iteration.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_cost</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e40</span></code></p></td>
 <td><p>Safety abort threshold if the trajectory cost blows up. Must be positive.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">state_bound</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">state_bound</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">10.0</span></code></p></td>
 <td><p>Safety bound on state magnitude during rollout. Must be positive.</p></td>
 </tr>

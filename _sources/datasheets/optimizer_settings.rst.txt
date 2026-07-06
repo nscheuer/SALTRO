@@ -481,14 +481,33 @@ subproblems:
      - ``250``
      - Maximum number of inner iLQR iterations. Must be nonnegative.
    * - ``grad_tol``
-     - ``1e-3``
-     - Gradient-based convergence threshold. Must be positive.
+     - ``0.0``
+     - Gradient-based convergence threshold on the maximum feedforward norm
+       ``max_k ||d_k||``. ``0`` disables the gradient test (cost-only
+       convergence). Must be finite and nonnegative.
    * - ``cost_tol``
      - ``1e-1``
      - Cost-improvement tolerance used to detect convergence or stagnation. Must be finite and nonnegative.
    * - ``z_count_lim``
      - ``10``
      - Maximum allowed number of consecutive near-zero-improvement steps before declaring stagnation. Must be nonnegative.
+   * - ``ls_strict_decrease``
+     - ``false``
+     - Line-search acceptance additionally requires a strict cost decrease
+       (``J_new < J_prev``) on top of the ``beta1 <= z <= beta2`` ratio test
+       (ALTRO-style; both costs include the augmented-Lagrangian merit terms).
+   * - ``conjunctive_convergence``
+     - ``false``
+     - Require ALL enabled convergence conditions (cost AND gradient) to hold
+       simultaneously, as in original ALTRO. Default (disjunctive): either
+       condition suffices. ``grad_tol = 0`` disables the gradient condition in
+       both modes.
+   * - ``persistent_reg``
+     - ``false``
+     - Carry regularization across iLQR iterations (ALTRO-style): decrease on
+       accepted steps (down to ``reg.reg_min``, then 0), increase with
+       ``reg.reg_scale``/``reg.reg_bump`` on backward/forward-pass failures.
+       Default (legacy): reset to ``reg.reg_init`` every iteration.
    * - ``max_cost``
      - ``1e40``
      - Safety abort threshold if the trajectory cost blows up. Must be positive.
