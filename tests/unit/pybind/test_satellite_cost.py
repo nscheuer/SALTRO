@@ -965,6 +965,50 @@ class TestRWMomentumCost:
         cfg.use_cost_hess = True     # exercise the real state-Hessian block
         return cfg
 
+    def test_rw_momentum_cost_hessian_diagonal_nonnegative(self, fixture):
+        """Twin of C++ 'Cost Hessian w.r.t. RW momentum' (convex diagonal)."""
+        sat = fixture.sat
+        x = np.zeros(sat.stateDim)
+        x[sat.AV_INDEX:sat.AV_INDEX + 3] = [0.05, 0.02, 0.01]
+        x[sat.QUAT_INDEX:sat.QUAT_INDEX + 4] = [1.0, 0.0, 0.0, 0.0]
+        x[sat.RW_MOMENTUM_INDEX:sat.RW_MOMENTUM_INDEX + 3] = [0.003, -0.002, 0.001]
+        u = np.zeros(sat.controlDim)
+
+        cfg = saltro.CostConfig()
+        cfg.rw_AM_weight = 1e4
+        cfg.rw_stic_weight = 1.0
+        cfg.RWh_knee_frac = 0.8
+        cfg.RWh_stiction_mult = 0.01
+        cfg.RWh_desat_mult = 0.5
+
+        lxx, _, _ = sat.stageCostHessians(0, 10, x, u, np.zeros(3),
+                                          np.array([1.0, 0.0, 0.0, 0.0]),
+                                          np.zeros(3), cfg)
+        lxx = np.asarray(lxx)
+        for i in range(3):
+            hi = sat.RW_MOMENTUM_INDEX + i
+            assert lxx[hi, hi] >= -1e-10
+
+    def test_rw_momentum_cost_jacobian_near_saturation(self, fixture):
+        """Twin of C++ 'Cost Jacobian near RW momentum saturation'."""
+        sat = fixture.sat
+        x = np.zeros(sat.stateDim)
+        x[sat.QUAT_INDEX:sat.QUAT_INDEX + 4] = [1.0, 0.0, 0.0, 0.0]
+        x[sat.RW_MOMENTUM_INDEX] = 0.009  # near the 0.01 max
+        u = np.zeros(sat.controlDim)
+
+        cfg = saltro.CostConfig()
+        cfg.rw_AM_weight = 1e4
+        cfg.RWh_knee_frac = 0.8
+        cfg.RWh_desat_mult = 0.5
+
+        lx, _, _ = sat.stageCostJacobians(0, 10, x, u, np.zeros(3),
+                                          np.array([1.0, 0.0, 0.0, 0.0]),
+                                          np.zeros(3), cfg)
+        lx = np.asarray(lx)
+        assert np.all(np.isfinite(lx))
+        assert abs(lx[sat.RW_MOMENTUM_INDEX]) > 0
+
     def test_rw_momentum_cost_c1_continuity_at_the_knee(self, fixture):
         """Twin of C++ 'RW momentum cost: C1 continuity at the knee'."""
         cfg = self._rwh_only_cfg()
