@@ -2045,7 +2045,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
 // ============================================================================
 // C++ twin of TestSingularitySweep / TestHemisphereKink in
 // tests/unit/pybind/test_satellite_cost.py.  Property tests over the full
-// cost-shape grid: cost type ∈ {0,1,3} × mode ∈ {vec (NaN ECI target), quat}
+// cost-shape grid: cost type ∈ {0,1,3,5} × mode ∈ {vec (NaN ECI target), quat}
 // × Gauss-Newton flag ∈ {on, off}.  Base attitude is identity, so the tangent
 // projector is P = diag(0,1,1,1) and only q-components 1..3 carry signal.
 //
@@ -2147,7 +2147,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
         return (P * H * P).eval();
     };
 
-    for (int act : {0, 1, 3}) {
+    for (int act : {0, 1, 3, 5}) {
         for (bool quat_mode : {false, true}) {
             for (bool gn : {false, true}) {
                 const CostConfig cfg = sweepCfg(act, gn);
@@ -2173,12 +2173,13 @@ TEST_CASE_METHOD(SatelliteCostFixture,
                     }
 
                     // Skip Hessian-FD within 1e-3 rad of the antipode for the
-                    // acos² shape (vec type 3): the cost curvature radius
-                    // there shrinks below the FD step, so central differences stop
-                    // tracking the correctly-diverging analytic Hessian.  (The
-                    // dense grid never enters that band; guard documents intent.)
+                    // acos-family shapes (vec types 3/5): the cost curvature
+                    // radius there shrinks below the FD step, so central
+                    // differences stop tracking the correctly-diverging (type
+                    // 5: δ-scaled) analytic Hessian.  (The dense grid never
+                    // enters that band; guard documents intent.)
                     const bool near_antipode =
-                        (!quat_mode && act == 3 &&
+                        (!quat_mode && (act == 3 || act == 5) &&
                          std::abs(kPiSweep - theta) < 1e-3);
                     const Eigen::Matrix4d Hq = P * lxx.block<4, 4>(QI, QI) * P;
                     if (full_hess && !near_antipode) {
@@ -2194,9 +2195,18 @@ TEST_CASE_METHOD(SatelliteCostFixture,
                         std::sort(mags.data(), mags.data() + 4);
                         // Two tangent eigenvalues ≈ 0 ⇒ rank ≤ 1.
                         REQUIRE(mags(2) < 1e-6 + 1e-3 * mags(3));
-                        // f'' ≥ 0 for types 0/1/3 ⇒ PSD.  (Type 2, whose
-                        // f'' changed sign at c = 0, was removed.)
-                        REQUIRE(ev.minCoeff() > -1e-6);
+                        if (act != 5) {
+                            // f'' ≥ 0 for types 0/1/3 ⇒ PSD.  (Type 2, whose
+                            // f'' changed sign at c = 0, was removed.)
+                            REQUIRE(ev.minCoeff() > -1e-6);
+                        } else {
+                            // Type 5 is convex in θ but CONCAVE in c below the
+                            // g'' = g'·cotθ crossover (≈86° at δ = 0.35): the
+                            // single nonzero GN eigenvalue 4·[g''−g'·cotθ]·w is
+                            // negative there, positive above, and bounded by
+                            // 4·w in magnitude (g'' ≤ 1, g'·cotθ ≤ 1).
+                            REQUIRE(ev.minCoeff() > -4.0 - 1e-6);
+                        }
                     }
                 }
             }
@@ -2215,7 +2225,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
     const std::vector<double> boundary = {1e-2, 1e-3, 1e-4, 1e-5};
 
-    for (int act : {0, 1, 3}) {
+    for (int act : {0, 1, 3, 5}) {
         for (bool gn : {false, true}) {
             const CostConfig cfg = sweepCfg(act, gn);
 
@@ -2388,7 +2398,7 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
 
     const Eigen::Vector4d qg0(0.0, 1.0, 0.0, 0.0);  // orthogonal to identity ⇒ d = 0
-    for (int act : {0, 1, 3}) {
+    for (int act : {0, 1, 3, 5}) {
         const CostConfig cfg = sweepCfg(act, false);
         const double c = sat.stageCost(0, 100, x, u, bs, qg0, B0, cfg);
         auto [lx, Lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, qg0, B0, cfg);
@@ -2601,5 +2611,292 @@ TEST_CASE_METHOD(SatelliteCostFixture,
             REQUIRE(std::abs(Hxx(AV + a, QI + b) - fd(AV + a, QI + b)) < 1e-5);
             REQUIRE(std::abs(Hxx(AV + a, QI + b) - Hxx(QI + b, AV + a)) < 1e-12);
         }
+// ============================================================================
+// TEST SECTION 13: afc=5 pseudo-Huber angle cost
+// ============================================================================
+// C++ twin of TestPseudoHuberCost in tests/unit/pybind/test_satellite_cost.py.
+// Shape: g(θ) = δ²·(√(1+(θ/δ)²) − 1), θ = acos(c), δ = ang_cost_huber_delta.
+//   g'(θ) = θ/√(1+(θ/δ)²)  — ≈ θ near the goal, saturates at δ for θ ≫ δ.
+//   c-space: f'(c) = −g'(θ)/sinθ, f''(c) = [g''(θ) − g'(θ)·cotθ]/sin²θ.
+// Key assembled-quantity facts verified here (vec mode, weight w):
+//   |g_q| = 2·w·g'(θ) ≤ 2·w·δ·π/√(π²+δ²) < 2·w·δ   (|∂c/∂θ| = 2·sinθ cancels
+//     the 1/sinθ of f', leaving the bounded θ-space slope — the whole point);
+//   near-goal cost matches type 3's ½θ² with relative error −(θ/δ)²/4;
+//   antipodal GN divergence is δ-scaled (4·g'(π)/ε vs type 3's ~4π/ε) and
+//   clamped at the same u = 1e-6 seam as type 3.
+
+namespace {
+
+CostConfig huberCfg(double delta, bool gn, double weight = 1.0) {
+    CostConfig cfg = sweepCfg(5, gn);
+    cfg.ang_cost_huber_delta = delta;
+    cfg.angle = weight;
+    cfg.angle_N = weight;
+    return cfg;
+}
+
+struct HbProbe {
+    double cost;
+    Eigen::Vector4d gq;     // tangent-projected q-block gradient
+    Eigen::Matrix4d Hq;     // tangent-projected q-block Hessian
+};
+
+HbProbe hbProbe(const Satellite& sat, bool quat_mode, double theta,
+                const CostConfig& cfg) {
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x(QI) = 1.0;
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    const Eigen::Vector3d bs(0, 0, 1);
+    const Eigen::Vector3d B0 = Eigen::Vector3d::Zero();
+    const Eigen::Matrix4d P = tangentProjIdentity();
+    const Eigen::Vector4d tgt = sweepTarget(quat_mode, theta);
+    HbProbe p;
+    p.cost = sat.stageCost(0, 100, x, u, bs, tgt, B0, cfg);
+    auto [lx, lu, lux] = sat.stageCostJacobians(0, 100, x, u, bs, tgt, B0, cfg);
+    auto [lxx, luu, lux2] = sat.stageCostHessians(0, 100, x, u, bs, tgt, B0, cfg);
+    p.gq = P * lx.segment<4>(QI);
+    p.Hq = P * lxx.block<4, 4>(QI, QI) * P;
+    return p;
+}
+
+double hbCost(const Satellite& sat, bool quat_mode, const Eigen::Vector4d& tgt,
+              const Satellite::VecX& x, const CostConfig& cfg) {
+    Satellite::VecX u = Satellite::VecX::Zero(sat.controlDim());
+    return sat.stageCost(0, 100, x, u, Eigen::Vector3d(0, 0, 1), tgt,
+                         Eigen::Vector3d::Zero(), cfg);
+}
+
+}  // namespace
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc5 FD grid: gradient + Hessian across theta x delta x mode x GN/FN",
+    "[cost][jacobians][hessians][afc5][huber][finite-diff]") {
+    // θ ∈ {0.01°, 1°, 20°, 90°, 170°} × δ ∈ {0.1, 0.35, 1.0} × mode × GN/FN.
+    // Full-Newton (and quat mode, where GN is a no-op) must match central FD in
+    // both gradient and Hessian; GN vec mode returns the rank-1 c-space outer
+    // product instead (structure asserted, incl. the δ-dependent sign).
+    const int QI = Satellite::QUAT_INDEX;
+    Satellite::VecX x = Satellite::VecX::Zero(sat.stateDim());
+    x(QI) = 1.0;
+    const Eigen::Matrix4d P = tangentProjIdentity();
+
+    auto gradFD = [&](bool quat_mode, double theta, const CostConfig& cfg) {
+        const Eigen::Vector4d tgt = sweepTarget(quat_mode, theta);
+        Eigen::Vector4d g;
+        const double eps = 1e-6;
+        for (int j = 0; j < 4; ++j) {
+            Satellite::VecX xp = x, xm = x;
+            xp(QI + j) += eps; xm(QI + j) -= eps;
+            g(j) = (hbCost(sat, quat_mode, tgt, xp, cfg) -
+                    hbCost(sat, quat_mode, tgt, xm, cfg)) / (2.0 * eps);
+        }
+        return (P * g).eval();
+    };
+    auto hessFD = [&](bool quat_mode, double theta, const CostConfig& cfg) {
+        const Eigen::Vector4d tgt = sweepTarget(quat_mode, theta);
+        Eigen::Matrix4d H;
+        const double eps = 1e-4;
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                Satellite::VecX xpp = x, xmm = x, xpm = x, xmp = x;
+                xpp(QI + i) += eps; xpp(QI + j) += eps;
+                xmm(QI + i) -= eps; xmm(QI + j) -= eps;
+                xpm(QI + i) += eps; xpm(QI + j) -= eps;
+                xmp(QI + i) -= eps; xmp(QI + j) += eps;
+                H(i, j) = (hbCost(sat, quat_mode, tgt, xpp, cfg) +
+                           hbCost(sat, quat_mode, tgt, xmm, cfg) -
+                           hbCost(sat, quat_mode, tgt, xpm, cfg) -
+                           hbCost(sat, quat_mode, tgt, xmp, cfg)) /
+                          (4.0 * eps * eps);
+            }
+        }
+        return (P * H * P).eval();
+    };
+
+    for (double delta : {0.1, 0.35, 1.0}) {
+        for (bool quat_mode : {false, true}) {
+            for (bool gn : {false, true}) {
+                const CostConfig cfg = huberCfg(delta, gn);
+                const bool full_hess = (!gn) || quat_mode;
+                for (double td : {0.01, 1.0, 20.0, 90.0, 170.0}) {
+                    const double theta = td * kPiSweep / 180.0;
+                    const HbProbe p = hbProbe(sat, quat_mode, theta, cfg);
+                    REQUIRE(std::isfinite(p.cost));
+                    REQUIRE(p.gq.allFinite());
+                    REQUIRE(p.Hq.allFinite());
+
+                    const Eigen::Vector4d gfd = gradFD(quat_mode, theta, cfg);
+                    for (int j = 0; j < 4; ++j) {
+                        const double tol = 1e-6 + 1e-4 * std::abs(gfd(j));
+                        REQUIRE_THAT(p.gq(j),
+                                     Catch::Matchers::WithinAbs(gfd(j), tol));
+                    }
+
+                    if (full_hess) {
+                        const Eigen::Matrix4d Hfd = hessFD(quat_mode, theta, cfg);
+                        const double herr = (p.Hq - Hfd).cwiseAbs().maxCoeff();
+                        const double hscale = Hfd.cwiseAbs().maxCoeff();
+                        REQUIRE(herr < 1e-3 + 5e-2 * hscale);
+                    } else {
+                        // GN vec mode: rank-1 c-space outer product, magnitude
+                        // 4·[g''−g'·cotθ] ∈ (−4, 4) — negative below the sign
+                        // crossover, positive above (170° is past it for every
+                        // δ here).
+                        Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> es(p.Hq);
+                        Eigen::Vector4d ev = es.eigenvalues();
+                        Eigen::Vector4d mags = ev.cwiseAbs();
+                        std::sort(mags.data(), mags.data() + 4);
+                        REQUIRE(mags(2) < 1e-6 + 1e-3 * mags(3));
+                        REQUIRE(ev.minCoeff() > -4.0 - 1e-6);
+                        // Upper bound: 4·(g'' + g'·|cotθ|) ≤ 4 + 4·δ/sinθ
+                        // (g'' ≤ 1, g' < δ).
+                        REQUIRE(ev.maxCoeff() <
+                                4.0 + 4.0 * delta / std::sin(theta) + 1e-6);
+                        const double r = theta / delta;
+                        const double S = std::sqrt(1.0 + r * r);
+                        const double expected_sign =
+                            1.0 / (S * S * S) -
+                            (theta / S) * std::cos(theta) / std::sin(theta);
+                        if (expected_sign < -1e-9) {
+                            REQUIRE(ev.minCoeff() < 0.0);
+                        } else if (expected_sign > 1e-9) {
+                            REQUIRE(ev.minCoeff() > -1e-6);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc5 near-goal equivalence to afc3: cost ratio 1 - (theta/delta)^2/4",
+    "[cost][afc5][huber][near-goal]") {
+    // For θ ≪ δ: g₅(θ) = ½θ²·(1 − (θ/δ)²/4 + O((θ/δ)⁴)), so the cost ratio to
+    // type 3's ½θ² departs from 1 by exactly −(θ/δ)²/4 to leading order, and
+    // the assembled gradients agree to the same relative order.
+    for (double delta : {0.35, 1.0}) {
+        const CostConfig cfg5 = huberCfg(delta, false);
+        const CostConfig cfg3 = sweepCfg(3, false);
+        for (bool quat_mode : {false, true}) {
+            for (double td : {0.01, 0.1, 1.0}) {
+                const double theta = td * kPiSweep / 180.0;
+                // In quat mode the shape argument is d = cos(θ/2): the shape's
+                // internal angle is θ/2.
+                const double theta_shape = quat_mode ? 0.5 * theta : theta;
+                const HbProbe p5 = hbProbe(sat, quat_mode, theta, cfg5);
+                const HbProbe p3 = hbProbe(sat, quat_mode, theta, cfg3);
+                const double expected = -(theta_shape / delta) *
+                                        (theta_shape / delta) / 4.0;
+                const double measured = p5.cost / p3.cost - 1.0;
+                REQUIRE_THAT(measured,
+                             Catch::Matchers::WithinAbs(expected,
+                                 1e-8 + 0.05 * std::abs(expected)));
+                // Gradient agreement to the same order.
+                const double gerr = (p5.gq - p3.gq).norm() /
+                                    std::max(1e-300, p3.gq.norm());
+                REQUIRE(gerr < 1e-8 + 2.0 * (theta_shape / delta) *
+                                          (theta_shape / delta));
+            }
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc5 assembled gradient bound: |g_q| <= 2*w*delta*pi/sqrt(pi^2+delta^2) < 2*w*delta",
+    "[jacobians][afc5][huber][bound]") {
+    // Derivation (vec mode): |∂c/∂θ| = 2·sinθ (quaternion tangent → physical
+    // angle factor 2), so |g_q| = w·|f'|·2·sinθ = 2·w·g'(θ).  g' is monotone
+    // increasing on [0, π] with g'(π) = π·δ/√(π²+δ²), hence the bound
+    //   |g_q| ≤ 2·w·δ·π/√(π²+δ²) < 2·w·δ,
+    // attained at the antipode (vs type 3's unbounded-in-δ 2·w·θ → 2πw).
+    // The bound is TIGHT (reached within 0.2% at 179°) and the large-angle
+    // gradient does NOT vanish: |g_q|(179°) ≥ 1.9·w·δ — the antipodal escape
+    // gradient that type 0 lacks.
+    for (double delta : {0.1, 0.35, 1.0}) {
+        for (double w : {1.0, 3.0}) {
+            const CostConfig cfg = huberCfg(delta, false, w);
+            const double bound =
+                2.0 * w * delta * kPiSweep /
+                std::sqrt(kPiSweep * kPiSweep + delta * delta);
+            double gmax = 0.0;
+            for (double td = 1.0; td <= 179.0; td += 1.0) {
+                const double theta = td * kPiSweep / 180.0;
+                const HbProbe p = hbProbe(sat, false, theta, cfg);
+                gmax = std::max(gmax, p.gq.norm());
+                REQUIRE(p.gq.norm() <= bound * (1.0 + 1e-9));
+            }
+            REQUIRE(gmax > 0.99 * bound);   // tight
+            const HbProbe p179 = hbProbe(sat, false, 179.0 * kPiSweep / 180.0, cfg);
+            REQUIRE(p179.gq.norm() > 1.9 * w * delta);  // non-vanishing escape
+        }
+    }
+}
+
+TEST_CASE_METHOD(SatelliteCostFixture,
+    "afc5 antipode divergence delta-scaled + clamped at the type-3 seam",
+    "[hessians][afc5][huber][antipode][clamp]") {
+    // Exact region (u = 1+c ≥ 1e-6): the assembled GN max-eig diverges like
+    // 4·w·g'(π)/ε (ε = π−θ) — the δ/π-scaled version of type 3's ~4π/ε.
+    // Clamped region (u < 1e-6): (f', f'') freeze at the type-5 seam values
+    // (δ = 0.35: f' ≈ −246, f'' ≈ +1.23e8, both ≈ δ·0.3478/π· the type-3
+    // bounds), FN min-eig saturates at ≈ 4·f'_seam, GN decays with frozen f''.
+    const double delta_h = 0.35;
+    const CostConfig cfgG = huberCfg(delta_h, true);
+    const CostConfig cfgF = huberCfg(delta_h, false);
+
+    // Seam constants (mirror angCostShape5Exact at c_eff = −1 + 1e-6).
+    const double c_eff = -1.0 + 1e-6;
+    const double omc2_eff = 1.0 - c_eff * c_eff;
+    const double s_eff = std::sqrt(omc2_eff);
+    const double phi_eff = std::acos(c_eff);
+    const double S_eff = std::sqrt(1.0 + (phi_eff / delta_h) * (phi_eff / delta_h));
+    const double gp_eff = phi_eff / S_eff;                    // ≈ g'(π) ≈ 0.3478
+    const double fp_seam = -gp_eff / s_eff;                   // ≈ −246
+    const double fpp_seam =
+        (1.0 / (S_eff * S_eff * S_eff) - gp_eff * c_eff / s_eff) / omc2_eff;
+    const double gn_bound = fpp_seam * 4.0 * omc2_eff;        // ≈ +984
+    const double fn_saturation = 4.0 * fp_seam;               // ≈ −984
+
+    // δ-scaling vs type 3: same seam, curvature scaled by g'(π)/π ≈ δ/π.
+    const double fpp_seam3 =
+        1.0 / omc2_eff - phi_eff * c_eff / (omc2_eff * s_eff);
+    REQUIRE_THAT(fpp_seam / fpp_seam3,
+                 Catch::Matchers::WithinRel(gp_eff / phi_eff, 1e-3));
+
+    double prev_gn = 0.0;
+    for (double eps : {1e-2, 1e-3, 1e-4, 1e-5}) {
+        const double theta = kPiSweep - eps;
+        const HbProbe pG = hbProbe(sat, false, theta, cfgG);
+        const HbProbe pF = hbProbe(sat, false, theta, cfgF);
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> esG(pG.Hq);
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> esF(pF.Hq);
+        const double gmax = esG.eigenvalues().maxCoeff();
+        const double fmin = esF.eigenvalues().minCoeff();
+
+        REQUIRE(gmax > 0.0);
+        REQUIRE(fmin < 0.0);
+        REQUIRE(gmax <= gn_bound * (1.0 + 1e-6));
+        REQUIRE(fmin >= fn_saturation * 1.01);
+        if (1.0 - std::cos(eps) >= 1e-6) {
+            // Exact region: ~4·g'(π)/ε scaling and monotone growth.
+            REQUIRE(gmax > prev_gn);
+            REQUIRE_THAT(gmax * eps, Catch::Matchers::WithinRel(
+                4.0 * gp_eff, 0.05));
+            // δ-scaled escape gradient: |g| ≈ 2·g'(θ) ≈ 2·g'(π), NOT 2π.
+            REQUIRE_THAT(pF.gq.norm(), Catch::Matchers::WithinRel(
+                2.0 * gp_eff, 0.05));
+        } else {
+            // Clamped region: FN saturates, GN decays with the frozen f'',
+            // gradient decays linearly (|f'_seam|·2·sinθ).
+            REQUIRE_THAT(fmin, Catch::Matchers::WithinRel(fn_saturation, 1e-2));
+            const double c_here = std::cos(theta);
+            REQUIRE_THAT(gmax, Catch::Matchers::WithinRel(
+                fpp_seam * 4.0 * (1.0 - c_here * c_here), 1e-5));
+            REQUIRE_THAT(pF.gq.norm(), Catch::Matchers::WithinRel(
+                -fp_seam * 2.0 * std::sin(theta), 1e-5));
+        }
+        prev_gn = gmax;
     }
 }

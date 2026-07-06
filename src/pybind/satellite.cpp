@@ -1360,6 +1360,56 @@ namespace {
 // including the aligned pole c = +1 where its gradient −1/√(1−c²) → −∞ is a
 // genuine — not removable — singularity, unlike type 3's ½·acos² whose aligned
 // pole is removable and Taylor-protected below.)
+//
+// === Type 5: pseudo-Huber in the pointing angle θ = acos(c) =====================
+//
+// g(θ) = δ²·(√(1 + (θ/δ)²) − 1), with δ = ang_cost_huber_delta (rad) the
+// quadratic→linear crossover.  Properties (all in the PHYSICAL angle θ):
+//
+//   g'(θ)  = θ/√(1+(θ/δ)²)          — ≈ θ for θ ≪ δ (quadratic basin, matches
+//                                     type 3's ½θ² to O((θ/δ)²)), saturates at
+//                                     δ for θ ≫ δ (bounded urgency: the demanded
+//                                     "descent force" stops growing with error).
+//   g''(θ) = (1+(θ/δ)²)^{-3/2} ∈ (0,1] — strictly positive: the θ-space shape
+//                                     is convex everywhere, never plateaus.
+//
+// c-space derivatives (this helper returns d/dc):
+//   f(c)   = g(θ)
+//   f'(c)  = −g'(θ)/sinθ
+//   f''(c) = [g''(θ) − g'(θ)·cotθ]/sin²θ
+//
+// c = +1 (aligned): the SAME removable 0/0 as type 3 (g'(θ)/sinθ → 1), plus the
+// SAME catastrophic cancellation in f'' (numerator g''−g'·cotθ = O(θ²) is a
+// difference of O(1) terms).  Protected by a Taylor branch mirroring type 3's
+// (series in omz = 1 − c below; thresholds δ-scaled because the series radius
+// of convergence shrinks like δ² — see the branch comment).
+// Aligned-pole limits: f'(1) = −1 (same as type 3);
+//   f''(1) = 1/3 − 1/δ²  — NEGATIVE for δ < √3.  That is not a bug: c is a
+// degenerate coordinate at the pole (dc/dθ = −sinθ → 0); the exact (full-
+// Newton) tangent Hessian recovers the true positive curvature g''(0) = 1
+// through the f'·(chain/manifold) terms, exactly as for type 3, and FD
+// confirms it.  CONSEQUENCE FOR GN MODE (vec): the c-space Gauss-Newton
+// outer product f''·dc·dcᵀ has assembled magnitude f''·|dc|² =
+// 4·[g''(θ) − g'(θ)·cotθ], which for δ < √3 is NEGATIVE from the pole up to
+// the sign crossover θ_c (g'' = g'·cotθ; θ_c ≈ 86° for δ = 0.35, → 90° as
+// δ → 0) and bounded by 4·w in magnitude.  Unlike types 0/1/3, c-space GN is
+// therefore NOT PSD for this shape — pseudo-Huber is concave in c over most
+// of the basin even though it is convex in θ.  The backward-pass
+// regularization absorbs it (it already must handle the zero GN curvature of
+// type 0 and the indefinite full-Newton blocks); the singularity-sweep tests
+// encode this expected sign structure rather than asserting PSD.
+//
+// c = −1 (antipodal): genuine cusp like type 3, but δ-SCALED:
+//   f'(c)  → −g'(π)/sinθ ≈ −δ/(π−θ)          (type 3: −π/(π−θ))
+//   f''(c) → +g'(π)/[sinθ·sin²θ]-ish, i.e. the assembled GN curvature diverges
+//            like +δ/(π−θ) — milder than type 3 by the factor δ/π but still
+//            divergent, so the bounded antipodal clamp below covers type 5 too
+//            (seam values computed from the type-5 exact formula; for δ = 0.35
+//            the clamped bounds are |f'| ≤ ~2.5e2, f'' ≤ ~1.2e8).
+// Crucially the assembled tangent GRADIENT near the antipode is |f'|·sinθ =
+// g'(θ) → g'(π) = πδ/√(π²+δ²) ≈ δ: a non-vanishing escape gradient (unlike
+// type 0, whose 1−c plateaus with zero slope at the antipode), yet bounded
+// (unlike type 3's ~π there — δ-scaled urgency is the whole point).
 struct AngCostShape { double f, fp, fpp; };
 
 inline AngCostShape angCostShape3Taylor(double omz) {
@@ -1377,7 +1427,59 @@ inline AngCostShape angCostShape3Taylor(double omz) {
     };
 }
 
-AngCostShape angCostShape(double c, int type) {
+inline AngCostShape angCostShape5Taylor(double omz, double delta) {
+    // f(c) = δ²·(√(1 + acos²(1 − omz)/δ²) − 1), expanded in omz around 0.
+    // Derivation: with T = acos²(1 − z) = 2z + z²/3 + 4z³/45 + z⁴/35 + O(z⁵)
+    // (inversion of z = 1 − cos√T), compose with δ²(√(1+T/δ²) − 1) =
+    // T/2 − T²/(8δ²) + T³/(16δ⁴) − 5T⁴/(128δ⁶) + …:
+    //   f   =  z + (1/6 − 1/(2δ²))·z² + (2/45 − 1/(6δ²) + 1/(2δ⁴))·z³
+    //            + (1/70 − 7/(120δ²) + 1/(4δ⁴) − 5/(8δ⁶))·z⁴
+    //   f'  = −[1 + (1/3 − 1/δ²)·z + (2/15 − 1/(2δ²) + 3/(2δ⁴))·z²
+    //            + (2/35 − 7/(30δ²) + 1/δ⁴ − 5/(2δ⁶))·z³]   (d/dc = −d/dz)
+    //   f'' =  (1/3 − 1/δ²) + (4/15 − 1/δ² + 3/δ⁴)·z
+    //            + (6/35 − 7/(10δ²) + 3/δ⁴ − 15/(2δ⁶))·z²
+    // Coefficients verified against the closed forms (long-double) with the
+    // truncation error shrinking at the expected next-order rate; same series
+    // depth as the type-3 helper above (δ → ∞ reproduces it term-by-term at
+    // this depth — note the type-3 comment's z³/z² tails differ slightly from
+    // this exact expansion, invisibly below the 1e-4 threshold).
+    const double d2 = delta * delta;
+    const double d4 = d2 * d2;
+    const double d6 = d4 * d2;
+    const double omz2 = omz * omz;
+    const double omz3 = omz2 * omz;
+    const double omz4 = omz2 * omz2;
+    return {
+        omz + (1.0 / 6.0 - 1.0 / (2.0 * d2)) * omz2
+            + (2.0 / 45.0 - 1.0 / (6.0 * d2) + 1.0 / (2.0 * d4)) * omz3
+            + (1.0 / 70.0 - 7.0 / (120.0 * d2) + 1.0 / (4.0 * d4)
+               - 5.0 / (8.0 * d6)) * omz4,
+        -(1.0 + (1.0 / 3.0 - 1.0 / d2) * omz
+              + (2.0 / 15.0 - 1.0 / (2.0 * d2) + 3.0 / (2.0 * d4)) * omz2
+              + (2.0 / 35.0 - 7.0 / (30.0 * d2) + 1.0 / d4
+                 - 5.0 / (2.0 * d6)) * omz3),
+        (1.0 / 3.0 - 1.0 / d2) + (4.0 / 15.0 - 1.0 / d2 + 3.0 / d4) * omz
+            + (6.0 / 35.0 - 7.0 / (10.0 * d2) + 3.0 / d4
+               - 15.0 / (2.0 * d6)) * omz2
+    };
+}
+
+// Exact type-5 (pseudo-Huber) c-space triple; used by the main switch, the
+// blend zone, and the antipodal-clamp seam.  `s` = √(1−c²) (pre-floored by
+// the caller), `omc2` = s².
+inline AngCostShape angCostShape5Exact(double c, double s, double omc2,
+                                       double delta) {
+    const double theta = std::acos(c);
+    const double r = theta / delta;
+    const double S = std::sqrt(1.0 + r * r);
+    const double gp = theta / S;              // g'(θ) ∈ [0, δ·π/√(π²+δ²))
+    const double gpp = 1.0 / (S * S * S);     // g''(θ) ∈ (0, 1]
+    return { delta * delta * (S - 1.0),
+             -gp / s,
+             (gpp - gp * c / s) / omc2 };
+}
+
+AngCostShape angCostShape(double c, int type, double huber_delta) {
     const double omc2 = std::max(1.0 - c * c, 1e-12);  // 1 − c²  (floored)
     const double s = std::sqrt(omc2);                  // √(1 − c²)
 
@@ -1413,30 +1515,69 @@ AngCostShape angCostShape(double c, int type) {
         // else: fall through to the exact-formula switch below
     }
 
-    // Bounded antipodal clamp at c = −1 for type 3 (see the block comment
-    // above `AngCostShape` for the derivation, the u_eff table, and the
-    // composition note vs the feat/gn-curvature-cap knob).  Bounds
+    if (type == 5 && c > 0.0) {
+        // Type-5 Taylor protection at c = +1, mirroring type 3's branch above
+        // (same removable 0/0 in f' and the same catastrophic cancellation in
+        // f'': numerator g'' − g'·cotθ = O(θ²) is a difference of O(1) terms).
+        // Thresholds are the type-3 ones SCALED BY min(1, (δ/0.35)²): the
+        // series is a polynomial in omz/δ², so its accuracy radius shrinks
+        // like δ² — scaling keeps both the series truncation error at the
+        // switch (≲1e-9 rel in f'') and the exact-formula cancellation margin
+        // at the low edge (≳6 decimal digits) δ-independent.  At the default
+        // δ = 0.35 the thresholds equal type 3's.
+        const double tscale =
+            std::min(1.0, (huber_delta * huber_delta) / (0.35 * 0.35));
+        const double t_low  = kTaylorThresholdLow * tscale;
+        const double t_high = kTaylorThresholdHigh * tscale;
+        const double omz = 1.0 - c;
+        if (omz < t_high) {
+            const AngCostShape taylor = angCostShape5Taylor(omz, huber_delta);
+            if (omz < t_low) {
+                return taylor;
+            }
+            // Linear blend between Taylor (at omz = low) and exact (at omz = high).
+            const double blend = (omz - t_low) / (t_high - t_low);
+            const AngCostShape exact = angCostShape5Exact(c, s, omc2, huber_delta);
+            return {
+                (1.0 - blend) * taylor.f   + blend * exact.f,
+                (1.0 - blend) * taylor.fp  + blend * exact.fp,
+                (1.0 - blend) * taylor.fpp + blend * exact.fpp
+            };
+        }
+        // else: fall through to the exact-formula switch below
+    }
+
+    // Bounded antipodal clamp at c = −1 for types 3 and 5 (see the block
+    // comment above `AngCostShape` for the derivation, the u_eff table, and
+    // the composition note vs the feat/gn-curvature-cap knob).  Type-3 bounds:
     // |f'| ≤ 2.22e3 and f'' ≤ 1.11e9 (assembled GN q-block ≤ 8.9e3·weight);
-    // the value is extended linearly so f stays strictly increasing toward
-    // the antipode.  Only type 3 and only the c < 0 hemisphere; quat mode
-    // never reaches this (d = |q_goal·q| ∈ [0, 1]).
+    // type 5's divergence is the same 1/√u shape scaled by g'(π)/π ≈ δ/π
+    // (|f'| ≤ ~2.5e2, f'' ≤ ~1.2e8 at δ = 0.35), clamped at the same seam.
+    // The value is extended linearly so f stays strictly increasing toward
+    // the antipode.  Only the c < 0 hemisphere; quat mode never reaches this
+    // (d = |q_goal·q| ∈ [0, 1]).
     constexpr double kAntipodeClampU = 1e-6;
 
-    if (type == 3 && c < -1.0 + kAntipodeClampU) {
+    if ((type == 3 || type == 5) && c < -1.0 + kAntipodeClampU) {
         // Exact formula at the seam c_eff = −1 + kAntipodeClampU: a
         // self-consistent (f', f'') pair (no cancellation on this side, so
         // the exact expressions are accurate at u_eff = 1e-6).
         const double c_eff = -1.0 + kAntipodeClampU;
         const double omc2_eff = 1.0 - c_eff * c_eff;   // = 2·u_eff − u_eff²
         const double s_eff = std::sqrt(omc2_eff);
-        const double phi_eff = std::acos(c_eff);       // ≈ π − √(2·u_eff)
-        const double fp_eff = -phi_eff / s_eff;                          // ≈ −2.22e3
-        const double fpp_eff =
-            1.0 / omc2_eff - phi_eff * c_eff / (omc2_eff * s_eff);       // ≈ +1.11e9
+        AngCostShape seam;
+        if (type == 3) {
+            const double phi_eff = std::acos(c_eff);   // ≈ π − √(2·u_eff)
+            seam = { 0.5 * phi_eff * phi_eff,
+                     -phi_eff / s_eff,                                   // ≈ −2.22e3
+                     1.0 / omc2_eff - phi_eff * c_eff / (omc2_eff * s_eff) };
+                                                                         // ≈ +1.11e9
+        } else {
+            seam = angCostShape5Exact(c_eff, s_eff, omc2_eff, huber_delta);
+        }
         // Linear value extension: f' here is df/dc (f'_clamp < 0 and
         // c − c_eff < 0 inside the clamp, so f grows toward the antipode).
-        return { 0.5 * phi_eff * phi_eff + fp_eff * (c - c_eff),
-                 fp_eff, fpp_eff };
+        return { seam.f + seam.fp * (c - c_eff), seam.fp, seam.fpp };
     }
 
     switch (type) {
@@ -1447,6 +1588,7 @@ AngCostShape angCostShape(double c, int type) {
             return { 0.5 * phi * phi, -phi / s,
                      1.0 / omc2 - phi * c / (omc2 * s) };
         }
+        case 5: return angCostShape5Exact(c, s, omc2, huber_delta);
         // NOTE: type 2 (raw acos(c)) was removed: it is concave (f'' < 0,
         // anti-PSD under GN) and singular at BOTH poles, including the aligned
         // pole c = +1 where f' = −1/√(1−c²) → −∞ (genuine, not removable).
@@ -1456,7 +1598,7 @@ AngCostShape angCostShape(double c, int type) {
         // constant 2 absorbed into the angle weight. Migrate by using type 1
         // (½(1-c)²) with doubled angle weight.
         // Unreachable for validated settings (validation rejects types
-        // outside {0,1,3}); throw instead of silently running acos.
+        // outside {0,1,3,5}); throw instead of silently running acos.
         default: throw invalid_argument("ang_cost_func_type invalid");
     }
 }
@@ -1553,7 +1695,8 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
         const double c_val = std::clamp(
             bs_unit.dot(saltro::math::rotationMatrix(q).transpose() * r_eci),
             -1.0, 1.0);
-        ang_cost = angCostShape(c_val, cost_cfg.ang_cost_func_type).f;
+        ang_cost = angCostShape(c_val, cost_cfg.ang_cost_func_type,
+                                cost_cfg.ang_cost_huber_delta).f;
     } else {
         switch (cost_cfg.ang_cost_func_type) {
             case 0:
@@ -1570,7 +1713,15 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                 // inner scalar d = |q_goal·q| is post-hemisphere-alignment
                 // (d ∈ [0, 1]), so d → +1 (alignment) is exactly the
                 // protected region.
-                ang_cost = angCostShape(qdot_aligned, 3).f;
+                ang_cost = angCostShape(qdot_aligned, 3,
+                                        cost_cfg.ang_cost_huber_delta).f;
+                break;
+            }
+            case 5: {
+                // Same routing as type 3: the shared helper carries the
+                // c = +1 Taylor protection for the pseudo-Huber shape too.
+                ang_cost = angCostShape(qdot_aligned, 5,
+                                        cost_cfg.ang_cost_huber_delta).f;
                 break;
             }
             // NOTE: type 2 (raw acos(d)) was removed -- see angCostShape():
@@ -1906,7 +2057,8 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         const Vec3 bs_unit = boresight_body.normalized();
         const Vec3 r_eci = attitude_target.tail(3).normalized();
         const VecPointingGeom geom = vecPointingGeom(q, bs_unit, r_eci);
-        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type,
+                                            cost_cfg.ang_cost_huber_delta);
         lx.segment<4>(QUAT_INDEX) =
             w_ang_eff * f.fp * (saltro::math::findWMat(q) * geom.dc);
     } else {
@@ -1924,7 +2076,13 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 // Shared Taylor-protected shape: dh/dd → −1 at d = +1, where
                 // the raw −acos(d)/√(1−d²+1e-12) form degenerates to −0/1e-6
                 // (i.e. → 0, the wrong limit) as d → 1.
-                d_ang_cost_dqdot = angCostShape(qdot_aligned, 3).fp;  // Always negative
+                d_ang_cost_dqdot = angCostShape(qdot_aligned, 3,
+                    cost_cfg.ang_cost_huber_delta).fp;  // Always negative
+                break;
+            }
+            case 5: {  // pseudo-Huber in acos(|qdot|); shared Taylor-protected shape
+                d_ang_cost_dqdot = angCostShape(qdot_aligned, 5,
+                    cost_cfg.ang_cost_huber_delta).fp;  // Always negative
                 break;
             }
             // NOTE: type 2 (raw acos(d)) removed -- see stageCost().
@@ -2172,7 +2330,8 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         const Vec3 bs_unit = boresight_body.normalized();
         const Vec3 r_eci = attitude_target.tail(3).normalized();
         const VecPointingGeom geom = vecPointingGeom(q, bs_unit, r_eci);
-        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type);
+        const AngCostShape f = angCostShape(geom.c, cost_cfg.ang_cost_func_type,
+                                            cost_cfg.ang_cost_huber_delta);
 
         Eigen::Matrix3d H_red = f.fpp * (geom.dc * geom.dc.transpose());
         if (!cost_cfg.cost_hess_gauss_newton) {
@@ -2202,7 +2361,16 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 // where the raw 1/(1−d²) − acos(d)·d/[(1−d²)·√(1−d²)] form
                 // suffers catastrophic cancellation (∞ − ∞, evaluating to
                 // ~1e12 in double precision instead of 1/3).
-                d2h_dd2 = angCostShape(d, 3).fpp;
+                d2h_dd2 = angCostShape(d, 3,
+                                        cost_cfg.ang_cost_huber_delta).fpp;
+                break;
+            case 5:
+                // Shared Taylor-protected pseudo-Huber shape.  NB f''(d=+1)
+                // = 1/3 - 1/delta^2 < 0 for delta < sqrt(3); the PwA manifold
+                // correction below (-f'*d, ~ +1) keeps the assembled quat-mode
+                // block positive near alignment, exactly as for type 3.
+                d2h_dd2 = angCostShape(d, 5,
+                                        cost_cfg.ang_cost_huber_delta).fpp;
                 break;
             // NOTE: type 2 (raw acos(d)) removed -- see stageCost(). Its
             // curvature −d/[(1−d²)√(1−d²)] was concave (anti-PSD).
@@ -2218,7 +2386,12 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 0: dh_dd = -1.0; break;
             case 1: dh_dd = -(1.0 - d); break;
             case 3:
-                dh_dd = angCostShape(d, 3).fp;  // Taylor-protected: → −1 at d = +1
+                dh_dd = angCostShape(d, 3,
+                    cost_cfg.ang_cost_huber_delta).fp;  // Taylor-protected: → −1 at d = +1
+                break;
+            case 5:
+                dh_dd = angCostShape(d, 5,
+                    cost_cfg.ang_cost_huber_delta).fp;  // Taylor-protected: → −1 at d = +1
                 break;
             // NOTE: type 2 (raw acos(d)) removed -- see stageCost().
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().

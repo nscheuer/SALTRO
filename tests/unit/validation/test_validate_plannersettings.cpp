@@ -466,7 +466,9 @@ TEST_CASE("Invalid cost.ang_vel_err_dir_N - negative", "[plannersettings][valida
 }
 
 static const std::string kAfcInvalidMsg =
-    "cost.ang_cost_func_type invalid (implemented set {0,1,3})";
+    "cost.ang_cost_func_type invalid (implemented set {0,1,3,5})";
+static const std::string kHuberInvalidMsg =
+    "cost.ang_cost_huber_delta invalid (must be finite and > 0)";
 
 TEST_CASE("Invalid cost.ang_cost_func_type - negative", "[plannersettings][validation][cost]") {
     PlannerSettings settings = validSettings();
@@ -497,20 +499,60 @@ TEST_CASE("Invalid cost.ang_cost_func_type - removed type 4", "[plannersettings]
 
 TEST_CASE("Invalid cost.ang_cost_func_type - above implemented set", "[plannersettings][validation][cost]") {
     PlannerSettings settings = validSettings();
-    settings.passes[0].cost.ang_cost_func_type = 5;  // never implemented
+    settings.passes[0].cost.ang_cost_func_type = 6;  // never implemented
     std::string error_msg;
 
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
     REQUIRE(error_msg == kAfcInvalidMsg);
 }
 
-TEST_CASE("Valid cost.ang_cost_func_type - implemented set {0,1,3}", "[plannersettings][validation][cost]") {
-    for (int type : {0, 1, 3}) {
+TEST_CASE("Valid cost.ang_cost_func_type - implemented set {0,1,3,5}", "[plannersettings][validation][cost]") {
+    for (int type : {0, 1, 3, 5}) {
         PlannerSettings settings = validSettings();
         settings.passes[0].cost.ang_cost_func_type = type;
         std::string error_msg;
 
         REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    }
+}
+
+TEST_CASE("Valid cost.ang_cost_huber_delta - positive finite values", "[plannersettings][validation][cost]") {
+    for (double delta : {1e-3, 0.1, 0.35, 1.0, 10.0}) {
+        PlannerSettings settings = validSettings();
+        settings.passes[0].cost.ang_cost_func_type = 5;
+        settings.passes[0].cost.ang_cost_huber_delta = delta;
+        std::string error_msg;
+
+        REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    }
+}
+
+TEST_CASE("Invalid cost.ang_cost_huber_delta - non-positive", "[plannersettings][validation][cost]") {
+    // Rejected regardless of the selected shape — in particular type 5 with
+    // non-positive delta is always refused.
+    for (double delta : {0.0, -0.35}) {
+        for (int type : {5, 3}) {
+            PlannerSettings settings = validSettings();
+            settings.passes[0].cost.ang_cost_func_type = type;
+            settings.passes[0].cost.ang_cost_huber_delta = delta;
+            std::string error_msg;
+
+            REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+            REQUIRE(error_msg == kHuberInvalidMsg);
+        }
+    }
+}
+
+TEST_CASE("Invalid cost.ang_cost_huber_delta - non-finite", "[plannersettings][validation][cost]") {
+    for (double delta : {std::numeric_limits<double>::quiet_NaN(),
+                         std::numeric_limits<double>::infinity()}) {
+        PlannerSettings settings = validSettings();
+        settings.passes[0].cost.ang_cost_func_type = 5;
+        settings.passes[0].cost.ang_cost_huber_delta = delta;
+        std::string error_msg;
+
+        REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+        REQUIRE(error_msg == kHuberInvalidMsg);
     }
 }
 
