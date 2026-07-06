@@ -1105,7 +1105,7 @@ J(x,u) + \lambda^\top g(x,u) + \frac{\mu}{2}\|g(x,u)\|^2
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig8grad_tolE">
-<span id="_CPPv3N10ILQRConfig8grad_tolE"></span><span id="_CPPv2N10ILQRConfig8grad_tolE"></span><span id="ILQRConfig::grad_tol__double"></span><span class="target" id="structILQRConfig_1a3e9216b8c27e3f219d536fd27d26c18c"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">grad_tol</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-3</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig8grad_tolE" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv3N10ILQRConfig8grad_tolE"></span><span id="_CPPv2N10ILQRConfig8grad_tolE"></span><span id="ILQRConfig::grad_tol__double"></span><span class="target" id="structILQRConfig_1a3e9216b8c27e3f219d536fd27d26c18c"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">grad_tol</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.0</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig8grad_tolE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 <dl class="cpp var">
@@ -1127,6 +1127,24 @@ J(x,u) + \lambda^\top g(x,u) + \frac{\mu}{2}\|g(x,u)\|^2
 <dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig11state_boundE">
 <span id="_CPPv3N10ILQRConfig11state_boundE"></span><span id="_CPPv2N10ILQRConfig11state_boundE"></span><span id="ILQRConfig::state_bound__double"></span><span class="target" id="structILQRConfig_1ada0d26f51c8b3933558e548192c94eb2"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">state_bound</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">10.0</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig11state_boundE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig18ls_strict_decreaseE">
+<span id="_CPPv3N10ILQRConfig18ls_strict_decreaseE"></span><span id="_CPPv2N10ILQRConfig18ls_strict_decreaseE"></span><span id="ILQRConfig::ls_strict_decrease__b"></span><span class="target" id="structILQRConfig_1a06c65bfb90b77b91fb168c7302971ba5"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ls_strict_decrease</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig18ls_strict_decreaseE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Require strict cost decrease in line search (J_new &lt; J_prev). Original ALTRO behavior; prevents accepting cost-increasing steps. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig23conjunctive_convergenceE">
+<span id="_CPPv3N10ILQRConfig23conjunctive_convergenceE"></span><span id="_CPPv2N10ILQRConfig23conjunctive_convergenceE"></span><span id="ILQRConfig::conjunctive_convergence__b"></span><span class="target" id="structILQRConfig_1a2aa06085707f06735cf0a9ad365c6928"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">conjunctive_convergence</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig23conjunctive_convergenceE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Require BOTH grad_tol AND cost_tol for convergence (true), or allow either alone (false). Original ALTRO uses conjunctive. </p>
+</dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10ILQRConfig14persistent_regE">
+<span id="_CPPv3N10ILQRConfig14persistent_regE"></span><span id="_CPPv2N10ILQRConfig14persistent_regE"></span><span id="ILQRConfig::persistent_reg__b"></span><span class="target" id="structILQRConfig_1a8ff0452c6d41c7978c7f5240c0b89b2c"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">persistent_reg</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N10ILQRConfig14persistent_regE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Persist regularization across iLQR iterations (true = ALTRO-style), or reset to reg_init each iteration (false = legacy). </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -1577,6 +1595,9 @@ J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig11z_count_limE"><code class="docutils literal notranslate"><span class="pre">z_count_lim</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig8max_costE"><code class="docutils literal notranslate"><span class="pre">max_cost</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig11state_boundE"><code class="docutils literal notranslate"><span class="pre">state_bound</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig18ls_strict_decreaseE"><code class="docutils literal notranslate"><span class="pre">ls_strict_decrease</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig23conjunctive_convergenceE"><code class="docutils literal notranslate"><span class="pre">conjunctive_convergence</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10ILQRConfig14persistent_regE"><code class="docutils literal notranslate"><span class="pre">persistent_reg</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv420RegularizationConfig"><code class="docutils literal notranslate"><span class="pre">RegularizationConfig</span></code></a><ul class="nav section-nav flex-column">
