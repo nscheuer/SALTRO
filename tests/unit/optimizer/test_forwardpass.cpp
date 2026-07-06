@@ -161,11 +161,11 @@ public:
 			result.U.col(k) = u_bar;
 
 			Eigen::VectorXd x_next;
-			rk4_step<Eigen::VectorXd>(
-				[&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
-					dxdt = satellite.dynamics(
-						x_state,
-						u_bar,
+				rk4_step<Eigen::VectorXd>(
+					[&](double, const Eigen::VectorXd& x_state, Eigen::VectorXd& dxdt) {
+						dxdt = satellite.dynamics(
+							x_state,
+							u_bar,
 						dist_cfg,
 						env.R.col(k),
 						env.B.col(k),
@@ -174,11 +174,12 @@ public:
 						static_cast<int>(std::max(0.0, std::round(env.rho(0, k))))
 					);
 				},
-				result.X.col(k),
-				0.0,
-				dt,
-				x_next
-			);
+					result.X.col(k),
+					0.0,
+					dt,
+					x_next,
+					Satellite::QUAT_INDEX
+				);
 
 			result.X.col(k + 1) = x_next;
 		}

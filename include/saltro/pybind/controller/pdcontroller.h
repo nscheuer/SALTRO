@@ -4,6 +4,10 @@
  */
 #pragma once
 
+#include <limits>
+
+#include <Eigen/Dense>
+
 #include <saltro/pybind/controller/controller.h>
 
 namespace saltro::controller {
@@ -85,6 +89,16 @@ public:
     /// Set RW preference: 0 = MTQ-only, 1 = equal weight.
     void setRWScale(double rw_scale);
 
+    /**
+     * @brief Set a desired body-frame angular rate to feed forward.
+     *
+     * When set finite, find_u damps ω toward this rate
+     * (τ_des += -kd·(ω - ω_des)) instead of toward zero, matching OldPlanner
+     * smartbdot's goal-rate feedforward (@c wkdes).  Pass a non-finite/NaN
+     * vector (the default) to disable.
+     */
+    void setGoalRate(const Eigen::Vector3d& omega_des);
+
     double kp_q() const { return kp_q_; }
     double kd_w() const { return kd_w_; }
     double rwScale() const { return rw_scale_; }
@@ -102,6 +116,9 @@ private:
     double kp_q_ = 0.0;
     double kd_w_ = 0.0;
     double rw_scale_ = 1.0;
+    /// Optional goal-rate feedforward; NaN entries disable it.
+    Eigen::Vector3d omega_des_ =
+        Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
 };
 
 }

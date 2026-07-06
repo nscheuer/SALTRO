@@ -133,6 +133,306 @@ def _max_gain_diff(K_a, d_a, K_b, d_b):
     )
 
 
+def _state_norm_jacobian(x, quat_idx=3):
+    nx = x.shape[0]
+    J = np.eye(nx)
+    q = x[quat_idx:quat_idx + 4]
+    qn = np.linalg.norm(q)
+    if qn < 1e-10:
+        return J
+    qn3 = qn * qn * qn
+    J[quat_idx:quat_idx + 4, quat_idx:quat_idx + 4] = (
+        np.eye(4) / qn - np.outer(q, q) / qn3
+    )
+    return J
+
+
+def _state_norm_hessian(x, quat_idx=3):
+    """Second derivative of norm_a(q)=q_a/‖q‖ as nx slices (only quat slices nonzero)."""
+    nx = x.shape[0]
+    H = [np.zeros((nx, nx)) for _ in range(nx)]
+    q = x[quat_idx:quat_idx + 4]
+    r = np.linalg.norm(q)
+    if r < 1e-10:
+        return H
+    r3 = r ** 3
+    r5 = r ** 5
+    for a in range(4):
+        slice_a = H[quat_idx + a]
+        for m in range(4):
+            for j in range(4):
+                d_am = 1.0 if a == m else 0.0
+                d_aj = 1.0 if a == j else 0.0
+                d_mj = 1.0 if m == j else 0.0
+                slice_a[quat_idx + m, quat_idx + j] = (
+                    3.0 * q[a] * q[m] * q[j] / r5
+                    - (d_am * q[j] + d_aj * q[m] + d_mj * q[a]) / r3
+                )
+    return H
+
+
+def _add_norm_hessian_term(Hxx, Hux, Huu, d2N, Jx, Ju, quat_idx=3):
+    """Hxx[l]+=Jxᵀ·d2N[l]·Jx, Hux[l]+=Juᵀ·d2N[l]·Jx, Huu[l]+=Juᵀ·d2N[l]·Ju for quat slices."""
+    for a in range(4):
+        l = quat_idx + a
+        S = d2N[l]
+        Hxx[l] = Hxx[l] + Jx.T @ S @ Jx
+        Hux[l] = Hux[l] + Ju.T @ S @ Jx
+        Huu[l] = Huu[l] + Ju.T @ S @ Ju
+
+
+def _find_g_mat(q, num_rw):
+    """Python equivalent of saltro::math::findGMat for an independent oracle."""
+    nx = 7 + num_rw
+    nx_reduced = 6 + num_rw
+    G = np.zeros((nx_reduced, nx))
+    G[:3, :3] = np.eye(3)
+
+    q0, q1, q2, q3 = q
+    W = np.array([
+        [-q1, -q2, -q3],
+        [q0, -q3, q2],
+        [q3, q0, -q1],
+        [-q2, q1, q0],
+    ])
+    G[3:6, 3:7] = W.T
+    G[6:, 7:] = np.eye(num_rw)
+    return G
+
+
+def _tensor_slices(tensor, rows, cols, depth):
+    array = np.asarray(tensor, dtype=float)
+    return [array[i, :rows, :cols] for i in range(depth)]
+
+
+def _mat_times_cube(M, cube):
+    return [M @ s for s in cube]
+
+
+def _cube_times_mat(cube, M):
+    return [s @ M for s in cube]
+
+
+def _mat_times_cube_t(M, cube):
+    return [M @ s.T for s in cube]
+
+
+def _mat_over_cube(A, cube):
+    n_out, n_in = A.shape
+    r, c = cube[0].shape
+    out = [np.zeros((r, c)) for _ in range(n_out)]
+    for i in range(n_out):
+        for l in range(n_in):
+            a = A[i, l]
+            if a != 0.0:
+                out[i] += a * cube[l]
+    return out
+
+
+def _cube_add(a, b):
+    return [x + y for x, y in zip(a, b)]
+
+
+def _cube_scale(s, cube):
+    return [s * m for m in cube]
+
+
+def _rk4_jacobians_python(dynamics_jac, x, u, t, dt, quat_idx=3):
+    # Convention B: F(x) = norm(Φ(m)), m = norm(x). Build dΦ/dm with m as base,
+    # then chain the input normalization dm/dx = N0 at the very end.
+    nx = x.shape[0]
+    I = np.eye(nx)
+
+    N0 = _state_norm_jacobian(x, quat_idx)
+    m = x.copy()
+    m[quat_idx:quat_idx + 4] /= np.linalg.norm(m[quat_idx:quat_idx + 4])
+
+    A1, B1, k1 = dynamics_jac(t, m, u)
+    dk1_dm = A1  # m is the base; no N0 here
+    dk1_du = B1
+
+    g2 = m + 0.5 * dt * k1
+    N2 = _state_norm_jacobian(g2, quat_idx)
+    x2 = g2.copy()
+    x2[quat_idx:quat_idx + 4] /= np.linalg.norm(x2[quat_idx:quat_idx + 4])
+    A2, B2, k2 = dynamics_jac(t + 0.5 * dt, x2, u)
+    dk2_dm = A2 @ N2 @ (I + 0.5 * dt * dk1_dm)
+    dk2_du = A2 @ N2 @ (0.5 * dt * dk1_du) + B2
+
+    g3 = m + 0.5 * dt * k2
+    N3 = _state_norm_jacobian(g3, quat_idx)
+    x3 = g3.copy()
+    x3[quat_idx:quat_idx + 4] /= np.linalg.norm(x3[quat_idx:quat_idx + 4])
+    A3, B3, k3 = dynamics_jac(t + 0.5 * dt, x3, u)
+    dk3_dm = A3 @ N3 @ (I + 0.5 * dt * dk2_dm)
+    dk3_du = A3 @ N3 @ (0.5 * dt * dk2_du) + B3
+
+    g4 = m + dt * k3
+    N4 = _state_norm_jacobian(g4, quat_idx)
+    x4 = g4.copy()
+    x4[quat_idx:quat_idx + 4] /= np.linalg.norm(x4[quat_idx:quat_idx + 4])
+    A4, B4, k4 = dynamics_jac(t + dt, x4, u)
+    dk4_dm = A4 @ N4 @ (I + dt * dk3_dm)
+    dk4_du = A4 @ N4 @ (dt * dk3_du) + B4
+
+    g_out = m + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    N_next = _state_norm_jacobian(g_out, quat_idx)
+    dPhi_dm = N_next @ (I + (dt / 6.0) * (dk1_dm + 2.0 * dk2_dm + 2.0 * dk3_dm + dk4_dm))
+    A = dPhi_dm @ N0
+    B = N_next @ ((dt / 6.0) * (dk1_du + 2.0 * dk2_du + 2.0 * dk3_du + dk4_du))
+    return A, B
+
+
+def _rk4_hessians_python(dynamics_hess, x, u, t, dt, quat_idx=3):
+    nx = x.shape[0]
+    nu = u.shape[0]
+    I = np.eye(nx)
+
+    def make_xx():
+        return [np.zeros((nx, nx)) for _ in range(nx)]
+
+    def make_ux():
+        return [np.zeros((nu, nx)) for _ in range(nx)]
+
+    def make_uu():
+        return [np.zeros((nu, nu)) for _ in range(nx)]
+
+    def compose_f(A, fxx, fux, fuu, Mx, Mu, H_xx, H_ux, H_uu):
+        Kxx = _cube_add(
+            _mat_times_cube(Mx.T, _cube_times_mat(fxx, Mx)),
+            _mat_over_cube(A, H_xx),
+        )
+        Kux = _cube_add(
+            _cube_add(
+                _mat_times_cube(Mu.T, _cube_times_mat(fxx, Mx)),
+                _cube_times_mat(fux, Mx),
+            ),
+            _mat_over_cube(A, H_ux),
+        )
+        Kuu = _cube_add(
+            _cube_add(
+                _mat_times_cube(Mu.T, _cube_times_mat(fxx, Mu)),
+                _cube_add(
+                    _cube_times_mat(fux, Mu),
+                    _mat_times_cube_t(Mu.T, fux),
+                ),
+            ),
+            _cube_add(fuu, _mat_over_cube(A, H_uu)),
+        )
+        return Kxx, Kux, Kuu
+
+    # Convention B: build Φ_x/Φ_xx/Φ_ux/Φ_uu w.r.t. the normalized base
+    # m = norm(x), then chain the input normalization (N0, d2N0) at the end.
+    N0 = _state_norm_jacobian(x, quat_idx)
+    d2N0 = _state_norm_hessian(x, quat_idx)
+    m = x.copy()
+    m[quat_idx:quat_idx + 4] /= np.linalg.norm(m[quat_idx:quat_idx + 4])
+
+    Mx_in = I
+    Mu_in = np.zeros((nx, nu))
+    Hxx_in = make_xx()
+    Hux_in = make_ux()
+    Huu_in = make_uu()
+
+    A1, B1, k1, fxx1, fux1, fuu1 = dynamics_hess(t, m, u)
+    Kxx1, Kux1, Kuu1 = compose_f(A1, fxx1, fux1, fuu1, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in)
+    dk1_dm = A1 @ Mx_in
+    dk1_du = A1 @ Mu_in + B1
+
+    g1 = m + 0.5 * dt * k1
+    N1 = _state_norm_jacobian(g1, quat_idx)
+    Jx1 = I + 0.5 * dt * dk1_dm
+    Ju1 = 0.5 * dt * dk1_du
+    Mx_in = N1 @ Jx1
+    Mu_in = N1 @ Ju1
+    Hxx_in = _mat_over_cube(N1, _cube_scale(0.5 * dt, Kxx1))
+    Hux_in = _mat_over_cube(N1, _cube_scale(0.5 * dt, Kux1))
+    Huu_in = _mat_over_cube(N1, _cube_scale(0.5 * dt, Kuu1))
+    _add_norm_hessian_term(Hxx_in, Hux_in, Huu_in,
+                           _state_norm_hessian(g1, quat_idx), Jx1, Ju1, quat_idx)
+    x1 = g1.copy()
+    x1[quat_idx:quat_idx + 4] /= np.linalg.norm(x1[quat_idx:quat_idx + 4])
+
+    A2, B2, k2, fxx2, fux2, fuu2 = dynamics_hess(t + 0.5 * dt, x1, u)
+    Kxx2, Kux2, Kuu2 = compose_f(A2, fxx2, fux2, fuu2, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in)
+    dk2_dm = A2 @ Mx_in
+    dk2_du = A2 @ Mu_in + B2
+
+    g2 = m + 0.5 * dt * k2
+    N2 = _state_norm_jacobian(g2, quat_idx)
+    Jx2 = I + 0.5 * dt * dk2_dm
+    Ju2 = 0.5 * dt * dk2_du
+    Mx_in = N2 @ Jx2
+    Mu_in = N2 @ Ju2
+    Hxx_in = _mat_over_cube(N2, _cube_scale(0.5 * dt, Kxx2))
+    Hux_in = _mat_over_cube(N2, _cube_scale(0.5 * dt, Kux2))
+    Huu_in = _mat_over_cube(N2, _cube_scale(0.5 * dt, Kuu2))
+    _add_norm_hessian_term(Hxx_in, Hux_in, Huu_in,
+                           _state_norm_hessian(g2, quat_idx), Jx2, Ju2, quat_idx)
+    x2n = g2.copy()
+    x2n[quat_idx:quat_idx + 4] /= np.linalg.norm(x2n[quat_idx:quat_idx + 4])
+
+    A3, B3, k3, fxx3, fux3, fuu3 = dynamics_hess(t + 0.5 * dt, x2n, u)
+    Kxx3, Kux3, Kuu3 = compose_f(A3, fxx3, fux3, fuu3, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in)
+    dk3_dm = A3 @ Mx_in
+    dk3_du = A3 @ Mu_in + B3
+
+    g3 = m + dt * k3
+    N3 = _state_norm_jacobian(g3, quat_idx)
+    Jx3 = I + dt * dk3_dm
+    Ju3 = dt * dk3_du
+    Mx_in = N3 @ Jx3
+    Mu_in = N3 @ Ju3
+    Hxx_in = _mat_over_cube(N3, _cube_scale(dt, Kxx3))
+    Hux_in = _mat_over_cube(N3, _cube_scale(dt, Kux3))
+    Huu_in = _mat_over_cube(N3, _cube_scale(dt, Kuu3))
+    _add_norm_hessian_term(Hxx_in, Hux_in, Huu_in,
+                           _state_norm_hessian(g3, quat_idx), Jx3, Ju3, quat_idx)
+    x3n = g3.copy()
+    x3n[quat_idx:quat_idx + 4] /= np.linalg.norm(x3n[quat_idx:quat_idx + 4])
+
+    A4, B4, k4, fxx4, fux4, fuu4 = dynamics_hess(t + dt, x3n, u)
+    Kxx4, Kux4, Kuu4 = compose_f(A4, fxx4, fux4, fuu4, Mx_in, Mu_in, Hxx_in, Hux_in, Huu_in)
+    dk4_dm = A4 @ Mx_in
+    dk4_du = A4 @ Mu_in + B4
+
+    w = dt / 6.0
+
+    def sum4(A, B, C, D):
+        return [w * (a + 2.0 * b + 2.0 * c + d) for a, b, c, d in zip(A, B, C, D)]
+
+    G_xx = sum4(Kxx1, Kxx2, Kxx3, Kxx4)
+    G_ux = sum4(Kux1, Kux2, Kux3, Kux4)
+    G_uu = sum4(Kuu1, Kuu2, Kuu3, Kuu4)
+
+    g_out = m + w * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    N_next = _state_norm_jacobian(g_out, quat_idx)
+    Jx_out = I + w * (dk1_dm + 2.0 * dk2_dm + 2.0 * dk3_dm + dk4_dm)
+    Ju_out = w * (dk1_du + 2.0 * dk2_du + 2.0 * dk3_du + dk4_du)
+    Phi_x = N_next @ Jx_out
+
+    Phi_xx = _mat_over_cube(N_next, G_xx)
+    Phi_ux = _mat_over_cube(N_next, G_ux)
+    Phi_uu = _mat_over_cube(N_next, G_uu)
+    _add_norm_hessian_term(Phi_xx, Phi_ux, Phi_uu,
+                           _state_norm_hessian(g_out, quat_idx), Jx_out, Ju_out, quat_idx)
+
+    # Chain input normalization: F_xx[l] = N0ᵀ·Φ_xx[l]·N0 + Σ_a Φ_x[l,a]·d2N0[a]
+    F_xx = []
+    F_ux = []
+    F_uu = []
+    for l in range(nx):
+        fxx = N0.T @ Phi_xx[l] @ N0
+        for a in range(4):
+            w_la = Phi_x[l, quat_idx + a]
+            if w_la != 0.0:
+                fxx = fxx + w_la * d2N0[quat_idx + a]
+        F_xx.append(fxx)
+        F_ux.append(Phi_ux[l] @ N0)
+        F_uu.append(Phi_uu[l])
+    return F_xx, F_ux, F_uu
+
+
 class BackwardPassFixture:
     """Fixture for backward pass tests with satellite setup."""
 
@@ -342,8 +642,72 @@ class TestBackwardPass:
         # K[0] and d[:,0] should be finite
         assert np.all(np.isfinite(K[0]))
         assert np.all(np.isfinite(d[:, 0]))
-        
-        # Verify deltaV is finite
+
+        # Independently reproduce the N=2 backward-pass equations, matching
+        # the hand verification in test_backwardpass.cpp.
+        x_0 = X[:, 0]
+        u_0 = U[:, 0]
+        B_0 = B_test[:, 0]
+        boresight_0 = boresight_test[:, 0]
+
+        p_1, _, _ = satellite_test.terminalCostJacobians(
+            x_0, boresight_0, attitude_target_test, B_0,
+            settings_test.passes[0].cost,
+        )
+        P_1, _, _ = satellite_test.terminalCostHessians(
+            x_0, boresight_0, attitude_target_test, B_0,
+            settings_test.passes[0].cost,
+        )
+        l_x, l_u_matrix, _ = satellite_test.stageCostJacobians(
+            0, N_test, x_0, u_0, boresight_0, attitude_target_test, B_0,
+            settings_test.passes[0].cost,
+        )
+        l_xx, l_uu, l_ux = satellite_test.stageCostHessians(
+            0, N_test, x_0, u_0, boresight_0, attitude_target_test, B_0,
+            settings_test.passes[0].cost,
+        )
+
+        dist = saltro_py.DisturbanceConfig()
+        R_0 = R_test[:, 0]
+        V_0 = V_test[:, 0]
+        S_0 = S_test[:, 0]
+
+        def dynamics_jacobian(t_local, x_local, u_local):
+            A_c, B_c, _ = satellite_test.dynamicsJacobians(
+                x_local, u_local, dist, R_0, B_0, S_0, V_0,
+            )
+            k = satellite_test.dynamics(
+                x_local, u_local, dist, R_0, B_0, S_0, V_0, 0,
+            )
+            return np.asarray(A_c), np.asarray(B_c), np.asarray(k)
+
+        A_0, B_0_dyn = _rk4_jacobians_python(
+            dynamics_jacobian, x_0, u_0, 0.0, settings_test.passes[0].dt,
+        )
+
+        G_0 = _find_g_mat(X[3:7, 0], satellite_test.numRW)
+        G_1 = _find_g_mat(X[3:7, 1], satellite_test.numRW)
+        p_1_reduced = G_1 @ np.asarray(p_1)
+        P_1_reduced = G_1 @ np.asarray(P_1) @ G_1.T
+        l_x_reduced = G_0 @ np.asarray(l_x)
+        l_xx_reduced = G_0 @ np.asarray(l_xx) @ G_0.T
+        l_ux_reduced = np.asarray(l_ux) @ G_0.T
+        A_0_reduced = G_1 @ A_0 @ G_0.T
+        B_0_reduced = G_1 @ B_0_dyn
+
+        # l_x_reduced/l_xx_reduced are part of the full value update even
+        # though only Q_u/Q_ux/Q_uu determine K and d at this single knot.
+        assert np.all(np.isfinite(l_x_reduced))
+        assert np.all(np.isfinite(l_xx_reduced))
+        Q_uu = np.asarray(l_uu) + B_0_reduced.T @ P_1_reduced @ B_0_reduced
+        Q_ux = l_ux_reduced + B_0_reduced.T @ P_1_reduced @ A_0_reduced
+        Q_u = np.asarray(l_u_matrix)[0] + B_0_reduced.T @ p_1_reduced
+        Q_uu_reg = Q_uu + settings_test.passes[0].reg.reg_init * np.eye(nu)
+        K_expected = -np.linalg.solve(Q_uu_reg, Q_ux)
+        d_expected = -np.linalg.solve(Q_uu_reg, Q_u)
+
+        assert np.linalg.norm(K[0] - K_expected) < 1e-10
+        assert np.linalg.norm(d[:, 0] - d_expected) < 1e-10
         assert np.all(np.isfinite(deltaV))
     
     def test_dimensions(self, fixture):
@@ -428,10 +792,10 @@ class TestBackwardPass:
         
         X = np.zeros((nx, N))
         X[:, 0] = fixture.x0
-        X[:, 1] = fixture.x0 + 0.001 * np.random.randn(nx)
+        X[:, 1] = fixture.x0 + 0.001 * np.linspace(-0.5, 0.5, nx)
         
         U = np.zeros((nu, N - 1))
-        U[:, 0] = 0.001 * np.random.randn(nu)
+        U[:, 0] = 0.001 * np.linspace(-0.5, 0.5, nu)
         
         ok, K, d, deltaV = saltro_py.backward_pass(
             fixture.satellite, X, U, fixture.R, fixture.V, fixture.B, fixture.S,
@@ -481,7 +845,7 @@ class TestBackwardPass:
         for k in range(N_test):
             X[:, k] = x0
             if k < N_test - 1:
-                U[:, k] = 0.001 * np.random.randn(nu)
+                U[:, k] = 0.001 * (k + 1) * np.linspace(-0.5, 0.5, nu)
             
             R_test[:, k] = np.array([7000e3, 0.0, 0.0])
             V_test[:, k] = np.array([0.0, 7500.0, 0.0])
@@ -857,6 +1221,23 @@ class TestBackwardPass:
         assert np.all(np.isfinite(deltaV_ddp))
         assert _max_gain_diff(K_gn, d_gn, K_ddp, d_ddp) > 1e-9
 
+    def test_ddp_psd_clip_yields_psd_matrix(self):
+        """Mirror the descent-safety property checked by the C++ PSD test."""
+        M = np.array([
+            [2.0, 0.0, 0.0],
+            [0.0, -5.0, 1.0],
+            [0.0, 1.0, 3.0],
+        ])
+        M = 0.5 * (M + M.T)
+        assert np.linalg.eigvalsh(M).min() < 0.0
+
+        eigenvalues, eigenvectors = np.linalg.eigh(M)
+        M_clipped = eigenvectors @ np.diag(np.maximum(eigenvalues, 0.0)) @ eigenvectors.T
+        assert np.linalg.eigvalsh(M_clipped).min() >= -1e-12
+
+        # Cholesky succeeding mirrors Eigen::LLT reporting Eigen::Success.
+        np.linalg.cholesky(M_clipped + 1e-6 * np.eye(3))
+
     def test_ddp_both_knobs_on_with_active_constraint_stays_finite(self):
         """Combined second-order terms should still yield a finite backward pass."""
         ok, K, d, deltaV = _run_ddp_scenario(
@@ -873,6 +1254,119 @@ class TestBackwardPass:
         assert np.all(np.isfinite(d))
         assert np.all(np.isfinite(deltaV))
 
+    def test_rk4_hessians_match_double_finite_difference_of_normalized_step(self):
+        """Mirror the C++ FD sanity check for normalized RK4 Hessian composition.
+
+        Named distinctly from test_rk4_hessians_match_finite_difference_of_rk4_jacobians
+        above (which exercises the saltro_py.rk4_dynamics_hessians pybind path) so the
+        two do not shadow each other within this class.
+        """
+        settings = saltro_py.PlannerSettings()
+        settings.num_passes = 1
+        settings.passes[0].dt = 0.05
+        sat = saltro_py.Satellite(np.diag([0.067, 0.071, 0.069]), settings)
+        sat.addMTQ(np.array([1.0, 0.0, 0.0]), 0.2)
+        sat.addRW(np.array([1.0, 0.0, 0.0]), 0.001, 1e-5, 0.0, 0.02)
+
+        nx = sat.stateDim
+        nu = sat.controlDim
+        dt = settings.passes[0].dt
+
+        axis = np.array([0.2, 0.5, -0.84], dtype=float)
+        axis /= np.linalg.norm(axis)
+        half = 0.5 * (40.0 * PI / 180.0)
+        q = np.concatenate(([np.cos(half)], np.sin(half) * axis))
+        x = np.zeros(nx)
+        x[0:3] = np.array([0.08, -0.05, 0.06])
+        x[3:7] = q
+        if sat.numRW > 0:
+            x[7] = 0.004
+        u = np.full(nu, 0.02)
+
+        dist = saltro_py.DisturbanceConfig()
+        R0 = np.array([7000e3, 0.0, 0.0])
+        V0 = np.array([0.0, 7500.0, 0.0])
+        B0 = np.array([2.5e-5, -1.5e-5, 3.0e-5])
+        S0 = np.array([1.0, 0.1, -0.05], dtype=float)
+        S0 /= np.linalg.norm(S0)
+
+        def jac_wrapper(t_local, xl, ul):
+            A, B, _ = sat.dynamicsJacobians(xl, ul, dist, R0, B0, S0, V0)
+            k = np.asarray(sat.dynamics(xl, ul, dist, R0, B0, S0, V0, 0), dtype=float)
+            return np.asarray(A, dtype=float), np.asarray(B, dtype=float), k
+
+        def hess_wrapper(t_local, xl, ul):
+            A, B, _ = sat.dynamicsJacobians(xl, ul, dist, R0, B0, S0, V0)
+            k = np.asarray(sat.dynamics(xl, ul, dist, R0, B0, S0, V0, 0), dtype=float)
+            hxx, hux, huu = sat.dynamicsHessians(xl, ul, dist, R0, B0, S0, V0)
+            return (
+                np.asarray(A, dtype=float),
+                np.asarray(B, dtype=float),
+                k,
+                _tensor_slices(hxx, nx, nx, nx),
+                _tensor_slices(hux, nu, nx, nx),
+                _tensor_slices(huu, nu, nu, nx),
+            )
+
+        Fxx, _, _ = _rk4_hessians_python(hess_wrapper, x, u, 0.0, dt)
+        A_analytic, _ = _rk4_jacobians_python(jac_wrapper, x, u, 0.0, dt)
+
+        # Convention-B normalized step (ground truth). Double finite differences
+        # of this map give the true F_xx (incl. the quaternion block); single
+        # central differences give the true A_discrete.
+        quat_idx = 3
+
+        def nq(v):
+            v = v.copy()
+            v[quat_idx:quat_idx + 4] /= np.linalg.norm(v[quat_idx:quat_idx + 4])
+            return v
+
+        def f(xin):
+            return np.asarray(
+                sat.dynamics(xin, u, dist, R0, B0, S0, V0, 0), dtype=float
+            )
+
+        def step(xin):
+            m = nq(xin)
+            k1 = f(m)
+            k2 = f(nq(m + 0.5 * dt * k1))
+            k3 = f(nq(m + 0.5 * dt * k2))
+            k4 = f(nq(m + dt * k3))
+            return nq(m + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4))
+
+        # ---- Jacobian check: central difference of step vs rk4_jacobians A. ----
+        hj = 1e-6
+        max_jac_err = 0.0
+        for j in range(nx):
+            xp = x.copy(); xp[j] += hj
+            xm = x.copy(); xm[j] -= hj
+            dF = (step(xp) - step(xm)) / (2.0 * hj)
+            for l in range(nx):
+                max_jac_err = max(max_jac_err, abs(dF[l] - A_analytic[l, j]))
+        assert max_jac_err < 1e-4, ("jacobian", max_jac_err)
+
+        # ---- Hessian check: DOUBLE central difference of step vs Fxx. ----
+        # All directions, quaternion block included (no is_quat skip).
+        h = 1e-4
+        max_err = 0.0
+        max_indices = None
+        checked = 0
+        for mi in range(nx):
+            for j in range(nx):
+                xpp = x.copy(); xpp[mi] += h; xpp[j] += h
+                xpm = x.copy(); xpm[mi] += h; xpm[j] -= h
+                xmp = x.copy(); xmp[mi] -= h; xmp[j] += h
+                xmm = x.copy(); xmm[mi] -= h; xmm[j] -= h
+                d2F = (step(xpp) - step(xpm) - step(xmp) + step(xmm)) / (4.0 * h * h)
+                for l in range(nx):
+                    err = abs(d2F[l] - Fxx[l][mi, j])
+                    if err > max_err:
+                        max_err = err
+                        max_indices = (l, mi, j, d2F[l], Fxx[l][mi, j])
+                    checked += 1
+
+        assert checked > 0
+        assert max_err < 5e-3, max_indices
     def test_psd_clamp_lxx_diagnostic_flag(self):
         """Python twin of the C++ test "backward_pass psd_clamp_lxx diagnostic
         flag".  psd_clamp_lxx is a TESTING/DIAGNOSTIC knob (default False).

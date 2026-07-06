@@ -225,3 +225,52 @@ def test_backward_pass_al_long_horizon_random_multipliers_are_stable():
     assert np.all(np.isfinite(K))
     assert np.all(np.isfinite(d))
     assert np.all(np.isfinite(deltaV))
+
+
+def test_backward_pass_al_terminal_knot_seeds_cost_to_go():
+    """Twin of the C++ "terminal-knot constraint terms seed the cost-to-go".
+
+    Violate the angular-velocity constraint at the terminal knot ONLY, then put
+    nonzero multipliers on just that terminal entry. Without the terminal
+    cost-to-go seed the backward pass never reads them and the result is
+    identical to the zero-multiplier case; with it, gains / feedforward / dV all
+    change.
+    """
+    fixture = BackwardPassALFixture(n=6)
+    X, U, R, V, B, S, rho, boresight, attitude_target = fixture.make_trajectory(force_active=False)
+
+    # Terminal |w| ~ 0.137 rad/s is well above wmax; pre-terminal |w| stays below.
+    fixture.settings.constraints.wmax = 0.05
+    AV = saltro_py.Satellite.AV_INDEX
+    X[AV:AV + 3, fixture.N - 1] = np.array([0.1, -0.05, 0.08])
+
+    c_list = collect_constraints(fixture, X, U, S)
+
+    # Sanity: AV constraint (entry 0) violated at the terminal knot, satisfied earlier.
+    assert c_list[-1][0] > 0.0
+    for k in range(fixture.N - 1):
+        assert c_list[k][0] <= 0.0
+
+    lambda_zero, mu_zero = make_zero_aug(c_list)
+
+    # Nonzero multipliers ONLY on the terminal-knot AV constraint.
+    lambda_term = [c.copy() for c in lambda_zero]
+    mu_term = [c.copy() for c in mu_zero]
+    lambda_term[-1][0] = 5.0
+    mu_term[-1][0] = 25.0
+
+    ok0, K0, d0, deltaV0 = run_backward(
+        fixture, X, U, R, V, B, S, rho, boresight, attitude_target, lambda_zero, mu_zero
+    )
+    ok1, K1, d1, deltaV1 = run_backward(
+        fixture, X, U, R, V, B, S, rho, boresight, attitude_target, lambda_term, mu_term
+    )
+
+    assert ok0 and ok1
+
+    # The backward pass must now "see" the terminal violation.
+    k_diff = np.linalg.norm(K1 - K0)
+    d_diff = np.linalg.norm(d1 - d0)
+    dv_diff = np.linalg.norm(deltaV1 - deltaV0)
+    assert k_diff > 1e-12 or d_diff > 1e-12
+    assert dv_diff > 1e-12

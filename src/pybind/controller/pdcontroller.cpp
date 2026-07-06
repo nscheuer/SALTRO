@@ -33,6 +33,10 @@ void PDController::setRWScale(double rw_scale) {
     rw_scale_ = std::clamp(rw_scale, 0.0, 1.0);
 }
 
+void PDController::setGoalRate(const Eigen::Vector3d& omega_des) {
+    omega_des_ = omega_des;
+}
+
 void PDController::autoTuneGains() {
     const double J_mean = satellite_.inertia().trace() / 3.0;
     const double omega_n = 0.1;
@@ -61,6 +65,14 @@ Satellite::VecX PDController::find_u(
     const Eigen::Vector4d q = x.segment<4>(Satellite::QUAT_INDEX);
     const double qn = q.norm();
     if (!std::isfinite(qn) || qn <= 1e-12) return u;
+
+    // Goal-rate feedforward (OldPlanner smartbdot wkdes): damp ω toward the
+    // desired body rate ω_des instead of toward zero.  omega_err = ω - ω_des.
+    // When ω_des is unset (NaN, the default), this reduces to ω_err = ω.
+    Eigen::Vector3d omega_err = omega;
+    if (omega_des_.allFinite()) {
+        omega_err = omega - omega_des_;
+    }
 
     // Compute desired body-frame torque.  Two cases:
     //
@@ -98,10 +110,10 @@ Satellite::VecX PDController::find_u(
         const Eigen::Matrix3d R_T = saltro::math::rotationMatrix(q).transpose();
         const Eigen::Vector3d r_body = R_T * r_eci;
 
-        tau_des = kp_q_ * bs.cross(r_body) - kd_w_ * omega;
+        tau_des = kp_q_ * bs.cross(r_body) - kd_w_ * omega_err;
     } else {
         const Eigen::Vector4d q_err = saltro::math::quatError(q_goal, q);
-        tau_des = -kp_q_ * q_err.tail<3>() - kd_w_ * omega;
+        tau_des = -kp_q_ * q_err.tail<3>() - kd_w_ * omega_err;
     }
 
     // Numerical actuator Jacobian J = ∂τ/∂u  (3 × nu) via finite differences.

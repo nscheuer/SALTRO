@@ -3,10 +3,17 @@ Comprehensive validation tests for PlannerSettings - mirrors test_validate_plann
 Tests all validation rules for PlannerSettings configuration.
 """
 
+import math
+import sys
+from pathlib import Path
+
 import pytest
 import numpy as np
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "build"))
+
 import saltro_py
-import math
 
 
 # ============================================================================
@@ -1082,3 +1089,27 @@ def test_psd_clip_quu_ddp_roundtrip_and_valid():
         ok, error_msg = saltro_py.validatePlannerSettings(settings)
         assert ok
         assert error_msg == ""
+
+
+# ============================================================================
+# PD warm-start goal-rate feedforward validation (G16)
+# Twin of the C++ cases in test_validate_plannersettings.cpp.
+# ============================================================================
+
+def test_default_pd_goal_rate_ff_off_and_valid():
+    """Default pd_goal_rate_ff_enabled is off and settings pass validation."""
+    settings = valid_settings()
+    assert settings.init_traj.pd_goal_rate_ff_enabled is False
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert ok
+    assert error_msg == ""
+
+
+def test_enabled_pd_goal_rate_ff_valid():
+    """Enabling the PD goal-rate feedforward passes validation."""
+    settings = valid_settings()
+    settings.init_traj.initcontroller = 3
+    settings.init_traj.pd_goal_rate_ff_enabled = True
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert ok
+    assert settings.init_traj.pd_goal_rate_ff_enabled is True

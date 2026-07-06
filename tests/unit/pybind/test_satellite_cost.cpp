@@ -2417,19 +2417,6 @@ TEST_CASE_METHOD(SatelliteCostFixture,
     REQUIRE((g0(QI + 1) > 0.0) == (g_plus(QI + 1) > 0.0));
 }
 
-// ============================================================================
-// TEST SECTION 12: afc=3 bounded antipodal clamp at c = −1
-// ============================================================================
-// C++ twin of the test_afc3_antipode_* tests in
-// tests/unit/pybind/test_satellite_cost_omega_ff.py.  The c = −1 cusp of
-// ½·acos²(c) is GENUINE (Puiseux: φ = π − √(2u)·(1 + u/12 + …), u = 1+c), so
-// it cannot be Taylor-removed like the c = +1 side.  Instead the shape clamps
-// below u < 1e-6: (f', f'') are the exact-formula pair evaluated at the seam
-// c_eff = −1 + 1e-6 and the value is extended linearly, keeping f strictly
-// increasing toward the antipode.  Documented bounds (weight = 1):
-//   |f'| ≤ 2220.442…,  f'' ≤ 1.110720…e9,
-//   assembled GN q-block max-eig ≤ f''·4·(1−c_eff²) ≈ 8885.76.
-
 namespace {
 
 constexpr double kAcClampU = 1e-6;

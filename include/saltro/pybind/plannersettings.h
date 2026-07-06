@@ -20,6 +20,17 @@ static constexpr int MAX_OUTER_PASSES = 2;
  */
 struct InitTrajConfig {
     int initcontroller = 0;
+
+    /**
+     * @brief Goal-rate feedforward toggle (ported from OldPlanner smartbdot).
+     *
+     * When true and initcontroller == 3, the PD warm-start feeds forward a
+     * desired body rate @c ω_des computed by finite-differencing the goal
+     * trajectory between consecutive knots (OldPlanner @c wkdes), adding a
+     * @c -kd·(ω - ω_des) damping term toward the goal rate instead of damping
+     * ω toward zero.  Default off preserves the rate-to-zero behavior.
+     */
+    bool pd_goal_rate_ff_enabled = false;
 };
 
 /**
