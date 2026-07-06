@@ -1151,3 +1151,42 @@ def test_enabled_pd_goal_rate_ff_valid():
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
     assert ok
     assert settings.init_traj.pd_goal_rate_ff_enabled is True
+
+def test_invalid_cost_gn_curvature_max_negative():
+    """Negative cost.gn_curvature_max should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.gn_curvature_max = -1.0
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "cost.gn_curvature_max invalid"
+
+
+def test_invalid_cost_gn_curvature_max_nan():
+    """NaN cost.gn_curvature_max should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.gn_curvature_max = float("nan")
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "cost.gn_curvature_max invalid"
+
+
+def test_invalid_cost_gn_curvature_max_infinity():
+    """Infinite cost.gn_curvature_max should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.gn_curvature_max = float("inf")
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "cost.gn_curvature_max invalid"
+
+
+def test_valid_cost_gn_curvature_max_zero_and_positive():
+    """0.0 (disabled) and positive caps should pass"""
+    for cap in (0.0, 2.0, 10.0, 50.0):
+        settings = valid_settings()
+        settings.passes[0].cost.gn_curvature_max = cap
+        ok, _ = saltro_py.validatePlannerSettings(settings)
+
+        assert ok, f"gn_curvature_max={cap} should be valid"

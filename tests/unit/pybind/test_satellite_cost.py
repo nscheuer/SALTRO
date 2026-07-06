@@ -1979,6 +1979,96 @@ class TestHemisphereKink:
             "d=0 gradient should match the +hemisphere approach convention"
 
 
+# ============================================================================
+# TEST SECTION: Gauss-Newton curvature cap (gn_curvature_max), vec mode
+# ============================================================================
+# The GN vec-pointing angle Hessian q-block is the rank-1 PSD term
+# w_ang * f'' * dc dc^T, whose single nonzero eigenvalue is exactly
+# w_ang * f'' * |dc|^2. For ang_cost_func_type=3 (0.5*acos^2) this diverges
+# like 1/sin(theta) toward the antipode. gn_curvature_max > 0 clamps it to
+# gn_curvature_max * w_ang. Mirrors the C++ tests in test_satellite_cost.cpp.
+
+
+def _state_at_angle(fixture, theta):
+    """State whose vec-pointing error angle is theta (rot about +z, bs +x,
+    target +x): c = bs.R^T.r = cos(theta)."""
+    QI = fixture.sat.QUAT_INDEX
+    x = np.zeros(fixture.sat.stateDim)
+    x[QI:QI + 4] = [np.cos(theta / 2.0), 0.0, 0.0, np.sin(theta / 2.0)]
+    return x
+
+
+def _q_block_max_eig(fixture, lxx):
+    QI = fixture.sat.QUAT_INDEX
+    qb = np.asarray(lxx)[QI:QI + 4, QI:QI + 4]
+    return np.linalg.eigvalsh(qb).max()
+
+
+def _gn_cfg(weight, cap):
+    cfg = saltro.CostConfig()
+    cfg.use_cost_hess = True
+    cfg.cost_hess_gauss_newton = True
+    cfg.ang_cost_func_type = 3
+    cfg.angle = weight
+    cfg.angle_N = weight
+    cfg.ang_vel = 0.0
+    cfg.ang_vel_N = 0.0
+    cfg.gn_curvature_max = cap
+    return cfg
+
+
+class TestGNCurvatureCap:
+    """Opt-in Gauss-Newton curvature cap for near-antipodal vec pointing."""
+
+    sat_dir = np.array([1.0, 0.0, 0.0])
+    eci_target = np.array([np.nan, 1.0, 0.0, 0.0])
+    B_eci = np.zeros(3)
+
+    def test_cap_disabled_matches_uncapped_formula(self, fixture):
+        # With the cap disabled (0.0), the assembled rank-1 GN eigenvalue must
+        # equal the closed-form uncapped value w*f''*|dc|^2 = w*4*(1 - th*cot th)
+        # (|dc|^2 = 4 sin^2 th for this geometry). This is the pre-change behavior.
+        u = np.zeros(fixture.sat.controlDim)
+        weight = 3.0
+        base = _gn_cfg(weight, 0.0)   # disabled
+        for deg in [90.0, 150.0, 170.0, 179.0, 179.9]:
+            th = np.deg2rad(deg)
+            x = _state_at_angle(fixture, th)
+            lxx, _, _ = fixture.sat.stageCostHessians(0, 10, x, u, self.sat_dir, self.eci_target, self.B_eci, base)
+            predicted = weight * 4.0 * (1.0 - th * np.cos(th) / np.sin(th))
+            assert _q_block_max_eig(fixture, lxx) == pytest.approx(predicted, rel=1e-9)
+
+    def test_cap_clamps_eigenvalue_and_keeps_gradient(self, fixture):
+        u = np.zeros(fixture.sat.controlDim)
+        weight, cap = 3.0, 10.0
+        uncapped = _gn_cfg(weight, 0.0)
+        capped = _gn_cfg(weight, cap)
+        for deg in [170.0, 179.0, 179.9]:
+            x = _state_at_angle(fixture, np.deg2rad(deg))
+            lxx_u, _, _ = fixture.sat.stageCostHessians(0, 10, x, u, self.sat_dir, self.eci_target, self.B_eci, uncapped)
+            lxx_c, _, _ = fixture.sat.stageCostHessians(0, 10, x, u, self.sat_dir, self.eci_target, self.B_eci, capped)
+            # Uncapped is genuinely stiff.
+            assert _q_block_max_eig(fixture, lxx_u) > cap * weight
+            # Capped eigenvalue is bounded.
+            assert _q_block_max_eig(fixture, lxx_c) <= cap * weight * (1.0 + 1e-9)
+            # Gradient untouched.
+            lx_u, _, _ = fixture.sat.stageCostJacobians(0, 10, x, u, self.sat_dir, self.eci_target, self.B_eci, uncapped)
+            lx_c, _, _ = fixture.sat.stageCostJacobians(0, 10, x, u, self.sat_dir, self.eci_target, self.B_eci, capped)
+            assert np.array_equal(np.asarray(lx_u), np.asarray(lx_c))
+
+    def test_cap_bit_identical_below_cap_angle(self, fixture):
+        u = np.zeros(fixture.sat.controlDim)
+        weight, cap = 3.0, 50.0
+        uncapped = _gn_cfg(weight, 0.0)
+        capped = _gn_cfg(weight, cap)
+        for deg in [90.0, 120.0, 150.0, 160.0]:
+            x = _state_at_angle(fixture, np.deg2rad(deg))
+            lxx_u, _, _ = fixture.sat.stageCostHessians(0, 10, x, u, self.sat_dir, self.eci_target, self.B_eci, uncapped)
+            lxx_c, _, _ = fixture.sat.stageCostHessians(0, 10, x, u, self.sat_dir, self.eci_target, self.B_eci, capped)
+            assert _q_block_max_eig(fixture, lxx_u) < cap * weight
+            assert np.array_equal(np.asarray(lxx_u), np.asarray(lxx_c))
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
 

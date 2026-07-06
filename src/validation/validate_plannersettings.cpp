@@ -185,6 +185,14 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
                 }
             }
 
+            // Opt-in GN curvature cap: 0.0 disables it. Must be nonnegative
+            // and finite (it multiplies the angle weight to bound the rank-1
+            // GN Hessian eigenvalue).
+            if (pass.cost.gn_curvature_max < 0.0 || !std::isfinite(pass.cost.gn_curvature_max)) {
+                error_msg = "cost.gn_curvature_max invalid";
+                return false;
+            }
+
             // Validate augmented Lagrangian configuration
             if (pass.auglag.max_outer_iters < 0) {
                 error_msg = "auglag.max_outer_iters invalid";
