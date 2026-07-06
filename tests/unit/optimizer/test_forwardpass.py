@@ -411,6 +411,84 @@ def test_forward_pass_accepts_alpha_1_when_full_step_already_descends(fixture):
     assert chosen_alpha == 1.0
 
 
+def test_forward_pass_strict_decrease_rejects_zero_improvement_rollouts(fixture):
+    X_base, U_base = fixture.warm_start()
+
+    U_trim = U_base[:, : fixture.N - 1]
+    cost_cfg = fixture.settings.passes[0].cost
+    J_prev = fixture.satellite.totalCost(
+        X_base, U_trim, fixture.B, fixture.boresight,
+        fixture.attitude_target_traj, cost_cfg
+    )
+
+    K_list = [
+        np.zeros((fixture.nu, fixture.satellite.reducedStateDim), dtype=float)
+        for _ in range(fixture.N - 1)
+    ]
+    d_list = [np.zeros(fixture.nu, dtype=float) for _ in range(fixture.N - 1)]
+    deltaV = np.array([-1.0, 0.0], dtype=float)
+
+    lambda_aug, mu_aug = make_zero_aug_terms(
+        fixture.satellite, fixture.settings, X_base, U_trim, fixture.S
+    )
+
+    fixture.settings.passes[0].linesearch.max_iters = 1
+    fixture.settings.passes[0].linesearch.beta1 = 0.0
+    fixture.settings.passes[0].ilqr.ls_strict_decrease = False
+
+    ok_relaxed, X_relaxed, U_relaxed, J_relaxed = saltro_py.forward_pass(
+        fixture.satellite,
+        X_base,
+        U_base,
+        K_list,
+        d_list,
+        deltaV,
+        fixture.B,
+        fixture.R,
+        fixture.V,
+        fixture.S,
+        fixture.rho,
+        fixture.boresight,
+        fixture.attitude_target_traj,
+        fixture.settings,
+        lambda_aug,
+        mu_aug,
+        fixture.jtime,
+        J_prev,
+    )
+    assert ok_relaxed
+    assert J_relaxed == pytest.approx(J_prev, abs=1e-10)
+
+    fixture.settings.passes[0].ilqr.ls_strict_decrease = True
+
+    ok_strict, X_strict, U_strict, J_strict = saltro_py.forward_pass(
+        fixture.satellite,
+        X_base,
+        U_base,
+        K_list,
+        d_list,
+        deltaV,
+        fixture.B,
+        fixture.R,
+        fixture.V,
+        fixture.S,
+        fixture.rho,
+        fixture.boresight,
+        fixture.attitude_target_traj,
+        fixture.settings,
+        lambda_aug,
+        mu_aug,
+        fixture.jtime,
+        J_prev,
+    )
+    assert not ok_strict
+    assert J_strict == pytest.approx(J_prev, abs=1e-10)
+    np.testing.assert_allclose(X_relaxed, X_base, atol=1e-12)
+    np.testing.assert_allclose(U_relaxed, U_base, atol=1e-12)
+    np.testing.assert_allclose(X_strict, X_base, atol=1e-12)
+    np.testing.assert_allclose(U_strict, U_base, atol=1e-12)
+
+
 def test_forward_pass_rejects_trials_when_backward_pass_predicts_ascent(fixture):
     """G2 regression twin of the C++ test "forward_pass rejects trials when
     backward pass predicts ascent".
