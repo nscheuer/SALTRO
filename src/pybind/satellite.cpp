@@ -1281,11 +1281,162 @@ namespace {
 //   0: 1−c    1: ½(1−c)²    2: acos(c)    3: ½·acos(c)²
 // fpp ≥ 0 for types 0,1,3, so the Gauss-Newton Hessian f''·g·gᵀ is PSD by
 // construction; type 2 (acos) is the exception (fpp < 0 for c > 0).
+//
+// === Taylor protection for type 3 at c = +1 =====================================
+//
+// f(c) = ½·acos²(c) is smooth at c = +1 (it's just ½·θ², θ = pointing angle).
+// But the c-coordinate formula has a removable 0/0 singularity:
+//
+//   f'(c)  = -acos(c) / √(1−c²)             →  −0/0   at c = 1
+//   f''(c) = 1/(1−c²) − acos(c)·c / [(1−c²)·√(1−c²)] →  ∞ − ∞  at c = 1
+//
+// L'Hôpital limits: f'(c=1) = −1 and f''(c=1) = 1/3.  Near c = +1, the
+// Taylor expansion (in omz = 1 − c) is:
+//   f(c)   ≈ omz + omz²/6 − omz³/90 + 4·omz⁴/2835
+//   f'(c)  ≈ −1 − omz/3 + omz²/30 − 2·omz³/567
+//   f''(c) ≈ 1/3 − omz/15 + omz²/189
+//
+// We switch from the exact c-formula to the Taylor formula when (1 − c) drops
+// below kTaylorThresholdLow, and linearly blend in [kTaylorThresholdLow,
+// kTaylorThresholdHigh].  This mirrors the OldPlanner cost2ang regularization
+// (acos_limitL / acos_limitH thresholds) used in the Generalized_ADCS PhD
+// planner; it handles the catastrophic-cancellation regime where the exact
+// formula computes ∞ − ∞ in double precision.
+//
+// === Bounded antipodal clamp for type 3 at c = −1 ===============================
+//
+// At c = −1, type 3 has a *genuine* cusp (acos(c)|_{c=−1} = π, not 0).  With
+// u = 1 + c the Puiseux expansion is φ = acos(c) = π − √(2u)·(1 + u/12 + …),
+// so (in the df/dc sign convention used throughout this helper — f' < 0 means
+// "cost decreases as alignment c increases"):
+//
+//   f'(c)  = −φ/√(1−c²)                       = −π/√(2u) + 1 + O(√u) → −∞
+//   f''(c) = 1/(1−c²) − φ·c/[(1−c²)·√(1−c²)]  = π/(2√2·u^{3/2}) + O(u^{-1/2}) → +∞
+//
+// Unlike the c = +1 side this is NOT removable — but there is also NO
+// cancellation: the exact formula computes the divergence accurately all the
+// way down, and the code used to ride it to the omc2 ≥ 1e-12 floor
+// (f' ~ −3e6, f'' ~ 3e18 — absurdly stiff for the solver).  Taylor protection
+// cannot remove a genuine cusp, so instead we CLAMP: below u < kAntipodeClampU
+// the exact formula is evaluated at the seam u_eff = kAntipodeClampU
+// (c_eff = −1 + u_eff), giving a self-consistent (f', f'') pair, and the value
+// is extended linearly, f(c) = f_exact(c_eff) + f'_clamp·(c − c_eff), so f
+// stays strictly monotone (increasing toward the antipode) and line-search
+// merit still discriminates direction inside the clamp.
+//
+// Continuity at the seam: f, f', f'' are all continuous by construction (the
+// clamped triple IS the exact triple at u_eff).  Inside the clamp, f' is the
+// exact derivative of the extended (linear) f; the returned f'' is the frozen
+// seam curvature — a GN stiffness surrogate, NOT the second derivative of the
+// extended f (which is 0).  That deliberate inconsistency keeps the GN outer
+// product PSD and "big but finite"; no blend zone is needed because nothing
+// the solver consumes jumps at the seam (C¹-exactness of the surrogate f''
+// w.r.t. the extended f is deliberately not pursued).
+//
+// Choice of kAntipodeClampU — target "solver-friendly large", f'' ∈ [1e6, 1e9]
+// (assembled GN q-block max-eig = f''·|∂c/∂θ|² with |∂c/∂θ|² = 4·(1−c²), so
+// the bound is f''·4·(2u_eff − u_eff²), attained at the seam):
+//
+//   u_eff  |  |f'|_max  |  f''_max   |  assembled GN max-eig (× weight)
+//   1e-5   |  7.02e2    |  3.51e7    |  2.8e3
+//   1e-6   |  2.22e3    |  1.11e9    |  8.9e3    ← chosen
+//   1e-7   |  7.02e3    |  3.51e10   |  2.8e4
+//
+// u_eff = 1e-6 keeps the shape exact to within 0.046° of the antipode
+// (θ_seam = π − √(2e-6) ≈ 179.919°) while capping the worst-case assembled
+// GN stiffness at ≈ 8.9e3·weight (measured ~7.2e5·weight at θ = 179.999°
+// before the clamp).  The assembled tangent gradient (≈ 2θ ≈ 2π near the
+// antipode) is untouched outside the micro-clamp region, so the
+// antipode-escape force is preserved; inside it the gradient shrinks as
+// |f'_clamp|·2·sinθ → 0 at the exact antipode (a stationary point by
+// symmetry — unavoidable).
+//
+// Composition note: the separate PR-in-flight feat/gn-curvature-cap adds a
+// CONFIGURABLE assembled-eigenvalue cap.  This clamp is STRUCTURAL (shape
+// level, always on) and bounds the worst case even with that knob off; they
+// compose — the knob can only lower the assembled curvature further.
+//
+// Type 2 (acos) keeps its genuine ±1 cusps unprotected (assembled gradient is
+// finite there by geometry cancellation; see the singularity-sweep tests).
 struct AngCostShape { double f, fp, fpp; };
+
+inline AngCostShape angCostShape3Taylor(double omz) {
+    // f(c) = ½·acos²(1 − omz), expanded in omz around 0.
+    //   f   = omz + omz²/6 − omz³/90 + 4·omz⁴/2835
+    //   f'  = −(1 + omz/3 − omz²/30 + 2·omz³/567)   (NB: d/dc = −d/d(omz))
+    //   f'' = 1/3 − omz/15 + omz²/189
+    const double omz2 = omz * omz;
+    const double omz3 = omz2 * omz;
+    const double omz4 = omz2 * omz2;
+    return {
+        omz + omz2 / 6.0 - omz3 / 90.0 + 4.0 * omz4 / 2835.0,
+        -(1.0 + omz / 3.0 - omz2 / 30.0 + 2.0 * omz3 / 567.0),
+        1.0 / 3.0 - omz / 15.0 + omz2 / 189.0
+    };
+}
 
 AngCostShape angCostShape(double c, int type) {
     const double omc2 = std::max(1.0 - c * c, 1e-12);  // 1 − c²  (floored)
     const double s = std::sqrt(omc2);                  // √(1 − c²)
+
+    // Taylor protection at c = +1 for type 3.  Thresholds chosen so the
+    // catastrophic-cancellation regime (1 − c² near double-precision floor)
+    // is fully handled by Taylor, with a blend zone where the exact form is
+    // still accurate.
+    constexpr double kTaylorThresholdLow  = 1e-6;
+    constexpr double kTaylorThresholdHigh = 1e-4;
+
+    if (type == 3 && c > 0.0) {
+        const double omz = 1.0 - c;
+        if (omz < kTaylorThresholdHigh) {
+            const AngCostShape taylor = angCostShape3Taylor(omz);
+            if (omz < kTaylorThresholdLow) {
+                return taylor;
+            }
+            // Linear blend between Taylor (at omz = low) and exact (at omz = high).
+            const double blend = (omz - kTaylorThresholdLow) /
+                                 (kTaylorThresholdHigh - kTaylorThresholdLow);
+            const double phi_e = std::acos(c);
+            const AngCostShape exact = {
+                0.5 * phi_e * phi_e,
+                -phi_e / s,
+                1.0 / omc2 - phi_e * c / (omc2 * s)
+            };
+            return {
+                (1.0 - blend) * taylor.f   + blend * exact.f,
+                (1.0 - blend) * taylor.fp  + blend * exact.fp,
+                (1.0 - blend) * taylor.fpp + blend * exact.fpp
+            };
+        }
+        // else: fall through to the exact-formula switch below
+    }
+
+    // Bounded antipodal clamp at c = −1 for type 3 (see the block comment
+    // above `AngCostShape` for the derivation, the u_eff table, and the
+    // composition note vs the feat/gn-curvature-cap knob).  Bounds
+    // |f'| ≤ 2.22e3 and f'' ≤ 1.11e9 (assembled GN q-block ≤ 8.9e3·weight);
+    // the value is extended linearly so f stays strictly increasing toward
+    // the antipode.  Only type 3 and only the c < 0 hemisphere; quat mode
+    // never reaches this (d = |q_goal·q| ∈ [0, 1]).
+    constexpr double kAntipodeClampU = 1e-6;
+
+    if (type == 3 && c < -1.0 + kAntipodeClampU) {
+        // Exact formula at the seam c_eff = −1 + kAntipodeClampU: a
+        // self-consistent (f', f'') pair (no cancellation on this side, so
+        // the exact expressions are accurate at u_eff = 1e-6).
+        const double c_eff = -1.0 + kAntipodeClampU;
+        const double omc2_eff = 1.0 - c_eff * c_eff;   // = 2·u_eff − u_eff²
+        const double s_eff = std::sqrt(omc2_eff);
+        const double phi_eff = std::acos(c_eff);       // ≈ π − √(2·u_eff)
+        const double fp_eff = -phi_eff / s_eff;                          // ≈ −2.22e3
+        const double fpp_eff =
+            1.0 / omc2_eff - phi_eff * c_eff / (omc2_eff * s_eff);       // ≈ +1.11e9
+        // Linear value extension: f' here is df/dc (f'_clamp < 0 and
+        // c − c_eff < 0 inside the clamp, so f grows toward the antipode).
+        return { 0.5 * phi_eff * phi_eff + fp_eff * (c - c_eff),
+                 fp_eff, fpp_eff };
+    }
+
     switch (type) {
         case 0: return { 1.0 - c, -1.0, 0.0 };
         case 1: { const double e = 1.0 - c; return { 0.5 * e * e, -e, 1.0 }; }
@@ -1411,8 +1562,12 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
                 ang_cost = std::acos(qdot_aligned);
                 break;
             case 3: {
-                const double phi = std::acos(qdot_aligned);
-                ang_cost = 0.5 * phi * phi;
+                // Route through the shared shape helper so the c = +1 Taylor
+                // protection applies in quaternion mode too.  The quat-mode
+                // inner scalar d = |q_goal·q| is post-hemisphere-alignment
+                // (d ∈ [0, 1]), so d → +1 (alignment) is exactly the
+                // protected region.
+                ang_cost = angCostShape(qdot_aligned, 3).f;
                 break;
             }
             // NOTE: type 4 ((1-d)²) was removed: it is exactly type 1 with the
@@ -1765,9 +1920,10 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
                 break;
             }
             case 3: {  // ang_cost = 0.5 * acos(|qdot|)^2
-                const double phi = std::acos(qdot_aligned);
-                const double denom = std::sqrt(1.0 - qdot_aligned * qdot_aligned + 1e-12);
-                d_ang_cost_dqdot = -phi / denom;  // Always negative
+                // Shared Taylor-protected shape: dh/dd → −1 at d = +1, where
+                // the raw −acos(d)/√(1−d²+1e-12) form degenerates to −0/1e-6
+                // (i.e. → 0, the wrong limit) as d → 1.
+                d_ang_cost_dqdot = angCostShape(qdot_aligned, 3).fp;  // Always negative
                 break;
             }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
@@ -2045,11 +2201,13 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 2:
                 d2h_dd2 = -d / (one_minus_d2 * sqrt_omd2);
                 break;
-            case 3: {
-                const double phi = std::acos(std::clamp(d, 0.0, 1.0));
-                d2h_dd2 = 1.0 / one_minus_d2 - phi * d / (one_minus_d2 * sqrt_omd2);
+            case 3:
+                // Shared Taylor-protected shape: d²h/dd² → 1/3 at d = +1,
+                // where the raw 1/(1−d²) − acos(d)·d/[(1−d²)·√(1−d²)] form
+                // suffers catastrophic cancellation (∞ − ∞, evaluating to
+                // ~1e12 in double precision instead of 1/3).
+                d2h_dd2 = angCostShape(d, 3).fpp;
                 break;
-            }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             // Unreachable for validated settings; no silent acos fallback.
             default: throw invalid_argument("ang_cost_func_type invalid");
@@ -2062,11 +2220,9 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
             case 0: dh_dd = -1.0; break;
             case 1: dh_dd = -(1.0 - d); break;
             case 2: dh_dd = -1.0 / sqrt_omd2; break;
-            case 3: {
-                const double phi2 = std::acos(std::clamp(d, 0.0, 1.0));
-                dh_dd = -phi2 / sqrt_omd2;
+            case 3:
+                dh_dd = angCostShape(d, 3).fp;  // Taylor-protected: → −1 at d = +1
                 break;
-            }
             // NOTE: type 4 ((1-d)²) removed -- see stageCost().
             // Unreachable for validated settings; no silent acos fallback.
             default: throw invalid_argument("ang_cost_func_type invalid");
