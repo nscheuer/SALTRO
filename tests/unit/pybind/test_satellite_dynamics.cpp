@@ -1279,3 +1279,60 @@ TEST_CASE_METHOD(SatelliteDynamicsFixture, "Hessian w.r.t. control-control match
         }
     }
 }
+
+// ============================================================================
+// TEST SECTION 13: ddrotmatTvecdqdq — second derivative of R(q)^T v w.r.t. q
+// ============================================================================
+// Direct guard on the rotation-Hessian helper that feeds every disturbance
+// Hessian (gravity-gradient/drag/SRP/residual-dipole) AND the analytic cost
+// Hessian. The qv-qv block was previously incomplete and asymmetric, which made
+// those Hessians disagree with finite differences (and broke symmetry). The
+// true second derivative is symmetric in the two quaternion indices (Schwarz)
+// and equals the finite difference of drotmatTvecdq.
+
+TEST_CASE("ddrotmatTvecdqdq is symmetric in its two quaternion indices",
+          "[quaternion][hessian]") {
+    // Several non-trivial q (need not be unit: the helper differentiates the
+    // raw closed-form R(q)) and v.
+    const std::array<Eigen::Vector4d, 3> qs = {
+        Eigen::Vector4d(1.0, 0.0, 0.0, 0.0),
+        Eigen::Vector4d(0.6, -0.3, 0.5, 0.2),
+        Eigen::Vector4d(-0.2, 0.7, -0.1, 0.4)};
+    const Eigen::Vector3d v(0.3, -1.2, 0.8);
+
+    for (const auto& q : qs) {
+        auto H = saltro::math::ddrotmatTvecdqdq(q, v);
+        for (int m = 0; m < 3; ++m) {
+            for (int a = 0; a < 4; ++a) {
+                for (int b = 0; b < 4; ++b) {
+                    REQUIRE(std::abs(H[static_cast<std::size_t>(m)](a, b) -
+                                     H[static_cast<std::size_t>(m)](b, a)) < 1e-12);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("ddrotmatTvecdqdq matches finite differences of drotmatTvecdq",
+          "[quaternion][hessian][finite-diff]") {
+    const Eigen::Vector4d q(0.6, -0.3, 0.5, 0.2);
+    const Eigen::Vector3d v(0.3, -1.2, 0.8);
+
+    auto H = saltro::math::ddrotmatTvecdqdq(q, v);  // H[m](a,b) = d^2(R^T v)_m / dq_a dq_b
+
+    const double eps = 1e-6;
+    for (int k = 0; k < 4; ++k) {
+        Eigen::Vector4d qp = q, qm = q;
+        qp(k) += eps;
+        qm(k) -= eps;
+        // drotmatTvecdq(q, v)(j, m) = d(R^T v)_m / dq_j
+        Eigen::Matrix<double, 4, 3> Jp = saltro::math::drotmatTvecdq(qp, v);
+        Eigen::Matrix<double, 4, 3> Jm = saltro::math::drotmatTvecdq(qm, v);
+        Eigen::Matrix<double, 4, 3> dJ = (Jp - Jm) / (2.0 * eps);  // dJ(j,m) = d^2(R^T v)_m/dq_j dq_k
+        for (int m = 0; m < 3; ++m) {
+            for (int j = 0; j < 4; ++j) {
+                REQUIRE(std::abs(H[static_cast<std::size_t>(m)](j, k) - dJ(j, m)) < 1e-7);
+            }
+        }
+    }
+}

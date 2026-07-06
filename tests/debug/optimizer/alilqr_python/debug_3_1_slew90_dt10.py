@@ -16,7 +16,7 @@ def create_planner_settings():
     plannersettings = saltro_py.PlannerSettings()
 
     # Warm-Start
-    plannersettings.init_traj.initcontroller = 1
+    plannersettings.init_traj.initcontroller = 2
     
     # Pass 0 Settings
     plannersettings.num_passes = 1
@@ -36,7 +36,7 @@ def create_planner_settings():
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1e-1
-    cost.rw_control_weight = 1.0
+    cost.rw_control_weight = 1e3
     cost.magic_control_weight = 0.0
     cost.rw_AM_weight = 0.0
     cost.rw_stic_weight = 0.0

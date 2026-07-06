@@ -729,14 +729,15 @@ TEST_CASE_METHOD(ConstraintFixture,
 
     const double eps = 1e-5;
 
-    // ∂²c/∂x² ≈ (Jx(x+eps) - Jx(x-eps)) / (2*eps)
+    // ∂²c/∂x² ≈ (Jx(x+eps) - Jx(x-eps)) / (2*eps), raw-quaternion (no
+    // renormalization): constraintHessians returns the raw 4-D Hessian, which the
+    // backward pass projects with G (G·H·Gᵀ) — same convention as the dynamics
+    // Hessian. constraintJacobians normalizes q internally, so the matching FD
+    // perturbs the raw quaternion. (Non-identity attitude exercises the
+    // q0-coupled manifold terms.)
     for (int j = 0; j < n_state(); ++j) {
         VecX xp = x0; xp(j) += eps;
         VecX xm = x0; xm(j) -= eps;
-        if (j >= 3 && j < 7) {
-            normalizeQuatInState(xp);
-            normalizeQuatInState(xm);
-        }
         auto [_, c_xp] = sat.constraintJacobians(k, N, xp, u0, sun, cfg);
         auto [_2, c_xm] = sat.constraintJacobians(k, N, xm, u0, sun, cfg);
         MatX fd_slice = (c_xp - c_xm) / (2.0 * eps);

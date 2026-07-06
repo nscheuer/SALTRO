@@ -1,0 +1,252 @@
+-- GLOB mismatch!
+-- GLOB mismatch!
+CMake Warning (dev) at /Users/patrickmckeen/Documents/Generalized_ADCS/venv/lib/python3.12/site-packages/cmake/data/share/cmake-4.1/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(eigen) is deprecated, call
+  FetchContent_MakeAvailable(eigen) instead.  Policy CMP0169 can be set to
+  OLD to allow FetchContent_Populate(eigen) to be called directly for now,
+  but the ability to call it with declared details will be removed completely
+  in a future version.
+Call Stack (most recent call first):
+  CMakeLists.txt:22 (FetchContent_Populate)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Deprecation Warning at external/pybind11/CMakeLists.txt:13 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- pybind11 v2.12.0 
+-- Configuring done (1.2s)
+-- Generating done (0.2s)
+-- Build files have been written to: /private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/build
+[  1%] Building CXX object CMakeFiles/saltro.dir/src/math/mrp.cpp.o
+[  1%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/alilqr.cpp.o
+[  1%] Building CXX object CMakeFiles/saltro.dir/src/math/quaternion.cpp.o
+[  1%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/forwardpass.cpp.o
+[  1%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/backwardpass.cpp.o
+[ 65%] Built target Catch2
+[ 67%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/iLQR.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/alilqr.cpp:100:39: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  100 |     const auto& aug = settings.passes[pass_idx].auglag;
+      |                       ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:59:52: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   59 |                 const int lam_size = static_cast<int>(lambda_aug[k].size());
+      |                                                       ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:60:47: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   60 |                 const int mu_size = static_cast<int>(mu_aug[k].size());
+      |                                                      ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:64:33: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   64 |                         const double li = lambda_aug[k](i);
+      |                                           ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:70:27: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   70 |                                 total += 0.5 * mu_aug[k](i) * ci * ci;
+      |                                                ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:101:47: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  101 |         const CostConfig& cost_cfg = settings.passes[pass_idx].cost;
+      |                                      ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:102:47: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  102 |         const ILQRConfig& ilqr_cfg = settings.passes[pass_idx].ilqr;
+      |                                      ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:103:56: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  103 |         const RegularizationConfig& reg_cfg = settings.passes[pass_idx].reg;
+      |                                               ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:108:44: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  108 |         pass_settings.passes[0] = settings.passes[pass_idx];
+      |                                   ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:114:35: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  114 |         std::vector<Eigen::MatrixXd> K(N - 1);
+      |                                      ~ ~~^~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:115:35: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  115 |         std::vector<Eigen::VectorXd> d(N - 1);
+      |                                      ~ ~~^~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:117:5: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  117 |                 K[k] = Eigen::MatrixXd::Zero(nu, nxr);
+      |                 ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:118:5: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  118 |                 d[k] = Eigen::VectorXd::Zero(nu);
+      |                 ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:46:4: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   46 |         K[k] = K_k;
+      |         ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:50:4: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   50 |         d[k] = d_k;
+      |         ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:152:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  152 |                 u_bar_k += K[k] * state_error_reduced;
+      |                            ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:155:38: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  155 |                 u_bar_k += alpha * d[k];
+      |                                    ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:238:66: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  238 |                 if (lambda_aug[k].size() != c_k.size() || mu_aug[k].size() != c_k.size()) {
+      |                                                           ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:238:32: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  238 |                 if (lambda_aug[k].size() != c_k.size() || mu_aug[k].size() != c_k.size()) {
+      |                     ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:245:50: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  245 |                     const double li = lambda_aug[k](i);
+      |                                       ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:246:46: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  246 |                     const double mi = mu_aug[k](i);
+      |                                       ~~~~~~ ^
+[ 69%] Built target Catch2WithMain
+[ 69%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/trajOpt.cpp.o
+12 warnings generated.
+[ 69%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/warm_start.cpp.o
+1 warning generated.
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:142:53: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  142 |                 if (lambda_aug[kT].size() == c_T.size() && mu_aug[kT].size() == c_T.size()) {
+      |                                                            ~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:142:18: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  142 |                 if (lambda_aug[kT].size() == c_T.size() && mu_aug[kT].size() == c_T.size()) {
+      |                     ~~~~~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:149:34: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  149 |                                 const double li = lambda_aug[kT](i);
+      |                                                   ~~~~~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:153:21: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  153 |                                         w(i) += mu_aug[kT](i) * ci;
+      |                                                 ~~~~~~ ^~
+[ 69%] Building CXX object CMakeFiles/saltro.dir/src/orbit_generation/orbits/compute_orbit_J2_RK4.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:159:37: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  159 |                                 if (c_T(i) <= 0.0 && lambda_aug[kT](i) <= 0.0) {
+      |                                                      ~~~~~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:162:32: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  162 |                                 const double mu_i = mu_aug[kT](i);
+      |                                                     ~~~~~~ ^~
+[ 69%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/controller.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:231:53: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  231 |                         if (lambda_aug[k].size() == c_k.size() && mu_aug[k].size() == c_k.size()) {
+      |                                                                   ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:231:19: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  231 |                         if (lambda_aug[k].size() == c_k.size() && mu_aug[k].size() == c_k.size()) {
+      |                             ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:240:35: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  240 |                                         const double li = lambda_aug[k](i);
+      |                                                           ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:244:22: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  244 |                                                 w(i) += mu_aug[k](i) * ci;
+      |                                                         ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:252:38: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  252 |                                         if (c_k(i) <= 0.0 && lambda_aug[k](i) <= 0.0) {
+      |                                                              ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:255:33: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  255 |                                         const double mu_i = mu_aug[k](i);
+      |                                                             ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:281:36: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  281 |                                                 const double li = lambda_aug[k](i);
+      |                                                                   ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:466:31: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  466 |                 if (!K[k].allFinite() || !d[k].allFinite() || !P_k.allFinite()) {
+      |                                           ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:466:10: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  466 |                 if (!K[k].allFinite() || !d[k].allFinite() || !P_k.allFinite()) {
+      |                      ~ ^
+[ 69%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/excitationcontroller.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/trajOpt.cpp:64:41: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   64 |                 const auto& reg_cfg = settings.passes[std::max(0, settings.num_passes - 1)].reg;
+      |                                       ~~~~~~~~        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+6 warnings generated.
+[ 71%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/integratedbdotcontroller.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/trajOpt.cpp:301:55: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  301 |                 tracking_settings.passes[0] = settings_local.passes[std::max(0, settings_local.num_passes - 1)];
+      |                                               ~~~~~~~~~~~~~~        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 71%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/pdcontroller.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:49:25: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   49 |         u(i) = -mtq_kp_[i] * bdot_i;
+      |                 ~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:59:25: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   59 |         u(ui) = -rw_kp_[i] * w_i;
+      |                  ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:68:31: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   68 |     mtq_kp_.assign(satellite_.numMTQ(), 0.0);
+      |             ~~~~~~ ~~~~~~~~~~~^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:69:31: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   69 |     mtq_kd_.assign(satellite_.numMTQ(), 0.0);
+      |             ~~~~~~ ~~~~~~~~~~~^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:70:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   70 |     rw_kp_.assign(satellite_.numRW(), 0.0);
+      |            ~~~~~~ ~~~~~~~~~~~^~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:71:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   71 |     rw_kd_.assign(satellite_.numRW(), 0.0);
+      |            ~~~~~~ ~~~~~~~~~~~^~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:79:17: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   79 |         mtq_kp_[i] = mtq_gain_const * J_axis;
+      |         ~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:88:16: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   88 |         rw_kp_[i] = rw_gain_const * J_axis;
+      |         ~~~~~~ ^
+[ 71%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/zerocontroller.cpp.o
+In file included from /private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:1:
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/include/saltro/pybind/controller/integratedbdotcontroller.h:83:12: warning: private field 'max_rate_ref_' is not used [-Wunused-private-field]
+   83 |     double max_rate_ref_ = 5.0 * 3.14159265358979323846 / 180.0;
+      |            ^
+[ 73%] Building CXX object CMakeFiles/saltro.dir/src/pybind/disturbances/disturbance.cpp.o
+9 warnings generated.
+[ 73%] Building CXX object CMakeFiles/saltro.dir/src/pybind/disturbances/dragdisturbance.cpp.o
+2 warnings generated.
+[ 75%] Building CXX object CMakeFiles/saltro.dir/src/pybind/disturbances/ggdisturbance.cpp.o
+[ 75%] Building CXX object CMakeFiles/saltro.dir/src/pybind/disturbances/srpdisturbance.cpp.o
+[ 75%] Building CXX object CMakeFiles/saltro.dir/src/pybind/satellite.cpp.o
+[ 76%] Building CXX object CMakeFiles/saltro.dir/src/validation/validate_plannersettings.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:86:20: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   86 |     mtq_actuators_[num_mtq_] = std::make_unique<MTQ>(axis, max_dipole);
+      |     ~~~~~~~~~~~~~~ ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:96:19: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   96 |     rw_actuators_[num_rw_] = std::make_unique<RW>(axis, max_torque, J, h0, h_max);
+      |     ~~~~~~~~~~~~~ ^~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:106:22: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  106 |     magic_actuators_[num_magic_] = std::make_unique<Magic>(axis, max_torque);
+      |     ~~~~~~~~~~~~~~~~ ^~~~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:115:28: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  115 |     return *mtq_actuators_[i];
+      |             ~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:122:28: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  122 |     return *mtq_actuators_[i];
+      |             ~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:129:27: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  129 |     return *rw_actuators_[i];
+      |             ~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:136:27: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  136 |     return *rw_actuators_[i];
+      |             ~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:143:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  143 |     return *magic_actuators_[i];
+      |             ~~~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:150:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  150 |     return *magic_actuators_[i];
+      |             ~~~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/validation/validate_plannersettings.cpp:71:48: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   71 |             const auto& pass = settings.passes[p];
+      |                                ~~~~~~~~        ^
+1 warning generated.
+[ 76%] Building CXX object CMakeFiles/saltro.dir/src/validation/validate_satellite.cpp.o
+[ 78%] Building CXX object CMakeFiles/saltro.dir/src/validation/validate_trajOpt.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:919:70: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  919 |                                 tau_hess_l += skew_m(l, m) * d2B_dq2[m](j, k);
+      |                                                              ~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:1485:63: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+ 1485 |     for (int b = 0; b < 3; ++b) d2c_amb += bs_unit(b) * H_RTv[b];
+      |                                                         ~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:2292:63: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+ 2292 |                         dderr_dir_dqdq[b] -= S(b, c) * H_rhat[c];
+      |                                                        ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:2292:40: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+ 2292 |                         dderr_dir_dqdq[b] -= S(b, c) * H_rhat[c];
+      |                         ~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:2320:57: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+ 2320 |                 Hqq_om += alpha * w(b) * dderr_dir_dqdq[b];
+      |                                          ~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:25:15: warning: unused function 'clampUnit' [-Wunused-function]
+   25 | inline double clampUnit(double x) {
+      |               ^~~~~~~~~
+15 warnings generated.
+17 warnings generated.
+[ 78%] Linking CXX static library libsaltro.a
+[ 98%] Built target saltro
+[100%] Building CXX object CMakeFiles/pybind_test_satellite_cost.dir/tests/unit/pybind/test_satellite_cost.cpp.o
+[100%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_cost
+[100%] Built target pybind_test_satellite_cost

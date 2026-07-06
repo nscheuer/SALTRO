@@ -9,7 +9,8 @@ namespace py = pybind11;
 void bind_plannersettings(py::module_& m) {
     py::class_<InitTrajConfig>(m, "InitTrajConfig")
         .def(py::init<>())
-        .def_readwrite("initcontroller", &InitTrajConfig::initcontroller);
+        .def_readwrite("initcontroller", &InitTrajConfig::initcontroller)
+        .def_readwrite("pd_goal_rate_ff_enabled", &InitTrajConfig::pd_goal_rate_ff_enabled);
 
     py::class_<DisturbanceConfig>(m, "DisturbanceConfig")
         .def(py::init<>())
@@ -41,6 +42,8 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ang_vel", &CostConfig::ang_vel)
         .def_readwrite("ang_vel_mag", &CostConfig::ang_vel_mag)
         .def_readwrite("ang_vel_err_dir", &CostConfig::ang_vel_err_dir)
+        .def_readwrite("ang_vel_roll_ratio", &CostConfig::ang_vel_roll_ratio)
+        .def_readwrite("ang_vel_err_dir_ratio", &CostConfig::ang_vel_err_dir_ratio)
         .def_readwrite("control_mult", &CostConfig::control_mult)
         .def_readwrite("mtq_control_weight", &CostConfig::mtq_control_weight)
         .def_readwrite("rw_control_weight", &CostConfig::rw_control_weight)
@@ -55,7 +58,12 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("ang_vel_mag_N", &CostConfig::ang_vel_mag_N)
         .def_readwrite("ang_vel_err_dir_N", &CostConfig::ang_vel_err_dir_N)
         .def_readwrite("ang_cost_func_type", &CostConfig::ang_cost_func_type)
-        .def_readwrite("use_cost_hess", &CostConfig::use_cost_hess);
+        .def_readwrite("ang_cost_huber_delta", &CostConfig::ang_cost_huber_delta)
+        .def_readwrite("use_cost_hess", &CostConfig::use_cost_hess)
+        .def_readwrite("cost_hess_gauss_newton", &CostConfig::cost_hess_gauss_newton)
+        .def("setTerminalEmphasis", &CostConfig::setTerminalEmphasis,
+             py::arg("k") = 100.0,
+             "Scale all terminal weights by k, preserving stage ratios.");
 
     py::class_<AugLagConfig>(m, "AugLagConfig")
         .def(py::init<>())
@@ -91,7 +99,8 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("rand_add_ratio", &RegularizationConfig::rand_add_ratio)
         .def_readwrite("use_dynamics_hess", &RegularizationConfig::use_dynamics_hess)
         .def_readwrite("use_constraint_hess", &RegularizationConfig::use_constraint_hess)
-        .def_readwrite("psd_clip_quu_ddp", &RegularizationConfig::psd_clip_quu_ddp);
+        .def_readwrite("psd_clip_quu_ddp", &RegularizationConfig::psd_clip_quu_ddp)
+        .def_readwrite("psd_clamp_lxx", &RegularizationConfig::psd_clamp_lxx);
 
     py::class_<LineSearchConfig>(m, "LineSearchConfig")
         .def(py::init<>())

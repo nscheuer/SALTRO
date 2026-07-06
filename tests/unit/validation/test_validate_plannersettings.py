@@ -3,10 +3,17 @@ Comprehensive validation tests for PlannerSettings - mirrors test_validate_plann
 Tests all validation rules for PlannerSettings configuration.
 """
 
+import math
+import sys
+from pathlib import Path
+
 import pytest
 import numpy as np
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "build"))
+
 import saltro_py
-import math
 
 
 # ============================================================================
@@ -499,14 +506,95 @@ def test_invalid_cost_ang_vel_err_dir_n_negative():
     assert error_msg == "cost.ang_vel_err_dir_N invalid"
 
 
+_AFC_INVALID_MSG = "cost.ang_cost_func_type invalid (implemented set {0,1,3,5})"
+_HUBER_INVALID_MSG = "cost.ang_cost_huber_delta invalid (must be finite and > 0)"
+
+
 def test_invalid_cost_ang_cost_func_type_negative():
     """Negative cost.ang_cost_func_type should fail"""
     settings = valid_settings()
     settings.passes[0].cost.ang_cost_func_type = -1
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
+
     assert not ok
-    assert error_msg == "cost.ang_cost_func_type invalid"
+    assert error_msg == _AFC_INVALID_MSG
+
+
+def test_invalid_cost_ang_cost_func_type_removed_type_2():
+    """Removed cost.ang_cost_func_type=2 (raw acos, concave + singular) should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.ang_cost_func_type = 2
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == _AFC_INVALID_MSG
+
+
+def test_invalid_cost_ang_cost_func_type_removed_type_4():
+    """Removed cost.ang_cost_func_type=4 (was (1-d)^2) should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.ang_cost_func_type = 4
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == _AFC_INVALID_MSG
+
+
+def test_invalid_cost_ang_cost_func_type_above_implemented_set():
+    """cost.ang_cost_func_type=6 (never implemented) should fail"""
+    settings = valid_settings()
+    settings.passes[0].cost.ang_cost_func_type = 6
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == _AFC_INVALID_MSG
+
+
+def test_valid_cost_ang_cost_func_type_implemented_set():
+    """All implemented types {0, 1, 3, 5} should pass"""
+    for cost_type in (0, 1, 3, 5):
+        settings = valid_settings()
+        settings.passes[0].cost.ang_cost_func_type = cost_type
+        ok, _ = saltro_py.validatePlannerSettings(settings)
+
+        assert ok, f"ang_cost_func_type={cost_type} should be valid"
+
+
+def test_valid_cost_ang_cost_huber_delta_positive_values():
+    """Positive finite ang_cost_huber_delta values should pass (with type 5)"""
+    for delta in (1e-3, 0.1, 0.35, 1.0, 10.0):
+        settings = valid_settings()
+        settings.passes[0].cost.ang_cost_func_type = 5
+        settings.passes[0].cost.ang_cost_huber_delta = delta
+        ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+        assert ok, f"ang_cost_huber_delta={delta} should be valid: {error_msg}"
+
+
+def test_invalid_cost_ang_cost_huber_delta_nonpositive():
+    """Zero/negative ang_cost_huber_delta should fail — in particular type 5
+    with non-positive delta is always refused"""
+    for delta in (0.0, -0.35):
+        for cost_type in (5, 3):  # rejected regardless of the selected shape
+            settings = valid_settings()
+            settings.passes[0].cost.ang_cost_func_type = cost_type
+            settings.passes[0].cost.ang_cost_huber_delta = delta
+            ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+            assert not ok
+            assert error_msg == _HUBER_INVALID_MSG
+
+
+def test_invalid_cost_ang_cost_huber_delta_nonfinite():
+    """NaN/inf ang_cost_huber_delta should fail"""
+    for delta in (float("nan"), float("inf")):
+        settings = valid_settings()
+        settings.passes[0].cost.ang_cost_func_type = 5
+        settings.passes[0].cost.ang_cost_huber_delta = delta
+        ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+        assert not ok
+        assert error_msg == _HUBER_INVALID_MSG
 
 
 # ============================================================================
@@ -1038,3 +1126,27 @@ def test_psd_clip_quu_ddp_roundtrip_and_valid():
         ok, error_msg = saltro_py.validatePlannerSettings(settings)
         assert ok
         assert error_msg == ""
+
+
+# ============================================================================
+# PD warm-start goal-rate feedforward validation (G16)
+# Twin of the C++ cases in test_validate_plannersettings.cpp.
+# ============================================================================
+
+def test_default_pd_goal_rate_ff_off_and_valid():
+    """Default pd_goal_rate_ff_enabled is off and settings pass validation."""
+    settings = valid_settings()
+    assert settings.init_traj.pd_goal_rate_ff_enabled is False
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert ok
+    assert error_msg == ""
+
+
+def test_enabled_pd_goal_rate_ff_valid():
+    """Enabling the PD goal-rate feedforward passes validation."""
+    settings = valid_settings()
+    settings.init_traj.initcontroller = 3
+    settings.init_traj.pd_goal_rate_ff_enabled = True
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert ok
+    assert settings.init_traj.pd_goal_rate_ff_enabled is True

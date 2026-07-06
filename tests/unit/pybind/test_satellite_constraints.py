@@ -15,10 +15,15 @@ Covers:
  - Finite-difference verification of Hessians against constraintJacobians()
 """
 
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
-import sys
-sys.path.insert(0, '/home/nic2703/SALTRO/build')
+
+# tests/unit/pybind/<this file>: parents[0]=pybind, [1]=unit, [2]=tests, [3]=repo root
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "build"))
 import saltro_py
 
 
@@ -847,12 +852,14 @@ def test_constraint_hessians_finite_difference_H_xx():
     L = saltro_py.limits
     H_xx_fd = np.zeros((L.MAX_CONSTRAINT_DIM, L.MAX_STATE_DIM, L.MAX_STATE_DIM))
     
+    # Raw-quaternion finite difference (no renormalization of the perturbed
+    # quaternion): constraintHessians returns the raw 4-D second derivative, which
+    # the backward pass projects with G (G·H·Gᵀ) exactly as it does the dynamics
+    # Hessian. constraintJacobians already normalizes q internally, so FD of it
+    # w.r.t. the raw quaternion is the matching raw Hessian.
     for i in range(len(x)):
         x_pert = x.copy()
         x_pert[i] += eps
-        # Normalize quaternion if we perturbed it
-        if i >= saltro_py.Satellite.QUAT_INDEX and i < saltro_py.Satellite.QUAT_INDEX + 4:
-            normalize_quat_in_state(x_pert)
         _, c_x_pert = fixture.sat.constraintJacobians(0, 10, x_pert, u, sun_z(), cfg)
         H_xx_fd[:n_constraints, :n_state, i] = (c_x_pert - c_x_base) / eps
     
@@ -1112,15 +1119,16 @@ def test_constraint_hessians_fd_check_wrt_state_state():
     
     eps = 1e-5
     
-    # ∂²c/∂x² ≈ (Jx(x+eps) - Jx(x-eps)) / (2*eps)
+    # ∂²c/∂x² ≈ (Jx(x+eps) - Jx(x-eps)) / (2*eps), raw-quaternion (no
+    # renormalization): constraintHessians returns the raw 4-D Hessian (the
+    # backward pass applies the G projection), and constraintJacobians normalizes
+    # q internally, so the matching FD perturbs the raw quaternion. This is a
+    # non-identity attitude, so it exercises the q0-coupled (manifold) terms.
     for j in range(fixture.sat.stateDim):
         xp = x0.copy()
         xm = x0.copy()
         xp[j] += eps
         xm[j] -= eps
-        if j >= saltro_py.Satellite.QUAT_INDEX and j < saltro_py.Satellite.QUAT_INDEX + 4:
-            normalize_quat_in_state(xp)
-            normalize_quat_in_state(xm)
         _, c_xp = fixture.sat.constraintJacobians(k, N, xp, u0, sun, cfg)
         _, c_xm = fixture.sat.constraintJacobians(k, N, xm, u0, sun, cfg)
         fd_slice = (c_xp - c_xm) / (2.0 * eps)

@@ -175,9 +175,9 @@ def alilqr(
     
     for iteration in range(passsettings.auglag.max_outer_iters):
         # Solve AL subproblem with iLQR first (ALTRO style).
-        X, U, stop_reason, snaps, trans = ilqr(
+        X, U, stop_reason, snaps, trans, inner_info = ilqr(
             plannersettings, pass_idx, satellite, X, U, R, V, B, S, rho,
-            jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug,
+            jtime, q_goal, boresight, lambda_aug=lambda_aug, mu_aug=mu_aug, debug=debug
         )
 
         if debug:
@@ -209,22 +209,36 @@ def alilqr(
                     "max_constraint_violation": max_c,
                     "lambda_max": float(max(np.max(lam) for lam in lambda_aug)) if lambda_aug else 0.0,
                     "mu_max": float(max(np.max(mu) for mu in mu_aug)) if mu_aug else 0.0,
+                    "inner_stop_reason": stop_reason,
+                    "inner_accepted_steps": int(inner_info["accepted_steps"]),
+                    "inner_last_delta_J": float(inner_info["last_delta_J"]),
                 }
             )
 
         if max_c <= passsettings.auglag.constraint_tol:
-            stop_reason = f"AL-iLQR converged: max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}"
+            if stop_reason == "converged" or int(inner_info["accepted_steps"]) > 0:
+                stop_reason = (
+                    "AL-iLQR converged: "
+                    f"max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}; "
+                    f"inner iLQR returned '{stop_reason}' after {int(inner_info['accepted_steps'])} accepted step(s)"
+                )
+                break
+
+            stop_reason = (
+                "AL-iLQR did not converge: constraints satisfied "
+                f"(max constraint violation {max_c:.2e} <= {passsettings.auglag.constraint_tol:.2e}) "
+                f"but inner iLQR returned '{stop_reason}' with no accepted trajectory update"
+            )
             break
 
-        # Update lambda_k and mu_k elementwise using c_pos to match C++ AL-iLQR.
+        # Update lambda_k and mu_k elementwise (inequality constraints).
         clist = _collect_constraints(plannersettings, satellite, X, U, S)
         for k, ck in enumerate(clist):
-            ck_pos = np.maximum(0.0, ck)
             lambda_aug[k] = np.maximum(
                 0.0,
                 np.minimum(
                     passsettings.auglag.lag_mult_max,
-                    lambda_aug[k] + mu_aug[k] * ck_pos,
+                    lambda_aug[k] + mu_aug[k] * ck,
                 ),
             )
             mu_aug[k] = np.minimum(passsettings.auglag.penalty_max, phi_aug * mu_aug[k])
