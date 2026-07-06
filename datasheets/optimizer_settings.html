@@ -748,14 +748,23 @@ current validator does not enforce that range.</p>
 \[\ell_u =
 \frac{1}{2}\,\texttt{control\_mult}
 \sum_i w_{u,i}\left(\frac{u_i}{u_{i,\max}}\right)^2\]</div>
-<p>Reaction-wheel momentum penalty activates near saturation:</p>
+<p>Reaction-wheel momentum soft cost (C1 everywhere): a gentle desat quadratic
+over the whole range plus a steep quadratic that turns on above the knee with
+zero value and zero slope there (no cliff, no gradient kink):</p>
 <div class="math notranslate nohighlight">
-\[h_{\text{thresh}} = \texttt{RWh\_max\_mult}\, h_{\max},
+\[h_{\text{knee}} = \texttt{RWh\_knee\_frac}\, h_{\max},
 \qquad
 \ell_h =
-\frac{1}{2}\,w_h
-\left(\frac{|h| - h_{\text{thresh}}}{h_{\max} - h_{\text{thresh}}}\right)^2\]</div>
-<p>for <code class="docutils literal notranslate"><span class="pre">|h|</span> <span class="pre">&gt;</span> <span class="pre">h_thresh</span></code>.</p>
+\frac{1}{2}\,w_h\,\texttt{RWh\_desat\_mult}\left(\frac{|h|}{h_{\max}}\right)^2
++ \frac{1}{2}\,w_h
+\left[\frac{(|h| - h_{\text{knee}})_+}{h_{\max} - h_{\text{knee}}}\right]^2\]</div>
+<p>The hard ceiling deliberately does not live in this cost: the AL momentum
+constraint enforces it (<code class="docutils literal notranslate"><span class="pre">ConstraintConfig.rw_momentum_limit_scale</span></code>) with its
+own per-family penalty schedule — cost shapes, constraint enforces. Combined
+with the stiction term below, the paired weighting
+<code class="docutils literal notranslate"><span class="pre">rw_stic_weight</span> <span class="pre">=</span> <span class="pre">rw_AM_weight</span> <span class="pre">*</span> <span class="pre">RWh_desat_mult</span> <span class="pre">*</span> <span class="pre">(h_stic/h_max)^2</span></code> parks the
+wheel at the bias momentum <span class="math notranslate nohighlight">\(h^* = h_{\text{stic}}/2\)</span> (off the
+zero-crossing stiction band without drifting toward saturation).</p>
 <div class="pst-scrollable-table-container"><table class="table">
 <colgroup>
 <col style="width: 28.0%" />
@@ -817,17 +826,26 @@ current validator does not enforce that range.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">1.0</span></code></p></td>
 <td><p>Weight on the reaction-wheel stiction-region penalty.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RWh_max_mult</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.8</span></code></p></td>
-<td><p>Fraction of <code class="docutils literal notranslate"><span class="pre">h_max</span></code> where the high-momentum penalty begins. Must lie in <code class="docutils literal notranslate"><span class="pre">[0,1]</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">RWh_stiction_mult</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.01</span></code></p></td>
-<td><p>Fraction of <code class="docutils literal notranslate"><span class="pre">h_max</span></code> used to scale the stiction region. Must lie in <code class="docutils literal notranslate"><span class="pre">[0,1]</span></code>.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RWh_ok_mult</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RWh_knee_frac</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code></p></td>
-<td><p>Additional multiplier used in the low-momentum wheel penalty shaping. Must lie in <code class="docutils literal notranslate"><span class="pre">[0,1]</span></code>.</p></td>
+<td><p>Fraction of <code class="docutils literal notranslate"><span class="pre">h_max</span></code> where the steep momentum term turns on (the knee);
+below it only the gentle desat quadratic applies. Must lie in <code class="docutils literal notranslate"><span class="pre">[0,1]</span></code>.
+(Renamed from the removed <code class="docutils literal notranslate"><span class="pre">RWh_ok_mult</span></code>, whose old weight-multiplier
+semantics no longer exist; <code class="docutils literal notranslate"><span class="pre">RWh_max_mult</span></code> is removed — the hard limit
+moved to the AL momentum constraint.)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">RWh_desat_mult</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.05</span></code></p></td>
+<td><p>Weight multiplier of the gentle full-range desat quadratic (relative to
+<code class="docutils literal notranslate"><span class="pre">rw_AM_weight</span></code>). A perfectly flat free band grinds the AL outer loop;
+keep this small but nonzero when <code class="docutils literal notranslate"><span class="pre">rw_AM_weight</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RWh_stiction_mult</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.01</span></code></p></td>
+<td><p>Fraction of <code class="docutils literal notranslate"><span class="pre">h_max</span></code> defining the stiction band; with <code class="docutils literal notranslate"><span class="pre">rw_stic_weight</span></code>
+the cost pulls the wheel away from <code class="docutils literal notranslate"><span class="pre">h</span> <span class="pre">=</span> <span class="pre">0</span></code> inside it (parking
+equilibrium at <code class="docutils literal notranslate"><span class="pre">h_stic/2</span></code> under the paired weighting above). Must lie
+in <code class="docutils literal notranslate"><span class="pre">[0,1]</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">angle_N</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e4</span></code></p></td>

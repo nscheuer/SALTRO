@@ -791,14 +791,14 @@
 <dt class="field-even">Param rw_stic_weight<span class="colon">:</span></dt>
 <dd class="field-even"><p>Reaction wheel stiction penalty</p>
 </dd>
-<dt class="field-odd">Param RWh_max_mult<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Multiplier when wheel momentum near saturation </p>
+<dt class="field-odd">Param RWh_knee_frac<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Knee of the momentum soft cost, as a fraction of h_max (default 0.5: free* region below 50% of saturation, steep quadratic above it; *free up to the desat term below). The hard ceiling does NOT live in this cost &amp;#8212; enforce it with <a class="reference internal" href="#structConstraintConfig_1a66b02e9a5e99eb20c0e87a585e21f59e"><span class="std std-ref">ConstraintConfig::rw_momentum_limit_scale</span></a> (the AL momentum constraint), tuned per-family via <a class="reference internal" href="#structAugLagConfig"><span class="std std-ref">AugLagConfig</span></a>. Cost shapes, constraint enforces. </p>
 </dd>
-<dt class="field-even">Param RWh_stiction_mult<span class="colon">:</span></dt>
-<dd class="field-even"><p>Multiplier for stiction region </p>
+<dt class="field-even">Param RWh_desat_mult<span class="colon">:</span></dt>
+<dd class="field-even"><p>Gentle desaturation quadratic applied over the whole momentum range: 0.5*rw_AM_weight*RWh_desat_mult*(h/h_max)^2. Default 0.05, NOT 0: a perfectly flat free band (zero value, gradient AND curvature below the knee) lets the first inner solve exploit the wheel and over-commit before the AL penalties ramp, which was observed to grind the outer loop to MaxOuterIterations on the 3MTQ+1RW vector-slew case. A small desat keeps the wheel direction informed without strangling it. Together with the stiction cost this implements bias-momentum parking: the net potential has stable minima at h* = (w_stic/h_stic) / (rw_AM_weight*desat/h_max^2 + w_stic/h_stic^2), with h_stic = RWh_stiction_mult*h_max, so the wheel idles at a bias speed instead of crossing zero. The special case rw_stic_weight = rw_AM_weight*RWh_desat_mult*(h_stic/h_max)^2 parks at h* = h_stic/2. All weights stay independent &amp;#8212; this is a tuning recipe, not a coupling. </p>
 </dd>
-<dt class="field-odd">Param RWh_ok_mult<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Multiplier when wheel is within safe region</p>
+<dt class="field-odd">Param RWh_stiction_mult<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Stiction band as a fraction of h_max: below RWh_stiction_mult*h_max the kinked-quadratic stiction cost pushes |h| away from zero (wheels at rest may not restart). Deliberately kinked at h = 0: a smoothed peak would inject genuine negative curvature and create a zero-gradient point a wheel can sit on; the kink contributes no curvature to the quadratic model, and the subgradient at exactly h = 0 is 0.</p>
 </dd>
 <dt class="field-even">Param angle_N<span class="colon">:</span></dt>
 <dd class="field-even"><p>Terminal orientation weight </p>
@@ -906,18 +906,18 @@
 <dd></dd></dl>
 
 <dl class="cpp var">
-<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig12RWh_max_multE">
-<span id="_CPPv3N10CostConfig12RWh_max_multE"></span><span id="_CPPv2N10CostConfig12RWh_max_multE"></span><span id="CostConfig::RWh_max_mult__double"></span><span class="target" id="structCostConfig_1a6e1b2b6b01405a359556d80968ff548b"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RWh_max_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.8</span></span><a class="headerlink" href="#_CPPv4N10CostConfig12RWh_max_multE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
-
-<dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N10CostConfig17RWh_stiction_multE">
 <span id="_CPPv3N10CostConfig17RWh_stiction_multE"></span><span id="_CPPv2N10CostConfig17RWh_stiction_multE"></span><span id="CostConfig::RWh_stiction_mult__double"></span><span class="target" id="structCostConfig_1a5de96970c4b1bb4b411dcce3f2e20ec9"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RWh_stiction_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.01</span></span><a class="headerlink" href="#_CPPv4N10CostConfig17RWh_stiction_multE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 <dl class="cpp var">
-<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig11RWh_ok_multE">
-<span id="_CPPv3N10CostConfig11RWh_ok_multE"></span><span id="_CPPv2N10CostConfig11RWh_ok_multE"></span><span id="CostConfig::RWh_ok_mult__double"></span><span class="target" id="structCostConfig_1af33d1d19b881bfbba7fdd4df56266181"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RWh_ok_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.5</span></span><a class="headerlink" href="#_CPPv4N10CostConfig11RWh_ok_multE" title="Link to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig13RWh_knee_fracE">
+<span id="_CPPv3N10CostConfig13RWh_knee_fracE"></span><span id="_CPPv2N10CostConfig13RWh_knee_fracE"></span><span id="CostConfig::RWh_knee_frac__double"></span><span class="target" id="structCostConfig_1a24b6f3bab6ce2292be298ee572a7a3ac"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RWh_knee_frac</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.5</span></span><a class="headerlink" href="#_CPPv4N10CostConfig13RWh_knee_fracE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N10CostConfig14RWh_desat_multE">
+<span id="_CPPv3N10CostConfig14RWh_desat_multE"></span><span id="_CPPv2N10CostConfig14RWh_desat_multE"></span><span id="CostConfig::RWh_desat_mult__double"></span><span class="target" id="structCostConfig_1a39f50ed36f1a5012f5b2c30e816410f8"></span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RWh_desat_mult</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0.05</span></span><a class="headerlink" href="#_CPPv4N10CostConfig14RWh_desat_multE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 <dl class="cpp var">
@@ -1563,9 +1563,9 @@ J(\alpha) \le J(0) + \beta_1 \alpha \nabla J^\top d
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig20magic_control_weightE"><code class="docutils literal notranslate"><span class="pre">magic_control_weight</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig12rw_AM_weightE"><code class="docutils literal notranslate"><span class="pre">rw_AM_weight</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig14rw_stic_weightE"><code class="docutils literal notranslate"><span class="pre">rw_stic_weight</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig12RWh_max_multE"><code class="docutils literal notranslate"><span class="pre">RWh_max_mult</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig17RWh_stiction_multE"><code class="docutils literal notranslate"><span class="pre">RWh_stiction_mult</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig11RWh_ok_multE"><code class="docutils literal notranslate"><span class="pre">RWh_ok_mult</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig13RWh_knee_fracE"><code class="docutils literal notranslate"><span class="pre">RWh_knee_frac</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig14RWh_desat_multE"><code class="docutils literal notranslate"><span class="pre">RWh_desat_mult</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig7angle_NE"><code class="docutils literal notranslate"><span class="pre">angle_N</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig9ang_vel_NE"><code class="docutils literal notranslate"><span class="pre">ang_vel_N</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N10CostConfig13ang_vel_mag_NE"><code class="docutils literal notranslate"><span class="pre">ang_vel_mag_N</span></code></a></li>
