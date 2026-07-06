@@ -1026,6 +1026,21 @@ class TestBackwardPass:
         settings_off.passes[0].dt = 0.5
         settings_gg.passes[0].dt = 0.5
         settings_gg.disturbances.plan_for_gg = True
+        # Active attitude cost so the gravity-gradient disturbance has a
+        # MEASURABLE effect on the gains. With a NaN (vector-mode) target and
+        # angle cost off the gains are ~0 and the GG effect is sub-ULP, making
+        # the `> 0` check below a machine-epsilon coin-flip (matches the C++
+        # twin, which uses a real quaternion target).
+        # use_cost_hess=True so the attitude cost produces NON-ZERO feedback
+        # gains; otherwise K ≡ 0 and only the feedforward d sees the
+        # (gravity-gradient) disturbance, at the sub-ULP level. GG is the right
+        # probe here because it is attitude-DEPENDENT (∂τ/∂q ≠ 0), so it changes
+        # the dynamics Jacobian A and hence K — a constant disturbance (prop)
+        # would not.
+        for st in (settings_off, settings_gg):
+            st.passes[0].cost.angle = 1.0
+            st.passes[0].cost.ang_vel = 1.0
+            st.passes[0].cost.use_cost_hess = True
 
         satellite = _make_test_satellite(settings_off)
         nx = satellite.stateDim
@@ -1057,8 +1072,11 @@ class TestBackwardPass:
             S[:, k] /= np.linalg.norm(S[:, k])
             boresight[:, k] = np.array([1.0, 0.0, 0.0])
 
+        # Real (identity) quaternion target: the 15°-rotated state then carries
+        # genuine attitude error, so the attitude cost — and through it the
+        # attitude-dependent GG disturbance — drives non-trivial gains.
         attitude_target = make_attitude_traj(
-            np.array([np.nan, 0.0, 0.0, 0.0]), N_test
+            np.array([1.0, 0.0, 0.0, 0.0]), N_test
         )
 
         def run(settings):
@@ -1074,7 +1092,11 @@ class TestBackwardPass:
         assert ok_off and ok_gg
         assert np.all(np.isfinite(K_gg))
         assert np.all(np.isfinite(d_gg))
-        assert np.linalg.norm(K_gg - K_off) + np.linalg.norm(d_gg - d_off) > 0.0
+        # Deterministic GG effect on the gains is ~1.7e-9 (gains are ~4e-3); a
+        # 1e-10 floor is ~17× below that physical signal and ~6 orders above
+        # float rounding, so it is robust across platforms (unlike the former
+        # `> 0.0`, which compared a sub-ULP value to exact zero).
+        assert np.linalg.norm(K_gg - K_off) + np.linalg.norm(d_gg - d_off) > 1e-10
 
     def test_psd_clip_clips_negative_eigenvalues(self):
         """Exercise the C++ psd_clip helper through its Python binding."""

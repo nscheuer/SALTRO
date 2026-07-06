@@ -1,0 +1,14 @@
+[ 33%] Built target saltro
+[ 98%] Built target Catch2
+[100%] Built target Catch2WithMain
+[100%] Building CXX object CMakeFiles/optimizer_test_forwardpass.dir/tests/unit/optimizer/test_forwardpass.cpp.o
+[100%] Linking CXX executable unit_tests/optimizer/optimizer_test_forwardpass
+[100%] Built target optimizer_test_forwardpass
+[ 32%] Built target saltro
+[ 96%] Built target Catch2
+[ 98%] Built target Catch2WithMain
+[100%] Built target optimizer_test_alilqr
+[ 51%] Built target saltro
+[ 51%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/controllers/pdcontroller_py.cpp.o
+[ 51%] Linking CXX shared module saltro_py.cpython-312-darwin.so
+[100%] Built target saltro_py

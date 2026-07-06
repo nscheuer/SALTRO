@@ -75,7 +75,7 @@ def create_planner_settings(gauss_newton):
     c.ang_vel_roll_ratio = 0.0
     c.ang_vel_err_dir_ratio = 0.0
     c.rw_AM_weight = 1e4
-    c.RWh_ok_mult = 0.5
+    c.RWh_knee_frac = 0.5
     c.rw_stic_weight = 0.0
     c.RWh_stiction_mult = 0.05
 

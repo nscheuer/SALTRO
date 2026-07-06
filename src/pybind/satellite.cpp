@@ -1849,14 +1849,22 @@ double Satellite::stageCost(int k, int N, const VecX& x, const VecX& u,
         const double z = std::abs(h);
         const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
 
-        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
-        const double denom_high = std::max(1e-9, h_max - h_thresh);
-        if (z > h_thresh) {
-            const double over = (z - h_thresh) / denom_high;
+        // Momentum soft cost, C1 everywhere: a gentle "desat" quadratic over
+        // the whole range plus a steep quadratic that turns on above the knee
+        // (RWh_knee_frac * h_max) with zero value AND zero slope there -- no
+        // cheaper-just-above-the-knee cliff and no gradient kink. The hard
+        // ceiling (e.g. 80% of h_max) deliberately does NOT live in this cost:
+        // the AL momentum constraint enforces it
+        // (ConstraintConfig.rw_momentum_limit_scale) with its own per-family
+        // penalty schedule. Cost shapes, constraint enforces.
+        const double knee = std::clamp(cost_cfg.RWh_knee_frac, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - knee);
+        const double desat = std::max(0.0, cost_cfg.RWh_desat_mult);
+        const double scaled = z / h_max;
+        rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * desat * scaled * scaled;
+        if (z > knee) {
+            const double over = (z - knee) / denom_high;
             rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * over * over;
-        } else {
-            const double scaled = z / h_max;
-            rw_momentum_cost += 0.5 * cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * scaled * scaled;
         }
 
         const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
@@ -2128,22 +2136,25 @@ std::tuple<Satellite::VecX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         const double z = std::abs(h);
         const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
 
-        // RW momentum penalty: soft penalty in saturation and stiction regions
-        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
-        const double denom_high = std::max(1e-9, h_max - h_thresh);
+        // Momentum soft cost gradient (see stageCost): desat quadratic term is
+        // smooth through h = 0 (gradient proportional to h); the steep term has
+        // zero slope at the knee, so the total is C1.
+        const double knee = std::clamp(cost_cfg.RWh_knee_frac, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - knee);
+        const double desat = std::max(0.0, cost_cfg.RWh_desat_mult);
         const double sign_h = safeSign(h);
-        
-        if (z > h_thresh) {
-            const double over = (z - h_thresh) / denom_high;
+        lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * desat * h / (h_max * h_max);
+        if (z > knee) {
+            const double over = (z - knee) / denom_high;
             lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * sign_h * over / denom_high;
-        } else {
-            const double scaled = z / h_max;
-            lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * sign_h * scaled / h_max;
         }
 
-        // Stiction penalty
+        // Stiction penalty. Subgradient contract: at exactly h == 0 (the tent
+        // peak) the gradient is defined as 0 -- deterministic, instead of
+        // safeSign(0) = +1 pushing an at-rest wheel in an arbitrary direction.
+        // Any perturbation moves h off zero and the ramp then pushes it out.
         const double h_stic = std::clamp(cost_cfg.RWh_stiction_mult, 0.0, 1.0) * h_max;
-        if (h_stic > 1e-12 && z < h_stic) {
+        if (h_stic > 1e-12 && z < h_stic && z > 0.0) {
             const double near_zero = (h_stic - z) / h_stic;
             lx(RW_MOMENTUM_INDEX + i) += cost_cfg.rw_stic_weight * (-sign_h) * near_zero / h_stic;
         }
@@ -2536,17 +2547,16 @@ std::tuple<Satellite::MatX, Satellite::MatX, Satellite::MatX> Satellite::stageCo
         const double z = std::abs(h);
         const double h_max = std::max(1e-9, std::abs(getRW(i).momentumMax()));
 
-        // Angular momentum saturation penalty
-        const double h_thresh = std::clamp(cost_cfg.RWh_max_mult, 0.0, 1.0) * h_max;
-        const double denom_high = std::max(1e-9, h_max - h_thresh);
-        if (z > h_thresh) {
-            const double d2_over_dz2 = 1.0 / (denom_high * denom_high);
-            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
-                cost_cfg.rw_AM_weight * d2_over_dz2;
-        } else {
-            const double d2_scaled_dz2 = 1.0 / (h_max * h_max);
-            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) += 
-                cost_cfg.rw_AM_weight * cost_cfg.RWh_ok_mult * d2_scaled_dz2;
+        // Momentum soft cost Hessian (see stageCost): desat term everywhere,
+        // steep term above the knee. Both positive -- PSD by construction.
+        const double knee = std::clamp(cost_cfg.RWh_knee_frac, 0.0, 1.0) * h_max;
+        const double denom_high = std::max(1e-9, h_max - knee);
+        const double desat = std::max(0.0, cost_cfg.RWh_desat_mult);
+        lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) +=
+            cost_cfg.rw_AM_weight * desat / (h_max * h_max);
+        if (z > knee) {
+            lxx(RW_MOMENTUM_INDEX + i, RW_MOMENTUM_INDEX + i) +=
+                cost_cfg.rw_AM_weight / (denom_high * denom_high);
         }
 
         // Stiction penalty second derivative
