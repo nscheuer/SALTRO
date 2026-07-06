@@ -136,7 +136,10 @@ SolveResult solveRW(double dt_seconds, double tf_seconds, double tvlqr_len,
 
 	SolveResult r;
 	REQUIRE_NOTHROW(r.ok = optimizer::trajOpt(settings, satellite, x0, r0, v0, jtime,
-	                                           q_goal, boresight, X, U, K, state_dim,
+	                                           q_goal, boresight,
+	                                           Eigen::MatrixXd(0, 0),  // seed_X
+	                                           Eigen::MatrixXd(0, 0),  // seed_U
+	                                           X, U, K, state_dim,
 	                                           input_dim, N));
 	r.N = N;
 	r.X = X.leftCols(N);

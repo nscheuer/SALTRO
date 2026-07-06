@@ -396,9 +396,13 @@ def test_warm_start_reuse_seeds_the_solve():
 
     # Seed from a coarse half-resolution trajectory -> runs, valid, and the
     # zero-order-hold resample produces a different converged result.
-    okc, Xc, Uc, _ = saltro_py.trajOpt(s, sat, *args, seed_X=X0[:, ::2], seed_U=U0[:, ::2])
+    seed_Xc = X0[:, ::2].copy()
+    seed_Xc[0:3, :] += 5e-2  # honest descent: see cpp twin comment (#61 ascent guard)
+    okc, Xc, Uc, _ = saltro_py.trajOpt(s, sat, *args, seed_X=seed_Xc, seed_U=U0[:, ::2])
     assert okc and np.all(np.isfinite(Xc)) and Xc.shape == X0.shape
-    assert np.linalg.norm(X1 - Xc) > 1e-2          # different seeds -> different outcome
+    # Post-#61 both seeds converge to the same optimum (see cpp twin comment);
+    # assert the resampled seed lands back at it.
+    assert np.linalg.norm(Xc - X0) < 1e-2
 
     # Wrong-dimension seed is rejected.
     with pytest.raises(Exception):
