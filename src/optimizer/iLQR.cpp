@@ -119,25 +119,32 @@ bool iLQR(
 	}
 	Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
-	// Main iLQR iteration loop
+	// Main iLQR iteration loop.
+	double reg = reg_cfg.reg_init;
 	for (int iteration = 0; iteration < ilqr_cfg.max_iters; ++iteration) {
 		telemetry.iterations = iteration + 1;
-		// Reset regularization at the start of each iteration
-		double reg = reg_cfg.reg_init;
+		// Reset regularization each iteration unless persistent (ALTRO-style)
+		if (!ilqr_cfg.persistent_reg) {
+			reg = reg_cfg.reg_init;
+		}
 		const int N_u = std::max(0, N - 1);
-		
+
 		// Regularization retry loop
 		while (reg <= reg_cfg.reg_max) {
 			deltaV.setZero();
-			
+
 			bool bp_success = backwardPass(
-				satellite, X, U.leftCols(N_u), R, V, B, S, rho, 
+				satellite, X, U.leftCols(N_u), R, V, B, S, rho,
 				boresight, attitude_target, pass_settings, reg,
 				K, d, deltaV, lambda_aug, mu_aug
 			);
-			
+
 			if (!bp_success) {
-				reg *= reg_cfg.reg_scale;
+				if (ilqr_cfg.persistent_reg) {
+					reg = reg * reg_cfg.reg_scale + reg_cfg.reg_bump;
+				} else {
+					reg *= reg_cfg.reg_scale;  // Legacy: simple multiply
+				}
 				continue;
 			}
 
@@ -167,30 +174,70 @@ bool iLQR(
 			);
 			
 			if (!fp_success) {
-				reg *= reg_cfg.reg_scale;
+				if (ilqr_cfg.persistent_reg) {
+					// Triple increase (original ALTRO): increaseReg + bump + increaseReg
+					reg = reg * reg_cfg.reg_scale + reg_cfg.reg_bump;
+					reg += reg_cfg.reg_bump;
+					reg = reg * reg_cfg.reg_scale + reg_cfg.reg_bump;
+				} else {
+					reg *= reg_cfg.reg_scale;  // Legacy: simple multiply
+				}
 				continue;
 			}
 
-			// Both passes succeeded
-			double delta_J = std::abs(J_prev - J);
-			++telemetry.accepted_steps;
-			telemetry.last_delta_J = delta_J;
-			telemetry.final_cost = J;
-			if (delta_J <= ilqr_cfg.cost_tol) {
-				status = ILQRStatus::Converged;
-				return true;
+			// Persistent regularization: decrease on success (ALTRO-style)
+			if (ilqr_cfg.persistent_reg) {
+				reg = reg / reg_cfg.reg_scale;
+				// Drop to zero below reg_min (pure Newton when well-conditioned)
+				if (reg < reg_cfg.reg_min) {
+					reg = 0.0;
+				}
 			}
-			
+			++telemetry.accepted_steps;
+			telemetry.final_cost = J;
+
+			// Both passes succeeded — check convergence (grad_tol/conjunctive
+			// flags supersede the legacy cost-only early return).
+			const double delta_J = std::abs(J_prev - J);
+			telemetry.last_delta_J = delta_J;
+			const bool cost_converged = (delta_J <= ilqr_cfg.cost_tol);
+
+			bool grad_converged = false;
+			if (ilqr_cfg.grad_tol > 0.0) {
+				double max_d_norm = 0.0;
+				for (int kk = 0; kk < N - 1; ++kk) {
+					const double dnorm = d[kk].norm();
+					if (dnorm > max_d_norm) max_d_norm = dnorm;
+				}
+				grad_converged = (max_d_norm <= ilqr_cfg.grad_tol);
+			}
+
+			if (ilqr_cfg.conjunctive_convergence) {
+				// Original ALTRO: require ALL conditions to hold.
+				// grad_tol=0 disables that requirement (treated as satisfied).
+				const bool grad_ok = (ilqr_cfg.grad_tol <= 0.0) || grad_converged;
+				if (cost_converged && grad_ok) {
+					status = ILQRStatus::Converged;
+					return true;
+				}
+			} else {
+				// Disjunctive: either cost or gradient convergence suffices.
+				if (cost_converged || (ilqr_cfg.grad_tol > 0.0 && grad_converged)) {
+					status = ILQRStatus::Converged;
+					return true;
+				}
+			}
+
 			break;  // Exit regularization loop, continue to next iteration
 		}
-		
+
 		// Check if regularization exceeded maximum
 		if (reg > reg_cfg.reg_max) {
 			status = ILQRStatus::RegularizationExceeded;
 			return false;
 		}
 	}
-	
+
 	status = ILQRStatus::MaxIterations;
 	return false;
 }

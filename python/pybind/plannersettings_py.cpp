@@ -84,7 +84,10 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("cost_tol", &ILQRConfig::cost_tol)
         .def_readwrite("z_count_lim", &ILQRConfig::z_count_lim)
         .def_readwrite("max_cost", &ILQRConfig::max_cost)
-        .def_readwrite("state_bound", &ILQRConfig::state_bound);
+        .def_readwrite("state_bound", &ILQRConfig::state_bound)
+        .def_readwrite("ls_strict_decrease", &ILQRConfig::ls_strict_decrease)
+        .def_readwrite("conjunctive_convergence", &ILQRConfig::conjunctive_convergence)
+        .def_readwrite("persistent_reg", &ILQRConfig::persistent_reg);
 
     py::class_<RegularizationConfig>(m, "RegularizationConfig")
         .def(py::init<>())

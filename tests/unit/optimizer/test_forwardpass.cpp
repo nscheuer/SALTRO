@@ -535,3 +535,84 @@ TEST_CASE_METHOD(ForwardPassFixture, "forward_pass accepts alpha=1 when full ste
 	REQUIRE(chosen_alpha > 0.0);
 	REQUIRE(chosen_alpha == 1.0);
 }
+
+TEST_CASE_METHOD(ForwardPassFixture, "forward_pass strict decrease rejects zero improvement rollouts", "[forward_pass][linesearch][strict-decrease]") {
+	REQUIRE(orbit_ok);
+
+	Eigen::MatrixXd X_base = Eigen::MatrixXd::Zero(satellite.stateDim(), N);
+	Eigen::MatrixXd U_base = Eigen::MatrixXd::Zero(satellite.controlDim(), N);
+	REQUIRE(warmStart(X_base, U_base));
+
+	EnvMatrices env = envMatrices();
+	const CostConfig& cost_cfg = settings.passes[0].cost;
+	const Eigen::MatrixXd U_trimmed = U_base.leftCols(N - 1);
+	const double J_prev = satellite.totalCost(X_base, U_trimmed, env.B, boresight, attitude_target_traj, cost_cfg);
+
+	std::vector<Eigen::MatrixXd> K_zero(
+		N - 1,
+		Eigen::MatrixXd::Zero(satellite.controlDim(), satellite.reducedStateDim())
+	);
+	std::vector<Eigen::VectorXd> d_zero(
+		N - 1,
+		Eigen::VectorXd::Zero(satellite.controlDim())
+	);
+	const Eigen::Vector2d deltaV_relaxed(-1.0, 0.0);
+
+	PlannerSettings relaxed = settings;
+	relaxed.passes[0].linesearch.max_iters = 1;
+	relaxed.passes[0].linesearch.beta1 = 0.0;
+	relaxed.passes[0].ilqr.ls_strict_decrease = false;
+
+	Eigen::MatrixXd X_relaxed = X_base;
+	Eigen::MatrixXd U_relaxed = U_base;
+	double J_relaxed = std::numeric_limits<double>::quiet_NaN();
+	REQUIRE(optimizer::forwardPass(
+		satellite,
+		X_relaxed,
+		U_relaxed,
+		K_zero,
+		d_zero,
+		deltaV_relaxed,
+		env.B,
+		env.R,
+		env.V,
+		env.S,
+		env.rho,
+		boresight,
+		attitude_target_traj,
+		relaxed,
+		jtime,
+		J_prev,
+		J_relaxed
+	));
+	REQUIRE_THAT(J_relaxed, Catch::Matchers::WithinAbs(J_prev, 1e-10));
+
+	PlannerSettings strict = relaxed;
+	strict.passes[0].ilqr.ls_strict_decrease = true;
+
+	Eigen::MatrixXd X_strict = X_base;
+	Eigen::MatrixXd U_strict = U_base;
+	double J_strict = std::numeric_limits<double>::quiet_NaN();
+	REQUIRE_FALSE(optimizer::forwardPass(
+		satellite,
+		X_strict,
+		U_strict,
+		K_zero,
+		d_zero,
+		deltaV_relaxed,
+		env.B,
+		env.R,
+		env.V,
+		env.S,
+		env.rho,
+		boresight,
+		attitude_target_traj,
+		strict,
+		jtime,
+		J_prev,
+		J_strict
+	));
+	REQUIRE_THAT(J_strict, Catch::Matchers::WithinAbs(J_prev, 1e-10));
+	REQUIRE_THAT((X_strict - X_base).norm(), Catch::Matchers::WithinAbs(0.0, 1e-12));
+	REQUIRE_THAT((U_strict - U_base).norm(), Catch::Matchers::WithinAbs(0.0, 1e-12));
+}
