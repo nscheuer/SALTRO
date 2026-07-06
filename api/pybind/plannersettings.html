@@ -816,8 +816,7 @@
 <dd class="field-even"><p>Type of orientation error cost function used, as a shape f(d) of the inner alignment scalar d &amp;#8212; in quaternion mode d = q_goal . q (post hemisphere-alignment, so d in [0, 1]); in vector-pointing mode d = c = bs . R(q)^T r_hat (cosine of the boresight-to-target angle):<ul class="simple">
 <li><p>0: 1 - d (linear)</p></li>
 <li><p>1: 0.5 * (1 - d)^2 (quadratic, convex)</p></li>
-<li><p>2: acos(d) (raw angle)</p></li>
-<li><p>3: 0.5 * acos(d)^2 (squared angle) Type 4 ((1 - d)^2) was REMOVED: it is exactly type 1 with the constant 2 absorbed into the angle weight. Migrate by using type 1 with doubled angle weights (2 * 0.5*(1-d)^2 == (1-d)^2). </p></li>
+<li><p>3: 0.5 * acos(d)^2 (squared angle, Taylor-protected at d = +1) Default is 3 (the preferred well-conditioned shape). Type 2 (acos(d), raw angle) was REMOVED: it is concave (f’’ &lt; 0, anti-PSD under Gauss-Newton) and has a genuine gradient singularity at BOTH poles, including perfect alignment (f’ = -1/sqrt(1-d^2) -&gt; -inf at d = +1, an unremovable singularity unlike type 3’s). Migrate to type 3 (same acos family, convex-usable and Taylor-protected at the aligned pole) or type 0 for a linear-in-d cost. Type 4 ((1 - d)^2) was REMOVED: it is exactly type 1 with the constant 2 absorbed into the angle weight. Migrate by using type 1 with doubled angle weights (2 * 0.5*(1-d)^2 == (1-d)^2). </p></li>
 </ul>
 </p>
 </dd>
@@ -943,7 +942,7 @@
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N10CostConfig18ang_cost_func_typeE">
-<span id="_CPPv3N10CostConfig18ang_cost_func_typeE"></span><span id="_CPPv2N10CostConfig18ang_cost_func_typeE"></span><span id="CostConfig::ang_cost_func_type__i"></span><span class="target" id="structCostConfig_1a754ad1eaba8100f969d1dab07b537395"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_cost_func_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">2</span></span><a class="headerlink" href="#_CPPv4N10CostConfig18ang_cost_func_typeE" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv3N10CostConfig18ang_cost_func_typeE"></span><span id="_CPPv2N10CostConfig18ang_cost_func_typeE"></span><span id="CostConfig::ang_cost_func_type__i"></span><span class="target" id="structCostConfig_1a754ad1eaba8100f969d1dab07b537395"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ang_cost_func_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">3</span></span><a class="headerlink" href="#_CPPv4N10CostConfig18ang_cost_func_typeE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 <dl class="cpp var">
