@@ -10,7 +10,7 @@
  *  - MTQ dipole upper/lower bounds (scaling, config override)
  *  - RW torque upper/lower bounds
  *  - RW momentum upper/lower bounds
- *  - RW stiction proxy
+ *  - RW stiction torque floor (c = θ − |u|/u_lim − |h|/h_c)
  *  - Input validation (wrong dimensions, out-of-range k, negative N)
  *  - Finite-difference verification of Jacobians against constraints()
  *  - Finite-difference verification of Hessians against constraintJacobians()
@@ -420,7 +420,12 @@ TEST_CASE_METHOD(ConstraintFixture,
 }
 
 // ============================================================================
-// SECTION 7 — RW stiction proxy
+// SECTION 7 — RW stiction torque floor
+//   c = θ − |u|/u_lim − |h|/h_c, with u_lim = control_limit_scale·rw_torque,
+//   h_c = rw_stic_band_mult·h_max. Default θ = 0 keeps the row always
+//   satisfied (back-compat with the old dead −(u·h)² row).
+//   NOTE: this base has no constraintFamily() API (that's PR #52 on the other
+//   train); the row keeps the 5th-per-RW slot so the layout is unchanged.
 // ============================================================================
 
 TEST_CASE_METHOD(ConstraintFixture,
@@ -446,6 +451,147 @@ TEST_CASE_METHOD(ConstraintFixture,
     int rw_start = 2 + 2 * n_mtq();
     for (int i = 0; i < n_rw(); ++i) {
         REQUIRE(c(rw_start + 5 * i + 4) <= 0.0);
+    }
+}
+
+TEST_CASE_METHOD(ConstraintFixture,
+    "constraints: stiction torque floor at default theta=0 is satisfied for assorted (u, h)",
+    "[satellite][constraints][stiction]") {
+    auto cfg = defaultCnstCfg();  // rw_stic_torque_theta defaults to 0.0
+    int rw_start = 2 + 2 * n_mtq();
+
+    const double u_vals[] = {0.0, 1e-6, -1e-5, 0.0005, -rw_torque, rw_torque};
+    const double h_vals[] = {0.0, 1e-7, -1e-6, 0.004, -rw_hmax, rw_hmax};
+
+    for (double uv : u_vals) {
+        for (double hv : h_vals) {
+            Eigen::VectorXd h(n_rw());
+            h.setConstant(hv);
+            auto x = makeState(Vec3::Zero(), identityQuat(), h);
+            VecX u = nominalControl();
+            for (int i = 0; i < n_rw(); ++i) u(n_mtq() + i) = uv;
+            auto c = sat.constraints(0, 10, x, u, sunZ(), cfg);
+            for (int i = 0; i < n_rw(); ++i) {
+                REQUIRE(c(rw_start + 5 * i + 4) <= 0.0);
+            }
+        }
+    }
+}
+
+TEST_CASE_METHOD(ConstraintFixture,
+    "constraints: stiction torque floor theta=0.9 activates/fades correctly",
+    "[satellite][constraints][stiction]") {
+    auto cfg = defaultCnstCfg();
+    cfg.rw_stic_torque_theta = 0.9;
+    // rw_stic_band_mult default 0.005 → h_c = 0.005 * rw_hmax = 5e-5
+    const double theta = 0.9;
+    const double h_c = 0.005 * rw_hmax;
+    const double u_lim = cfg.control_limit_scale * rw_torque;  // 7.5e-4
+    int rw_start = 2 + 2 * n_mtq();
+
+    // (a) Violated at u = 0, h = 0: c = θ > 0.
+    {
+        auto c = sat.constraints(0, 10, nominalState(), nominalControl(), sunZ(), cfg);
+        for (int i = 0; i < n_rw(); ++i) {
+            REQUIRE(c(rw_start + 5 * i + 4) == Catch::Approx(theta).margin(1e-14));
+        }
+    }
+
+    // (b) Satisfied at u = u_lim (effective, incl. control_limit_scale), h = 0:
+    //     c = θ − 1 = −0.1.
+    {
+        VecX u = nominalControl();
+        for (int i = 0; i < n_rw(); ++i) u(n_mtq() + i) = u_lim;
+        auto c = sat.constraints(0, 10, nominalState(), u, sunZ(), cfg);
+        for (int i = 0; i < n_rw(); ++i) {
+            REQUIRE(c(rw_start + 5 * i + 4) == Catch::Approx(theta - 1.0).margin(1e-12));
+        }
+    }
+
+    // (c) Satisfied at u = 0, |h| >= θ·h_c (either sign).
+    for (double sign : {1.0, -1.0}) {
+        Eigen::VectorXd h(n_rw());
+        h.setConstant(sign * theta * h_c);  // boundary: c = 0
+        auto x = makeState(Vec3::Zero(), identityQuat(), h);
+        auto c = sat.constraints(0, 10, x, nominalControl(), sunZ(), cfg);
+        for (int i = 0; i < n_rw(); ++i) {
+            REQUIRE(c(rw_start + 5 * i + 4) <= 1e-12);
+        }
+
+        h.setConstant(sign * h_c);  // strictly inside: c = θ − 1 < 0
+        x = makeState(Vec3::Zero(), identityQuat(), h);
+        c = sat.constraints(0, 10, x, nominalControl(), sunZ(), cfg);
+        for (int i = 0; i < n_rw(); ++i) {
+            REQUIRE(c(rw_start + 5 * i + 4) < 0.0);
+        }
+    }
+
+    // (d) Violated at u = 0, |h| < θ·h_c.
+    {
+        Eigen::VectorXd h(n_rw());
+        h.setConstant(0.5 * theta * h_c);
+        auto x = makeState(Vec3::Zero(), identityQuat(), h);
+        auto c = sat.constraints(0, 10, x, nominalControl(), sunZ(), cfg);
+        for (int i = 0; i < n_rw(); ++i) {
+            REQUIRE(c(rw_start + 5 * i + 4) > 0.0);
+        }
+    }
+}
+
+TEST_CASE_METHOD(ConstraintFixture,
+    "constraints: stiction torque floor does not change constraint dimension",
+    "[satellite][constraints][stiction][dim]") {
+    auto cfg = defaultCnstCfg();
+    cfg.rw_stic_torque_theta = 0.9;
+    cfg.rw_stic_band_mult = 0.005;
+    auto c = sat.constraints(0, 10, nominalState(), nominalControl(), sunZ(), cfg);
+    REQUIRE(c.size() == expectedDimIntermediate());
+    auto ct = sat.constraints(9, 10, nominalState(), nominalControl(), sunZ(), cfg);
+    REQUIRE(ct.size() == expectedDimTerminal());
+}
+
+TEST_CASE_METHOD(ConstraintFixture,
+    "constraintJacobians: stiction torque floor FD check away from kinks",
+    "[satellite][jacobians][stiction][fd]") {
+    auto cfg = defaultCnstCfg();
+    cfg.rw_stic_torque_theta = 0.9;
+    int rw_start = 2 + 2 * n_mtq();
+    const double eps = 1e-9;  // well below the |u|, |h| magnitudes used
+
+    // Both signs of u and h, away from u = 0 / h = 0.
+    for (double su : {1.0, -1.0}) {
+        for (double sh : {1.0, -1.0}) {
+            Eigen::VectorXd h(n_rw());
+            h << sh * 2e-5, sh * 3e-5;
+            auto x0 = makeState(Vec3::Zero(), identityQuat(), h);
+            VecX u0 = nominalControl();
+            u0(n_mtq())     = su * 2e-4;
+            u0(n_mtq() + 1) = su * 3e-4;
+
+            auto [c_u, c_x] = sat.constraintJacobians(0, 10, x0, u0, sunZ(), cfg);
+
+            for (int i = 0; i < n_rw(); ++i) {
+                const int row = rw_start + 5 * i + 4;
+                const int ctrl_idx = n_mtq() + i;
+                const int state_idx = 7 + i;
+
+                // FD in the u direction.
+                VecX up = u0; up(ctrl_idx) += eps;
+                VecX um = u0; um(ctrl_idx) -= eps;
+                auto cp = sat.constraints(0, 10, x0, up, sunZ(), cfg);
+                auto cm = sat.constraints(0, 10, x0, um, sunZ(), cfg);
+                const double fd_u = (cp(row) - cm(row)) / (2.0 * eps);
+                REQUIRE(c_u(row, ctrl_idx) == Catch::Approx(fd_u).epsilon(1e-6));
+
+                // FD in the h direction.
+                VecX xp = x0; xp(state_idx) += eps;
+                VecX xm = x0; xm(state_idx) -= eps;
+                cp = sat.constraints(0, 10, xp, u0, sunZ(), cfg);
+                cm = sat.constraints(0, 10, xm, u0, sunZ(), cfg);
+                const double fd_h = (cp(row) - cm(row)) / (2.0 * eps);
+                REQUIRE(c_x(row, state_idx) == Catch::Approx(fd_h).epsilon(1e-6));
+            }
+        }
     }
 }
 
@@ -937,11 +1083,13 @@ TEST_CASE_METHOD(ConstraintFixture,
 }
 
 // ============================================================================
-// SECTION 16 — Stiction Hessian structure
+// SECTION 16 — Stiction torque-floor Hessian structure
+// The row c = θ − |u|/u_lim − |h|/h_c is piecewise-linear: Hessian is zero
+// (the old −(u·h)² row had curvature here; the new form has none).
 // ============================================================================
 
 TEST_CASE_METHOD(ConstraintFixture,
-    "constraintHessians: stiction Hessian is non-zero and has correct pattern",
+    "constraintHessians: stiction torque-floor row has zero Hessians (piecewise linear)",
     "[satellite][hessians][stiction]") {
     Eigen::VectorXd h(n_rw());
     h << 0.005, -0.003;
@@ -950,27 +1098,17 @@ TEST_CASE_METHOD(ConstraintFixture,
     u0(n_mtq()) = 0.0003;
     u0(n_mtq() + 1) = -0.0002;
 
-    auto [H_uu, H_ux, H_xx] = sat.constraintHessians(0, 10, x0, u0, sunZ(), defaultCnstCfg());
+    auto cfg = defaultCnstCfg();
+    cfg.rw_stic_torque_theta = 0.9;  // zero Hessian whether or not the floor is enabled
+
+    auto [H_uu, H_ux, H_xx] = sat.constraintHessians(0, 10, x0, u0, sunZ(), cfg);
 
     int rw_start = 2 + 2 * n_mtq();
     for (int i = 0; i < n_rw(); ++i) {
         int stiction_idx = rw_start + 5 * i + 4;
-        int ctrl_idx = n_mtq() + i;
-        int state_idx = 7 + i;  // RW_MOMENTUM_INDEX + i
-        double u_i = u0(ctrl_idx);
-        double h_i = h(i);
-
-        // Huu: -2 * h²
-        REQUIRE(H_uu.slice(stiction_idx)(ctrl_idx, ctrl_idx) ==
-                Catch::Approx(-2.0 * h_i * h_i).margin(1e-12));
-
-        // Hxx: -2 * u²
-        REQUIRE(H_xx.slice(stiction_idx)(state_idx, state_idx) ==
-                Catch::Approx(-2.0 * u_i * u_i).margin(1e-12));
-
-        // Hux: -4 * u * h
-        REQUIRE(H_ux.slice(stiction_idx)(ctrl_idx, state_idx) ==
-                Catch::Approx(-4.0 * u_i * h_i).margin(1e-12));
+        REQUIRE(H_uu.slice(stiction_idx).norm() == Catch::Approx(0.0).margin(1e-14));
+        REQUIRE(H_ux.slice(stiction_idx).norm() == Catch::Approx(0.0).margin(1e-14));
+        REQUIRE(H_xx.slice(stiction_idx).norm() == Catch::Approx(0.0).margin(1e-14));
     }
 }
 

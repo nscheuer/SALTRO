@@ -24,6 +24,27 @@ bool validatePlannerSettings(const PlannerSettings& settings, std::string& error
         return false;
     }
 
+    if (settings.constraints.rw_stic_torque_theta < 0.0 || settings.constraints.rw_stic_torque_theta > 1.0 ||
+        !std::isfinite(settings.constraints.rw_stic_torque_theta)) {
+        error_msg = "rw_stic_torque_theta invalid";
+        return false;
+    }
+
+    if (settings.constraints.rw_stic_band_mult <= 0.0 || settings.constraints.rw_stic_band_mult > 1.0 ||
+        !std::isfinite(settings.constraints.rw_stic_band_mult)) {
+        error_msg = "rw_stic_band_mult invalid";
+        return false;
+    }
+
+    // WARNING (not enforced): when the torque floor is enabled
+    // (rw_stic_torque_theta > 0) together with cost-side bias-momentum
+    // parking, the alignment rule
+    //   rw_stic_torque_theta * rw_stic_band_mult * rw_momentum_limit_scale <= h*/h_max
+    // (parking fraction; h* = h_stic/2 under the PR #54 recipe) must hold so
+    // a parked wheel satisfies the floor at zero torque. The parking point is
+    // determined by cost-side weights (CostConfig) which are not visible to
+    // constraint validation, so we cannot hard-reject a misalignment here.
+
     // Validate u_max vector
     if (settings.constraints.u_max.size() == 0) {
         error_msg = "u_max is empty";

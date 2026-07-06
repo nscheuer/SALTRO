@@ -200,6 +200,108 @@ def test_invalid_sun_limit_angle_nan():
     assert error_msg == "sun_limit_angle invalid"
 
 
+def test_valid_rw_stic_torque_theta_and_band_mult_enabled_floor():
+    """Enabled torque floor (theta=0.9, band=0.005) should pass"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_torque_theta = 0.9
+    settings.constraints.rw_stic_band_mult = 0.005
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert ok
+
+
+def test_valid_rw_stic_torque_theta_boundary_values():
+    """theta = 0 and theta = 1 are both valid"""
+    settings = valid_settings()
+
+    settings.constraints.rw_stic_torque_theta = 0.0
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+    settings.constraints.rw_stic_torque_theta = 1.0
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+
+def test_invalid_rw_stic_torque_theta_negative():
+    """Negative rw_stic_torque_theta should fail"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_torque_theta = -0.1
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "rw_stic_torque_theta invalid"
+
+
+def test_invalid_rw_stic_torque_theta_exceeds_one():
+    """rw_stic_torque_theta above 1 should fail"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_torque_theta = 1.1
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "rw_stic_torque_theta invalid"
+
+
+def test_invalid_rw_stic_torque_theta_nan():
+    """NaN rw_stic_torque_theta should fail"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_torque_theta = float('nan')
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "rw_stic_torque_theta invalid"
+
+
+def test_valid_rw_stic_band_mult_boundary_value_one():
+    """rw_stic_band_mult = 1 is valid (band covers full momentum range)"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_band_mult = 1.0
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+
+    assert ok
+
+
+def test_invalid_rw_stic_band_mult_zero():
+    """Zero rw_stic_band_mult should fail (band must be positive)"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_band_mult = 0.0
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "rw_stic_band_mult invalid"
+
+
+def test_invalid_rw_stic_band_mult_negative():
+    """Negative rw_stic_band_mult should fail"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_band_mult = -0.005
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "rw_stic_band_mult invalid"
+
+
+def test_invalid_rw_stic_band_mult_exceeds_one():
+    """rw_stic_band_mult above 1 should fail"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_band_mult = 1.5
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "rw_stic_band_mult invalid"
+
+
+def test_invalid_rw_stic_band_mult_nan():
+    """NaN rw_stic_band_mult should fail"""
+    settings = valid_settings()
+    settings.constraints.rw_stic_band_mult = float('nan')
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert error_msg == "rw_stic_band_mult invalid"
+
+
 def test_invalid_u_max_empty_vector():
     """Empty u_max vector should fail"""
     settings = valid_settings()

@@ -34,7 +34,9 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("rw_momentum_limit_scale", &ConstraintConfig::rw_momentum_limit_scale)
         .def_readwrite("u_max", &ConstraintConfig::u_max)
         .def_readwrite("wmax", &ConstraintConfig::wmax)
-        .def_readwrite("sun_limit_angle", &ConstraintConfig::sun_limit_angle);
+        .def_readwrite("sun_limit_angle", &ConstraintConfig::sun_limit_angle)
+        .def_readwrite("rw_stic_torque_theta", &ConstraintConfig::rw_stic_torque_theta)
+        .def_readwrite("rw_stic_band_mult", &ConstraintConfig::rw_stic_band_mult);
 
     py::class_<CostConfig>(m, "CostConfig")
         .def(py::init<>())

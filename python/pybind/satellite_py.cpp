@@ -414,7 +414,8 @@ Evaluate inequality constraints c(x,u) <= 0.
 Constraint ordering:
 1) Angular velocity magnitude limit
 2) Sun avoidance limit using body +X boresight
-3) (k < N-1 only) MTQ and RW bounds, RW momentum bounds, RW stiction proxy
+3) (k < N-1 only) MTQ and RW bounds, RW momentum bounds, RW stiction torque
+   floor (theta - |u|/u_lim - |h|/h_c; always satisfied at default theta=0)
 
 Parameters
 ----------
@@ -757,7 +758,8 @@ cost_cfg : CostConfig
     - control effort weights
     - RW momentum management weights
     - magnetic alignment weights
-    - cost function type (linear, quadratic, arccos, etc.)
+    - angle cost shape via `ang_cost_func_type` in the implemented set
+      `{0, 1, 3, 5}` (`2` and `4` are retired)
 
 Returns
 -------

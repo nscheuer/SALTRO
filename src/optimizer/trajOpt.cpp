@@ -7,6 +7,7 @@
 #include <saltro/math/integrators/rk4.h>
 
 #include <algorithm>
+#include <iostream>
 #include <cmath>
 #include <stdexcept>
 
@@ -214,6 +215,34 @@ bool trajOpt(
 	std::string error_msg;
 	if (!validation::validatetrajOpt(settings_local, satellite, x0, r0, v0, jtime, q_goal, boresight, state_dim, input_dim, N, error_msg)) {
 		throw std::runtime_error("trajOpt input validation failed: " + error_msg);
+	}
+
+	// Stiction torque floor + in-band initial momentum is a known convergence
+	// hazard: the floor demands torque from knot 0, the (u=0, h=0) point has a
+	// flat constraint gradient, and AL solves have been observed to grind to
+	// MaxOuterIterations from such starts. Warn loudly; do not reject (the
+	// caller may know the warm start punches through).
+	if (settings_local.constraints.rw_stic_torque_theta > 0.0) {
+		const double theta = std::clamp(settings_local.constraints.rw_stic_torque_theta, 0.0, 1.0);
+		const double band = std::clamp(settings_local.constraints.rw_stic_band_mult, 0.0, 1.0);
+		// Mirror the enforced constraint exactly: the floor's momentum band is
+		// h_c = band * h_lim with h_lim = rw_momentum_limit_scale * h_max (the
+		// scaled momentum limit) -- warning on the unscaled h_max would
+		// over-warn for margin configs (rw_momentum_limit_scale < 1).
+		const double h_lim_scale = settings_local.constraints.rw_momentum_limit_scale;
+		for (int i = 0; i < satellite.numRW(); ++i) {
+			const double h_max_i = std::max(1e-9, std::abs(satellite.getRW(i).momentumMax()));
+			const double h0_i = std::abs(x0(Satellite::RW_MOMENTUM_INDEX + i));
+			const double demand_edge = theta * band * h_lim_scale * h_max_i;
+			if (h0_i < demand_edge) {
+				std::cerr << "[trajOpt] WARNING: rw_stic_torque_theta = "
+				          << settings_local.constraints.rw_stic_torque_theta
+				          << " is enabled but RW " << i << " starts inside the floor's demand band (|h0| = "
+				          << h0_i << " < theta*band*rw_momentum_limit_scale*h_max = " << demand_edge
+				          << "). The floor requires torque from knot 0 and convergence failures have been"
+				          << " observed from in-band starts; consider a biased initial momentum or theta = 0.\n";
+			}
+		}
 	}
 
 	const double dt_sec = settings_local.passes[0].dt;

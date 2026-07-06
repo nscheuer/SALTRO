@@ -199,9 +199,12 @@ Implemented set: `{0, 1, 3, 5}`, default **3**. Type 5 matches type 3's ½θ² n
 |-----------|-------------------------------|-------|
 | Linear (0) | 0 | Piecewise linear, Hessian = 0 (except at q̇=0) |
 | Quadratic (1) | 1 | Constant curvature |
-| Angular (2) | -q̇/(1 - q̇²)^(3/2) | Singular at q̇=±1 |
 | Quadratic Angular (3) | [1 - acos(q̇)·q̇]/[(1 - q̇²)^(3/2)] | Complex curvature |
-| Quadratic Dot (4) | -2 | Constant negative curvature |
+| Pseudo-Huber Angular (5) | See `angCostShape()`; depends on both θ = acos(q̇) and δ = `ang_cost_huber_delta` | Smoothly transitions from type-3-like quadratic curvature near the goal to bounded large-angle urgency |
+
+Only `{0, 1, 3, 5}` are implemented. Type 2 was removed because raw `acos`
+is concave in the alignment scalar and singular at both poles; type 4 was
+removed because it is exactly type 1 with the angle weight doubled.
 
 **Components of `luu` (Control-Control Hessian)**:
 

@@ -581,7 +581,8 @@ public:
         *    - MTQ upper/lower bounds (2 per MTQ)
         *    - RW torque upper/lower bounds (2 per RW)
         *    - RW momentum upper/lower bounds (2 per RW)
-        *    - RW stiction proxy (1 per RW)
+        *    - RW stiction torque floor (1 per RW): c = θ − |u|/u_lim − |h|/h_c
+        *      (always satisfied at the default θ = 0; see ConstraintConfig)
         *    - Magic actuator upper/lower bounds (2 per magic actuator)
         *
         * All constraints are formulated as c <= 0.
