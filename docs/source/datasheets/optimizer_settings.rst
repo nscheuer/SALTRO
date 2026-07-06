@@ -308,17 +308,26 @@ Control effort is normalized by each actuator limit:
    \frac{1}{2}\,\texttt{control\_mult}
    \sum_i w_{u,i}\left(\frac{u_i}{u_{i,\max}}\right)^2
 
-Reaction-wheel momentum penalty activates near saturation:
+Reaction-wheel momentum soft cost (C1 everywhere): a gentle desat quadratic
+over the whole range plus a steep quadratic that turns on above the knee with
+zero value and zero slope there (no cliff, no gradient kink):
 
 .. math::
 
-   h_{\text{thresh}} = \texttt{RWh\_max\_mult}\, h_{\max},
+   h_{\text{knee}} = \texttt{RWh\_knee\_frac}\, h_{\max},
    \qquad
    \ell_h =
-   \frac{1}{2}\,w_h
-   \left(\frac{|h| - h_{\text{thresh}}}{h_{\max} - h_{\text{thresh}}}\right)^2
+   \frac{1}{2}\,w_h\,\texttt{RWh\_desat\_mult}\left(\frac{|h|}{h_{\max}}\right)^2
+   + \frac{1}{2}\,w_h
+   \left[\frac{(|h| - h_{\text{knee}})_+}{h_{\max} - h_{\text{knee}}}\right]^2
 
-for ``|h| > h_thresh``.
+The hard ceiling deliberately does not live in this cost: the AL momentum
+constraint enforces it (``ConstraintConfig.rw_momentum_limit_scale``) with its
+own per-family penalty schedule — cost shapes, constraint enforces. Combined
+with the stiction term below, the paired weighting
+``rw_stic_weight = rw_AM_weight * RWh_desat_mult * (h_stic/h_max)^2`` parks the
+wheel at the bias momentum :math:`h^* = h_{\text{stic}}/2` (off the
+zero-crossing stiction band without drifting toward saturation).
 
 .. list-table::
    :header-rows: 1
@@ -363,15 +372,24 @@ for ``|h| > h_thresh``.
    * - ``rw_stic_weight``
      - ``1.0``
      - Weight on the reaction-wheel stiction-region penalty.
-   * - ``RWh_max_mult``
-     - ``0.8``
-     - Fraction of ``h_max`` where the high-momentum penalty begins. Must lie in ``[0,1]``.
+   * - ``RWh_knee_frac``
+     - ``0.5``
+     - Fraction of ``h_max`` where the steep momentum term turns on (the knee);
+       below it only the gentle desat quadratic applies. Must lie in ``[0,1]``.
+       (Renamed from the removed ``RWh_ok_mult``, whose old weight-multiplier
+       semantics no longer exist; ``RWh_max_mult`` is removed — the hard limit
+       moved to the AL momentum constraint.)
+   * - ``RWh_desat_mult``
+     - ``0.05``
+     - Weight multiplier of the gentle full-range desat quadratic (relative to
+       ``rw_AM_weight``). A perfectly flat free band grinds the AL outer loop;
+       keep this small but nonzero when ``rw_AM_weight > 0``.
    * - ``RWh_stiction_mult``
      - ``0.01``
-     - Fraction of ``h_max`` used to scale the stiction region. Must lie in ``[0,1]``.
-   * - ``RWh_ok_mult``
-     - ``0.5``
-     - Additional multiplier used in the low-momentum wheel penalty shaping. Must lie in ``[0,1]``.
+     - Fraction of ``h_max`` defining the stiction band; with ``rw_stic_weight``
+       the cost pulls the wheel away from ``h = 0`` inside it (parking
+       equilibrium at ``h_stic/2`` under the paired weighting above). Must lie
+       in ``[0,1]``.
    * - ``angle_N``
      - ``1e4``
      - Terminal attitude weight. Must be finite and nonnegative.

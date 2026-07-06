@@ -21,33 +21,35 @@ def create_planner_settings():
     # Pass 0 Settings
     plannersettings.num_passes = 1
     plannersettings.passes[0].dt = 10.0
-    plannersettings.passes[0].ilqr.cost_tol = 1e-3
-    plannersettings.passes[0].ilqr.max_iters = 20
+    plannersettings.passes[0].ilqr.cost_tol = 1e-5
+    plannersettings.passes[0].ilqr.max_iters = 100
 
-    # Pass 0 AL-iLQR Settings
-    plannersettings.passes[0].auglag.max_outer_iters = 10
+    # Pass 0 AL-iLQR Settings (mirrors the alilqr_cpp twin)
+    plannersettings.passes[0].auglag.max_outer_iters = 100
     plannersettings.passes[0].auglag.constraint_tol = 1e-3
+    plannersettings.passes[0].auglag.penalty_init = 1e2  # feel constraints from iter 0
 
     # Pass 0 iLQR Settings
     cost = plannersettings.passes[0].cost
-    cost.angle = 1e2
-    cost.ang_vel = 1e1
+    cost.angle = 2e3   # type-1 with 2x weight == the former type-4 exactly
+    cost.ang_vel = 1e2  # rate damping (residual spin nutates the boresight)
     cost.ang_vel_mag = 0.0
     cost.ang_vel_err_dir = 0.0
     cost.control_mult = 1.0
     cost.mtq_control_weight = 1e-1
-    cost.rw_control_weight = 1e3
+    cost.rw_control_weight = 1.0
     cost.magic_control_weight = 0.0
-    cost.rw_AM_weight = 0.0
+    # rank-1 GN angle Hessian needs auxiliary curvature on h (see cpp twin)
+    cost.rw_AM_weight = 1e4
     cost.rw_stic_weight = 0.0
     cost.RWh_stiction_mult = 0.0
     cost.RWh_knee_frac = 0.5   # free band below 50% h_max (validated: wheel used ~11%)
     cost.RWh_desat_mult = 0.05  # REQUIRED: flat free band grinds the outer loop (see plannersettings.h)
-    cost.angle_N = 1e2
-    cost.ang_vel_N = 1e1
+    cost.angle_N = 2e4   # doubled with the type-4 -> type-1 migration
+    cost.ang_vel_N = 1e5  # strong terminal rate damping holds the boresight
     cost.ang_vel_mag_N = 0.0
     cost.ang_vel_err_dir_N = 0.0
-    cost.ang_cost_func_type = 4
+    cost.ang_cost_func_type = 1  # 0.5*(1-c)^2 (type 4 removed)
     cost.use_cost_hess = True
     cost.cost_hess_gauss_newton = True
 
