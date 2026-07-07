@@ -33,18 +33,32 @@ static py::tuple backward_pass_py(
     std::vector<Eigen::VectorXd> d(std::max(0, N - 1), Eigen::VectorXd::Zero(nu));
     Eigen::Vector2d deltaV = Eigen::Vector2d::Zero();
 
+    // Disturbance-aware (eq. 7.40): when settings.tvlqr.disturbance_aware is
+    // set (mirroring how trajOpt requests K_dist), also compute the K_tau
+    // gains and return [K_x | K_tau] of width nxr + 3.
+    const bool dist_aware = settings.tvlqr.disturbance_aware;
+    std::vector<Eigen::MatrixXd> K_dist(
+        static_cast<std::size_t>(dist_aware ? std::max(0, N - 1) : 0),
+        Eigen::MatrixXd::Zero(nu, 3));
+
     const bool ok = backwardPass(
         satellite, X, U, R, V, B, S, rho, boresight, attitude_target,
-        settings, reg, K, d, deltaV, lambda_aug, mu_aug
+        settings, reg, K, d, deltaV, lambda_aug, mu_aug,
+        dist_aware ? &K_dist : nullptr
     );
 
-    // Stack K into shape (N-1, nu, nxr) — reduced state columns
-    py::array_t<double> K_arr({std::max(0, N - 1), nu, nxr});
+    // Stack K into shape (N-1, nu, nxr) — reduced state columns — or
+    // (N-1, nu, nxr + 3) with the K_tau block appended when disturbance-aware.
+    const int gain_w = dist_aware ? nxr + 3 : nxr;
+    py::array_t<double> K_arr({std::max(0, N - 1), nu, gain_w});
     auto K_buf = K_arr.mutable_unchecked<3>();
     for (int k = 0; k < std::max(0, N - 1); ++k) {
         for (int i = 0; i < nu; ++i) {
             for (int j = 0; j < nxr; ++j) {
                 K_buf(k, i, j) = K[k](i, j);
+            }
+            for (int j = 0; dist_aware && j < 3; ++j) {
+                K_buf(k, i, nxr + j) = K_dist[static_cast<std::size_t>(k)](i, j);
             }
         }
     }
@@ -92,7 +106,9 @@ Returns
 -------
 ok : bool
 K : ndarray (N-1, control_dim, reduced_state_dim)
-    Feedback gains in reduced state space (6 + num_rw columns).
+    Feedback gains in reduced state space (6 + num_rw columns). When
+    settings.tvlqr.disturbance_aware is set, the last axis widens to
+    reduced_state_dim + 3 and each block is [K_x | K_tau] (eq. 7.40).
 d : ndarray (control_dim, N-1)
 deltaV : ndarray (2,)
 )doc"

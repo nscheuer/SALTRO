@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -358,6 +359,89 @@ TEST_CASE("backward_pass sqrt: DDP flags force the dense path", "[backward_pass]
 	REQUIRE(relGainDelta(K_dense, K_flag) == 0.0);
 	REQUIRE(relFeedforwardDelta(d_dense, d_flag) == 0.0);
 	REQUIRE(dV_dense == dV_flag);
+}
+
+TEST_CASE("backward_pass sqrt: disturbance-aware K_dist matches dense pass",
+          "[backward_pass][sqrt][disturbance][parity]") {
+	// Disturbance-aware (eq. 7.40) TVLQR gains through the square-root pass:
+	// the augmented-Riccati δτ channel is carried with the P·D and Q_uu/Q_ux
+	// products formed through the cost-to-go factor (S_{k+1}^T(S_{k+1}D)) and
+	// the joint [F_x F_u] factor, and the K_tau solve reuses the Z_uu_reg
+	// triangular solves. The full [K_x | K_tau] gains must match the dense
+	// pass to the same tight tolerance as the plain gains on this multi-knot
+	// RW(+MTQ) case.
+	const bool with_al = GENERATE(false, true);
+	BackwardPassSqrtFixture fixture(8);
+	// The fixture's default cost config carries no state weights (P_k stays
+	// zero and every gain with it); give it the balanced weights and a real
+	// quaternion target from the tvlqr_disturbance tests so both K_x and the
+	// K_tau channel are live.
+	auto& cost = fixture.settings.passes[0].cost;
+	cost.angle = 1e2;
+	cost.ang_vel = 1e2;
+	cost.angle_N = 1e2;
+	cost.ang_vel_N = 1e2;
+	cost.control_mult = 1.0;
+	cost.mtq_control_weight = 1e-2;
+	cost.rw_control_weight = 1.0;
+	cost.ang_cost_func_type = 3;
+	cost.use_cost_hess = true;
+	TrajectoryData td = fixture.makeTrajectory(with_al);
+	const double r2 = std::sqrt(0.5);
+	td.attitude_target = makeAttitudeTraj(Eigen::Vector4d(r2, r2, 0.0, 0.0), fixture.N);
+
+	std::vector<Eigen::VectorXd> lambda_aug, mu_aug;
+	if (with_al) {
+		const std::vector<Eigen::VectorXd> c_list = fixture.collectConstraints(td);
+		BackwardPassSqrtFixture::makeConstAug(c_list, 1.0, 100.0, lambda_aug, mu_aug);
+	}
+
+	const int nu = fixture.satellite.controlDim();
+	const int steps = std::max(0, fixture.N - 1);
+
+	std::vector<Eigen::MatrixXd> K_dense, K_sqrt, K_flag;
+	std::vector<Eigen::VectorXd> d_dense, d_sqrt, d_flag;
+	Eigen::Vector2d dV_dense = Eigen::Vector2d::Zero();
+	Eigen::Vector2d dV_sqrt = Eigen::Vector2d::Zero();
+	Eigen::Vector2d dV_flag = Eigen::Vector2d::Zero();
+	fixture.initializeGains(K_dense, d_dense);
+	fixture.initializeGains(K_sqrt, d_sqrt);
+	fixture.initializeGains(K_flag, d_flag);
+	std::vector<Eigen::MatrixXd> Kd_dense(static_cast<size_t>(steps), Eigen::MatrixXd::Zero(nu, 3));
+	std::vector<Eigen::MatrixXd> Kd_sqrt = Kd_dense;
+	std::vector<Eigen::MatrixXd> Kd_flag = Kd_dense;
+
+	REQUIRE(optimizer::backwardPass(
+		fixture.satellite, td.X, td.U, td.R, td.V, td.B, td.S, td.rho,
+		td.boresight, td.attitude_target, fixture.settings, fixture.reg,
+		K_dense, d_dense, dV_dense, lambda_aug, mu_aug, &Kd_dense));
+	REQUIRE(optimizer::backwardPassSqrt(
+		fixture.satellite, td.X, td.U, td.R, td.V, td.B, td.S, td.rho,
+		td.boresight, td.attitude_target, fixture.settings, fixture.reg,
+		K_sqrt, d_sqrt, dV_sqrt, lambda_aug, mu_aug, &Kd_sqrt));
+
+	// Plain-gain parity as before...
+	REQUIRE(relGainDelta(K_dense, K_sqrt) < 1e-8);
+	REQUIRE(relFeedforwardDelta(d_dense, d_sqrt) < 1e-8);
+	// ...and the K_tau block matches to the same tight tolerance.
+	REQUIRE(relGainDelta(Kd_dense, Kd_sqrt) < 1e-8);
+	// The disturbance channel is live, not trivially-zero agreement.
+	double ktau_max = 0.0;
+	for (const Eigen::MatrixXd& m : Kd_dense) {
+		ktau_max = std::max(ktau_max, m.cwiseAbs().maxCoeff());
+	}
+	REQUIRE(ktau_max > 1e-12);
+
+	// The use_sqrt_bp dispatch must forward K_dist to the sqrt pass
+	// (bit-identical to calling backwardPassSqrt directly) rather than
+	// silently dropping it.
+	fixture.settings.passes[0].reg.use_sqrt_bp = true;
+	REQUIRE(optimizer::backwardPass(
+		fixture.satellite, td.X, td.U, td.R, td.V, td.B, td.S, td.rho,
+		td.boresight, td.attitude_target, fixture.settings, fixture.reg,
+		K_flag, d_flag, dV_flag, lambda_aug, mu_aug, &Kd_flag));
+	REQUIRE(relGainDelta(K_sqrt, K_flag) == 0.0);
+	REQUIRE(relGainDelta(Kd_sqrt, Kd_flag) == 0.0);
 }
 
 TEST_CASE("backward_pass sqrt: N=1 edge case", "[backward_pass][sqrt][n1_edge_case]") {

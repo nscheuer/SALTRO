@@ -39,7 +39,10 @@ py::tuple trajOpt_py(
 	Eigen::MatrixXd X(state_dim, saltro::limits::MAX_LENGTH_TRAJ);
 	Eigen::MatrixXd U(input_dim, saltro::limits::MAX_LENGTH_TRAJ);
 	const int reduced_state_dim = satellite.reducedStateDim();
-	Eigen::MatrixXd K(input_dim, reduced_state_dim * saltro::limits::MAX_LENGTH_TRAJ);
+	// Disturbance-aware TVLQR widens each per-step gain to [K_x | K_τ]
+	// (reduced_state_dim + 3); the default keeps the reduced-state width.
+	const int gain_w = settings.tvlqr.disturbance_aware ? reduced_state_dim + 3 : reduced_state_dim;
+	Eigen::MatrixXd K(input_dim, gain_w * saltro::limits::MAX_LENGTH_TRAJ);
 	int N_out = N;
 
 	const bool ok = saltro::optimizer::trajOpt(
@@ -62,7 +65,7 @@ py::tuple trajOpt_py(
 	const int N_cols = std::max(0, std::min(N_out, saltro::limits::MAX_LENGTH_TRAJ));
 	Eigen::MatrixXd X_out = X.leftCols(N_cols);
 	Eigen::MatrixXd U_out = U.leftCols(N_cols);
-	Eigen::MatrixXd K_out = K.leftCols(reduced_state_dim * N_cols);
+	Eigen::MatrixXd K_out = K.leftCols(gain_w * N_cols);
 	return py::make_tuple(
 		ok,
 		X_out,

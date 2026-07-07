@@ -567,11 +567,19 @@ struct PassConfig {
  *                 uses the planner pass dt and keeps this at 0.0.
  * @param tvlqr_len Chunk duration in seconds for gain computation.
  * @param tvlqr_overlap Overlap duration in seconds between consecutive chunks.
+ * @param disturbance_aware When true, trajOpt augments the tracking gains with a
+ *                 disturbance-torque feedback channel (McKeen 2025, eq. 7.40):
+ *                 each per-step gain becomes [K_x | K_τ], input_dim ×
+ *                 (reducedStateDim + 3), so the controller can feed back the
+ *                 disturbance-torque error (τ_expected − τ_estimated) in
+ *                 addition to the reduced-state error. Default false keeps the
+ *                 gains at the reducedStateDim width (fully backward-compatible).
  */
 struct TVLQRSettings {
     double dt_tvlqr;
     double tvlqr_len = 60.0;
     double tvlqr_overlap = 15.0;
+    bool disturbance_aware = false;
 
     TVLQRSettings() : dt_tvlqr(0.0) {}
 };

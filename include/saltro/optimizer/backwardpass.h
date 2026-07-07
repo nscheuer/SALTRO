@@ -53,7 +53,8 @@ bool backwardPass(
 	std::vector<Eigen::VectorXd>& d,
 	Eigen::Ref<Eigen::Vector2d> deltaV,
 	const std::vector<Eigen::VectorXd>& lambda_aug,
-	const std::vector<Eigen::VectorXd>& mu_aug
+	const std::vector<Eigen::VectorXd>& mu_aug,
+	std::vector<Eigen::MatrixXd>* K_dist = nullptr
 );
 
 /**
@@ -81,7 +82,12 @@ bool backwardPass(
  * Selected at runtime by setting RegularizationConfig::use_sqrt_bp = true,
  * which makes backwardPass() forward to this function.
  *
- * Parameters and return value are identical to backwardPass().
+ * Parameters and return value are identical to backwardPass(), including the
+ * optional K_dist output: when non-null, the disturbance-aware (eq. 7.40)
+ * gains K_tau are computed alongside K, with the P·D and Q_uu/Q_ux products
+ * of the augmented Riccati recursion formed through the square-root factors
+ * (S_{k+1}^T(S_{k+1}·D) and the joint [F_x F_u] factor) and the K_tau solve
+ * done with the same triangular Z_uu_reg solves used for K.
  */
 bool backwardPassSqrt(
 	const Satellite& satellite,
@@ -100,7 +106,8 @@ bool backwardPassSqrt(
 	std::vector<Eigen::VectorXd>& d,
 	Eigen::Ref<Eigen::Vector2d> deltaV,
 	const std::vector<Eigen::VectorXd>& lambda_aug,
-	const std::vector<Eigen::VectorXd>& mu_aug
+	const std::vector<Eigen::VectorXd>& mu_aug,
+	std::vector<Eigen::MatrixXd>* K_dist = nullptr
 );
 
 inline bool backwardPass(
