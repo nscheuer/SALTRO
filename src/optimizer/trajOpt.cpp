@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cmath>
 #include <stdexcept>
+#include <string>
 
 namespace saltro::optimizer {
 
@@ -312,12 +313,14 @@ bool trajOpt(
 		(void)max_c;
 		if (!ok) {
 			if (al_status == ALILQRStatus::InnerFailed) {
-				throw std::runtime_error("trajOpt failed during AL-iLQR inner solve");
+				throw std::runtime_error("trajOpt failed during AL-iLQR inner solve (status=InnerFailed)");
 			}
 			if (al_status == ALILQRStatus::MaxOuterIterations) {
-				throw std::runtime_error("trajOpt AL-iLQR did not converge before max outer iterations");
+				throw std::runtime_error(
+					"trajOpt AL-iLQR did not converge before max outer iterations (status=MaxOuterIterations)");
 			}
-			throw std::runtime_error("trajOpt AL-iLQR failed");
+			throw std::runtime_error(
+				std::string("trajOpt AL-iLQR did not converge (status=") + alilqrStatusName(al_status) + ")");
 		}
 
 	}

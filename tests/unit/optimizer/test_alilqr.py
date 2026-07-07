@@ -197,7 +197,12 @@ def create_hybrid_planner_settings(dt_seconds: float) -> saltro_py.PlannerSettin
 	plannersettings.passes[0].ilqr.cost_tol = 1e-5
 	plannersettings.passes[0].ilqr.max_iters = 20
 
-	plannersettings.passes[0].auglag.max_outer_iters = 10
+	# 2026-06: was 10. The two-sided convergence gate (feasible iterate
+	# followed by a strict-tier settling solve) intentionally spends more
+	# outer iterations than the old one-sided max_c test; the dt=5 case
+	# reaches feasibility only around outer iter 9 and then needs the
+	# settling tail. The budget is a cap, not a quality assertion.
+	plannersettings.passes[0].auglag.max_outer_iters = 30
 	plannersettings.passes[0].auglag.constraint_tol = 1e-3
 
 	cost = plannersettings.passes[0].cost

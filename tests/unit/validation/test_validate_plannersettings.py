@@ -844,24 +844,125 @@ def test_invalid_auglag_constraint_tol_zero():
     assert error_msg == "auglag.constraint_tol invalid"
 
 
-def test_invalid_auglag_total_cost_tol_negative():
-    """Negative auglag.total_cost_tol should fail"""
+def test_auglag_total_cost_tol_reserved_rejects_non_default():
+    """total_cost_tol is reserved (never read): non-default values must be
+    rejected so the knob cannot silently no-op (G20: wire or reject)."""
+    expected = "auglag.total_cost_tol is reserved (not implemented); leave at default"
+    default = saltro_py.AugLagConfig().total_cost_tol
+
+    for bad in (-0.1, 0.0, 1e-3):
+        settings = valid_settings()
+        settings.passes[0].auglag.total_cost_tol = bad
+        ok, error_msg = saltro_py.validatePlannerSettings(settings)
+        assert not ok
+        assert error_msg == expected
+
     settings = valid_settings()
-    settings.passes[0].auglag.total_cost_tol = -0.1
-    ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
-    assert not ok
-    assert error_msg == "auglag.total_cost_tol invalid"
+    settings.passes[0].auglag.total_cost_tol = default
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
 
 
-def test_invalid_auglag_total_cost_tol_zero():
-    """Zero auglag.total_cost_tol should fail"""
+def test_auglag_min_outer_iters_validation():
+    """min_outer_iters: negative invalid, zero disables the maturation gate."""
     settings = valid_settings()
-    settings.passes[0].auglag.total_cost_tol = 0.0
+    settings.passes[0].auglag.min_outer_iters = -1
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
-    
     assert not ok
-    assert error_msg == "auglag.total_cost_tol invalid"
+    assert error_msg == "auglag.min_outer_iters invalid"
+
+    settings = valid_settings()
+    settings.passes[0].auglag.min_outer_iters = 0
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+
+def test_auglag_max_total_iters_validation():
+    """max_total_iters: negative invalid, zero disables the global budget."""
+    settings = valid_settings()
+    settings.passes[0].auglag.max_total_iters = -1
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert not ok
+    assert error_msg == "auglag.max_total_iters invalid"
+
+    settings = valid_settings()
+    settings.passes[0].auglag.max_total_iters = 0
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+
+def test_auglag_constraint_tol_strict_validation():
+    """constraint_tol_strict: 0 disables; must be <= constraint_tol; >= 0."""
+    settings = valid_settings()
+    settings.passes[0].auglag.constraint_tol_strict = 0.0
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+    settings = valid_settings()
+    settings.passes[0].auglag.constraint_tol_strict = (
+        0.1 * settings.passes[0].auglag.constraint_tol
+    )
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+    for bad in (-1e-4, math.nan):
+        settings = valid_settings()
+        settings.passes[0].auglag.constraint_tol_strict = bad
+        ok, error_msg = saltro_py.validatePlannerSettings(settings)
+        assert not ok
+        assert error_msg == "auglag.constraint_tol_strict invalid"
+
+    settings = valid_settings()
+    settings.passes[0].auglag.constraint_tol_strict = (
+        2.0 * settings.passes[0].auglag.constraint_tol
+    )
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert not ok
+    assert error_msg == "auglag.constraint_tol_strict invalid"
+
+
+def test_auglag_lambda_stall_tol_validation():
+    """lambda_stall_tol must be a positive finite value."""
+    for bad in (0.0, -1e-3, math.nan):
+        settings = valid_settings()
+        settings.passes[0].auglag.lambda_stall_tol = bad
+        ok, error_msg = saltro_py.validatePlannerSettings(settings)
+        assert not ok
+        assert error_msg == "auglag.lambda_stall_tol invalid"
+
+    settings = valid_settings()
+    settings.passes[0].auglag.lambda_stall_tol = 1e-2
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+
+def test_auglag_penalty_max_patience_validation():
+    """penalty_max_patience: negative invalid, zero valid."""
+    settings = valid_settings()
+    settings.passes[0].auglag.penalty_max_patience = -1
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert not ok
+    assert error_msg == "auglag.penalty_max_patience invalid"
+
+    settings = valid_settings()
+    settings.passes[0].auglag.penalty_max_patience = 0
+    ok, _ = saltro_py.validatePlannerSettings(settings)
+    assert ok
+
+
+def test_auglag_dual_update_mode_enum_roundtrip():
+    """The DualUpdateMode enum binds, defaults to on_converged, and accepts
+    all members."""
+    settings = valid_settings()
+    assert settings.passes[0].auglag.dual_update_mode == saltro_py.DualUpdateMode.on_converged
+    for mode in (
+        saltro_py.DualUpdateMode.on_converged,
+        saltro_py.DualUpdateMode.on_progress,
+    ):
+        settings.passes[0].auglag.dual_update_mode = mode
+        ok, _ = saltro_py.validatePlannerSettings(settings)
+        assert ok
+        assert settings.passes[0].auglag.dual_update_mode == mode
 
 
 # ============================================================================
@@ -888,13 +989,76 @@ def test_invalid_ilqr_grad_tol_negative():
     assert error_msg == "ilqr.grad_tol invalid"
 
 
-def test_valid_ilqr_grad_tol_zero():
-    """Zero ilqr.grad_tol should pass (disables gradient convergence check)"""
+def test_valid_ilqr_grad_tol_zero_disables_gradient_test():
+    """Zero ilqr.grad_tol disables the gradient test and is valid."""
     settings = valid_settings()
     settings.passes[0].ilqr.grad_tol = 0.0
     ok, error_msg = saltro_py.validatePlannerSettings(settings)
 
-    assert ok, f"grad_tol=0 should be valid (disables check), got: {error_msg}"
+    assert ok
+    assert error_msg == ""
+
+
+def test_ilqr_grad_tol_intermediate_validation():
+    """grad_tol_intermediate: negative invalid; 0 (auto) and positive valid."""
+    settings = valid_settings()
+    settings.passes[0].ilqr.grad_tol_intermediate = -0.1
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert not ok
+    assert error_msg == "ilqr.grad_tol_intermediate invalid"
+
+    for good in (0.0, 1e-2):
+        settings = valid_settings()
+        settings.passes[0].ilqr.grad_tol_intermediate = good
+        ok, _ = saltro_py.validatePlannerSettings(settings)
+        assert ok
+
+
+def test_ilqr_cost_tol_intermediate_validation():
+    """cost_tol_intermediate: negative/NaN invalid; 0 (auto) and positive valid."""
+    for bad in (-0.1, math.nan):
+        settings = valid_settings()
+        settings.passes[0].ilqr.cost_tol_intermediate = bad
+        ok, error_msg = saltro_py.validatePlannerSettings(settings)
+        assert not ok
+        assert error_msg == "ilqr.cost_tol_intermediate invalid"
+
+    for good in (0.0, 1.0):
+        settings = valid_settings()
+        settings.passes[0].ilqr.cost_tol_intermediate = good
+        ok, _ = saltro_py.validatePlannerSettings(settings)
+        assert ok
+
+
+def test_ilqr_rel_cost_tol_validation():
+    """rel_cost_tol: negative invalid; defaults OFF (0.0) valid; positive valid."""
+    settings = valid_settings()
+    settings.passes[0].ilqr.rel_cost_tol = -1e-4
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+    assert not ok
+    assert error_msg == "ilqr.rel_cost_tol invalid"
+
+    settings = valid_settings()
+    assert settings.passes[0].ilqr.rel_cost_tol == 0.0  # defaults OFF
+    for good in (0.0, 1e-4):
+        settings.passes[0].ilqr.rel_cost_tol = good
+        ok, _ = saltro_py.validatePlannerSettings(settings)
+        assert ok
+
+
+def test_ilqr_grad_metric_enum_roundtrip():
+    """The GradMetric enum binds, defaults to authority, and accepts all members."""
+    settings = valid_settings()
+    assert settings.passes[0].ilqr.grad_metric == saltro_py.GradMetric.authority
+    for metric in (
+        saltro_py.GradMetric.authority,
+        saltro_py.GradMetric.gnorm_tassa,
+        saltro_py.GradMetric.linf,
+    ):
+        settings.passes[0].ilqr.grad_metric = metric
+        ok, _ = saltro_py.validatePlannerSettings(settings)
+        assert ok
+        assert settings.passes[0].ilqr.grad_metric == metric
 
 
 def test_invalid_ilqr_cost_tol_negative():

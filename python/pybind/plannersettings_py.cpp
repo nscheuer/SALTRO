@@ -38,6 +38,23 @@ void bind_plannersettings(py::module_& m) {
         .def_readwrite("rw_stic_torque_theta", &ConstraintConfig::rw_stic_torque_theta)
         .def_readwrite("rw_stic_band_mult", &ConstraintConfig::rw_stic_band_mult);
 
+    py::enum_<ConstraintFamily>(m, "ConstraintFamily", R"doc(
+Constraint families for per-family AL bookkeeping.
+
+Each row of Satellite.constraints() belongs to one family (see
+Satellite.constraintFamily). The AL outer loop tracks the maximum violation
+per family for diagnostics and gating. The C++ sentinel
+ConstraintFamily::NumFamilies (= 7) is intentionally not exposed as an
+enum value.
+)doc")
+        .value("angular_velocity", ConstraintFamily::AngularVelocity)
+        .value("sun_avoidance", ConstraintFamily::SunAvoidance)
+        .value("mtq_saturation", ConstraintFamily::MTQSaturation)
+        .value("rw_torque_sat", ConstraintFamily::RWTorqueSat)
+        .value("rw_momentum", ConstraintFamily::RWMomentum)
+        .value("rw_stiction", ConstraintFamily::RWStiction)
+        .value("magic_torque_sat", ConstraintFamily::MagicTorqueSat);
+
     py::class_<CostConfig>(m, "CostConfig")
         .def(py::init<>())
         .def_readwrite("angle", &CostConfig::angle)
@@ -68,22 +85,41 @@ void bind_plannersettings(py::module_& m) {
              py::arg("k") = 100.0,
              "Scale all terminal weights by k, preserving stage ratios.");
 
+    py::enum_<DualUpdateMode>(m, "DualUpdateMode")
+        .value("on_converged", DualUpdateMode::OnConverged)
+        .value("on_progress", DualUpdateMode::OnProgress);
+
     py::class_<AugLagConfig>(m, "AugLagConfig")
         .def(py::init<>())
         .def_readwrite("max_outer_iters", &AugLagConfig::max_outer_iters)
+        .def_readwrite("min_outer_iters", &AugLagConfig::min_outer_iters)
+        .def_readwrite("max_total_iters", &AugLagConfig::max_total_iters)
         .def_readwrite("lag_mult_init", &AugLagConfig::lag_mult_init)
         .def_readwrite("lag_mult_max", &AugLagConfig::lag_mult_max)
         .def_readwrite("penalty_init", &AugLagConfig::penalty_init)
         .def_readwrite("penalty_max", &AugLagConfig::penalty_max)
         .def_readwrite("penalty_scale", &AugLagConfig::penalty_scale)
+        .def_readwrite("dual_update_mode", &AugLagConfig::dual_update_mode)
+        .def_readwrite("lambda_stall_tol", &AugLagConfig::lambda_stall_tol)
+        .def_readwrite("penalty_max_patience", &AugLagConfig::penalty_max_patience)
         .def_readwrite("constraint_tol", &AugLagConfig::constraint_tol)
+        .def_readwrite("constraint_tol_strict", &AugLagConfig::constraint_tol_strict)
         .def_readwrite("total_cost_tol", &AugLagConfig::total_cost_tol);
+
+    py::enum_<GradMetric>(m, "GradMetric")
+        .value("authority", GradMetric::Authority)
+        .value("gnorm_tassa", GradMetric::GNormTassa)
+        .value("linf", GradMetric::LInf);
 
     py::class_<ILQRConfig>(m, "ILQRConfig")
         .def(py::init<>())
         .def_readwrite("max_iters", &ILQRConfig::max_iters)
         .def_readwrite("grad_tol", &ILQRConfig::grad_tol)
+        .def_readwrite("grad_tol_intermediate", &ILQRConfig::grad_tol_intermediate)
+        .def_readwrite("grad_metric", &ILQRConfig::grad_metric)
         .def_readwrite("cost_tol", &ILQRConfig::cost_tol)
+        .def_readwrite("cost_tol_intermediate", &ILQRConfig::cost_tol_intermediate)
+        .def_readwrite("rel_cost_tol", &ILQRConfig::rel_cost_tol)
         .def_readwrite("z_count_lim", &ILQRConfig::z_count_lim)
         .def_readwrite("max_cost", &ILQRConfig::max_cost)
         .def_readwrite("state_bound", &ILQRConfig::state_bound)

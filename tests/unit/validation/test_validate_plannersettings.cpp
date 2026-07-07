@@ -780,22 +780,118 @@ TEST_CASE("Invalid auglag.constraint_tol - zero", "[plannersettings][validation]
     REQUIRE(error_msg == "auglag.constraint_tol invalid");
 }
 
-TEST_CASE("Invalid auglag.total_cost_tol - negative", "[plannersettings][validation][auglag]") {
+TEST_CASE("auglag.total_cost_tol is reserved - non-default values rejected", "[plannersettings][validation][auglag]") {
+    // total_cost_tol is never read by the optimizer; validation rejects any
+    // non-default value so the knob cannot silently no-op (G20: wire or reject).
     PlannerSettings settings = validSettings();
-    settings.passes[0].auglag.total_cost_tol = -0.1;
     std::string error_msg;
-    
+
+    settings.passes[0].auglag.total_cost_tol = -0.1;
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "auglag.total_cost_tol invalid");
+    REQUIRE(error_msg == "auglag.total_cost_tol is reserved (not implemented); leave at default");
+
+    settings.passes[0].auglag.total_cost_tol = 0.0;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.total_cost_tol is reserved (not implemented); leave at default");
+
+    settings.passes[0].auglag.total_cost_tol = 1e-3;  // would even be a "sane" value
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.total_cost_tol is reserved (not implemented); leave at default");
+
+    settings.passes[0].auglag.total_cost_tol = AugLagConfig{}.total_cost_tol;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
 }
 
-TEST_CASE("Invalid auglag.total_cost_tol - zero", "[plannersettings][validation][auglag]") {
+TEST_CASE("Invalid auglag.min_outer_iters - negative", "[plannersettings][validation][auglag]") {
     PlannerSettings settings = validSettings();
-    settings.passes[0].auglag.total_cost_tol = 0.0;
+    settings.passes[0].auglag.min_outer_iters = -1;
     std::string error_msg;
-    
+
     REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
-    REQUIRE(error_msg == "auglag.total_cost_tol invalid");
+    REQUIRE(error_msg == "auglag.min_outer_iters invalid");
+}
+
+TEST_CASE("Valid auglag.min_outer_iters - zero disables maturation gate", "[plannersettings][validation][auglag]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.min_outer_iters = 0;
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("Invalid auglag.max_total_iters - negative", "[plannersettings][validation][auglag]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.max_total_iters = -1;
+    std::string error_msg;
+
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.max_total_iters invalid");
+}
+
+TEST_CASE("Valid auglag.max_total_iters - zero disables global budget", "[plannersettings][validation][auglag]") {
+    PlannerSettings settings = validSettings();
+    settings.passes[0].auglag.max_total_iters = 0;
+    std::string error_msg;
+
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("auglag.constraint_tol_strict validation", "[plannersettings][validation][auglag]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    // 0 disables the fast path (default) — valid.
+    settings.passes[0].auglag.constraint_tol_strict = 0.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+
+    // Enabled and tighter than constraint_tol — valid.
+    settings.passes[0].auglag.constraint_tol_strict =
+        0.1 * settings.passes[0].auglag.constraint_tol;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+
+    // Negative — invalid.
+    settings.passes[0].auglag.constraint_tol_strict = -1e-4;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.constraint_tol_strict invalid");
+
+    // Looser than constraint_tol — invalid (would weaken the feasibility gate).
+    settings.passes[0].auglag.constraint_tol_strict =
+        2.0 * settings.passes[0].auglag.constraint_tol;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.constraint_tol_strict invalid");
+
+    // NaN — invalid.
+    settings.passes[0].auglag.constraint_tol_strict = std::numeric_limits<double>::quiet_NaN();
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.constraint_tol_strict invalid");
+}
+
+TEST_CASE("auglag.lambda_stall_tol validation", "[plannersettings][validation][auglag]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    settings.passes[0].auglag.lambda_stall_tol = 0.0;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.lambda_stall_tol invalid");
+
+    settings.passes[0].auglag.lambda_stall_tol = -1e-3;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.lambda_stall_tol invalid");
+
+    settings.passes[0].auglag.lambda_stall_tol = 1e-2;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("auglag.penalty_max_patience validation", "[plannersettings][validation][auglag]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    settings.passes[0].auglag.penalty_max_patience = -1;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "auglag.penalty_max_patience invalid");
+
+    settings.passes[0].auglag.penalty_max_patience = 0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
 }
 
 // ============================================================================
@@ -820,11 +916,63 @@ TEST_CASE("Invalid ilqr.grad_tol - negative", "[plannersettings][validation][ilq
     REQUIRE(error_msg == "ilqr.grad_tol invalid");
 }
 
-TEST_CASE("Valid ilqr.grad_tol - zero disables gradient check", "[plannersettings][validation][ilqr]") {
+TEST_CASE("Valid ilqr.grad_tol - zero disables the gradient test", "[plannersettings][validation][ilqr]") {
     PlannerSettings settings = validSettings();
     settings.passes[0].ilqr.grad_tol = 0.0;
     std::string error_msg;
 
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("ilqr.grad_tol_intermediate validation", "[plannersettings][validation][ilqr]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    settings.passes[0].ilqr.grad_tol_intermediate = -0.1;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "ilqr.grad_tol_intermediate invalid");
+
+    // 0 = auto-derive (10x grad_tol) — valid default.
+    settings.passes[0].ilqr.grad_tol_intermediate = 0.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+
+    settings.passes[0].ilqr.grad_tol_intermediate = 1e-2;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("ilqr.cost_tol_intermediate validation", "[plannersettings][validation][ilqr]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    settings.passes[0].ilqr.cost_tol_intermediate = -0.1;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "ilqr.cost_tol_intermediate invalid");
+
+    settings.passes[0].ilqr.cost_tol_intermediate = std::numeric_limits<double>::quiet_NaN();
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "ilqr.cost_tol_intermediate invalid");
+
+    // 0 = auto-derive (10x cost_tol) — valid default.
+    settings.passes[0].ilqr.cost_tol_intermediate = 0.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+
+    settings.passes[0].ilqr.cost_tol_intermediate = 1.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+}
+
+TEST_CASE("ilqr.rel_cost_tol validation", "[plannersettings][validation][ilqr]") {
+    PlannerSettings settings = validSettings();
+    std::string error_msg;
+
+    settings.passes[0].ilqr.rel_cost_tol = -1e-4;
+    REQUIRE_FALSE(saltro::validation::validatePlannerSettings(settings, error_msg));
+    REQUIRE(error_msg == "ilqr.rel_cost_tol invalid");
+
+    // Defaults OFF (0.0) — valid.
+    settings.passes[0].ilqr.rel_cost_tol = 0.0;
+    REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
+
+    settings.passes[0].ilqr.rel_cost_tol = 1e-4;
     REQUIRE(saltro::validation::validatePlannerSettings(settings, error_msg));
 }
 
