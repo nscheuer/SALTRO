@@ -1,0 +1,392 @@
+[ 33%] Built target Catch2
+[ 34%] Built target Catch2WithMain
+[ 34%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/alilqr.cpp.o
+[ 34%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/backwardpass.cpp.o
+[ 35%] Building CXX object CMakeFiles/saltro.dir/src/math/mrp.cpp.o
+[ 36%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/forwardpass.cpp.o
+[ 36%] Building CXX object CMakeFiles/saltro.dir/src/math/quaternion.cpp.o
+[ 36%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/iLQR.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/alilqr.cpp:101:39: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  101 |     const auto& aug = settings.passes[pass_idx].auglag;
+      |                       ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/alilqr.cpp:106:36: warning: lambda capture 'NUM_FAMILIES' is not required to be captured for this use [-Wunused-lambda-capture]
+  106 |     auto per_family_or_default = [&NUM_FAMILIES](
+      |                                   ~^~~~~~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:59:52: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   59 |                 const int lam_size = static_cast<int>(lambda_aug[k].size());
+      |                                                       ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:60:47: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   60 |                 const int mu_size = static_cast<int>(mu_aug[k].size());
+      |                                                      ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:64:33: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   64 |                         const double li = lambda_aug[k](i);
+      |                                           ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:70:27: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   70 |                                 total += 0.5 * mu_aug[k](i) * ci * ci;
+      |                                                ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:101:47: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  101 |         const CostConfig& cost_cfg = settings.passes[pass_idx].cost;
+      |                                      ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:102:47: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  102 |         const ILQRConfig& ilqr_cfg = settings.passes[pass_idx].ilqr;
+      |                                      ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:103:56: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  103 |         const RegularizationConfig& reg_cfg = settings.passes[pass_idx].reg;
+      |                                               ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:108:44: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  108 |         pass_settings.passes[0] = settings.passes[pass_idx];
+      |                                   ~~~~~~~~        ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:114:35: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  114 |         std::vector<Eigen::MatrixXd> K(N - 1);
+      |                                      ~ ~~^~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:115:35: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  115 |         std::vector<Eigen::VectorXd> d(N - 1);
+      |                                      ~ ~~^~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:117:5: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  117 |                 K[k] = Eigen::MatrixXd::Zero(nu, nxr);
+      |                 ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:118:5: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  118 |                 d[k] = Eigen::VectorXd::Zero(nu);
+      |                 ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/iLQR.cpp:209:29: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  209 |                                         const double dnorm = d[kk].norm();
+      |                                                              ~ ^~
+[ 36%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/trajOpt.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:46:4: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   46 |         K[k] = K_k;
+      |         ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:50:4: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   50 |         d[k] = d_k;
+      |         ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:165:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  165 |                 u_bar_k += K[k] * state_error_reduced;
+      |                            ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:168:38: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  168 |                 u_bar_k += alpha * d[k];
+      |                                    ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:251:66: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  251 |                 if (lambda_aug[k].size() != c_k.size() || mu_aug[k].size() != c_k.size()) {
+      |                                                           ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:251:32: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  251 |                 if (lambda_aug[k].size() != c_k.size() || mu_aug[k].size() != c_k.size()) {
+      |                     ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:258:50: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  258 |                     const double li = lambda_aug[k](i);
+      |                                       ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/forwardpass.cpp:259:46: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  259 |                     const double mi = mu_aug[k](i);
+      |                                       ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:142:53: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  142 |                 if (lambda_aug[kT].size() == c_T.size() && mu_aug[kT].size() == c_T.size()) {
+      |                                                            ~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:142:18: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  142 |                 if (lambda_aug[kT].size() == c_T.size() && mu_aug[kT].size() == c_T.size()) {
+      |                     ~~~~~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:149:34: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  149 |                                 const double li = lambda_aug[kT](i);
+      |                                                   ~~~~~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:153:21: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  153 |                                         w(i) += mu_aug[kT](i) * ci;
+      |                                                 ~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:159:37: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  159 |                                 if (c_T(i) <= 0.0 && lambda_aug[kT](i) <= 0.0) {
+      |                                                      ~~~~~~~~~~ ^~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:162:32: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  162 |                                 const double mu_i = mu_aug[kT](i);
+      |                                                     ~~~~~~ ^~
+13 warnings generated.
+[ 36%] Building CXX object CMakeFiles/saltro.dir/src/optimizer/warm_start.cpp.o
+[ 36%] Building CXX object CMakeFiles/saltro.dir/src/orbit_generation/orbits/compute_orbit_J2_RK4.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:231:53: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  231 |                         if (lambda_aug[k].size() == c_k.size() && mu_aug[k].size() == c_k.size()) {
+      |                                                                   ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:231:19: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  231 |                         if (lambda_aug[k].size() == c_k.size() && mu_aug[k].size() == c_k.size()) {
+      |                             ~~~~~~~~~~ ^
+2 warnings generated.
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:240:35: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  240 |                                         const double li = lambda_aug[k](i);
+      |                                                           ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:244:22: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  244 |                                                 w(i) += mu_aug[k](i) * ci;
+      |                                                         ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:252:38: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  252 |                                         if (c_k(i) <= 0.0 && lambda_aug[k](i) <= 0.0) {
+      |                                                              ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:255:33: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  255 |                                         const double mu_i = mu_aug[k](i);
+      |                                                             ~~~~~~ ^
+[ 36%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/controller.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:281:36: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  281 |                                                 const double li = lambda_aug[k](i);
+      |                                                                   ~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:466:31: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  466 |                 if (!K[k].allFinite() || !d[k].allFinite() || !P_k.allFinite()) {
+      |                                           ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/backwardpass.cpp:466:10: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  466 |                 if (!K[k].allFinite() || !d[k].allFinite() || !P_k.allFinite()) {
+      |                      ~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/trajOpt.cpp:64:41: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   64 |                 const auto& reg_cfg = settings.passes[std::max(0, settings.num_passes - 1)].reg;
+      |                                       ~~~~~~~~        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 36%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/excitationcontroller.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/optimizer/trajOpt.cpp:301:55: warning: implicit conversion changes signedness: 'const int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  301 |                 tracking_settings.passes[0] = settings_local.passes[std::max(0, settings_local.num_passes - 1)];
+      |                                               ~~~~~~~~~~~~~~        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+6 warnings generated.
+[ 37%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/integratedbdotcontroller.cpp.o
+[ 37%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/pdcontroller.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:49:25: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   49 |         u(i) = -mtq_kp_[i] * bdot_i;
+      |                 ~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:59:25: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   59 |         u(ui) = -rw_kp_[i] * w_i;
+      |                  ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:68:31: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   68 |     mtq_kp_.assign(satellite_.numMTQ(), 0.0);
+      |             ~~~~~~ ~~~~~~~~~~~^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:69:31: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   69 |     mtq_kd_.assign(satellite_.numMTQ(), 0.0);
+      |             ~~~~~~ ~~~~~~~~~~~^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:70:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   70 |     rw_kp_.assign(satellite_.numRW(), 0.0);
+      |            ~~~~~~ ~~~~~~~~~~~^~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:71:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   71 |     rw_kd_.assign(satellite_.numRW(), 0.0);
+      |            ~~~~~~ ~~~~~~~~~~~^~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:79:17: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   79 |         mtq_kp_[i] = mtq_gain_const * J_axis;
+      |         ~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:88:16: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   88 |         rw_kp_[i] = rw_gain_const * J_axis;
+      |         ~~~~~~ ^
+[ 37%] Building CXX object CMakeFiles/saltro.dir/src/pybind/controller/zerocontroller.cpp.o
+In file included from /private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/controller/integratedbdotcontroller.cpp:1:
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/include/saltro/pybind/controller/integratedbdotcontroller.h:83:12: warning: private field 'max_rate_ref_' is not used [-Wunused-private-field]
+   83 |     double max_rate_ref_ = 5.0 * 3.14159265358979323846 / 180.0;
+      |            ^
+9 warnings generated.
+[ 38%] Building CXX object CMakeFiles/saltro.dir/src/pybind/disturbances/disturbance.cpp.o
+[ 38%] Building CXX object CMakeFiles/saltro.dir/src/pybind/disturbances/dragdisturbance.cpp.o
+2 warnings generated.
+[ 39%] Building CXX object CMakeFiles/saltro.dir/src/pybind/disturbances/ggdisturbance.cpp.o
+[ 39%] Building CXX object CMakeFiles/saltro.dir/src/pybind/disturbances/srpdisturbance.cpp.o
+[ 39%] Building CXX object CMakeFiles/saltro.dir/src/pybind/satellite.cpp.o
+[ 40%] Building CXX object CMakeFiles/saltro.dir/src/validation/validate_plannersettings.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:87:20: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   87 |     mtq_actuators_[num_mtq_] = std::make_unique<MTQ>(axis, max_dipole);
+      |     ~~~~~~~~~~~~~~ ^~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:97:19: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   97 |     rw_actuators_[num_rw_] = std::make_unique<RW>(axis, max_torque, J, h0, h_max);
+      |     ~~~~~~~~~~~~~ ^~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:107:22: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  107 |     magic_actuators_[num_magic_] = std::make_unique<Magic>(axis, max_torque);
+      |     ~~~~~~~~~~~~~~~~ ^~~~~~~~~~
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:116:28: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  116 |     return *mtq_actuators_[i];
+      |             ~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:123:28: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  123 |     return *mtq_actuators_[i];
+      |             ~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:130:27: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  130 |     return *rw_actuators_[i];
+      |             ~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:137:27: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  137 |     return *rw_actuators_[i];
+      |             ~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:144:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  144 |     return *magic_actuators_[i];
+      |             ~~~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:151:30: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  151 |     return *magic_actuators_[i];
+      |             ~~~~~~~~~~~~~~~~ ^
+[ 40%] Building CXX object CMakeFiles/saltro.dir/src/validation/validate_satellite.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/validation/validate_plannersettings.cpp:71:48: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+   71 |             const auto& pass = settings.passes[p];
+      |                                ~~~~~~~~        ^
+1 warning generated.
+[ 41%] Building CXX object CMakeFiles/saltro.dir/src/validation/validate_trajOpt.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:920:70: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+  920 |                                 tau_hess_l += skew_m(l, m) * d2B_dq2[m](j, k);
+      |                                                              ~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:1628:63: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+ 1628 |     for (int b = 0; b < 3; ++b) d2c_amb += bs_unit(b) * H_RTv[b];
+      |                                                         ~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:2490:63: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+ 2490 |                         dderr_dir_dqdq[b] -= S(b, c) * H_rhat[c];
+      |                                                        ~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:2490:40: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+ 2490 |                         dderr_dir_dqdq[b] -= S(b, c) * H_rhat[c];
+      |                         ~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:2518:57: warning: implicit conversion changes signedness: 'int' to 'size_type' (aka 'unsigned long') [-Wsign-conversion]
+ 2518 |                 Hqq_om += alpha * w(b) * dderr_dir_dqdq[b];
+      |                                          ~~~~~~~~~~~~~~ ^
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/src/pybind/satellite.cpp:26:15: warning: unused function 'clampUnit' [-Wunused-function]
+   26 | inline double clampUnit(double x) {
+      |               ^~~~~~~~~
+15 warnings generated.
+17 warnings generated.
+[ 41%] Linking CXX static library libsaltro.a
+[ 51%] Built target saltro
+[ 52%] Linking CXX executable debug_tests/orbit_generation/debug_generate_orbit
+[ 53%] Building CXX object CMakeFiles/debug_integratedbdotcontroller_mc.dir/tests/debug/pybind/controllers/debug_integratedbdotcontroller_mc.cpp.o
+[ 53%] Building CXX object CMakeFiles/debug_satellite.dir/tests/debug/pybind/debug_satellite.cpp.o
+[ 53%] Building CXX object CMakeFiles/math_test_angles.dir/tests/unit/math/test_angles.cpp.o
+[ 53%] Building CXX object CMakeFiles/math_test_frames.dir/tests/unit/math/test_frames.cpp.o
+[ 53%] Built target debug_generate_orbit
+[ 53%] Building CXX object CMakeFiles/math_test_matrix.dir/tests/unit/math/test_matrix.cpp.o
+[ 54%] Building CXX object CMakeFiles/saltro_py.dir/python/math/angles_py.cpp.o
+[ 54%] Linking CXX executable unit_tests/math/math_test_angles
+[ 54%] Built target math_test_angles
+[ 54%] Building CXX object CMakeFiles/math_test_mrp.dir/tests/unit/math/test_mrp.cpp.o
+[ 54%] Linking CXX executable unit_tests/math/math_test_frames
+[ 54%] Built target math_test_frames
+[ 55%] Building CXX object CMakeFiles/math_test_quaternion.dir/tests/unit/math/test_quaternion.cpp.o
+[ 55%] Linking CXX executable debug_tests/pybind/controllers/debug_integratedbdotcontroller_mc
+[ 55%] Built target debug_integratedbdotcontroller_mc
+[ 55%] Building CXX object CMakeFiles/optimizer_test_alilqr.dir/tests/unit/optimizer/test_alilqr.cpp.o
+[ 55%] Linking CXX executable unit_tests/math/math_test_mrp
+[ 56%] Linking CXX executable debug_tests/pybind/debug_satellite
+[ 56%] Built target math_test_mrp
+[ 56%] Built target debug_satellite
+[ 56%] Building CXX object CMakeFiles/optimizer_test_backwardpass.dir/tests/unit/optimizer/test_backwardpass.cpp.o
+[ 57%] Building CXX object CMakeFiles/optimizer_test_backwardpass_al.dir/tests/unit/optimizer/test_backwardpass_al.cpp.o
+[ 57%] Building CXX object CMakeFiles/saltro_py.dir/python/math/frames_py.cpp.o
+[ 57%] Linking CXX executable unit_tests/math/math_test_quaternion
+[ 57%] Built target math_test_quaternion
+[ 57%] Building CXX object CMakeFiles/optimizer_test_forwardpass.dir/tests/unit/optimizer/test_forwardpass.cpp.o
+[ 58%] Linking CXX executable unit_tests/optimizer/optimizer_test_alilqr
+[ 58%] Built target optimizer_test_alilqr
+[ 59%] Building CXX object CMakeFiles/optimizer_test_forwardpass_al.dir/tests/unit/optimizer/test_forwardpass_al.cpp.o
+[ 60%] Linking CXX executable unit_tests/math/math_test_matrix
+[ 60%] Built target math_test_matrix
+[ 60%] Building CXX object CMakeFiles/saltro_py.dir/python/math/integrators/rk4_py.cpp.o
+[ 60%] Linking CXX executable unit_tests/optimizer/optimizer_test_backwardpass_al
+[ 60%] Built target optimizer_test_backwardpass_al
+[ 60%] Building CXX object CMakeFiles/optimizer_test_tvlqr_gains.dir/tests/unit/optimizer/test_tvlqr_gains.cpp.o
+[ 60%] Building CXX object CMakeFiles/optimizer_test_warm_start.dir/tests/unit/optimizer/test_warm_start.cpp.o
+[ 60%] Linking CXX executable unit_tests/optimizer/optimizer_test_forwardpass_al
+[ 60%] Built target optimizer_test_forwardpass_al
+[ 60%] Building CXX object CMakeFiles/saltro_py.dir/python/math/mrp_py.cpp.o
+[ 60%] Linking CXX executable unit_tests/optimizer/optimizer_test_forwardpass
+[ 60%] Built target optimizer_test_forwardpass
+[ 60%] Building CXX object CMakeFiles/saltro_py.dir/python/math/quaternion_py.cpp.o
+[ 61%] Linking CXX executable unit_tests/optimizer/optimizer_test_tvlqr_gains
+[ 61%] Built target optimizer_test_tvlqr_gains
+[ 61%] Linking CXX executable unit_tests/orbit_generation/density/orbit_generation_density_test_compute_density_harrispriester
+[ 62%] Built target orbit_generation_density_test_compute_density_harrispriester
+[ 63%] Linking CXX executable unit_tests/orbit_generation/eclipse/orbit_generation_eclipse_test_compute_eclipse_cylinder
+[ 63%] Built target orbit_generation_eclipse_test_compute_eclipse_cylinder
+[ 63%] Linking CXX executable unit_tests/orbit_generation/eclipse/orbit_generation_eclipse_test_compute_eclipse_penumbra
+[ 63%] Built target orbit_generation_eclipse_test_compute_eclipse_penumbra
+[ 63%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_dipole
+[ 64%] Built target orbit_generation_magnetics_test_compute_magnetic_dipole
+[ 65%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_igrf13
+[ 65%] Built target orbit_generation_magnetics_test_compute_magnetic_igrf13
+[ 65%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_igrf8
+[ 65%] Built target orbit_generation_magnetics_test_compute_magnetic_igrf8
+[ 66%] Linking CXX executable unit_tests/orbit_generation/orbits/orbit_generation_orbits_test_compute_orbit_J2_RK4
+[ 66%] Built target orbit_generation_orbits_test_compute_orbit_J2_RK4
+[ 66%] Linking CXX executable unit_tests/optimizer/optimizer_test_warm_start
+[ 66%] Linking CXX executable unit_tests/orbit_generation/orbits/orbit_generation_orbits_test_compute_orbit_keplerian
+[ 66%] Built target optimizer_test_warm_start
+[ 66%] Built target orbit_generation_orbits_test_compute_orbit_keplerian
+[ 67%] Building CXX object CMakeFiles/saltro_py.dir/python/optimizer/backwardpass_py.cpp.o
+[ 67%] Linking CXX executable unit_tests/orbit_generation/sun/orbit_generation_sun_test_compute_sun_noaa
+[ 68%] Built target orbit_generation_sun_test_compute_sun_noaa
+[ 69%] Linking CXX executable unit_tests/orbit_generation/sun/orbit_generation_sun_test_compute_sun_nrelspa
+[ 69%] Built target orbit_generation_sun_test_compute_sun_nrelspa
+[ 69%] Linking CXX executable unit_tests/orbit_generation/orbit_generation_test_generate_orbit
+[ 69%] Built target orbit_generation_test_generate_orbit
+[ 70%] Building CXX object CMakeFiles/orbit_generation_test_orbit_dispatchers.dir/tests/unit/orbit_generation/test_orbit_dispatchers.cpp.o
+[ 70%] Building CXX object CMakeFiles/saltro_py.dir/python/optimizer/forwardpass_py.cpp.o
+/private/tmp/claude-501/-Users-patrickmckeen-ADCS-wt/ab62a3ac-f2ac-49e1-8ac1-15a29eed648b/scratchpad/fixph/python/optimizer/backwardpass_py.cpp:61:36: warning: braces around scalar initializer [-Wbraced-scalar-init]
+   61 |     py::array_t<double> deltaV_arr({2});
+      |                                    ^~~
+[ 70%] Linking CXX executable unit_tests/orbit_generation/orbit_generation_test_orbit_dispatchers
+[ 70%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/actuators/actuator_py.cpp.o
+[ 70%] Built target orbit_generation_test_orbit_dispatchers
+[ 71%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_MTQ
+[ 71%] Built target pybind_actuators_test_MTQ
+[ 71%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_Magic
+[ 71%] Built target pybind_actuators_test_Magic
+[ 72%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_RW
+[ 72%] Built target pybind_actuators_test_RW
+[ 73%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/disturbances/disturbance_py.cpp.o
+[ 73%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_actuator
+[ 73%] Built target pybind_actuators_test_actuator
+[ 74%] Building CXX object CMakeFiles/pybind_controllers_test_integratedbdotcontroller.dir/tests/unit/pybind/controllers/test_integratedbdotcontroller.cpp.o
+1 warning generated.
+[ 74%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/plannersettings_py.cpp.o
+[ 74%] Building CXX object CMakeFiles/pybind_controllers_test_pdcontroller.dir/tests/unit/pybind/controllers/test_pdcontroller.cpp.o
+[ 74%] Linking CXX executable unit_tests/pybind/controllers/pybind_controllers_test_integratedbdotcontroller
+[ 74%] Built target pybind_controllers_test_integratedbdotcontroller
+[ 74%] Building CXX object CMakeFiles/pybind_disturbances_test_dragdisturbance.dir/tests/unit/pybind/disturbances/test_dragdisturbance.cpp.o
+[ 74%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/actuators/MTQ_py.cpp.o
+[ 75%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/actuators/Magic_py.cpp.o
+[ 75%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_dragdisturbance
+[ 75%] Built target pybind_disturbances_test_dragdisturbance
+[ 75%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_geometryconfig
+[ 76%] Built target pybind_disturbances_test_geometryconfig
+[ 76%] Building CXX object CMakeFiles/pybind_disturbances_test_ggdisturbance.dir/tests/unit/pybind/disturbances/test_ggdisturbance.cpp.o
+[ 77%] Linking CXX executable unit_tests/pybind/controllers/pybind_controllers_test_pdcontroller
+[ 77%] Built target pybind_controllers_test_pdcontroller
+[ 77%] Building CXX object CMakeFiles/pybind_disturbances_test_srpdisturbance.dir/tests/unit/pybind/disturbances/test_srpdisturbance.cpp.o
+[ 77%] Linking CXX executable unit_tests/optimizer/optimizer_test_backwardpass
+[ 77%] Built target optimizer_test_backwardpass
+[ 78%] Building CXX object CMakeFiles/pybind_test_satellite.dir/tests/unit/pybind/test_satellite.cpp.o
+[ 79%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_ggdisturbance
+[ 79%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_srpdisturbance
+[ 79%] Built target pybind_disturbances_test_ggdisturbance
+[ 79%] Built target pybind_disturbances_test_srpdisturbance
+[ 79%] Building CXX object CMakeFiles/pybind_test_satellite_constraints.dir/tests/unit/pybind/test_satellite_constraints.cpp.o
+[ 80%] Building CXX object CMakeFiles/pybind_test_satellite_cost.dir/tests/unit/pybind/test_satellite_cost.cpp.o
+[ 80%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/actuators/RW_py.cpp.o
+[ 80%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/disturbances/dragdisturbance_py.cpp.o
+[ 81%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/disturbances/ggdisturbance_py.cpp.o
+[ 81%] Linking CXX executable unit_tests/pybind/pybind_test_satellite
+[ 81%] Built target pybind_test_satellite
+[ 81%] Building CXX object CMakeFiles/pybind_test_satellite_cost_omega_ff.dir/tests/unit/pybind/test_satellite_cost_omega_ff.cpp.o
+[ 81%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_constraints
+[ 81%] Built target pybind_test_satellite_constraints
+[ 81%] Building CXX object CMakeFiles/pybind_test_satellite_disturbances.dir/tests/unit/pybind/test_satellite_disturbances.cpp.o
+[ 81%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/disturbances/srpdisturbance_py.cpp.o
+[ 82%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_cost_omega_ff
+[ 82%] Built target pybind_test_satellite_cost_omega_ff
+[ 82%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/satellite_py.cpp.o
+[ 83%] Building CXX object CMakeFiles/pybind_test_satellite_dynamics.dir/tests/unit/pybind/test_satellite_dynamics.cpp.o
+[ 84%] Building CXX object CMakeFiles/saltro_py.dir/python/validation/validate_plannersettings_py.cpp.o
+[ 84%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_disturbances
+[ 84%] Built target pybind_test_satellite_disturbances
+[ 84%] Building CXX object CMakeFiles/saltro_py.dir/python/validation/validate_satellite_py.cpp.o
+[ 84%] Linking CXX executable unit_tests/validation/validation_test_validate_boresight
+[ 85%] Built target validation_test_validate_boresight
+[ 86%] Linking CXX executable unit_tests/validation/validation_test_validate_initialstate
+[ 86%] Built target validation_test_validate_initialstate
+[ 86%] Linking CXX executable unit_tests/validation/validation_test_validate_juliantime
+[ 86%] Built target validation_test_validate_juliantime
+[ 86%] Building CXX object CMakeFiles/saltro_py.dir/python/validation/validate_trajopt_py.cpp.o
+[ 86%] Linking CXX executable unit_tests/validation/validation_test_validate_orbitstate
+[ 87%] Built target validation_test_validate_orbitstate
+[ 87%] Building CXX object CMakeFiles/validation_test_validate_plannersettings.dir/tests/unit/validation/test_validate_plannersettings.cpp.o
+[ 88%] Building CXX object CMakeFiles/saltro_py.dir/python/optimizer/alilqr_py.cpp.o
+[ 88%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_dynamics
+[ 88%] Built target pybind_test_satellite_dynamics
+[ 88%] Building CXX object CMakeFiles/saltro_py.dir/python/optimizer/trajOpt_py.cpp.o
+[ 88%] Building CXX object CMakeFiles/saltro_py.dir/python/optimizer/warm_start_py.cpp.o
+[ 89%] Linking CXX executable unit_tests/validation/validation_test_validate_plannersettings
+[ 89%] Built target validation_test_validate_plannersettings
+[ 90%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/controllers/integratedbdotcontroller_py.cpp.o
+[ 90%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/controllers/pdcontroller_py.cpp.o
+[ 90%] Linking CXX executable unit_tests/validation/validation_test_validate_qgoal
+[ 90%] Built target validation_test_validate_qgoal
+[ 91%] Building CXX object CMakeFiles/validation_test_validate_satellite.dir/tests/unit/validation/test_validate_satellite.cpp.o
+[ 91%] Building CXX object CMakeFiles/validation_test_validate_trajopt.dir/tests/unit/validation/test_validate_trajopt.cpp.o
+[ 92%] Linking CXX executable unit_tests/validation/validation_test_validate_trajopt
+[ 92%] Built target validation_test_validate_trajopt
+[ 92%] Linking CXX executable unit_tests/validation/validation_test_validate_satellite
+[ 92%] Built target validation_test_validate_satellite
+[ 92%] Linking CXX shared module saltro_py.cpython-312-darwin.so
+[ 92%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_cost
+[ 92%] Built target pybind_test_satellite_cost
+[100%] Built target saltro_py

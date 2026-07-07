@@ -1,0 +1,133 @@
+[ 33%] Built target Catch2
+[ 33%] Built target Catch2WithMain
+[ 50%] Built target saltro
+[ 51%] Built target debug_generate_orbit
+[ 52%] Built target debug_satellite
+[ 52%] Built target math_test_frames
+[ 52%] Built target debug_integratedbdotcontroller_mc
+[ 53%] Built target math_test_angles
+[ 54%] Built target math_test_matrix
+[ 54%] Building CXX object CMakeFiles/optimizer_test_alilqr_sqrt.dir/tests/unit/optimizer/test_alilqr_sqrt.cpp.o
+[ 55%] Built target optimizer_test_alilqr
+[ 56%] Built target math_test_quaternion
+[ 56%] Built target math_test_mrp
+[ 56%] Built target optimizer_test_backwardpass
+[ 56%] Built target optimizer_test_backwardpass_sqrt
+[ 57%] Building CXX object CMakeFiles/optimizer_test_forwardpass.dir/tests/unit/optimizer/test_forwardpass.cpp.o
+[ 58%] Built target optimizer_test_backwardpass_al
+[ 58%] Building CXX object CMakeFiles/optimizer_test_forwardpass_al.dir/tests/unit/optimizer/test_forwardpass_al.cpp.o
+[ 58%] Building CXX object CMakeFiles/optimizer_test_tvlqr_gains.dir/tests/unit/optimizer/test_tvlqr_gains.cpp.o
+[ 59%] Building CXX object CMakeFiles/optimizer_test_warm_start.dir/tests/unit/optimizer/test_warm_start.cpp.o
+[ 59%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/plannersettings_py.cpp.o
+[ 60%] Linking CXX executable unit_tests/optimizer/optimizer_test_alilqr_sqrt
+[ 60%] Built target optimizer_test_alilqr_sqrt
+[ 61%] Linking CXX executable unit_tests/orbit_generation/density/orbit_generation_density_test_compute_density_harrispriester
+[ 61%] Built target orbit_generation_density_test_compute_density_harrispriester
+[ 61%] Linking CXX executable unit_tests/orbit_generation/eclipse/orbit_generation_eclipse_test_compute_eclipse_cylinder
+[ 61%] Built target orbit_generation_eclipse_test_compute_eclipse_cylinder
+[ 62%] Linking CXX executable unit_tests/orbit_generation/eclipse/orbit_generation_eclipse_test_compute_eclipse_penumbra
+[ 62%] Built target orbit_generation_eclipse_test_compute_eclipse_penumbra
+[ 62%] Linking CXX executable unit_tests/optimizer/optimizer_test_tvlqr_gains
+[ 62%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_dipole
+[ 63%] Linking CXX executable unit_tests/optimizer/optimizer_test_forwardpass_al
+[ 63%] Built target optimizer_test_tvlqr_gains
+[ 63%] Built target orbit_generation_magnetics_test_compute_magnetic_dipole
+[ 63%] Built target optimizer_test_forwardpass_al
+[ 63%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_igrf13
+[ 64%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_igrf8
+[ 64%] Linking CXX executable unit_tests/orbit_generation/orbits/orbit_generation_orbits_test_compute_orbit_J2_RK4
+[ 65%] Built target orbit_generation_magnetics_test_compute_magnetic_igrf13
+[ 65%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/disturbances/dragdisturbance_py.cpp.o
+[ 65%] Built target orbit_generation_magnetics_test_compute_magnetic_igrf8
+[ 65%] Built target orbit_generation_orbits_test_compute_orbit_J2_RK4
+[ 65%] Linking CXX executable unit_tests/orbit_generation/orbits/orbit_generation_orbits_test_compute_orbit_keplerian
+[ 66%] Linking CXX executable unit_tests/orbit_generation/sun/orbit_generation_sun_test_compute_sun_noaa
+[ 66%] Linking CXX executable unit_tests/optimizer/optimizer_test_warm_start
+[ 67%] Built target orbit_generation_orbits_test_compute_orbit_keplerian
+[ 67%] Built target orbit_generation_sun_test_compute_sun_noaa
+[ 67%] Built target optimizer_test_warm_start
+[ 67%] Linking CXX executable unit_tests/orbit_generation/sun/orbit_generation_sun_test_compute_sun_nrelspa
+[ 68%] Linking CXX executable unit_tests/orbit_generation/orbit_generation_test_generate_orbit
+[ 68%] Building CXX object CMakeFiles/orbit_generation_test_orbit_dispatchers.dir/tests/unit/orbit_generation/test_orbit_dispatchers.cpp.o
+[ 68%] Built target orbit_generation_sun_test_compute_sun_nrelspa
+[ 68%] Built target orbit_generation_test_generate_orbit
+[ 68%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_MTQ
+[ 69%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_Magic
+[ 70%] Built target pybind_actuators_test_MTQ
+[ 70%] Built target pybind_actuators_test_Magic
+[ 70%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_RW
+[ 70%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_actuator
+[ 70%] Built target pybind_actuators_test_RW
+[ 71%] Built target pybind_actuators_test_actuator
+[ 71%] Building CXX object CMakeFiles/pybind_controllers_test_integratedbdotcontroller.dir/tests/unit/pybind/controllers/test_integratedbdotcontroller.cpp.o
+[ 72%] Building CXX object CMakeFiles/pybind_controllers_test_pdcontroller.dir/tests/unit/pybind/controllers/test_pdcontroller.cpp.o
+[ 72%] Linking CXX executable unit_tests/optimizer/optimizer_test_forwardpass
+[ 72%] Built target optimizer_test_forwardpass
+[ 73%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/disturbances/ggdisturbance_py.cpp.o
+[ 73%] Linking CXX executable unit_tests/orbit_generation/orbit_generation_test_orbit_dispatchers
+[ 73%] Built target orbit_generation_test_orbit_dispatchers
+[ 73%] Building CXX object CMakeFiles/pybind_disturbances_test_dragdisturbance.dir/tests/unit/pybind/disturbances/test_dragdisturbance.cpp.o
+[ 73%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_geometryconfig
+[ 73%] Built target pybind_disturbances_test_geometryconfig
+[ 73%] Linking CXX executable unit_tests/pybind/controllers/pybind_controllers_test_integratedbdotcontroller
+[ 74%] Building CXX object CMakeFiles/pybind_disturbances_test_ggdisturbance.dir/tests/unit/pybind/disturbances/test_ggdisturbance.cpp.o
+[ 74%] Built target pybind_controllers_test_integratedbdotcontroller
+[ 74%] Building CXX object CMakeFiles/pybind_disturbances_test_srpdisturbance.dir/tests/unit/pybind/disturbances/test_srpdisturbance.cpp.o
+[ 74%] Linking CXX executable unit_tests/pybind/controllers/pybind_controllers_test_pdcontroller
+[ 74%] Built target pybind_controllers_test_pdcontroller
+[ 74%] Building CXX object CMakeFiles/pybind_test_satellite.dir/tests/unit/pybind/test_satellite.cpp.o
+[ 75%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_dragdisturbance
+[ 75%] Built target pybind_disturbances_test_dragdisturbance
+[ 76%] Building CXX object CMakeFiles/pybind_test_satellite_constraints.dir/tests/unit/pybind/test_satellite_constraints.cpp.o
+[ 76%] Building CXX object CMakeFiles/pybind_test_satellite_cost.dir/tests/unit/pybind/test_satellite_cost.cpp.o
+[ 77%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_srpdisturbance
+[ 77%] Built target pybind_disturbances_test_srpdisturbance
+[ 77%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_ggdisturbance
+[ 78%] Building CXX object CMakeFiles/pybind_test_satellite_cost_omega_ff.dir/tests/unit/pybind/test_satellite_cost_omega_ff.cpp.o
+[ 78%] Built target pybind_disturbances_test_ggdisturbance
+[ 78%] Building CXX object CMakeFiles/pybind_test_satellite_disturbances.dir/tests/unit/pybind/test_satellite_disturbances.cpp.o
+[ 78%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/disturbances/srpdisturbance_py.cpp.o
+[ 78%] Linking CXX executable unit_tests/pybind/pybind_test_satellite
+[ 78%] Built target pybind_test_satellite
+[ 78%] Building CXX object CMakeFiles/pybind_test_satellite_dynamics.dir/tests/unit/pybind/test_satellite_dynamics.cpp.o
+[ 78%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_constraints
+[ 78%] Built target pybind_test_satellite_constraints
+[ 78%] Linking CXX executable unit_tests/validation/validation_test_validate_boresight
+[ 78%] Built target validation_test_validate_boresight
+[ 79%] Linking CXX executable unit_tests/validation/validation_test_validate_initialstate
+[ 79%] Built target validation_test_validate_initialstate
+[ 79%] Linking CXX executable unit_tests/validation/validation_test_validate_juliantime
+[ 79%] Built target validation_test_validate_juliantime
+[ 79%] Linking CXX executable unit_tests/validation/validation_test_validate_orbitstate
+[ 80%] Built target validation_test_validate_orbitstate
+[ 80%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_cost_omega_ff
+[ 80%] Building CXX object CMakeFiles/validation_test_validate_plannersettings.dir/tests/unit/validation/test_validate_plannersettings.cpp.o
+[ 80%] Built target pybind_test_satellite_cost_omega_ff
+[ 81%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_disturbances
+[ 81%] Linking CXX executable unit_tests/validation/validation_test_validate_qgoal
+[ 81%] Built target pybind_test_satellite_disturbances
+[ 81%] Built target validation_test_validate_qgoal
+[ 81%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/satellite_py.cpp.o
+[ 82%] Building CXX object CMakeFiles/validation_test_validate_satellite.dir/tests/unit/validation/test_validate_satellite.cpp.o
+[ 83%] Building CXX object CMakeFiles/saltro_py.dir/python/validation/validate_plannersettings_py.cpp.o
+[ 84%] Linking CXX executable unit_tests/validation/validation_test_validate_plannersettings
+[ 84%] Built target validation_test_validate_plannersettings
+[ 84%] Building CXX object CMakeFiles/validation_test_validate_trajopt.dir/tests/unit/validation/test_validate_trajopt.cpp.o
+[ 84%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_dynamics
+[ 84%] Built target pybind_test_satellite_dynamics
+[ 84%] Linking CXX executable unit_tests/validation/validation_test_validate_satellite
+[ 84%] Building CXX object CMakeFiles/saltro_py.dir/python/validation/validate_satellite_py.cpp.o
+[ 84%] Built target validation_test_validate_satellite
+[ 84%] Building CXX object CMakeFiles/saltro_py.dir/python/validation/validate_trajopt_py.cpp.o
+[ 85%] Linking CXX executable unit_tests/validation/validation_test_validate_trajopt
+[ 85%] Built target validation_test_validate_trajopt
+[ 86%] Building CXX object CMakeFiles/saltro_py.dir/python/optimizer/alilqr_py.cpp.o
+[ 86%] Building CXX object CMakeFiles/saltro_py.dir/python/optimizer/trajOpt_py.cpp.o
+[ 86%] Building CXX object CMakeFiles/saltro_py.dir/python/optimizer/warm_start_py.cpp.o
+[ 87%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/controllers/integratedbdotcontroller_py.cpp.o
+[ 87%] Building CXX object CMakeFiles/saltro_py.dir/python/pybind/controllers/pdcontroller_py.cpp.o
+[ 87%] Building CXX object CMakeFiles/saltro_py.dir/saltro_generated_module.cpp.o
+[ 88%] Linking CXX shared module saltro_py.cpython-312-darwin.so
+[ 88%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_cost
+[ 88%] Built target pybind_test_satellite_cost
+[100%] Built target saltro_py

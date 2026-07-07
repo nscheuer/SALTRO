@@ -485,6 +485,11 @@ struct ILQRConfig {
  *        fails, but it runs an eigendecomposition per knot (slow) and masks
  *        model problems rather than fixing them. Default false; when false
  *        the backward pass is bitwise-identical to the unflagged code.
+ *
+ * @param use_sqrt_bp Use the square-root backward pass (ALTRO Sec. IV-A):
+ *                    propagates a Cholesky-style factor of the cost-to-go
+ *                    Hessian instead of the Hessian itself, improving
+ *                    numerical robustness when AL penalties grow large.
  */
 struct RegularizationConfig {
     double reg_init = 1e-2;
@@ -507,6 +512,7 @@ struct RegularizationConfig {
     // the existing reg+LLT. Default OFF — pure Gauss-Newton is unchanged.
     bool psd_clip_quu_ddp = false;
     bool psd_clamp_lxx = false;
+    bool use_sqrt_bp = false;
 };
 
 /**

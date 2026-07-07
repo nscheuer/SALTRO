@@ -1203,6 +1203,54 @@ def test_valid_boundary_zero_cost_weights():
 
 
 # ============================================================================
+# Square-root backward pass compatibility guards
+# (mirrors the C++ twin in test_validate_plannersettings.cpp)
+# ============================================================================
+
+def test_valid_use_sqrt_bp_alone():
+    """use_sqrt_bp on its own is a supported, valid configuration."""
+    settings = valid_settings()
+    settings.passes[0].reg.use_sqrt_bp = True
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert ok
+    assert error_msg == ""
+
+
+def test_use_sqrt_bp_with_use_dynamics_hess_rejected():
+    """The sqrt pass does not implement DDP second-order dynamics curvature."""
+    settings = valid_settings()
+    settings.passes[0].reg.use_sqrt_bp = True
+    settings.passes[0].reg.use_dynamics_hess = True
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert "square-root backward pass" in error_msg
+
+
+def test_use_sqrt_bp_with_use_constraint_hess_rejected():
+    """The sqrt pass does not implement DDP second-order constraint curvature."""
+    settings = valid_settings()
+    settings.passes[0].reg.use_sqrt_bp = True
+    settings.passes[0].reg.use_constraint_hess = True
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert not ok
+    assert "square-root backward pass" in error_msg
+
+
+def test_ddp_second_order_without_sqrt_bp_still_valid():
+    """The guard fires only on the unsupported combination; pure DDP stays valid."""
+    settings = valid_settings()
+    settings.passes[0].reg.use_sqrt_bp = False
+    settings.passes[0].reg.use_dynamics_hess = True
+    settings.passes[0].reg.use_constraint_hess = True
+    ok, error_msg = saltro_py.validatePlannerSettings(settings)
+
+    assert ok
+
+
+# ============================================================================
 # DDP second-order term knobs (G12/G13)
 # ============================================================================
 

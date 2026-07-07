@@ -2,6 +2,7 @@
 #include <saltro/math/integrators/rk4.h>
 #include <saltro/math/matrix.h>
 #include <saltro/math/mrp.h>
+#include <atomic>
 #include <iostream>
 #include <cmath>
 
@@ -94,6 +95,28 @@ bool backwardPass(
 	const std::vector<Eigen::VectorXd>& lambda_aug,
 	const std::vector<Eigen::VectorXd>& mu_aug
 ) {
+	if (settings.passes[0].reg.use_sqrt_bp) {
+		// backwardPassSqrt is Gauss-Newton only: it has no DDP second-order
+		// (true dynamics/constraint Hessian) path. validatePlannerSettings
+		// rejects the combination, but callers that skip validation (e.g. the
+		// direct backward_pass/alilqr python bindings) must not silently drop
+		// the DDP curvature — take the dense path instead and warn once.
+		const bool ddp_terms_requested = settings.passes[0].reg.use_dynamics_hess
+			|| settings.passes[0].reg.use_constraint_hess;
+		if (!ddp_terms_requested) {
+			return backwardPassSqrt(
+				satellite, X, U, R, V, B, S, rho, boresight, attitude_target,
+				settings, reg, K, d, deltaV, lambda_aug, mu_aug
+			);
+		}
+		static std::atomic<bool> sqrt_ddp_warned{false};
+		if (!sqrt_ddp_warned.exchange(true)) {
+			std::cerr << "[saltro] warning: use_sqrt_bp is set but DDP second-order terms "
+			             "(use_dynamics_hess/use_constraint_hess) are enabled; the square-root "
+			             "backward pass does not support them, falling back to the dense pass."
+			          << std::endl;
+		}
+	}
 	(void)rho;  // Suppress unused parameter warning
 	const CostConfig& cost_cfg = settings.passes[0].cost;
 	const ConstraintConfig& cnst_cfg = settings.constraints;

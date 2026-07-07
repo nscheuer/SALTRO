@@ -1,0 +1,108 @@
+[ 33%] Built target Catch2
+[ 34%] Built target Catch2WithMain
+[ 51%] Built target saltro
+[ 52%] Built target debug_generate_orbit
+[ 53%] Built target debug_satellite
+[ 53%] Built target debug_integratedbdotcontroller_mc
+[ 54%] Built target math_test_angles
+[ 54%] Built target math_test_frames
+[ 55%] Built target math_test_matrix
+[ 57%] Built target optimizer_test_backwardpass
+[ 57%] Built target math_test_mrp
+[ 57%] Built target math_test_quaternion
+[ 57%] Built target optimizer_test_alilqr
+[ 58%] Built target optimizer_test_backwardpass_al
+[ 58%] Linking CXX executable unit_tests/orbit_generation/density/orbit_generation_density_test_compute_density_harrispriester
+[ 59%] Built target optimizer_test_forwardpass_al
+[ 59%] Built target optimizer_test_forwardpass
+[ 59%] Built target optimizer_test_warm_start
+[ 59%] Building CXX object CMakeFiles/optimizer_test_tvlqr_gains.dir/tests/unit/optimizer/test_tvlqr_gains.cpp.o
+[ 60%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_dipole
+[ 60%] Linking CXX executable unit_tests/orbit_generation/eclipse/orbit_generation_eclipse_test_compute_eclipse_penumbra
+[ 60%] Linking CXX executable unit_tests/orbit_generation/eclipse/orbit_generation_eclipse_test_compute_eclipse_cylinder
+[ 61%] Built target orbit_generation_density_test_compute_density_harrispriester
+[ 62%] Built target orbit_generation_eclipse_test_compute_eclipse_penumbra
+[ 62%] Built target orbit_generation_magnetics_test_compute_magnetic_dipole
+[ 62%] Built target orbit_generation_eclipse_test_compute_eclipse_cylinder
+[ 63%] Linking CXX executable unit_tests/orbit_generation/orbits/orbit_generation_orbits_test_compute_orbit_J2_RK4
+[ 64%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_igrf8
+[ 64%] Linking CXX executable unit_tests/orbit_generation/orbits/orbit_generation_orbits_test_compute_orbit_keplerian
+[ 64%] Linking CXX executable unit_tests/orbit_generation/magnetics/orbit_generation_magnetics_test_compute_magnetic_igrf13
+[ 64%] Built target orbit_generation_orbits_test_compute_orbit_keplerian
+[ 64%] Built target orbit_generation_magnetics_test_compute_magnetic_igrf8
+[ 64%] Built target orbit_generation_orbits_test_compute_orbit_J2_RK4
+[ 64%] Built target orbit_generation_magnetics_test_compute_magnetic_igrf13
+[ 80%] Built target saltro_py
+[ 80%] Linking CXX executable unit_tests/orbit_generation/sun/orbit_generation_sun_test_compute_sun_noaa
+[ 80%] Linking CXX executable unit_tests/orbit_generation/orbit_generation_test_generate_orbit
+[ 81%] Linking CXX executable unit_tests/orbit_generation/sun/orbit_generation_sun_test_compute_sun_nrelspa
+[ 82%] Building CXX object CMakeFiles/orbit_generation_test_orbit_dispatchers.dir/tests/unit/orbit_generation/test_orbit_dispatchers.cpp.o
+[ 83%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_MTQ
+[ 83%] Built target orbit_generation_test_generate_orbit
+[ 84%] Built target orbit_generation_sun_test_compute_sun_noaa
+[ 84%] Built target orbit_generation_sun_test_compute_sun_nrelspa
+[ 84%] Built target pybind_actuators_test_MTQ
+[ 85%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_actuator
+[ 85%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_RW
+[ 85%] Linking CXX executable unit_tests/pybind/actuators/pybind_actuators_test_Magic
+[ 86%] Building CXX object CMakeFiles/pybind_controllers_test_integratedbdotcontroller.dir/tests/unit/pybind/controllers/test_integratedbdotcontroller.cpp.o
+[ 86%] Built target pybind_actuators_test_Magic
+[ 86%] Built target pybind_actuators_test_RW
+[ 86%] Built target pybind_actuators_test_actuator
+[ 86%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_geometryconfig
+[ 86%] Building CXX object CMakeFiles/pybind_disturbances_test_dragdisturbance.dir/tests/unit/pybind/disturbances/test_dragdisturbance.cpp.o
+[ 86%] Building CXX object CMakeFiles/pybind_controllers_test_pdcontroller.dir/tests/unit/pybind/controllers/test_pdcontroller.cpp.o
+[ 87%] Built target pybind_disturbances_test_geometryconfig
+[ 87%] Building CXX object CMakeFiles/pybind_disturbances_test_ggdisturbance.dir/tests/unit/pybind/disturbances/test_ggdisturbance.cpp.o
+[ 87%] Linking CXX executable unit_tests/orbit_generation/orbit_generation_test_orbit_dispatchers
+[ 87%] Built target orbit_generation_test_orbit_dispatchers
+[ 87%] Building CXX object CMakeFiles/pybind_disturbances_test_srpdisturbance.dir/tests/unit/pybind/disturbances/test_srpdisturbance.cpp.o
+[ 87%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_dragdisturbance
+[ 87%] Built target pybind_disturbances_test_dragdisturbance
+[ 88%] Building CXX object CMakeFiles/pybind_test_satellite.dir/tests/unit/pybind/test_satellite.cpp.o
+[ 89%] Linking CXX executable unit_tests/pybind/controllers/pybind_controllers_test_integratedbdotcontroller
+[ 89%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_ggdisturbance
+[ 90%] Linking CXX executable unit_tests/optimizer/optimizer_test_tvlqr_gains
+[ 90%] Built target pybind_disturbances_test_ggdisturbance
+[ 90%] Built target pybind_controllers_test_integratedbdotcontroller
+[ 90%] Built target optimizer_test_tvlqr_gains
+[ 91%] Building CXX object CMakeFiles/pybind_test_satellite_constraints.dir/tests/unit/pybind/test_satellite_constraints.cpp.o
+[ 91%] Building CXX object CMakeFiles/pybind_test_satellite_cost.dir/tests/unit/pybind/test_satellite_cost.cpp.o
+[ 92%] Linking CXX executable unit_tests/pybind/controllers/pybind_controllers_test_pdcontroller
+[ 92%] Building CXX object CMakeFiles/pybind_test_satellite_cost_omega_ff.dir/tests/unit/pybind/test_satellite_cost_omega_ff.cpp.o
+[ 92%] Built target pybind_controllers_test_pdcontroller
+[ 92%] Building CXX object CMakeFiles/pybind_test_satellite_disturbances.dir/tests/unit/pybind/test_satellite_disturbances.cpp.o
+[ 92%] Linking CXX executable unit_tests/pybind/disturbances/pybind_disturbances_test_srpdisturbance
+[ 92%] Built target pybind_disturbances_test_srpdisturbance
+[ 93%] Building CXX object CMakeFiles/pybind_test_satellite_dynamics.dir/tests/unit/pybind/test_satellite_dynamics.cpp.o
+[ 93%] Linking CXX executable unit_tests/pybind/pybind_test_satellite
+[ 93%] Built target pybind_test_satellite
+[ 93%] Linking CXX executable unit_tests/validation/validation_test_validate_boresight
+[ 94%] Built target validation_test_validate_boresight
+[ 95%] Linking CXX executable unit_tests/validation/validation_test_validate_initialstate
+[ 95%] Built target validation_test_validate_initialstate
+[ 95%] Linking CXX executable unit_tests/validation/validation_test_validate_juliantime
+[ 95%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_disturbances
+[ 95%] Built target validation_test_validate_juliantime
+[ 95%] Built target pybind_test_satellite_disturbances
+[ 95%] Linking CXX executable unit_tests/validation/validation_test_validate_orbitstate
+[ 96%] Building CXX object CMakeFiles/validation_test_validate_plannersettings.dir/tests/unit/validation/test_validate_plannersettings.cpp.o
+[ 96%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_cost_omega_ff
+[ 97%] Built target validation_test_validate_orbitstate
+[ 97%] Built target pybind_test_satellite_cost_omega_ff
+[ 97%] Linking CXX executable unit_tests/validation/validation_test_validate_qgoal
+[ 98%] Building CXX object CMakeFiles/validation_test_validate_satellite.dir/tests/unit/validation/test_validate_satellite.cpp.o
+[ 98%] Built target validation_test_validate_qgoal
+[ 98%] Building CXX object CMakeFiles/validation_test_validate_trajopt.dir/tests/unit/validation/test_validate_trajopt.cpp.o
+[ 98%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_constraints
+[ 98%] Built target pybind_test_satellite_constraints
+[ 99%] Linking CXX executable unit_tests/validation/validation_test_validate_trajopt
+[ 99%] Built target validation_test_validate_trajopt
+[100%] Linking CXX executable unit_tests/validation/validation_test_validate_plannersettings
+[100%] Built target validation_test_validate_plannersettings
+[100%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_dynamics
+[100%] Built target pybind_test_satellite_dynamics
+[100%] Linking CXX executable unit_tests/validation/validation_test_validate_satellite
+[100%] Built target validation_test_validate_satellite
+[100%] Linking CXX executable unit_tests/pybind/pybind_test_satellite_cost
+[100%] Built target pybind_test_satellite_cost
