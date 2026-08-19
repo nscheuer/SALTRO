@@ -342,3 +342,37 @@ Common Diagnosis Paths
        <p>The middle layer may be working, but AL penalty updates are not enforcing at least one active constraint quickly enough.</p>
      </article>
    </div>
+
+Harness note: wall-clock timeouts cannot interrupt the solver
+-------------------------------------------------------------
+
+.. warning::
+
+   A timeout enforced at the Python layer (``signal.SIGALRM``, ``threading.Timer``, or any
+   in-process mechanism) **cannot interrupt a running C++ solve**. Python signals fire only
+   between bytecodes; once control enters the compiled solver, the handler is queued until
+   the solve returns on its own. A pathological grind therefore overruns *silently* until the
+   internal iteration caps bind — the wall-clock backstop is inert exactly when it is needed.
+
+   Field incident (2026-08-19, IAC-1RW campaign): 18 worker processes wedged for hours inside
+   full-attitude solves on a magnetorquer-only bus; every worker's 90 s SIGALRM timeout was
+   armed and none fired. The failure was invisible from the harness — near-zero CPU progress
+   with no exception, indistinguishable from "still working" without external inspection.
+
+   Consequences for closed-loop use: a replanning architecture whose fallback hierarchy is
+   triggered by such a timeout does not have the safety property it appears to have. The
+   vehicle rides its overlap window and then falls through to reactive control with no
+   diagnostic.
+
+   Mitigations, in order of preference:
+
+   1. **Solver-internal budget** — an iteration-count budget and/or per-iteration wall-clock
+      check inside the AL/iLQR loops, returning best-so-far with a distinct status. This is
+      the only mechanism that bounds a single pathological solve.
+   2. **Process-boundary timeout** — run the solve in a separate process and kill it from
+      outside. Works, but loses the partial trajectory and costs process overhead per solve.
+   3. Iteration caps sized so worst-case wall time is acceptable — fragile, since
+      per-iteration cost varies by orders of magnitude across problems.
+
+   Signal-based timeouts remain useful only as a backstop for the Python-side portions of a
+   solve cycle (setup, propagation, post-processing) — never as the guarantee.
