@@ -43,8 +43,14 @@ nohup python mc_datagen/gen_dataset.py \
 - **Throughput**: ~0.1 s/solve → a 64-core day is tens of millions of
   core-seconds; 100k trials take well under an hour. Size `--n-trials` to
   what you want, not to the wall clock.
-- **Storage**: ~14 MB per 1000 trials (`.npz` per trial: X, U, B, R, V +
-  sampled inputs; `--save-gains` adds TVLQR K, ~2x size).
+- **Storage**: ~31 KB per trial (`.npz`: X, U, B, R, V, TVLQR K + sampled
+  inputs) → ~31 MB per 1000 trials, ~3.1 GB per 100k, ~31 GB per 1M.
+  Compression barely helps (trajectory float64 is high-entropy). `--no-gains`
+  drops K and roughly halves the size. K (input_dim x 6N tracking gains) is
+  saved by default so perturbed rollouts u = u_ref - K dz can densify the
+  dataset around each expert trajectory without re-solving. Above ~1M trials
+  the per-trial file count becomes the bottleneck before the bytes do —
+  consolidate shards if you go there.
 - **Failures**: `trajOpt` raises on non-convergence; failures are caught and
   logged per-trial in `index.jsonl` (`status: failed`), never kill the batch.
 

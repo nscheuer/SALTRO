@@ -281,7 +281,8 @@ def main():
     ap.add_argument("--outer-iters", type=int, default=30)
     ap.add_argument("--ilqr-iters", type=int, default=20)
     ap.add_argument("--cost-tol", type=float, default=1e-5)
-    ap.add_argument("--save-gains", action="store_true")
+    ap.add_argument("--no-gains", action="store_true",
+                    help="omit TVLQR K from output (K is ~half the ~31 KB/trial)")
     args = ap.parse_args()
 
     ep_lo = centuries_since_j2000(jd_from_ymd(*map(int, args.epoch_start.split("-"))))
@@ -296,7 +297,7 @@ def main():
         "angle_N": args.angle_N, "ang_vel_N": args.ang_vel_N,
         "cost_type": args.cost_type, "huber_delta": args.huber_delta,
         "outer_iters": args.outer_iters, "ilqr_iters": args.ilqr_iters,
-        "cost_tol": args.cost_tol, "save_gains": args.save_gains,
+        "cost_tol": args.cost_tol, "save_gains": not args.no_gains,
     }
 
     out = Path(args.out)
